@@ -6,9 +6,9 @@ const StyledLink = styled(Link, { className: "style" });
 
 export default function Index() {
   return (
-    <View className="flex-1 bg-[#25292e] items-center justify-center">
+    <View className="flex-1 items-center justify-center bg-[#25292e]">
       <Text className="text-white">Home screen</Text>
-      <StyledLink href="/about" className="text-white text-2xl underline">
+      <StyledLink href="/about" className="text-2xl text-white underline">
         Go to About screen
       </StyledLink>
     </View>
