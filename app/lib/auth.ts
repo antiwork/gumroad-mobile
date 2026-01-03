@@ -23,7 +23,6 @@ export interface TokenResponse {
 
 export interface AuthConfig {
   clientId: string;
-  clientSecret?: string;
 }
 
 // Get the redirect URI based on the app scheme
@@ -65,23 +64,20 @@ export async function clearTokens(): Promise<void> {
   await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
 }
 
-// Exchange authorization code for tokens
+// Exchange authorization code for tokens using PKCE
 export async function exchangeCodeForTokens(
   code: string,
   redirectUri: string,
   clientId: string,
-  clientSecret?: string,
+  codeVerifier: string,
 ): Promise<TokenResponse> {
   const params = new URLSearchParams({
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectUri,
     client_id: clientId,
+    code_verifier: codeVerifier,
   });
-
-  if (clientSecret) {
-    params.append("client_secret", clientSecret);
-  }
 
   const response = await fetch(GUMROAD_AUTH_CONFIG.tokenEndpoint, {
     method: "POST",
@@ -100,20 +96,12 @@ export async function exchangeCodeForTokens(
 }
 
 // Refresh access token using refresh token
-export async function refreshAccessToken(
-  refreshToken: string,
-  clientId: string,
-  clientSecret?: string,
-): Promise<TokenResponse> {
+export async function refreshAccessToken(refreshToken: string, clientId: string): Promise<TokenResponse> {
   const params = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
     client_id: clientId,
   });
-
-  if (clientSecret) {
-    params.append("client_secret", clientSecret);
-  }
 
   const response = await fetch(GUMROAD_AUTH_CONFIG.tokenEndpoint, {
     method: "POST",

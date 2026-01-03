@@ -12,7 +12,7 @@ import {
   refreshAccessToken,
   storeTokens,
 } from "../lib/auth";
-import { CLIENT_ID, CLIENT_SECRET } from "../lib/authSecrets";
+import { CLIENT_ID } from "../lib/authSecrets";
 
 // Enable web browser for auth session completion
 WebBrowser.maybeCompleteAuthSession();
@@ -39,13 +39,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const redirectUri = getRedirectUri();
   const discovery = getDiscovery();
 
-  // Auth request configuration
+  // Auth request configuration with PKCE
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: CLIENT_ID,
       scopes: [...GUMROAD_AUTH_CONFIG.scopes],
       redirectUri,
       responseType: AuthSession.ResponseType.Code,
+      usePKCE: true,
     },
     discovery,
   );
@@ -70,14 +71,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Handle auth response
   useEffect(() => {
     async function handleAuthResponse() {
-      if (response?.type === "success" && response.params.code) {
+      if (response?.type === "success" && response.params.code && request?.codeVerifier) {
         try {
           setIsLoading(true);
           const tokenResponse = await exchangeCodeForTokens(
             response.params.code,
             redirectUri,
             CLIENT_ID,
-            CLIENT_SECRET,
+            request.codeVerifier,
           );
 
           await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
@@ -93,7 +94,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
     handleAuthResponse();
-  }, [response, redirectUri]);
+  }, [response, redirectUri, request?.codeVerifier]);
 
   const login = useCallback(async () => {
     if (request) {
@@ -120,7 +121,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error("No refresh token available");
       }
 
-      const tokenResponse = await refreshAccessToken(storedRefreshToken, CLIENT_ID, CLIENT_SECRET);
+      const tokenResponse = await refreshAccessToken(storedRefreshToken, CLIENT_ID);
 
       await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
       setAccessToken(tokenResponse.access_token);
