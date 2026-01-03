@@ -1,0 +1,29 @@
+name: autofix.ci
+
+on:
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run eslint
+        run: npm run lint -- --fix --max-warnings 0
+
+      - name: Run prettier
+        run: npm run format
+
+      - uses: autofix-ci/action@ff86a557419858bb967097bfc916833f5647fa8c
