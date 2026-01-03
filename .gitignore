@@ -41,3 +41,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# TODO: remove
+app/lib/authSecrets.ts
