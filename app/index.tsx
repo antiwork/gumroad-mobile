@@ -8,7 +8,6 @@ const StyledLink = styled(Link, { className: "style" });
 export default function Index() {
   const { isAuthenticated, isLoading, logout, accessToken } = useAuth();
 
-  // Show loading state
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-[#0d0d0d]">
