@@ -1,0 +1,3 @@
+- Use Nativewind for styling
+- Use kebab-case for all TypeScript file names
+- Prefer defining functions with const rather than the function keyword

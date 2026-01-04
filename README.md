@@ -10,7 +10,15 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Set up environment variables
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Then edit `.env` and add your Gumroad URL and OAuth client ID. You'll need to create an `OauthApplication` with scopes `mobile_api creator_api` in your Gumroad instance.
+
+3. Start the app
 
    ```bash
    npx expo start
