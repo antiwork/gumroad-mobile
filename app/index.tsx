@@ -2,6 +2,7 @@ import { Link, Redirect } from "expo-router";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { styled } from "react-native-css";
 import { useAuth } from "../lib/auth-context";
+import { env } from "../lib/env";
 
 const StyledLink = styled(Link, { className: "style" });
 
@@ -35,8 +36,11 @@ export default function Index() {
       </View>
 
       <View className="w-full max-w-sm gap-3">
-        <StyledLink href="/about" className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-6 py-4 text-center">
-          <Text className="font-medium text-white">Go to About</Text>
+        <StyledLink
+          href={`/download/${env.EXPO_PUBLIC_PLACEHOLDER_DOWNLOAD_ID}`}
+          className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-6 py-4 text-center"
+        >
+          <Text className="font-medium text-white">Go to Download</Text>
         </StyledLink>
 
         <Pressable onPress={logout} className="items-center rounded-xl bg-[#2a2a2a] px-6 py-4 active:bg-[#3a3a3a]">
