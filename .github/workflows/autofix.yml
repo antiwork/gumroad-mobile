@@ -20,6 +20,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Run typecheck
+        run: npm run typecheck
+
       - name: Run eslint
         run: npm run lint -- --fix --max-warnings 0
 
