@@ -9,7 +9,7 @@ export default function DownloadScreen() {
 
   return (
     <View className="flex-1 bg-[#25292e]">
-      <WebView source={{ uri: url }} className="flex-1" />
+      <WebView source={{ uri: url }} className="flex-1" webviewDebuggingEnabled pullToRefreshEnabled />
     </View>
   );
 }
