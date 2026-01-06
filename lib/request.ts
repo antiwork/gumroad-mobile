@@ -23,5 +23,8 @@ export const buildApiUrl = (path: string) => {
   return url.toString();
 };
 
-export const requestAPI = async <T>(path: string, options?: RequestInit & { data?: any }) =>
-  request<T>(buildApiUrl(path), options);
+export const requestAPI = async <T>(path: string, options: RequestInit & { accessToken: string; data?: any }) =>
+  request<T>(buildApiUrl(path), {
+    ...options,
+    headers: { Authorization: `Bearer ${options?.accessToken}`, ...options?.headers },
+  });

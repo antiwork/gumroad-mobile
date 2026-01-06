@@ -1,10 +1,12 @@
-import { requestAPI } from "@/lib/request";
 import { Redirect, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Pressable, Text, View } from "react-native";
 import { useAuth } from "../lib/auth-context";
 
-interface Purchase {
+import { assertDefined } from "@/lib/assert";
+import { requestAPI } from "@/lib/request";
+import { useQuery } from "@tanstack/react-query";
+
+export interface Purchase {
   name: string;
   thumbnail_url: string | null;
   url_redirect_token: string;
@@ -17,34 +19,25 @@ interface PurchasesResponse {
   user_id: string;
 }
 
+export const usePurchases = () => {
+  const { accessToken } = useAuth();
+
+  return useQuery({
+    queryKey: ["purchases"],
+    queryFn: async () => {
+      const response = await requestAPI<PurchasesResponse>("mobile/purchases/index", {
+        accessToken: assertDefined(accessToken),
+      });
+      return response.products;
+    },
+    enabled: !!accessToken,
+  });
+};
+
 export default function Index() {
-  const { isAuthenticated, isLoading, logout, accessToken } = useAuth();
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [isLoadingPurchases, setIsLoadingPurchases] = useState(false);
+  const { isAuthenticated, isLoading, logout } = useAuth();
+  const { data: purchases = [], isLoading: isLoadingPurchases } = usePurchases();
   const router = useRouter();
-
-  useEffect(() => {
-    if (isAuthenticated && accessToken) {
-      const fetchPurchases = async () => {
-        if (!accessToken) return;
-
-        setIsLoadingPurchases(true);
-        try {
-          const response = await requestAPI<PurchasesResponse>("mobile/purchases/index", {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          });
-          setPurchases(response.products);
-        } catch (error) {
-          console.error("Failed to fetch purchases:", error);
-        } finally {
-          setIsLoadingPurchases(false);
-        }
-      };
-      fetchPurchases();
-    }
-  }, [isAuthenticated, accessToken]);
 
   if (isLoading) {
     return (
@@ -74,7 +67,7 @@ export default function Index() {
           <ActivityIndicator size="large" color="#ff90e8" />
         </View>
       ) : (
-        <FlatList
+        <FlatList<Purchase>
           data={purchases}
           keyExtractor={(item) => item.url_redirect_token}
           contentContainerStyle={{ padding: 16, gap: 12 }}
