@@ -43,10 +43,10 @@ const downloadAndShareFile = async (token: string, productFileId: string) => {
 };
 
 export default function DownloadScreen() {
-  const { id, email } = useLocalSearchParams<{ id: string; email: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/confirm?id=${id}&email=${encodeURIComponent(email)}&destination=mobile_download_page`;
+  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app`;
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     try {
