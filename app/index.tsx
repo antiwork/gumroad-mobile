@@ -19,6 +19,8 @@ export default function Index() {
 
   if (!isAuthenticated) return <Redirect href="/login" />;
 
+  const email = "reason.koan@gmail.com";
+
   return (
     <View className="flex-1 items-center justify-center bg-[#0d0d0d] px-6">
       <View className="absolute top-0 right-0 left-0 h-1 bg-[#23c55e]" />
@@ -37,7 +39,7 @@ export default function Index() {
 
       <View className="w-full max-w-sm gap-3">
         <StyledLink
-          href={`/download/${env.EXPO_PUBLIC_PLACEHOLDER_DOWNLOAD_ID}`}
+          href={`/purchase/${env.EXPO_PUBLIC_PLACEHOLDER_DOWNLOAD_ID}?email=${encodeURIComponent(email)}`}
           className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-6 py-4 text-center"
         >
           <Text className="font-medium text-white">Go to Download</Text>

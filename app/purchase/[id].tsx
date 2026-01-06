@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -28,9 +29,12 @@ const injectedJavascript = `
   };
 `;
 
-const downloadAndShareFile = async (token: string, productFileId: string): Promise<void> => {
-  const downloadUrl = `https://api.gumroad.com/mobile/url_redirects/download/${token}/${productFileId}?mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
-  const downloadedFile = await File.downloadFileAsync(downloadUrl, Paths.cache, { idempotent: true });
+const downloadAndShareFile = async (token: string, productFileId: string) => {
+  const downloadedFile = await File.downloadFileAsync(
+    buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`),
+    Paths.cache,
+    { idempotent: true },
+  );
 
   const isAvailable = await Sharing.isAvailableAsync();
   if (!isAvailable) throw new Error("Sharing is not available on this device");
@@ -39,17 +43,17 @@ const downloadAndShareFile = async (token: string, productFileId: string): Promi
 };
 
 export default function DownloadScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, email } = useLocalSearchParams<{ id: string; email: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const url = `https://gumroad.com/d/${id}?display=mobile_app`;
+  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/confirm?id=${id}&email=${encodeURIComponent(email)}&destination=mobile_download_page`;
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     try {
       const message = JSON.parse(event.nativeEvent.data) as ClickMessage;
       console.info("WebView message received:", message);
 
-      if (message.type === "click" && id) {
+      if (message.type === "click") {
         setIsDownloading(true);
         try {
           await downloadAndShareFile(id, message.payload.resourceId);
@@ -59,9 +63,11 @@ export default function DownloadScreen() {
         } finally {
           setIsDownloading(false);
         }
+      } else {
+        console.warn("Unknown message from webview:", message);
       }
     } catch (error) {
-      console.error("Failed to parse WebView message:", error);
+      console.error("Failed to parse WebView message:", error, event.nativeEvent.data);
     }
   };
 
