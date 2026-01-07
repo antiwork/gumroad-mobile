@@ -8,15 +8,9 @@ export default function RootLayout() {
     <QueryProvider>
       <AuthProvider>
         <Stack>
-        <Stack.Screen
-          name="login"
-          options={{
-            title: "Sign In",
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen name="index" options={{ title: "Home" }} />
-        <Stack.Screen name="download/[id]" options={{ title: "Download" }} />
+          <Stack.Screen name="login" options={{ title: "Sign In", headerShown: false }} />
+          <Stack.Screen name="index" options={{ title: "Home" }} />
+          <Stack.Screen name="purchase/[id]" options={{ title: "", headerBackButtonDisplayMode: "minimal" }} />
         </Stack>
       </AuthProvider>
     </QueryProvider>

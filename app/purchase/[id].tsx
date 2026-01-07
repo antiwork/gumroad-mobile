@@ -1,7 +1,8 @@
+import { usePurchases } from "@/app/index";
 import { env } from "@/lib/env";
 import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
-import { useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useState } from "react";
 import { ActivityIndicator, Alert, View } from "react-native";
@@ -45,7 +46,9 @@ const downloadAndShareFile = async (token: string, productFileId: string) => {
 export default function DownloadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
+  const { data: purchases = [] } = usePurchases();
 
+  const purchase = purchases.find((p) => p.url_redirect_token === id);
   const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app`;
 
   const handleMessage = async (event: WebViewMessageEvent) => {
@@ -73,6 +76,7 @@ export default function DownloadScreen() {
 
   return (
     <View className="flex-1 bg-[#25292e]">
+      <Stack.Screen options={{ title: purchase?.name ?? "" }} />
       <WebView
         source={{ uri: url }}
         className="flex-1"
