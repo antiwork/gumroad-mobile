@@ -11,6 +11,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ title: "Sign In", headerShown: false }} />
           <Stack.Screen name="index" options={{ title: "Home" }} />
           <Stack.Screen name="purchase/[id]" options={{ title: "", headerBackButtonDisplayMode: "minimal" }} />
+          <Stack.Screen name="pdf-viewer" options={{ title: "PDF", headerBackButtonDisplayMode: "minimal" }} />
         </Stack>
       </AuthProvider>
     </QueryProvider>
