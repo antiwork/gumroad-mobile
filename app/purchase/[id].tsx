@@ -90,7 +90,9 @@ export default function DownloadScreen() {
         className="flex-1"
         webviewDebuggingEnabled
         pullToRefreshEnabled
+        mediaPlaybackRequiresUserAction={false}
         injectedJavaScript={injectedJavascript}
+        originWhitelist={["*"]}
         onMessage={handleMessage}
       />
       {isDownloading && (
