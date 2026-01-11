@@ -25,10 +25,7 @@ export default function PdfViewerScreen() {
   const [viewMode, setViewMode] = useState<"single" | "continuous">("single");
   const [tableOfContents, setTableOfContents] = useState<TableContent[]>([]);
   const [showTocModal, setShowTocModal] = useState(false);
-
-  const toggleViewMode = () => {
-    setViewMode((prev) => (prev === "single" ? "continuous" : "single"));
-  };
+  const [showViewModeModal, setShowViewModeModal] = useState(false);
 
   const handleTocItemPress = (pageIdx: number) => {
     pdfRef.current?.setPage(pageIdx + 1); // pageIdx is 0-based, setPage expects 1-based
@@ -49,22 +46,20 @@ export default function PdfViewerScreen() {
                   <MaterialCommunityIcons name="table-of-contents" size={24} color="black" />
                 </Pressable>
               )}
-              <Pressable onPress={toggleViewMode} className="p-2">
-                <MaterialCommunityIcons
-                  name={viewMode === "single" ? "arrow-up-down" : "arrow-left-right"}
-                  size={24}
-                  color="black"
-                />
+              <Pressable onPress={() => setShowViewModeModal(true)} className="p-2">
+                <MaterialCommunityIcons name="eye-outline" size={24} color="black" />
               </Pressable>
             </View>
           ),
         }}
       />
       <Pdf
+        key={viewMode}
         ref={pdfRef}
         source={{ uri }}
         style={styles.pdf}
         trustAllCerts={false}
+        fitPolicy={0}
         enablePaging={viewMode === "single"}
         horizontal={viewMode === "single"}
         onLoadComplete={(numberOfPages, _path, _size, toc) => {
@@ -119,6 +114,65 @@ export default function PdfViewerScreen() {
           />
         </View>
       </Modal>
+
+      <Modal
+        visible={showViewModeModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowViewModeModal(false)}
+      >
+        <View className="flex-1 bg-[#1a1d21]">
+          <View className="flex-row items-center justify-between border-b border-[#3a3f47] px-4 py-4">
+            <Text className="text-xl font-bold text-white">View Mode</Text>
+            <Pressable onPress={() => setShowViewModeModal(false)} className="p-2">
+              <MaterialCommunityIcons name="close" size={24} color="white" />
+            </Pressable>
+          </View>
+          <View className="p-4">
+            <TouchableOpacity
+              onPress={() => {
+                setViewMode("single");
+                setShowViewModeModal(false);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingVertical: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: "#2a2f37",
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <MaterialCommunityIcons name="file-document-outline" size={24} color="white" />
+                <Text style={{ fontSize: 16, color: "white" }}>Single Page</Text>
+              </View>
+              {viewMode === "single" && <MaterialCommunityIcons name="check" size={24} color="#4ade80" />}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setViewMode("continuous");
+                setShowViewModeModal(false);
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingVertical: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: "#2a2f37",
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <MaterialCommunityIcons name="view-sequential-outline" size={24} color="white" />
+                <Text style={{ fontSize: 16, color: "white" }}>Continuous</Text>
+              </View>
+              {viewMode === "continuous" && <MaterialCommunityIcons name="check" size={24} color="#4ade80" />}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {totalPages > 0 && (
         <View className="absolute right-0 bottom-8 left-0 items-center">
           <View className="flex-row items-center gap-2 rounded bg-[rgba(0,0,0,0.7)] px-4 py-2">
