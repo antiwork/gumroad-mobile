@@ -1,4 +1,5 @@
 import { usePurchases } from "@/app/index";
+import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
@@ -46,9 +47,10 @@ export default function DownloadScreen() {
   const [isDownloading, setIsDownloading] = useState(false);
   const { data: purchases = [] } = usePurchases();
   const router = useRouter();
+  const { isLoading, accessToken } = useAuth();
 
   const purchase = purchases.find((p) => p.url_redirect_token === id);
-  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app`;
+  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}`;
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     try {
@@ -81,6 +83,14 @@ export default function DownloadScreen() {
       console.error("Failed to parse WebView message:", error, event.nativeEvent.data);
     }
   };
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-[#25292e]">
+        <ActivityIndicator size="large" color="#ff90e8" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-[#25292e]">
