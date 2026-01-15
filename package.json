@@ -19,6 +19,7 @@
     "@react-navigation/native": "^7.1.8",
     "@tanstack/react-query": "^5.90.16",
     "expo": "~54.0.30",
+    "expo-audio": "~1.1.1",
     "expo-auth-session": "~7.0.10",
     "expo-constants": "~18.0.12",
     "expo-crypto": "~15.0.8",

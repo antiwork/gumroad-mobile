@@ -34,16 +34,16 @@ export default function LoginScreen() {
         <Pressable
           onPress={login}
           disabled={isLoading}
-          className="items-center justify-center rounded-xl bg-[#ff90e8] px-6 py-4 active:bg-[#ff6ad5]"
+          className="items-center justify-center rounded-xl bg-black px-6 py-4 active:bg-gray-800"
           style={({ pressed }) => ({
             opacity: isLoading ? 0.6 : pressed ? 0.9 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
           {isLoading ? (
-            <ActivityIndicator color="#0d0d0d" />
+            <ActivityIndicator color="white" />
           ) : (
-            <Text className="text-lg font-semibold text-[#0d0d0d]">Sign in with Gumroad</Text>
+            <Text className="text-lg font-semibold text-white">Sign in with Gumroad</Text>
           )}
         </Pressable>
       </View>
