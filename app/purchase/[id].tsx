@@ -16,6 +16,7 @@ type ClickPayload = {
   isDownload: boolean;
   isPost: boolean;
   type?: string | null;
+  extension?: string | null;
   isPlaying?: "true" | "false" | null;
   resumeAt?: string | null;
   contentLength?: string | null;
@@ -26,8 +27,11 @@ type ClickMessage = {
   payload: ClickPayload;
 };
 
+const downloadUrl = (token: string, productFileId: string) =>
+  buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
+
 const downloadFile = (token: string, productFileId: string) =>
-  File.downloadFileAsync(buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`), Paths.cache, {
+  File.downloadFileAsync(downloadUrl(token, productFileId), Paths.cache, {
     idempotent: true,
   });
 
@@ -61,27 +65,29 @@ export default function DownloadScreen() {
         return;
       }
 
-      setIsDownloading(true);
-      const downloadedFile = await downloadFile(id, message.payload.resourceId);
-
-      if (downloadedFile.uri.endsWith(".pdf") && !message.payload.isDownload) {
+      if (message.payload.extension === "PDF" && !message.payload.isDownload) {
         router.push({
           pathname: "/pdf-viewer",
-          params: { uri: downloadedFile.uri, title: purchase?.name },
+          params: { uri: downloadUrl(id, message.payload.resourceId), title: purchase?.name },
         });
-      } else if (message.payload.type === "audio") {
+        return;
+      }
+      if (message.payload.type === "audio") {
         if (message.payload.isPlaying === "true") {
           pauseAudio();
         } else {
           playAudio(
-            downloadedFile.uri,
+            downloadUrl(id, message.payload.resourceId),
             message.payload.resourceId,
             message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
           );
         }
-      } else {
-        await shareFile(downloadedFile.uri);
+        return;
       }
+
+      setIsDownloading(true);
+      const downloadedFile = await downloadFile(id, message.payload.resourceId);
+      await shareFile(downloadedFile.uri);
     } catch (error) {
       console.error("Download failed:", error, data);
       Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");

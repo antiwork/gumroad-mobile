@@ -51,7 +51,6 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
 
   const playAudio = (uri: string, resourceId: string, resumeAt?: number) => {
     audioPlayer.replace(uri);
-    console.log("playing audio", uri, resourceId, resumeAt, currentAudioResourceIdRef.current);
     if (currentAudioResourceIdRef.current !== resourceId) {
       audioPlayer.seekTo(resumeAt ?? 0);
     }
