@@ -9,6 +9,7 @@ import { useEffect } from "react";
 
 export interface Purchase {
   name: string;
+  creator_name: string;
   thumbnail_url: string | null;
   url_redirect_token: string;
   purchase_email: string;

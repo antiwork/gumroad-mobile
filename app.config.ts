@@ -20,6 +20,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         NSAllowsArbitraryLoads: allowLocalhost,
         NSAllowsLocalNetworking: true,
       },
+      UIBackgroundModes: ["audio"],
     },
   },
   android: {
@@ -53,7 +54,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     "expo-secure-store",
     "expo-web-browser",
-    "expo-audio",
   ],
   experiments: {
     typedRoutes: true,

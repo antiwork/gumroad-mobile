@@ -1,9 +1,15 @@
 import { Stack } from "expo-router";
+import { useEffect } from "react";
+import { setupPlayer } from "../components/use-audio-player-sync";
 import { AuthProvider } from "../lib/auth-context";
 import { QueryProvider } from "../lib/query-client";
 import "./global.css";
 
 export default function RootLayout() {
+  useEffect(() => {
+    setupPlayer();
+  }, []);
+
   return (
     <QueryProvider>
       <AuthProvider>

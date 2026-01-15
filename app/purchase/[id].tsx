@@ -74,13 +74,16 @@ export default function DownloadScreen() {
       }
       if (message.payload.type === "audio") {
         if (message.payload.isPlaying === "true") {
-          pauseAudio();
+          await pauseAudio();
         } else {
-          playAudio(
-            downloadUrl(id, message.payload.resourceId),
-            message.payload.resourceId,
-            message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
-          );
+          await playAudio({
+            uri: downloadUrl(id, message.payload.resourceId),
+            resourceId: message.payload.resourceId,
+            resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
+            title: purchase?.name,
+            artist: purchase?.creator_name,
+            artwork: purchase?.thumbnail_url,
+          });
         }
         return;
       }
