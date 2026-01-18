@@ -7,7 +7,9 @@ import "./global.css";
 
 export default function RootLayout() {
   useEffect(() => {
-    setupPlayer();
+    setupPlayer().catch((error) => {
+      console.error("Failed to setup player:", error);
+    });
   }, []);
 
   return (

@@ -13,7 +13,6 @@ export const setupPlayer = async () => {
     await TrackPlayer.setupPlayer();
     await TrackPlayer.updateOptions({
       capabilities: [Capability.Play, Capability.Pause, Capability.Stop],
-      compactCapabilities: [Capability.Play, Capability.Pause],
     });
     await TrackPlayer.setRepeatMode(RepeatMode.Off);
   } catch {
