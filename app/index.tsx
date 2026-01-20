@@ -13,6 +13,7 @@ export interface Purchase {
   thumbnail_url: string | null;
   url_redirect_token: string;
   purchase_email: string;
+  purchase_id?: string;
 }
 
 interface PurchasesResponse {

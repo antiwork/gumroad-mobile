@@ -68,7 +68,14 @@ export default function DownloadScreen() {
       if (message.payload.extension === "PDF" && !message.payload.isDownload) {
         router.push({
           pathname: "/pdf-viewer",
-          params: { uri: downloadUrl(id, message.payload.resourceId), title: purchase?.name },
+          params: {
+            uri: downloadUrl(id, message.payload.resourceId),
+            title: purchase?.name,
+            urlRedirectId: id,
+            productFileId: message.payload.resourceId,
+            purchaseId: purchase?.purchase_id,
+            initialPage: message.payload.resumeAt,
+          },
         });
         return;
       }
@@ -83,6 +90,9 @@ export default function DownloadScreen() {
             title: purchase?.name,
             artist: purchase?.creator_name,
             artwork: purchase?.thumbnail_url,
+            urlRedirectId: id,
+            purchaseId: purchase?.purchase_id,
+            contentLength: message.payload.contentLength ? Number(message.payload.contentLength) : undefined,
           });
         }
         return;
