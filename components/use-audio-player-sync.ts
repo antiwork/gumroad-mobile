@@ -43,6 +43,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     });
   }, []);
 
+  // TODO: Only works when the component is mounted, need to support background playback
   const sendAudioPlayerInfo = useCallback(
     async ({ isPlaying, isEnd: forceIsEnd }: { isPlaying: boolean; isEnd?: boolean }) => {
       const currentAudio = currentAudioRef.current;
@@ -125,6 +126,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
       }
 
       if (!previousContext || previousContext.resourceId !== audio.resourceId) {
+        // TODO: Should add multiple tracks when there are multiple audio files in the purchase
         await TrackPlayer.reset();
         await TrackPlayer.add({
           id: audio.resourceId,
