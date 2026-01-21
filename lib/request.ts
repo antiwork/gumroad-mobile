@@ -1,5 +1,12 @@
 import { env } from "@/lib/env";
 
+export class UnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
 export const request = async <T>(url: string, options?: RequestInit & { data?: any }): Promise<T> => {
   const body = options?.data ? JSON.stringify(options.data) : options?.body;
   const response = await fetch(url, {
@@ -10,9 +17,12 @@ export const request = async <T>(url: string, options?: RequestInit & { data?: a
     },
     body,
   });
+  if (response.status === 401) {
+    throw new UnauthorizedError("Unauthorized");
+  }
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Request failed: ${error}`);
+    throw new Error(`Request failed: ${response.status} ${error}`);
   }
   return response.json();
 };

@@ -1,6 +1,8 @@
+import { useRefToLatest } from "@/components/use-ref-to-latest";
+import { updateMediaLocation } from "@/lib/media-location";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 
@@ -18,17 +20,40 @@ const flattenToc = (items: TableContent[], depth = 0): FlattenedTocItem[] => {
 };
 
 export default function PdfViewerScreen() {
-  const { uri, title } = useLocalSearchParams<{ uri: string; title?: string }>();
+  const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } = useLocalSearchParams<{
+    uri: string;
+    title?: string;
+    urlRedirectId?: string;
+    productFileId?: string;
+    purchaseId?: string;
+    initialPage?: string;
+  }>();
   const pdfRef = useRef<PdfRef>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(initialPage ? Number(initialPage) : 1);
+  const currentPageRef = useRefToLatest(currentPage);
   const [totalPages, setTotalPages] = useState(0);
   const [viewMode, setViewMode] = useState<"single" | "continuous">("single");
   const [tableOfContents, setTableOfContents] = useState<TableContent[]>([]);
   const [showTocModal, setShowTocModal] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
 
+  useEffect(() => {
+    return () => {
+      if (!urlRedirectId || !productFileId) return;
+
+      updateMediaLocation({
+        urlRedirectId,
+        productFileId,
+        purchaseId,
+        // We deliberately use the latest value of the ref for the latest media location
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        location: currentPageRef.current,
+      });
+    };
+  }, [urlRedirectId, productFileId, purchaseId, currentPageRef]);
+
   const handleTocItemPress = (pageIdx: number) => {
-    pdfRef.current?.setPage(pageIdx + 1); // pageIdx is 0-based, setPage expects 1-based
+    pdfRef.current?.setPage(pageIdx + 1);
     setShowTocModal(false);
   };
 
@@ -62,6 +87,7 @@ export default function PdfViewerScreen() {
         fitPolicy={0}
         enablePaging={viewMode === "single"}
         horizontal={viewMode === "single"}
+        page={initialPage ? Number(initialPage) : 1}
         onLoadComplete={(numberOfPages, _path, _size, toc) => {
           setTotalPages(numberOfPages);
           setTableOfContents(toc ?? []);

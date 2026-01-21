@@ -1,16 +1,19 @@
-import { Redirect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Image, Pressable, Text, View } from "react-native";
 import { useAuth } from "../lib/auth-context";
 
 import { assertDefined } from "@/lib/assert";
-import { requestAPI } from "@/lib/request";
+import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 export interface Purchase {
   name: string;
+  creator_name: string;
   thumbnail_url: string | null;
   url_redirect_token: string;
   purchase_email: string;
+  purchase_id?: string;
 }
 
 interface PurchasesResponse {
@@ -20,9 +23,9 @@ interface PurchasesResponse {
 }
 
 export const usePurchases = () => {
-  const { accessToken } = useAuth();
+  const { accessToken, logout } = useAuth();
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["purchases"],
     queryFn: async () => {
       const response = await requestAPI<PurchasesResponse>("mobile/purchases/index", {
@@ -32,12 +35,26 @@ export const usePurchases = () => {
     },
     enabled: !!accessToken,
   });
+
+  useEffect(() => {
+    if (!accessToken || query.error instanceof UnauthorizedError) logout();
+  }, [accessToken, query.error, logout]);
+
+  return query;
 };
 
 export default function Index() {
-  const { isAuthenticated, isLoading, logout } = useAuth();
-  const { data: purchases = [], isLoading: isLoadingPurchases } = usePurchases();
+  const { isLoading, logout } = useAuth();
+  const { data: purchases = [], isLoading: isLoadingPurchases, error } = usePurchases();
   const router = useRouter();
+
+  if (error) {
+    return (
+      <View className="flex-1 items-center justify-center bg-[#0d0d0d]">
+        <Text className="text-white">Error: {error.message}</Text>
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -46,8 +63,6 @@ export default function Index() {
       </View>
     );
   }
-
-  if (!isAuthenticated) return <Redirect href="/login" />;
 
   return (
     <View className="flex-1 bg-[#0d0d0d]">

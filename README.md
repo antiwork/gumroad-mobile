@@ -18,41 +18,33 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
    Then edit `.env` and add your Gumroad URL and OAuth client ID. You'll need to create an `OauthApplication` with scopes `mobile_api creator_api` in your Gumroad instance.
 
-3. Start the app
+3. Start the app. Run one of:
 
    ```bash
-   npx expo start
+   npm run android
+   npm run ios
    ```
 
-In the output, you'll find options to open the app in a
+## Connecting to a local Gumroad instance
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+To connect to a local Gumroad instance, you will need to
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+1. Run the following in Rails console in your Gumroad directory:
 
-## Get a fresh project
+   ```ruby
+   OauthApplication.create!(name: "Gumroad Mobile", redirect_uri: "gumroadmobile://", scopes: ["mobile_api", "creator_api"])
+   ```
 
-When you're ready, run:
+   Add the `client_id` value to your gumroad-mobile `.env` file as `EXPO_PUBLIC_GUMROAD_CLIENT_ID`.
 
-```bash
-npm run reset-project
-```
+2. Set the `ALLOW_LOCALHOST` environment variable to `true` in your `.env` file.
+3. Run `npx expo prebuild --clean` to rebuild native project directories.
+4. Add the following to your `.env` file:
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+   ```
+   EXPO_PUBLIC_GUMROAD_URL=http://localhost:3000
+   EXPO_PUBLIC_GUMROAD_API_URL=http://localhost:3000
+   EXPO_PUBLIC_MOBILE_TOKEN=your-local-mobile-token
+   ```
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+5. Start your local Gumroad with `CUSTOM_DOMAIN=localhost bin/dev` so that pages can be accessed via localhost.

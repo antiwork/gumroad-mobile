@@ -1,38 +1,37 @@
 import { usePurchases } from "@/app/index";
+import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActivityIndicator, Alert, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 
-interface ClickMessage {
-  type: "click";
-  payload: {
-    resourceId: string;
-    isDownload: boolean;
-  };
-}
+// See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
+type ClickPayload = {
+  resourceId: string;
+  isDownload: boolean;
+  isPost: boolean;
+  type?: string | null;
+  extension?: string | null;
+  isPlaying?: "true" | "false" | null;
+  resumeAt?: string | null;
+  contentLength?: string | null;
+};
 
-const injectedJavascript = `
-  window.CustomJavaScriptInterface = {
-    onFileClickedEvent: (id, isDownload) => {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: "click",
-        payload: {
-          resourceId: id,
-          isDownload: isDownload,
-        }
-      }))
-    }
-  };
-`;
+type ClickMessage = {
+  type: "click";
+  payload: ClickPayload;
+};
+
+const downloadUrl = (token: string, productFileId: string) =>
+  buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
 
 const downloadFile = (token: string, productFileId: string) =>
-  File.downloadFileAsync(buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`), Paths.cache, {
+  File.downloadFileAsync(downloadUrl(token, productFileId), Paths.cache, {
     idempotent: true,
   });
 
@@ -48,39 +47,65 @@ export default function DownloadScreen() {
   const { data: purchases = [] } = usePurchases();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
+  const webViewRef = useRef<WebView>(null);
 
   const purchase = purchases.find((p) => p.url_redirect_token === id);
-  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}`;
+  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
+
+  const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
 
   const handleMessage = async (event: WebViewMessageEvent) => {
+    const data = event.nativeEvent.data;
     try {
-      const message = JSON.parse(event.nativeEvent.data) as ClickMessage;
+      const message = JSON.parse(data) as ClickMessage;
       console.info("WebView message received:", message);
 
-      if (message.type === "click") {
-        setIsDownloading(true);
-        try {
-          const downloadedFile = await downloadFile(id, message.payload.resourceId);
-
-          if (downloadedFile.uri.endsWith(".pdf") && !message.payload.isDownload) {
-            router.push({
-              pathname: "/pdf-viewer",
-              params: { uri: downloadedFile.uri, title: purchase?.name },
-            });
-          } else {
-            await shareFile(downloadedFile.uri);
-          }
-        } catch (err) {
-          console.error("Download failed:", err);
-          Alert.alert("Download Failed", err instanceof Error ? err.message : "Failed to download file");
-        } finally {
-          setIsDownloading(false);
-        }
-      } else {
+      if (message.type !== "click") {
         console.warn("Unknown message from webview:", message);
+        return;
       }
+
+      if (message.payload.extension === "PDF" && !message.payload.isDownload) {
+        router.push({
+          pathname: "/pdf-viewer",
+          params: {
+            uri: downloadUrl(id, message.payload.resourceId),
+            title: purchase?.name,
+            urlRedirectId: id,
+            productFileId: message.payload.resourceId,
+            purchaseId: purchase?.purchase_id,
+            initialPage: message.payload.resumeAt,
+          },
+        });
+        return;
+      }
+      if (message.payload.type === "audio") {
+        if (message.payload.isPlaying === "true") {
+          await pauseAudio();
+        } else {
+          await playAudio({
+            uri: downloadUrl(id, message.payload.resourceId),
+            resourceId: message.payload.resourceId,
+            resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
+            title: purchase?.name,
+            artist: purchase?.creator_name,
+            artwork: purchase?.thumbnail_url,
+            urlRedirectId: id,
+            purchaseId: purchase?.purchase_id,
+            contentLength: message.payload.contentLength ? Number(message.payload.contentLength) : undefined,
+          });
+        }
+        return;
+      }
+
+      setIsDownloading(true);
+      const downloadedFile = await downloadFile(id, message.payload.resourceId);
+      await shareFile(downloadedFile.uri);
     } catch (error) {
-      console.error("Failed to parse WebView message:", error, event.nativeEvent.data);
+      console.error("Download failed:", error, data);
+      Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -96,12 +121,12 @@ export default function DownloadScreen() {
     <View className="flex-1 bg-[#25292e]">
       <Stack.Screen options={{ title: purchase?.name ?? "" }} />
       <WebView
+        ref={webViewRef}
         source={{ uri: url }}
         className="flex-1"
         webviewDebuggingEnabled
         pullToRefreshEnabled
         mediaPlaybackRequiresUserAction={false}
-        injectedJavaScript={injectedJavascript}
         originWhitelist={["*"]}
         onMessage={handleMessage}
       />

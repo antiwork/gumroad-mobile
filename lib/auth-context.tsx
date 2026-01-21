@@ -2,6 +2,7 @@ import { assertDefined } from "@/lib/assert";
 import { env } from "@/lib/env";
 import { request } from "@/lib/request";
 import * as AuthSession from "expo-auth-session";
+import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const router = useRouter();
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
 
@@ -105,12 +107,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await SecureStore.deleteItemAsync(accessTokenKey);
       await SecureStore.deleteItemAsync(refreshTokenKey);
       setAccessToken(null);
+      router.replace("/login");
     } catch (error) {
       console.error("Failed to logout:", error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [router]);
 
   const refreshTokenFn = useCallback(async () => {
     try {
