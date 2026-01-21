@@ -37,8 +37,8 @@ export const usePurchases = () => {
   });
 
   useEffect(() => {
-    if (query.error instanceof UnauthorizedError) logout();
-  }, [query.error, logout]);
+    if (!accessToken || query.error instanceof UnauthorizedError) logout();
+  }, [accessToken, query.error, logout]);
 
   return query;
 };
