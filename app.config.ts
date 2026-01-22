@@ -41,6 +41,30 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     "expo-router",
     [
+      "expo-font",
+      {
+        fonts: [
+          "./assets/fonts/ABCFavorit-Regular-custom.ttf",
+          "./assets/fonts/ABCFavorit-Bold-custom.ttf",
+          "./assets/fonts/ABCFavorit-RegularItalic-custom.ttf",
+          "./assets/fonts/ABCFavorit-BoldItalic-custom.ttf",
+        ],
+        android: {
+          fonts: [
+            {
+              fontFamily: "ABC Favorit",
+              fontDefinitions: [
+                { path: "./assets/fonts/ABCFavorit-Regular-custom.ttf", weight: 400 },
+                { path: "./assets/fonts/ABCFavorit-Bold-custom.ttf", weight: 700 },
+                { path: "./assets/fonts/ABCFavorit-RegularItalic-custom.ttf", weight: 400, style: "italic" },
+                { path: "./assets/fonts/ABCFavorit-BoldItalic-custom.ttf", weight: 700, style: "italic" },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    [
       "expo-splash-screen",
       {
         image: "./assets/images/splash-icon.png",

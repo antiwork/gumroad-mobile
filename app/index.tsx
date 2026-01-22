@@ -9,6 +9,7 @@ import { ActivityIndicator, FlatList, Image, Text, TouchableOpacity, View } from
 export interface Purchase {
   name: string;
   creator_name: string;
+  creator_profile_picture_url: string;
   thumbnail_url: string | null;
   url_redirect_token: string;
   purchase_email: string;
@@ -69,43 +70,48 @@ export default function Index() {
   }
 
   return (
-    <View className="flex-1 bg-body-bg">
+    <View className="flex-1 border-t border-border bg-body-bg">
       {isLoadingPurchases ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#ff90e8" />
         </View>
       ) : (
         <FlatList<Purchase>
+          numColumns={2}
           data={purchases}
           keyExtractor={(item) => item.url_redirect_token}
           contentContainerStyle={{ padding: 16, gap: 12 }}
+          columnWrapperStyle={{ gap: 12 }}
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
-              className="flex-row items-center gap-4 rounded-xl border border-border bg-background p-3"
+              className="max-w-1/2 flex-1 overflow-hidden rounded border border-border bg-background"
             >
               {item.thumbnail_url ? (
                 <Image
                   source={{ uri: item.thumbnail_url }}
-                  className="h-16 w-16 rounded-lg bg-background"
+                  className="aspect-square bg-background"
                   resizeMode="cover"
                 />
               ) : (
-                <View className="h-16 w-16 items-center justify-center rounded-lg bg-background">
+                <View className="aspect-square items-center justify-center bg-background">
                   <Text className="text-2xl">📦</Text>
                 </View>
               )}
-              <View className="flex-1">
-                <Text className="text-base font-medium text-foreground" numberOfLines={2}>
+              <View className="border-y border-border p-2">
+                <Text className="font-sans text-base text-foreground" numberOfLines={2}>
                   {item.name}
                 </Text>
               </View>
-              <Text className="text-muted">›</Text>
+              <View className="flex-row items-center gap-2 p-2">
+                <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" />
+                <Text className="font-sans text-sm text-foreground">{item.creator_name}</Text>
+              </View>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
-              <Text className="text-lg text-muted">No purchases yet</Text>
+              <Text className="font-sans text-lg text-muted">No purchases yet</Text>
             </View>
           }
         />

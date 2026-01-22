@@ -37,14 +37,16 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: background as string },
+            headerShadowVisible: false,
             headerTintColor: accent as string,
-            headerTitleStyle: { color: foreground as string },
+            headerTitleStyle: { fontFamily: "ABC Favorit", color: foreground as string },
+            headerBackButtonDisplayMode: "minimal",
           }}
         >
           <Stack.Screen name="login" options={{ title: "Sign In", headerShown: false }} />
           <Stack.Screen name="index" options={{ title: "Library", headerRight: () => <SignOutButton /> }} />
-          <Stack.Screen name="purchase/[id]" options={{ title: "", headerBackButtonDisplayMode: "minimal" }} />
-          <Stack.Screen name="pdf-viewer" options={{ title: "PDF", headerBackButtonDisplayMode: "minimal" }} />
+          <Stack.Screen name="purchase/[id]" options={{ title: "" }} />
+          <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
         </Stack>
       </AuthProvider>
     </QueryProvider>

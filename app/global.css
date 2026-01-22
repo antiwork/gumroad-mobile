@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "uniwind";
 
+@theme {
+  --font-sans: "ABC Favorit";
+}
+
 @layer theme {
   :root {
     @variant light {
