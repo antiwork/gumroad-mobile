@@ -4,7 +4,8 @@
 @layer theme {
   :root {
     @variant light {
-      --color-background: hsl(0 0% 100%);
+      --color-body-bg: #f4f4f0;
+      --color-background: #ffffff;
       --color-foreground: hsl(240 10% 3.9%);
       --color-primary: hsl(240 5.9% 10%);
       --color-primary-foreground: hsl(0 0% 98%);
@@ -12,7 +13,7 @@
       --color-secondary-foreground: hsl(240 5.9% 10%);
       --color-muted: hsl(240 4.8% 95.9%);
       --color-muted-foreground: hsl(240 3.8% 46.1%);
-      --color-accent: hsl(240 4.8% 95.9%);
+      --color-accent: #ff90e8;
       --color-accent-foreground: hsl(240 5.9% 10%);
       --color-destructive: hsl(0 84.2% 60.2%);
       --color-destructive-foreground: hsl(0 0% 98%);
@@ -22,7 +23,8 @@
     }
 
     @variant dark {
-      --color-background: hsl(240 10% 3.9%);
+      --color-body-bg: #242423;
+      --color-background: #000000;
       --color-foreground: hsl(0 0% 98%);
       --color-primary: hsl(0 0% 98%);
       --color-primary-foreground: hsl(240 5.9% 10%);
@@ -30,7 +32,7 @@
       --color-secondary-foreground: hsl(0 0% 98%);
       --color-muted: hsl(240 3.7% 15.9%);
       --color-muted-foreground: hsl(240 5% 64.9%);
-      --color-accent: hsl(240 3.7% 15.9%);
+      --color-accent: #ff90e8;
       --color-accent-foreground: hsl(0 0% 98%);
       --color-destructive: hsl(0 62.8% 30.6%);
       --color-destructive-foreground: hsl(0 0% 98%);

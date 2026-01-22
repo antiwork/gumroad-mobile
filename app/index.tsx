@@ -1,11 +1,10 @@
-import { useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Image, Text, TouchableOpacity, View } from "react-native";
-import { useAuth } from "../lib/auth-context";
-
 import { assertDefined } from "@/lib/assert";
+import { useAuth } from "@/lib/auth-context";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { useEffect } from "react";
+import { ActivityIndicator, FlatList, Image, Text, TouchableOpacity, View } from "react-native";
 
 export interface Purchase {
   name: string;
@@ -49,7 +48,7 @@ export const usePurchases = () => {
 };
 
 export default function Index() {
-  const { isLoading, logout } = useAuth();
+  const { isLoading } = useAuth();
   const { data: purchases = [], isLoading: isLoadingPurchases, error } = usePurchases();
   const router = useRouter();
 
@@ -70,16 +69,7 @@ export default function Index() {
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <View className="border-b border-border px-6 pt-14 pb-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-2xl font-bold text-foreground">Library</Text>
-          <TouchableOpacity onPress={logout} className="rounded-lg bg-primary px-4 py-2">
-            <Text className="text-sm font-medium text-destructive">Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
+    <View className="flex-1 bg-body-bg">
       {isLoadingPurchases ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#ff90e8" />
