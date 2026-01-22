@@ -14,6 +14,11 @@ export interface Purchase {
   url_redirect_token: string;
   purchase_email: string;
   purchase_id?: string;
+  file_data?: {
+    id: string;
+    filegroup?: string;
+    streaming_url?: string;
+  }[];
 }
 
 interface PurchasesResponse {
@@ -23,7 +28,7 @@ interface PurchasesResponse {
 }
 
 export const usePurchases = () => {
-  const { accessToken, logout } = useAuth();
+  const { isLoading, accessToken, logout } = useAuth();
 
   const query = useQuery({
     queryKey: ["purchases"],
@@ -37,8 +42,8 @@ export const usePurchases = () => {
   });
 
   useEffect(() => {
-    if (!accessToken || query.error instanceof UnauthorizedError) logout();
-  }, [accessToken, query.error, logout]);
+    if ((!isLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
+  }, [isLoading, accessToken, query.error, logout]);
 
   return query;
 };
