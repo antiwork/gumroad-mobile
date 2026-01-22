@@ -1,0 +1,5 @@
+- Use `npx expo install <package>` instead of `npm install <package>` to install dependencies
+- Use Nativewind for styling
+- Use kebab-case for all TypeScript file names
+- Prefer defining functions with const rather than the function keyword
+- Don't leave comments in the code

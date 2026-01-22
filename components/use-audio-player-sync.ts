@@ -9,17 +9,18 @@ type AudioPlayerInfo = {
   latestMediaLocation?: string;
 };
 
+let isPlayerSetup = false;
+
 export const setupPlayer = async () => {
-  try {
-    await TrackPlayer.setupPlayer();
-    await TrackPlayer.updateOptions({
-      capabilities: [Capability.Play, Capability.Pause, Capability.Stop],
-      notificationCapabilities: [Capability.Play, Capability.Pause],
-    });
-    await TrackPlayer.setRepeatMode(RepeatMode.Off);
-  } catch {
-    console.info("Player already initialized");
-  }
+  if (isPlayerSetup) return;
+
+  await TrackPlayer.setupPlayer();
+  await TrackPlayer.updateOptions({
+    capabilities: [Capability.Play, Capability.Pause, Capability.Stop],
+    notificationCapabilities: [Capability.Play, Capability.Pause],
+  });
+  await TrackPlayer.setRepeatMode(RepeatMode.Off);
+  isPlayerSetup = true;
 };
 
 export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) => {

@@ -65,6 +65,8 @@ export default function DownloadScreen() {
         return;
       }
 
+      const fileData = purchase?.file_data?.find((f) => f.id === message.payload.resourceId);
+
       if (message.payload.extension === "PDF" && !message.payload.isDownload) {
         router.push({
           pathname: "/pdf-viewer",
@@ -79,7 +81,7 @@ export default function DownloadScreen() {
         });
         return;
       }
-      if (message.payload.type === "audio") {
+      if (message.payload.type === "audio" && !message.payload.isDownload) {
         if (message.payload.isPlaying === "true") {
           await pauseAudio();
         } else {
@@ -95,6 +97,21 @@ export default function DownloadScreen() {
             contentLength: message.payload.contentLength ? Number(message.payload.contentLength) : undefined,
           });
         }
+        return;
+      }
+      if (fileData?.filegroup === "video" && !message.payload.isDownload) {
+        router.push({
+          pathname: "/video-player",
+          params: {
+            uri: downloadUrl(id, message.payload.resourceId),
+            streamingUrl: purchase?.file_data?.find((f) => f.id === message.payload.resourceId)?.streaming_url,
+            title: purchase?.name,
+            urlRedirectId: id,
+            productFileId: message.payload.resourceId,
+            purchaseId: purchase?.purchase_id,
+            initialPosition: message.payload.resumeAt ?? undefined,
+          },
+        });
         return;
       }
 
