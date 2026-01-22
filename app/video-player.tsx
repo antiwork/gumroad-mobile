@@ -1,4 +1,5 @@
 import { useRefToLatest } from "@/components/use-ref-to-latest";
+import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -6,10 +7,11 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
-const fetchStreamingPlaylistUrl = async (streamingUrl: string): Promise<string> =>
-  (await requestAPI<{ playlist_url: string }>(streamingUrl)).playlist_url;
+const fetchStreamingPlaylistUrl = async (streamingUrl: string, accessToken: string): Promise<string> =>
+  (await requestAPI<{ playlist_url: string }>(streamingUrl, { accessToken })).playlist_url;
 
 export default function VideoPlayerScreen() {
+  const { accessToken } = useAuth();
   const { uri, streamingUrl, title, urlRedirectId, productFileId, purchaseId, initialPosition } = useLocalSearchParams<{
     uri: string;
     streamingUrl?: string;
@@ -26,11 +28,13 @@ export default function VideoPlayerScreen() {
   const currentPositionRef = useRefToLatest(currentPosition);
 
   useEffect(() => {
+    if (!accessToken) return;
+
     const resolveVideoUrl = async () => {
       setIsLoading(true);
       try {
         if (streamingUrl) {
-          const playlistUrl = await fetchStreamingPlaylistUrl(streamingUrl);
+          const playlistUrl = await fetchStreamingPlaylistUrl(streamingUrl, accessToken);
           setVideoUrl(playlistUrl);
         } else {
           setVideoUrl(uri);
@@ -44,7 +48,7 @@ export default function VideoPlayerScreen() {
     };
 
     resolveVideoUrl();
-  }, [streamingUrl, uri]);
+  }, [accessToken, streamingUrl, uri]);
 
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
