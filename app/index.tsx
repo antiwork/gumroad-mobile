@@ -100,12 +100,12 @@ export default function Index() {
                   {item.name}
                 </Text>
               </View>
-              <Text className="text-muted-foreground">›</Text>
+              <Text className="text-muted">›</Text>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
-              <Text className="text-lg text-muted-foreground">No purchases yet</Text>
+              <Text className="text-lg text-muted">No purchases yet</Text>
             </View>
           }
         />
