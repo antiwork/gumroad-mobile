@@ -1,6 +1,7 @@
+import { Icon } from "@/components/styled";
+import { Screen } from "@/components/ui/screen";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { updateMediaLocation } from "@/lib/media-location";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -60,20 +61,20 @@ export default function PdfViewerScreen() {
   const flattenedToc = flattenToc(tableOfContents);
 
   return (
-    <View className="flex-1 bg-[#25292e]">
+    <Screen>
       <Stack.Screen
         options={{
           title: title ?? "PDF",
           headerRight: () => (
             <View className="flex-row items-center">
               {tableOfContents.length > 0 && (
-                <Pressable onPress={() => setShowTocModal(true)} className="p-2">
-                  <MaterialCommunityIcons name="table-of-contents" size={24} color="black" />
-                </Pressable>
+                <TouchableOpacity onPress={() => setShowTocModal(true)} className="p-2">
+                  <Icon name="table-of-contents" size={24} className="text-accent" />
+                </TouchableOpacity>
               )}
-              <Pressable onPress={() => setShowViewModeModal(true)} className="p-2">
-                <MaterialCommunityIcons name="eye-outline" size={24} color="black" />
-              </Pressable>
+              <TouchableOpacity onPress={() => setShowViewModeModal(true)} className="p-2">
+                <Icon name="eye-outline" size={24} className="text-accent" />
+              </TouchableOpacity>
             </View>
           ),
         }}
@@ -104,11 +105,11 @@ export default function PdfViewerScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowTocModal(false)}
       >
-        <View className="flex-1 bg-[#1a1d21]">
-          <View className="flex-row items-center justify-between border-b border-[#3a3f47] px-4 py-4">
-            <Text className="text-xl font-bold text-white">Table of Contents</Text>
+        <View className="flex-1 bg-background">
+          <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
+            <Text className="text-xl font-bold text-foreground">Table of Contents</Text>
             <Pressable onPress={() => setShowTocModal(false)} className="p-2">
-              <MaterialCommunityIcons name="close" size={24} color="white" />
+              <Icon name="close" size={24} className="text-foreground" />
             </Pressable>
           </View>
           <FlatList
@@ -116,17 +117,8 @@ export default function PdfViewerScreen() {
             keyExtractor={(item, index) => `${item.pageIdx}-${index}`}
             renderItem={({ item }) => (
               <TouchableOpacity onPress={() => handleTocItemPress(item.pageIdx)}>
-                <View
-                  // Nativewind classes don't seem to work in FlatList
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#2a2f37",
-                    paddingVertical: 12,
-                    paddingRight: 16,
-                    paddingLeft: 16 + item.depth * 16,
-                  }}
-                >
-                  <Text style={{ fontSize: 16, color: "white" }} numberOfLines={2}>
+                <View className="border-b border-border py-3 pr-4" style={{ paddingLeft: 16 + item.depth * 16 }}>
+                  <Text className="text-base text-foreground" numberOfLines={2}>
                     {item.title}
                   </Text>
                 </View>
@@ -134,7 +126,7 @@ export default function PdfViewerScreen() {
             )}
             ListEmptyComponent={
               <View className="items-center justify-center p-8">
-                <Text className="text-[#888]">No table of contents available</Text>
+                <Text className="text-muted">No table of contents available</Text>
               </View>
             }
           />
@@ -147,11 +139,11 @@ export default function PdfViewerScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowViewModeModal(false)}
       >
-        <View className="flex-1 bg-[#1a1d21]">
-          <View className="flex-row items-center justify-between border-b border-[#3a3f47] px-4 py-4">
-            <Text className="text-xl font-bold text-white">View Mode</Text>
+        <View className="flex-1 bg-background">
+          <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
+            <Text className="text-xl font-bold text-foreground">View Mode</Text>
             <Pressable onPress={() => setShowViewModeModal(false)} className="p-2">
-              <MaterialCommunityIcons name="close" size={24} color="white" />
+              <Icon name="close" size={24} className="text-foreground" />
             </Pressable>
           </View>
           <View className="p-4">
@@ -160,40 +152,26 @@ export default function PdfViewerScreen() {
                 setViewMode("single");
                 setShowViewModeModal(false);
               }}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingVertical: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: "#2a2f37",
-              }}
+              className="flex-row items-center justify-between border-b border-border py-4"
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                <MaterialCommunityIcons name="file-document-outline" size={24} color="white" />
-                <Text style={{ fontSize: 16, color: "white" }}>Single Page</Text>
+              <View className="flex-row items-center gap-3">
+                <Icon name="file-document-outline" size={24} className="text-foreground" />
+                <Text className="text-base text-foreground">Single Page</Text>
               </View>
-              {viewMode === "single" && <MaterialCommunityIcons name="check" size={24} color="#4ade80" />}
+              {viewMode === "single" && <Icon name="check" size={24} className="text-accent" />}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
                 setViewMode("continuous");
                 setShowViewModeModal(false);
               }}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingVertical: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: "#2a2f37",
-              }}
+              className="flex-row items-center justify-between border-b border-border py-4"
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                <MaterialCommunityIcons name="view-sequential-outline" size={24} color="white" />
-                <Text style={{ fontSize: 16, color: "white" }}>Continuous</Text>
+              <View className="flex-row items-center gap-3">
+                <Icon name="view-sequential-outline" size={24} className="text-foreground" />
+                <Text className="text-base text-foreground">Continuous</Text>
               </View>
-              {viewMode === "continuous" && <MaterialCommunityIcons name="check" size={24} color="#4ade80" />}
+              {viewMode === "continuous" && <Icon name="check" size={24} className="text-accent" />}
             </TouchableOpacity>
           </View>
         </View>
@@ -201,14 +179,14 @@ export default function PdfViewerScreen() {
 
       {totalPages > 0 && (
         <View className="absolute right-0 bottom-8 left-0 items-center">
-          <View className="flex-row items-center gap-2 rounded bg-[rgba(0,0,0,0.7)] px-4 py-2">
-            <Text className="text-lg font-semibold tracking-wide text-white">
+          <View className="flex-row items-center gap-2 rounded bg-background/70 px-4 py-2">
+            <Text className="text-lg font-semibold tracking-wide text-foreground">
               {currentPage} / {totalPages}
             </Text>
           </View>
         </View>
       )}
-    </View>
+    </Screen>
   );
 }
 

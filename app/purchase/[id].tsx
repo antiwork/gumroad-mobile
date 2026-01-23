@@ -1,4 +1,6 @@
 import { usePurchases } from "@/app/index";
+import { StyledWebView } from "@/components/styled";
+import { Screen } from "@/components/ui/screen";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
@@ -8,7 +10,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useRef, useState } from "react";
 import { ActivityIndicator, Alert, View } from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
 // See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
 type ClickPayload = {
@@ -47,7 +49,7 @@ export default function DownloadScreen() {
   const { data: purchases = [] } = usePurchases();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<BaseWebView>(null);
 
   const purchase = purchases.find((p) => p.url_redirect_token === id);
   const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
@@ -128,19 +130,19 @@ export default function DownloadScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#25292e]">
+      <View className="flex-1 items-center justify-center bg-body-bg">
         <ActivityIndicator size="large" color="#ff90e8" />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-[#25292e]">
+    <Screen>
       <Stack.Screen options={{ title: purchase?.name ?? "" }} />
-      <WebView
+      <StyledWebView
         ref={webViewRef}
         source={{ uri: url }}
-        className="flex-1"
+        className="flex-1 bg-transparent"
         webviewDebuggingEnabled
         pullToRefreshEnabled
         mediaPlaybackRequiresUserAction={false}
@@ -152,6 +154,6 @@ export default function DownloadScreen() {
           <ActivityIndicator size="large" color="#ff90e8" />
         </View>
       )}
-    </View>
+    </Screen>
   );
 }

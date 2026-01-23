@@ -1,3 +1,4 @@
+import { Screen } from "@/components/ui/screen";
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
@@ -70,7 +71,7 @@ export default function Index() {
   }
 
   return (
-    <View className="flex-1 border-t border-border bg-body-bg">
+    <Screen>
       {isLoadingPurchases ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#ff90e8" />
@@ -116,6 +117,6 @@ export default function Index() {
           }
         />
       )}
-    </View>
+    </Screen>
   );
 }
