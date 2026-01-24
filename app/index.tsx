@@ -86,33 +86,33 @@ export default function Index() {
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
-              className="max-w-1/2 flex-1 overflow-hidden rounded border border-border bg-background"
+              className="border-border bg-background max-w-1/2 flex-1 overflow-hidden rounded border"
             >
               {item.thumbnail_url ? (
                 <Image
                   source={{ uri: item.thumbnail_url }}
-                  className="aspect-square bg-background"
+                  className="bg-background aspect-square"
                   resizeMode="cover"
                 />
               ) : (
-                <View className="aspect-square items-center justify-center bg-background">
+                <View className="bg-background aspect-square items-center justify-center">
                   <Text className="text-2xl">📦</Text>
                 </View>
               )}
-              <View className="border-y border-border p-2">
-                <Text className="font-sans text-base text-foreground" numberOfLines={2}>
+              <View className="border-border border-y p-2">
+                <Text className="text-foreground font-sans text-base" numberOfLines={2}>
                   {item.name}
                 </Text>
               </View>
               <View className="flex-row items-center gap-2 p-2">
                 <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" />
-                <Text className="font-sans text-sm text-foreground">{item.creator_name}</Text>
+                <Text className="text-foreground font-sans text-sm">{item.creator_name}</Text>
               </View>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
-              <Text className="font-sans text-lg text-muted">No purchases yet</Text>
+              <Text className="text-muted font-sans text-lg">No purchases yet</Text>
             </View>
           }
         />
