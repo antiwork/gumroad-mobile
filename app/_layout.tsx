@@ -1,4 +1,4 @@
-import { Icon } from "@/components/styled";
+import { SolidIcon } from "@/components/icon";
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { TouchableOpacity } from "react-native";
@@ -13,7 +13,7 @@ const SignOutButton = () => {
   // TODO: sheet with delete account prompt as well as logout
   return (
     <TouchableOpacity onPress={logout}>
-      <Icon name="cog" size={24} className="text-foreground" />
+      <SolidIcon name="cog" size={24} className="text-foreground" />
     </TouchableOpacity>
   );
 };

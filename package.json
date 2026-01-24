@@ -10,7 +10,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate-icons": "npx tsx scripts/generate-boxicons.ts",
+    "postinstall": "npm run generate-icons"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -18,6 +20,7 @@
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
     "@tanstack/react-query": "^5.90.16",
+    "boxicons": "^2.1.4",
     "clsx": "^2.1.1",
     "expo": "~54.0.30",
     "expo-auth-session": "~7.0.10",

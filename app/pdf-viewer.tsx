@@ -1,4 +1,4 @@
-import { Icon } from "@/components/styled";
+import { LineIcon, SolidIcon } from "@/components/icon";
 import { Screen } from "@/components/ui/screen";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { updateMediaLocation } from "@/lib/media-location";
@@ -69,11 +69,15 @@ export default function PdfViewerScreen() {
             <View className="flex-row items-center">
               {tableOfContents.length > 0 && (
                 <TouchableOpacity onPress={() => setShowTocModal(true)} className="p-2">
-                  <Icon name="table-of-contents" size={24} className="text-accent" />
+                  <SolidIcon name="book-content" size={24} className="text-accent" />
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => setShowViewModeModal(true)} className="p-2">
-                <Icon name="eye-outline" size={24} className="text-accent" />
+                {viewMode === "continuous" ? (
+                  <LineIcon name="move-vertical" size={24} className="text-accent" />
+                ) : (
+                  <SolidIcon name="carousel" size={24} className="text-accent" />
+                )}
               </TouchableOpacity>
             </View>
           ),
@@ -109,7 +113,7 @@ export default function PdfViewerScreen() {
           <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
             <Text className="text-xl font-bold text-foreground">Table of Contents</Text>
             <Pressable onPress={() => setShowTocModal(false)} className="p-2">
-              <Icon name="close" size={24} className="text-foreground" />
+              <LineIcon name="x" size={24} className="text-foreground" />
             </Pressable>
           </View>
           <FlatList
@@ -143,7 +147,7 @@ export default function PdfViewerScreen() {
           <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
             <Text className="text-xl font-bold text-foreground">View Mode</Text>
             <Pressable onPress={() => setShowViewModeModal(false)} className="p-2">
-              <Icon name="close" size={24} className="text-foreground" />
+              <LineIcon name="x" size={24} className="text-foreground" />
             </Pressable>
           </View>
           <View className="p-4">
@@ -155,10 +159,10 @@ export default function PdfViewerScreen() {
               className="flex-row items-center justify-between border-b border-border py-4"
             >
               <View className="flex-row items-center gap-3">
-                <Icon name="file-document-outline" size={24} className="text-foreground" />
+                <SolidIcon name="carousel" size={24} className="text-foreground" />
                 <Text className="text-base text-foreground">Single Page</Text>
               </View>
-              {viewMode === "single" && <Icon name="check" size={24} className="text-accent" />}
+              {viewMode === "single" && <LineIcon name="check" size={24} className="text-accent" />}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
@@ -168,10 +172,10 @@ export default function PdfViewerScreen() {
               className="flex-row items-center justify-between border-b border-border py-4"
             >
               <View className="flex-row items-center gap-3">
-                <Icon name="view-sequential-outline" size={24} className="text-foreground" />
+                <LineIcon name="move-vertical" size={24} className="text-foreground" />
                 <Text className="text-base text-foreground">Continuous</Text>
               </View>
-              {viewMode === "continuous" && <Icon name="check" size={24} className="text-accent" />}
+              {viewMode === "continuous" && <LineIcon name="check" size={24} className="text-accent" />}
             </TouchableOpacity>
           </View>
         </View>
