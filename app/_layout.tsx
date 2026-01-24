@@ -1,4 +1,5 @@
 import { SolidIcon } from "@/components/icon";
+import { PortalHost } from "@rn-primitives/portal";
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { TouchableOpacity } from "react-native";
@@ -50,6 +51,7 @@ export default function RootLayout() {
             <Stack.Screen name="purchase/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
           </Stack>
+          <PortalHost />
         </AuthProvider>
       </QueryProvider>
     </GestureHandlerRootView>

@@ -19,8 +19,14 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
+    "@rn-primitives/checkbox": "^1.2.0",
+    "@rn-primitives/label": "^1.2.0",
+    "@rn-primitives/radio-group": "^1.2.0",
+    "@rn-primitives/select": "^1.2.0",
+    "@rn-primitives/slot": "^1.2.0",
     "@tanstack/react-query": "^5.90.16",
     "boxicons": "^2.1.4",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "expo": "~54.0.30",
     "expo-auth-session": "~7.0.10",
@@ -57,6 +63,7 @@
     "react-native-webview": "13.15.0",
     "react-native-worklets": "0.5.1",
     "tailwind-merge": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
     "uniwind": "^1.2.4"
   },
   "devDependencies": {

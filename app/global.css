@@ -17,6 +17,16 @@
   --color-destructive-foreground: #ffffff;
   --color-border: #000000;
 
+  --color-card: var(--color-background);
+  --color-card-foreground: var(--color-foreground);
+  --color-popover: var(--color-background);
+  --color-popover-foreground: var(--color-foreground);
+  --color-secondary: var(--color-primary);
+  --color-secondary-foreground: var(--color-primary-foreground);
+  --color-muted-foreground: var(--color-muted);
+  --color-input: var(--color-border);
+  --color-ring: var(--color-accent);
+
   --font-sans: "ABC Favorit";
 }
 

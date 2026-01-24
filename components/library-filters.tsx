@@ -1,10 +1,15 @@
 import { LineIcon } from "@/components/icon";
-import { CreatorCount, SortOption } from "@/lib/use-library-filters";
+import { CreatorCount, SortOption } from "@/components/use-library-filters";
 import { useState } from "react";
-import { FlatList, Pressable, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { FlatList, Platform, TextInput, TouchableOpacity, View } from "react-native";
 import { Drawer } from "react-native-drawer-layout";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
+import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
+import { Label } from "./ui/label";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Text } from "./ui/text";
 
 export interface LibraryFiltersProps {
   searchText: string;
@@ -51,91 +56,86 @@ export const LibraryFilters = ({
       onClose={() => setDrawerOpen(false)}
       drawerPosition="right"
       drawerType="front"
-      drawerStyle={{ width: 320, backgroundColor }}
+      drawerStyle={{ width: 240, backgroundColor }}
       renderDrawerContent={() => (
-        <View className="flex-1 p-4" style={{ paddingBottom: insets.bottom }}>
-          <View className="mb-4 flex-row items-center justify-between">
+        <View className="flex-1 border-l border-border" style={{ paddingBottom: insets.bottom }}>
+          <View className="flex-row items-center justify-between border-b border-border p-4">
             <Text className="font-sans text-xl text-foreground">Filters</Text>
+            {hasActiveFilters && (
+              <Button size="sm" variant="outline">
+                <Text>Clear</Text>
+              </Button>
+            )}
           </View>
 
-          <FlatList
-            data={creatorCounts}
-            keyExtractor={(item) => item.name}
-            ListHeaderComponent={
-              <>
-                <View className="border-b border-border px-4 py-3">
-                  <Text className="font-sans text-sm font-semibold tracking-wide text-muted uppercase">Sort by</Text>
-                </View>
-
-                <Pressable
-                  onPress={() => setSortBy("content_updated_at")}
-                  className="flex-row items-center justify-between border-b border-border px-4 py-4"
+          <View className="border-b border-border p-4">
+            <RadioGroup value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+              <View className="flex flex-row items-center gap-3">
+                <RadioGroupItem value="content_updated_at" id="content_updated_at" />
+                <Label
+                  htmlFor="content_updated_at"
+                  onPress={Platform.select({ native: () => setSortBy("content_updated_at") })}
                 >
-                  <Text className="font-sans text-base text-foreground">Recently Updated</Text>
-                  {sortBy === "content_updated_at" && <LineIcon name="check" size={24} className="text-accent" />}
-                </Pressable>
+                  Recently updated
+                </Label>
+              </View>
+              <View className="flex flex-row items-center gap-3">
+                <RadioGroupItem value="purchased_at" id="purchased_at" />
+                <Label htmlFor="purchased_at" onPress={Platform.select({ native: () => setSortBy("purchased_at") })}>
+                  Purchase date
+                </Label>
+              </View>
+            </RadioGroup>
+          </View>
 
-                <Pressable
-                  onPress={() => setSortBy("purchased_at")}
-                  className="flex-row items-center justify-between border-b border-border px-4 py-4"
-                >
-                  <Text className="font-sans text-base text-foreground">Purchase Date</Text>
-                  {sortBy === "purchased_at" && <LineIcon name="check" size={24} className="text-accent" />}
-                </Pressable>
-
-                <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
-                  <Text className="font-sans text-sm font-semibold tracking-wide text-muted uppercase">Creators</Text>
-                  {hasActiveFilters && (
-                    <Pressable onPress={handleClearFilters}>
-                      <Text className="font-sans text-sm text-accent">Clear</Text>
-                    </Pressable>
-                  )}
+          <View className="flex-1 border-b border-border px-4 py-3">
+            <FlatList
+              data={creatorCounts}
+              keyExtractor={(item) => item.name}
+              ListHeaderComponent={
+                <View className="flex flex-row items-center gap-3 py-1">
+                  <Checkbox
+                    id="allCreators"
+                    checked={selectedCreators.size === 0}
+                    onCheckedChange={handleSelectAllCreators}
+                  />
+                  <Label onPress={Platform.select({ native: handleSelectAllCreators })} htmlFor="allCreators">
+                    All creators
+                  </Label>
                 </View>
-
-                <Pressable
-                  onPress={handleSelectAllCreators}
-                  className="flex-row items-center justify-between border-b border-border px-4 py-4"
-                >
-                  <Text className="font-sans text-base text-foreground">All Creators</Text>
-                  {selectedCreators.size === 0 && <LineIcon name="check" size={24} className="text-accent" />}
-                </Pressable>
-              </>
-            }
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => handleCreatorToggle(item.name)}
-                className="flex-row items-center justify-between border-b border-border px-4 py-4"
-              >
-                <View className="flex-1 flex-row items-center gap-2">
-                  <Text className="flex-1 font-sans text-base text-foreground" numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text className="font-sans text-sm text-muted">{item.count}</Text>
-                </View>
-                {selectedCreators.has(item.name) && <LineIcon name="check" size={24} className="ml-2 text-accent" />}
-              </Pressable>
-            )}
-            ListFooterComponent={
-              hasArchivedProducts ? (
-                <>
-                  <View className="border-b border-border px-4 py-3">
-                    <Text className="font-sans text-sm font-semibold tracking-wide text-muted uppercase">Archived</Text>
-                  </View>
-                  <Pressable
-                    onPress={handleToggleArchived}
-                    className="flex-row items-center justify-between border-b border-border px-4 py-4"
+              }
+              renderItem={({ item }) => (
+                <View className="flex flex-row items-center gap-3 py-1">
+                  <Checkbox
+                    id={item.username}
+                    checked={selectedCreators.has(item.username)}
+                    onCheckedChange={() => handleCreatorToggle(item.username)}
+                  />
+                  <Label
+                    onPress={Platform.select({ native: () => handleCreatorToggle(item.username) })}
+                    htmlFor={item.username}
                   >
-                    <Text className="font-sans text-base text-foreground">Show archived only</Text>
-                    {showArchivedOnly && <LineIcon name="check" size={24} className="text-accent" />}
-                  </Pressable>
-                </>
-              ) : null
-            }
-          />
+                    {item.name} ({item.count})
+                  </Label>
+                </View>
+              )}
+            />
+          </View>
 
-          <TouchableOpacity onPress={() => setDrawerOpen(false)} className="items-center rounded bg-primary px-4 py-3">
-            <Text className="text-primary-foreground">Done</Text>
-          </TouchableOpacity>
+          {hasArchivedProducts ? (
+            <View className="border-b border-border px-4 py-3">
+              <Checkbox id="archived" checked={showArchivedOnly} onCheckedChange={handleToggleArchived} />
+              <Label onPress={Platform.select({ native: handleToggleArchived })} htmlFor="archived">
+                Show archived only
+              </Label>
+            </View>
+          ) : null}
+
+          <View className="px-4 pt-4">
+            <Button onPress={() => setDrawerOpen(false)}>
+              <Text>Done</Text>
+            </Button>
+          </View>
         </View>
       )}
     >

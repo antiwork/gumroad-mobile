@@ -11,6 +11,7 @@ export interface LibraryFiltersState {
 }
 
 export interface CreatorCount {
+  username: string;
   name: string;
   count: number;
 }
@@ -45,28 +46,29 @@ export const useLibraryFilters = (purchases: Purchase[]): UseLibraryFiltersRetur
       ? purchases.filter((p) => p.is_archived)
       : purchases.filter((p) => !p.is_archived);
 
-    const counts = new Map<string, number>();
+    const counts = new Map<string, { name: string; count: number }>();
     for (const purchase of basePurchases) {
-      counts.set(purchase.creator_name, (counts.get(purchase.creator_name) ?? 0) + 1);
+      counts.set(purchase.creator_username, {
+        name: purchase.creator_name,
+        count: (counts.get(purchase.creator_name)?.count ?? 0) + 1,
+      });
     }
 
     return Array.from(counts.entries())
       .sort((a, b) => {
-        if (b[1] !== a[1]) return b[1] - a[1];
-        return a[0].localeCompare(b[0]);
+        if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+        return a[1].name.localeCompare(b[1].name);
       })
-      .map(([name, count]) => ({ name, count }));
+      .map(([username, { name, count }]) => ({ username, name, count }));
   }, [purchases, showArchivedOnly]);
 
   const filteredPurchases = useMemo(() => {
-    let result = showArchivedOnly
-      ? purchases.filter((p) => p.is_archived)
-      : purchases.filter((p) => !p.is_archived);
+    let result = showArchivedOnly ? purchases.filter((p) => p.is_archived) : purchases.filter((p) => !p.is_archived);
 
     if (searchText.trim()) {
       const search = searchText.toLowerCase();
       result = result.filter(
-        (p) => p.name.toLowerCase().includes(search) || p.creator_name.toLowerCase().includes(search)
+        (p) => p.name.toLowerCase().includes(search) || p.creator_name.toLowerCase().includes(search),
       );
     }
 

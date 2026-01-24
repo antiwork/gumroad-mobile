@@ -1,9 +1,9 @@
 import { LibraryFilters } from "@/components/library-filters";
 import { Screen } from "@/components/ui/screen";
+import { useLibraryFilters } from "@/components/use-library-filters";
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
-import { useLibraryFilters } from "@/lib/use-library-filters";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
@@ -13,6 +13,7 @@ import { useCSSVariable } from "uniwind";
 export interface Purchase {
   name: string;
   creator_name: string;
+  creator_username: string;
   creator_profile_picture_url: string;
   thumbnail_url: string | null;
   url_redirect_token: string;
