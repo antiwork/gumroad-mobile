@@ -24,13 +24,13 @@ export default function LoginScreen() {
   if (isAuthenticated) return <Redirect href="/" />;
 
   return (
-    <View className="bg-background flex-1 items-center justify-center gap-12 px-6">
+    <View className="flex-1 items-center justify-center gap-12 bg-background px-6">
       <StyledImage source={theme === "dark" ? logoDark : logoLight} className="aspect-158/22 w-50" />
 
       <TouchableOpacity
         onPress={login}
         disabled={isLoading}
-        className="bg-accent items-center justify-center rounded px-6 py-4"
+        className="items-center justify-center rounded bg-accent px-6 py-4"
       >
         {isLoading ? (
           <ActivityIndicator className="text-accent-foreground" />

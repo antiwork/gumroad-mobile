@@ -4,6 +4,19 @@
 @source "../components";
 
 @theme {
+  /* Keep in sync with the `@variant light` block below. prettier-plugin-tailwindcss only reads the variables here, but Uniwind expects them to be declared per theme. */
+  --color-body-bg: #f4f4f0;
+  --color-background: #ffffff;
+  --color-foreground: #000000;
+  --color-primary: #000000;
+  --color-primary-foreground: #ffffff;
+  --color-muted: #8a8a8a;
+  --color-accent: #ff90e8;
+  --color-accent-foreground: #000000;
+  --color-destructive: #dc341e;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #000000;
+
   --font-sans: "ABC Favorit";
 }
 

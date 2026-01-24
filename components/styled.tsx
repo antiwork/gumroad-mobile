@@ -11,5 +11,5 @@ export const StyledImage = withUniwind(Image);
 export const StyledWebView = withUniwind(WebView);
 
 export const StyledText = (props: TextProps) => (
-  <Text {...props} className={cn("text-foreground font-sans text-base", props.className)} />
+  <Text {...props} className={cn("font-sans text-base text-foreground", props.className)} />
 );

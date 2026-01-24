@@ -109,9 +109,9 @@ export default function PdfViewerScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowTocModal(false)}
       >
-        <View className="bg-background flex-1">
-          <View className="border-border flex-row items-center justify-between border-b px-4 py-4">
-            <Text className="text-foreground text-xl font-bold">Table of Contents</Text>
+        <View className="flex-1 bg-background">
+          <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
+            <Text className="text-xl font-bold text-foreground">Table of Contents</Text>
             <Pressable onPress={() => setShowTocModal(false)} className="p-2">
               <LineIcon name="x" size={24} className="text-foreground" />
             </Pressable>
@@ -121,8 +121,8 @@ export default function PdfViewerScreen() {
             keyExtractor={(item, index) => `${item.pageIdx}-${index}`}
             renderItem={({ item }) => (
               <TouchableOpacity onPress={() => handleTocItemPress(item.pageIdx)}>
-                <View className="border-border border-b py-3 pr-4" style={{ paddingLeft: 16 + item.depth * 16 }}>
-                  <Text className="text-foreground text-base" numberOfLines={2}>
+                <View className="border-b border-border py-3 pr-4" style={{ paddingLeft: 16 + item.depth * 16 }}>
+                  <Text className="text-base text-foreground" numberOfLines={2}>
                     {item.title}
                   </Text>
                 </View>
@@ -143,9 +143,9 @@ export default function PdfViewerScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowViewModeModal(false)}
       >
-        <View className="bg-background flex-1">
-          <View className="border-border flex-row items-center justify-between border-b px-4 py-4">
-            <Text className="text-foreground text-xl font-bold">View Mode</Text>
+        <View className="flex-1 bg-background">
+          <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
+            <Text className="text-xl font-bold text-foreground">View Mode</Text>
             <Pressable onPress={() => setShowViewModeModal(false)} className="p-2">
               <LineIcon name="x" size={24} className="text-foreground" />
             </Pressable>
@@ -156,11 +156,11 @@ export default function PdfViewerScreen() {
                 setViewMode("single");
                 setShowViewModeModal(false);
               }}
-              className="border-border flex-row items-center justify-between border-b py-4"
+              className="flex-row items-center justify-between border-b border-border py-4"
             >
               <View className="flex-row items-center gap-3">
                 <SolidIcon name="carousel" size={24} className="text-foreground" />
-                <Text className="text-foreground text-base">Single Page</Text>
+                <Text className="text-base text-foreground">Single Page</Text>
               </View>
               {viewMode === "single" && <LineIcon name="check" size={24} className="text-accent" />}
             </TouchableOpacity>
@@ -169,11 +169,11 @@ export default function PdfViewerScreen() {
                 setViewMode("continuous");
                 setShowViewModeModal(false);
               }}
-              className="border-border flex-row items-center justify-between border-b py-4"
+              className="flex-row items-center justify-between border-b border-border py-4"
             >
               <View className="flex-row items-center gap-3">
                 <LineIcon name="move-vertical" size={24} className="text-foreground" />
-                <Text className="text-foreground text-base">Continuous</Text>
+                <Text className="text-base text-foreground">Continuous</Text>
               </View>
               {viewMode === "continuous" && <LineIcon name="check" size={24} className="text-accent" />}
             </TouchableOpacity>
@@ -183,8 +183,8 @@ export default function PdfViewerScreen() {
 
       {totalPages > 0 && (
         <View className="absolute right-0 bottom-8 left-0 items-center">
-          <View className="bg-background/70 flex-row items-center gap-2 rounded px-4 py-2">
-            <Text className="text-foreground text-lg font-semibold tracking-wide">
+          <View className="flex-row items-center gap-2 rounded bg-background/70 px-4 py-2">
+            <Text className="text-lg font-semibold tracking-wide text-foreground">
               {currentPage} / {totalPages}
             </Text>
           </View>

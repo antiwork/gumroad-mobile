@@ -130,7 +130,7 @@ export default function DownloadScreen() {
 
   if (isLoading) {
     return (
-      <View className="bg-body-bg flex-1 items-center justify-center">
+      <View className="flex-1 items-center justify-center bg-body-bg">
         <ActivityIndicator size="large" color="#ff90e8" />
       </View>
     );
