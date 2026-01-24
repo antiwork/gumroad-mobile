@@ -1,7 +1,9 @@
 import { SolidIcon } from "@/components/icon";
+import { RightSheetProvider } from "@/components/right-sheet-portal";
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { TouchableOpacity } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useCSSVariable } from "uniwind";
 import { setupPlayer } from "../components/use-audio-player-sync";
 import { AuthProvider, useAuth } from "../lib/auth-context";
@@ -32,23 +34,27 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryProvider>
-      <AuthProvider>
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: background as string },
-            headerShadowVisible: false,
-            headerTintColor: accent as string,
-            headerTitleStyle: { fontFamily: "ABC Favorit", color: foreground as string },
-            headerBackButtonDisplayMode: "minimal",
-          }}
-        >
-          <Stack.Screen name="login" options={{ title: "Sign In", headerShown: false }} />
-          <Stack.Screen name="index" options={{ title: "Library", headerRight: () => <SignOutButton /> }} />
-          <Stack.Screen name="purchase/[id]" options={{ title: "" }} />
-          <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
-        </Stack>
-      </AuthProvider>
-    </QueryProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryProvider>
+        <AuthProvider>
+          <RightSheetProvider>
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: background as string },
+                headerShadowVisible: false,
+                headerTintColor: accent as string,
+                headerTitleStyle: { fontFamily: "ABC Favorit", color: foreground as string },
+                headerBackButtonDisplayMode: "minimal",
+              }}
+            >
+              <Stack.Screen name="login" options={{ title: "Sign In", headerShown: false }} />
+              <Stack.Screen name="index" options={{ title: "Library", headerRight: () => <SignOutButton /> }} />
+              <Stack.Screen name="purchase/[id]" options={{ title: "" }} />
+              <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
+            </Stack>
+          </RightSheetProvider>
+        </AuthProvider>
+      </QueryProvider>
+    </GestureHandlerRootView>
   );
 }
