@@ -62,7 +62,7 @@ export const LibraryFilters = ({
           <View className="flex-row items-center justify-between border-b border-border p-4">
             <Text className="font-sans text-xl text-foreground">Filters</Text>
             {hasActiveFilters && (
-              <Button size="sm" variant="outline">
+              <Button size="sm" variant="outline" onPress={handleClearFilters}>
                 <Text>Clear</Text>
               </Button>
             )}
@@ -123,7 +123,7 @@ export const LibraryFilters = ({
           </View>
 
           {hasArchivedProducts ? (
-            <View className="border-b border-border px-4 py-3">
+            <View className="flex-row items-center gap-3 border-b border-border px-4 py-3">
               <Checkbox id="archived" checked={showArchivedOnly} onCheckedChange={handleToggleArchived} />
               <Label onPress={Platform.select({ native: handleToggleArchived })} htmlFor="archived">
                 Show archived only
