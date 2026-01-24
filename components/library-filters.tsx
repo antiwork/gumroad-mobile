@@ -1,7 +1,7 @@
-import { LineIcon, SolidIcon } from "@/components/icon";
+import { LineIcon } from "@/components/icon";
 import { CreatorCount, SortOption } from "@/lib/use-library-filters";
 import { useState } from "react";
-import { FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
+import { FlatList, Modal, Pressable, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 export interface LibraryFiltersProps {
@@ -53,18 +53,17 @@ export const LibraryFilters = ({
             autoCorrect={false}
           />
           {searchText.length > 0 && (
-            <Pressable onPress={() => setSearchText("")} hitSlop={8}>
+            <TouchableOpacity onPress={() => setSearchText("")} hitSlop={8}>
               <LineIcon name="x" size={20} className="text-muted" />
-            </Pressable>
+            </TouchableOpacity>
           )}
         </View>
-        <Pressable onPress={() => setShowFilterModal(true)} className="rounded border border-border bg-background p-2">
-          {hasActiveFilters ? (
-            <SolidIcon name="filter-alt" size={24} className="text-accent" />
-          ) : (
-            <LineIcon name="filter" size={24} className="text-foreground" />
-          )}
-        </Pressable>
+        <TouchableOpacity
+          onPress={() => setShowFilterModal(true)}
+          className="rounded border border-border bg-background p-2"
+        >
+          <LineIcon name="filter" size={24} className={hasActiveFilters ? "text-accent" : "text-foreground"} />
+        </TouchableOpacity>
       </View>
 
       <Modal
@@ -76,9 +75,9 @@ export const LibraryFilters = ({
         <View className="flex-1 bg-background">
           <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
             <Text className="font-sans text-xl font-bold text-foreground">Filters</Text>
-            <Pressable onPress={() => setShowFilterModal(false)} className="p-2">
+            <TouchableOpacity onPress={() => setShowFilterModal(false)} className="p-2">
               <LineIcon name="x" size={24} className="text-foreground" />
-            </Pressable>
+            </TouchableOpacity>
           </View>
 
           <FlatList

@@ -96,7 +96,7 @@ export default function Index() {
           <LibraryFilters {...filters} />
 
           {showResultsCount && (
-            <View className="border-b border-border bg-background px-4 py-2">
+            <View className="px-4 pb-4">
               <Text className="font-sans text-sm text-muted">
                 Showing {filters.filteredPurchases.length} product
                 {filters.filteredPurchases.length !== 1 ? "s" : ""}
