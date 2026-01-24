@@ -126,7 +126,7 @@ export default function Index() {
                     <Text className="text-2xl">📦</Text>
                   </View>
                 )}
-                <View className="border-y border-border p-2">
+                <View className="flex-1 border-y border-border p-2">
                   <Text className="font-sans text-base text-foreground" numberOfLines={2}>
                     {item.name}
                   </Text>
