@@ -92,9 +92,7 @@ export default function Index() {
           <ActivityIndicator size="large" color={accentColor} />
         </View>
       ) : (
-        <>
-          <LibraryFilters {...filters} />
-
+        <LibraryFilters {...filters}>
           {showResultsCount && (
             <View className="px-4 pb-4">
               <Text className="font-sans text-sm text-muted">
@@ -145,7 +143,7 @@ export default function Index() {
               </View>
             }
           />
-        </>
+        </LibraryFilters>
       )}
     </Screen>
   );
