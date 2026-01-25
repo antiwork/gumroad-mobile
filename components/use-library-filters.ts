@@ -73,7 +73,7 @@ export const useLibraryFilters = (purchases: Purchase[]): UseLibraryFiltersRetur
     }
 
     if (selectedCreators.size > 0) {
-      result = result.filter((p) => selectedCreators.has(p.creator_name));
+      result = result.filter((p) => selectedCreators.has(p.creator_username));
     }
 
     result = [...result].sort((a, b) => {
@@ -90,13 +90,13 @@ export const useLibraryFilters = (purchases: Purchase[]): UseLibraryFiltersRetur
 
   const hasActiveFilters = selectedCreators.size > 0 || showArchivedOnly;
 
-  const handleCreatorToggle = (creatorName: string) => {
+  const handleCreatorToggle = (username: string) => {
     setSelectedCreators((prev) => {
       const next = new Set(prev);
-      if (next.has(creatorName)) {
-        next.delete(creatorName);
+      if (next.has(username)) {
+        next.delete(username);
       } else {
-        next.add(creatorName);
+        next.add(username);
       }
       return next;
     });

@@ -126,12 +126,12 @@ export default function Index() {
                     <Text className="text-2xl">📦</Text>
                   </View>
                 )}
-                <View className="flex-1 border-y border-border p-2">
+                <View className="border-t border-border p-2">
                   <Text className="font-sans text-base text-foreground" numberOfLines={2}>
                     {item.name}
                   </Text>
                 </View>
-                <View className="flex-row items-center gap-2 p-2">
+                <View className="mt-auto flex-row items-center gap-2 border-t border-border p-2">
                   <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" />
                   <Text className="font-sans text-sm text-foreground">{item.creator_name}</Text>
                 </View>
