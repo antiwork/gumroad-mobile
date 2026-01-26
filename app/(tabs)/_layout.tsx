@@ -150,6 +150,15 @@ export default function TabsLayout() {
             }}
           />
           <Tabs.Screen
+            name="analytics"
+            options={{
+              title: "Analytics",
+              headerLeft: () => <LogoIcon />,
+              headerRight: () => <LibraryHeaderRight />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-alt-2" size={size} color={color} />,
+            }}
+          />
+          <Tabs.Screen
             name="library"
             options={{
               title: "Library",
