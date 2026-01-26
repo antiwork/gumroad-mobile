@@ -29,7 +29,6 @@ const buttonVariants = cva(
             web: "hover:bg-accent dark:hover:bg-input/50",
           }),
         ),
-        secondary: cn("bg-secondary active:bg-secondary/80", Platform.select({ web: "hover:bg-secondary/80" })),
         ghost: cn("border border-transparent", Platform.select({ web: "hover:bg-accent dark:hover:bg-accent/50" })),
         link: "",
       },
@@ -59,7 +58,6 @@ const buttonTextVariants = cva(
           "group-active:text-accent-foreground",
           Platform.select({ web: "group-hover:text-accent-foreground" }),
         ),
-        secondary: "text-secondary-foreground",
         ghost: "group-active:text-accent-foreground",
         link: cn(
           "text-primary group-active:underline",
