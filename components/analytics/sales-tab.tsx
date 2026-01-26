@@ -4,6 +4,7 @@ import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { useCSSVariable } from "uniwind";
 import { formatCurrency, formatDate, formatNumber, getMinBarValue, useChartColors } from "./analytics-bar-chart";
+import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
 interface SalesTabProps {
@@ -51,7 +52,6 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
   const viewsData = createChartData(views, minViewsBar);
 
   const hasData = dates.length > 0;
-  const allZero = totalRevenue === 0 && totalSales === 0 && totalViews === 0;
 
   if (isLoading) {
     return (
@@ -61,25 +61,22 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
     );
   }
 
-  if (!hasData || allZero) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <Text className="text-muted">No data available</Text>
-      </View>
-    );
-  }
+  const chartWidth = hasData ? Math.max(dates.length * 30, 300) : 300;
+  const barWidth = hasData ? Math.max(16, Math.min(24, chartWidth / dates.length - 8)) : 20;
 
-  const chartWidth = Math.max(dates.length * 30, 300);
-  const barWidth = Math.max(16, Math.min(24, chartWidth / dates.length - 8));
+  const showRevenueChart = hasData && totalRevenue > 0;
+  const showSalesChart = hasData && totalSales > 0;
+  const showViewsChart = hasData && totalViews > 0;
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-      <View className="p-4">
-        <View className="mb-6 rounded border border-border bg-background p-4">
-          <View className="mb-2 flex-row items-baseline justify-between">
-            <Text className="text-sm text-muted">Revenue</Text>
-            <Text className="text-xs text-muted">{selectedDate}</Text>
-          </View>
+      <View className="p-4 pt-0">
+        <ChartContainer
+          title="Revenue"
+          selectedDate={selectedDate}
+          showChart={showRevenueChart}
+          emptyMessage="No sales revenue... yet"
+        >
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>
@@ -103,13 +100,14 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
               />
             </ScrollView>
           </View>
-        </View>
+        </ChartContainer>
 
-        <View className="mb-6 rounded border border-border bg-background p-4">
-          <View className="mb-2 flex-row items-baseline justify-between">
-            <Text className="text-sm text-muted">Sales</Text>
-            <Text className="text-xs text-muted">{selectedDate}</Text>
-          </View>
+        <ChartContainer
+          title="Sales"
+          selectedDate={selectedDate}
+          showChart={showSalesChart}
+          emptyMessage="No sales... yet"
+        >
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatNumber(totalSales)}</Text>
             <Text className="text-lg text-accent">
@@ -135,13 +133,14 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
               />
             </ScrollView>
           </View>
-        </View>
+        </ChartContainer>
 
-        <View className="mb-6 rounded border border-border bg-background p-4">
-          <View className="mb-2 flex-row items-baseline justify-between">
-            <Text className="text-sm text-muted">Views</Text>
-            <Text className="text-xs text-muted">{selectedDate}</Text>
-          </View>
+        <ChartContainer
+          title="Views"
+          selectedDate={selectedDate}
+          showChart={showViewsChart}
+          emptyMessage="No views... yet"
+        >
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatNumber(totalViews)}</Text>
             <Text className="text-lg text-accent">
@@ -167,7 +166,7 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
               />
             </ScrollView>
           </View>
-        </View>
+        </ChartContainer>
       </View>
     </ScrollView>
   );

@@ -64,10 +64,10 @@ export default function Analytics() {
     <Screen>
       <View className="flex-row justify-center gap-2 border-b border-border p-4">
         <TabButton label="Sales" value="sales" selected={activeTab === "sales"} onSelect={setActiveTab} />
-        <TabButton label="Traffic" value="traffic" selected={activeTab === "traffic"} onSelect={setActiveTab} />
+        <TabButton label="Referrers" value="traffic" selected={activeTab === "traffic"} onSelect={setActiveTab} />
       </View>
 
-      <View className="flex-row justify-center gap-2 border-b border-border p-4">
+      <View className="flex-row justify-center gap-2 p-4">
         <TimeRangeButton label="1W" value="1w" selected={timeRange === "1w"} onSelect={setTimeRange} />
         <TimeRangeButton label="1M" value="1m" selected={timeRange === "1m"} onSelect={setTimeRange} />
         <TimeRangeButton label="1Y" value="1y" selected={timeRange === "1y"} onSelect={setTimeRange} />

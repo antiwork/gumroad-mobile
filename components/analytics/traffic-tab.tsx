@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { formatCurrency, formatDate, formatNumber, useChartColors } from "./analytics-bar-chart";
+import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
 
@@ -98,7 +99,6 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const salesChartData = createStackedChartData(sales);
 
   const hasData = dates.length > 0;
-  const allZero = totalRevenue === 0 && totalVisits === 0 && totalSales === 0;
 
   if (isLoading) {
     return (
@@ -108,16 +108,8 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
     );
   }
 
-  if (!hasData || allZero) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <Text className="text-muted">No data available</Text>
-      </View>
-    );
-  }
-
-  const chartWidth = Math.max(dates.length * 30, 300);
-  const barWidth = Math.max(16, Math.min(24, chartWidth / dates.length - 8));
+  const chartWidth = hasData ? Math.max(dates.length * 30, 300) : 300;
+  const barWidth = hasData ? Math.max(16, Math.min(24, chartWidth / dates.length - 8)) : 20;
 
   const referrerColors: Record<string, string> = {};
   if (revenue.length > 0 && revenue[0].referrers) {
@@ -126,14 +118,19 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
     });
   }
 
+  const showRevenueChart = hasData && totalRevenue > 0;
+  const showVisitsChart = hasData && totalVisits > 0;
+  const showSalesChart = hasData && totalSales > 0;
+
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-      <View className="p-4">
-        <View className="mb-6 rounded border border-border bg-background p-4">
-          <View className="mb-2 flex-row items-baseline justify-between">
-            <Text className="text-sm text-muted">Revenue</Text>
-            <Text className="text-xs text-muted">{selectedDate}</Text>
-          </View>
+      <View className="p-4 pt-0">
+        <ChartContainer
+          title="Revenue"
+          selectedDate={selectedDate}
+          showChart={showRevenueChart}
+          emptyMessage="No referral revenue... yet"
+        >
           <Text className="mb-4 text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
           <View className="mb-4">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -162,48 +159,14 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               />
             ))}
           </View>
-        </View>
+        </ChartContainer>
 
-        <View className="mb-6 rounded border border-border bg-background p-4">
-          <View className="mb-2 flex-row items-baseline justify-between">
-            <Text className="text-sm text-muted">Visits</Text>
-            <Text className="text-xs text-muted">{selectedDate}</Text>
-          </View>
-          <Text className="mb-4 text-2xl font-bold text-foreground">{formatNumber(totalVisits)}</Text>
-          <View className="mb-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <BarChart
-                stackData={visitsChartData}
-                width={chartWidth}
-                height={120}
-                barWidth={barWidth}
-                spacing={8}
-                hideRules
-                hideYAxisText
-                disableScroll
-                barBorderRadius={2}
-                yAxisThickness={0}
-                xAxisThickness={0}
-              />
-            </ScrollView>
-          </View>
-          <View className="border-t border-border pt-3">
-            {topReferrers.map((name) => (
-              <LegendItem
-                key={name}
-                color={referrerColors[name] || colors.muted}
-                label={name}
-                value={formatNumber(selectedVisitsValues[name] || 0)}
-              />
-            ))}
-          </View>
-        </View>
-
-        <View className="mb-6 rounded border border-border bg-background p-4">
-          <View className="mb-2 flex-row items-baseline justify-between">
-            <Text className="text-sm text-muted">Sales</Text>
-            <Text className="text-xs text-muted">{selectedDate}</Text>
-          </View>
+        <ChartContainer
+          title="Sales"
+          selectedDate={selectedDate}
+          showChart={showSalesChart}
+          emptyMessage="No referral sales... yet"
+        >
           <Text className="mb-4 text-2xl font-bold text-foreground">{formatNumber(totalSales)}</Text>
           <View className="mb-4">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -232,7 +195,43 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               />
             ))}
           </View>
-        </View>
+        </ChartContainer>
+
+        <ChartContainer
+          title="Visits"
+          selectedDate={selectedDate}
+          showChart={showVisitsChart}
+          emptyMessage="No visits... yet"
+        >
+          <Text className="mb-4 text-2xl font-bold text-foreground">{formatNumber(totalVisits)}</Text>
+          <View className="mb-4">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <BarChart
+                stackData={visitsChartData}
+                width={chartWidth}
+                height={120}
+                barWidth={barWidth}
+                spacing={8}
+                hideRules
+                hideYAxisText
+                disableScroll
+                barBorderRadius={2}
+                yAxisThickness={0}
+                xAxisThickness={0}
+              />
+            </ScrollView>
+          </View>
+          <View className="border-t border-border pt-3">
+            {topReferrers.map((name) => (
+              <LegendItem
+                key={name}
+                color={referrerColors[name] || colors.muted}
+                label={name}
+                value={formatNumber(selectedVisitsValues[name] || 0)}
+              />
+            ))}
+          </View>
+        </ChartContainer>
       </View>
     </ScrollView>
   );
