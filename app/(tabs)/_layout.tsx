@@ -2,11 +2,12 @@ import logoG from "@/assets/images/logo-g.svg";
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
 import { env } from "@/lib/env";
 import { Tabs } from "expo-router";
 import { createContext, useContext, useState } from "react";
-import { Linking, Modal, Pressable, TouchableOpacity, View } from "react-native";
+import { Linking, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
 import { useAuth } from "../../lib/auth-context";
 
@@ -68,45 +69,31 @@ const SettingsSheet = () => {
   };
 
   return (
-    <Modal
-      visible={isSettingsOpen}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setSettingsOpen(false)}
-    >
-      <View className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
-          <Pressable onPress={() => setSettingsOpen(false)} className="p-2">
-            <LineIcon name="x" size={24} className="text-foreground" />
-          </Pressable>
-          <Text className="font-sans text-lg font-semibold text-foreground">Settings</Text>
-          <View className="p-2 opacity-0">
-            <LineIcon name="x" size={24} />
-          </View>
-        </View>
+    <Sheet open={isSettingsOpen} onOpenChange={setSettingsOpen}>
+      <SheetHeader onClose={() => setSettingsOpen(false)}>
+        <SheetTitle>Settings</SheetTitle>
+      </SheetHeader>
+      <SheetContent className="p-4">
+        <Text className="mb-2 font-sans text-lg text-foreground">Account</Text>
+        <Text className="mb-4 text-sm text-muted-foreground">This will log you out of your Gumroad account.</Text>
+        <Button onPress={handleLogout}>
+          <Text>Logout</Text>
+          <LineIcon name="log-out" size={20} className="text-primary-foreground" />
+        </Button>
 
-        <View className="flex-1 p-4">
-          <Text className="mb-2 font-sans text-2xl text-foreground">Account</Text>
-          <Text className="mb-4 text-muted-foreground">This will log you out of your Gumroad account.</Text>
-          <Button onPress={handleLogout}>
-            <Text>Logout</Text>
-            <LineIcon name="log-out" size={20} className="text-primary-foreground" />
-          </Button>
+        <View className="my-6 border-b border-border" />
 
-          <View className="my-6 border-b border-border" />
-
-          <Text className="mb-2 font-sans text-2xl text-foreground">Danger Zone</Text>
-          <Text className="mb-4 text-muted-foreground">
-            Deleting your account will delete all of your products and product files, as well as any credit card and
-            payout information.
-          </Text>
-          <Button variant="destructive" onPress={handleDeleteAccount}>
-            <Text>Go to account deletion page</Text>
-            <LineIcon name="right-arrow-alt" size={20} className="text-destructive-foreground" />
-          </Button>
-        </View>
-      </View>
-    </Modal>
+        <Text className="mb-2 font-sans text-lg text-foreground">Danger Zone</Text>
+        <Text className="mb-4 text-sm text-muted-foreground">
+          Deleting your account will delete all of your products and product files, as well as any credit card and
+          payout information.
+        </Text>
+        <Button variant="destructive" onPress={handleDeleteAccount}>
+          <Text>Go to account deletion page</Text>
+          <LineIcon name="right-arrow-alt" size={20} className="text-destructive-foreground" />
+        </Button>
+      </SheetContent>
+    </Sheet>
   );
 };
 

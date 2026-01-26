@@ -1,23 +1,19 @@
 import { useSaleDetail } from "@/components/dashboard/use-sales-analytics";
-import { LineIcon } from "@/components/icon";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
-import { Modal, Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; onClose: () => void }) => {
   const { data: sale, isLoading } = useSaleDetail(saleId);
 
   return (
-    <Modal visible={!!saleId} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
-          <Text className="font-sans text-lg font-semibold text-foreground">{sale?.name}</Text>
-          <Pressable onPress={onClose} className="p-2">
-            <LineIcon name="x" size={24} className="text-foreground" />
-          </Pressable>
-        </View>
-
+    <Sheet open={!!saleId} onOpenChange={(open) => !open && onClose()}>
+      <SheetHeader onClose={onClose}>
+        <SheetTitle>{sale?.name}</SheetTitle>
+      </SheetHeader>
+      <SheetContent>
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
             <LoadingSpinner size="large" />
@@ -61,7 +57,7 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
             <Text className="font-sans text-lg text-muted">Sale not found</Text>
           </View>
         )}
-      </View>
-    </Modal>
+      </SheetContent>
+    </Sheet>
   );
 };
