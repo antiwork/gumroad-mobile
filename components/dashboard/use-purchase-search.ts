@@ -1,7 +1,8 @@
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { SalePurchase } from "./use-sales-analytics";
 
 interface SearchResponse {
@@ -13,66 +14,38 @@ interface SearchResponse {
 
 export const usePurchaseSearch = (searchText: string, originalPurchases: SalePurchase[]) => {
   const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<SalePurchase[]>([]);
-  const [error, setError] = useState<Error | null>(null);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
 
   useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    if (!searchText.trim()) {
-      setSearchResults(originalPurchases);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-
-    debounceTimerRef.current = setTimeout(async () => {
-      try {
-        const endTime = new Date().toISOString();
-        const response = await requestAPI<SearchResponse>(
-          `mobile/analytics/data_by_date.json?range=all&end_time=${encodeURIComponent(endTime)}&query=${encodeURIComponent(searchText.trim())}`,
-          { accessToken: assertDefined(accessToken) },
-        );
-        setSearchResults(response.purchases);
-        setError(null);
-      } catch (err) {
-        if (err instanceof UnauthorizedError) {
-          logout();
-        } else {
-          setError(err instanceof Error ? err : new Error("Search failed"));
-        }
-      } finally {
-        setIsSearching(false);
-      }
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText.trim());
     }, 500);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [searchText, accessToken, logout, originalPurchases]);
+  const query = useQuery({
+    queryKey: ["purchaseSearch", debouncedSearchText],
+    queryFn: async () => {
+      const endTime = new Date().toISOString();
+      const response = await requestAPI<SearchResponse>(
+        `mobile/analytics/data_by_date.json?range=all&end_time=${encodeURIComponent(endTime)}&query=${encodeURIComponent(debouncedSearchText)}`,
+        { accessToken: assertDefined(accessToken) },
+      );
+      return response.purchases;
+    },
+    enabled: !!accessToken && !!debouncedSearchText,
+  });
 
   useEffect(() => {
-    if (!isAuthLoading && !accessToken) {
-      logout();
-    }
-  }, [isAuthLoading, accessToken, logout]);
+    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
+  }, [isAuthLoading, accessToken, query.error, logout]);
 
-  useEffect(() => {
-    if (!searchText.trim()) {
-      setSearchResults(originalPurchases);
-    }
-  }, [originalPurchases, searchText]);
+  const isSearching = !!searchText.trim() && (searchText.trim() !== debouncedSearchText || query.isLoading);
+  const searchResults = debouncedSearchText ? (query.data ?? []) : originalPurchases;
 
   return {
     isSearching,
     searchResults,
-    error,
+    error: query.error,
   };
 };
