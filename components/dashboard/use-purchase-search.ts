@@ -1,7 +1,4 @@
-import { assertDefined } from "@/lib/assert";
-import { useAuth } from "@/lib/auth-context";
-import { requestAPI, UnauthorizedError } from "@/lib/request";
-import { useQuery } from "@tanstack/react-query";
+import { useAPIRequest } from "@/lib/request";
 import { useEffect, useState } from "react";
 import { SalePurchase } from "./use-sales-analytics";
 
@@ -13,7 +10,6 @@ interface SearchResponse {
 }
 
 export const usePurchaseSearch = (searchText: string, originalPurchases: SalePurchase[]) => {
-  const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
 
   useEffect(() => {
@@ -23,22 +19,13 @@ export const usePurchaseSearch = (searchText: string, originalPurchases: SalePur
     return () => clearTimeout(timer);
   }, [searchText]);
 
-  const query = useQuery({
+  const endTime = new Date().toISOString();
+  const query = useAPIRequest<SearchResponse, SalePurchase[]>({
     queryKey: ["purchaseSearch", debouncedSearchText],
-    queryFn: async () => {
-      const endTime = new Date().toISOString();
-      const response = await requestAPI<SearchResponse>(
-        `mobile/analytics/data_by_date.json?range=all&end_time=${encodeURIComponent(endTime)}&query=${encodeURIComponent(debouncedSearchText)}`,
-        { accessToken: assertDefined(accessToken) },
-      );
-      return response.purchases;
-    },
-    enabled: !!accessToken && !!debouncedSearchText,
+    url: `mobile/analytics/data_by_date.json?range=all&end_time=${encodeURIComponent(endTime)}&query=${encodeURIComponent(debouncedSearchText)}`,
+    enabled: !!debouncedSearchText,
+    select: (data) => data.purchases,
   });
-
-  useEffect(() => {
-    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
-  }, [isAuthLoading, accessToken, query.error, logout]);
 
   const isSearching = !!searchText.trim() && (searchText.trim() !== debouncedSearchText || query.isLoading);
   const searchResults = debouncedSearchText ? (query.data ?? []) : originalPurchases;

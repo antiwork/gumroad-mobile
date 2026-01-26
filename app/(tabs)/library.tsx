@@ -2,12 +2,9 @@ import { LibraryFilters } from "@/components/library-filters";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useLibraryFilters } from "@/components/use-library-filters";
-import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
-import { requestAPI, UnauthorizedError } from "@/lib/request";
-import { useQuery } from "@tanstack/react-query";
+import { useAPIRequest } from "@/lib/request";
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
 import { FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
@@ -37,24 +34,11 @@ interface PurchasesResponse {
 }
 
 export const usePurchases = () => {
-  const { isLoading, accessToken, logout } = useAuth();
-
-  const query = useQuery({
+  return useAPIRequest<PurchasesResponse, Purchase[]>({
     queryKey: ["purchases"],
-    queryFn: async () => {
-      const response = await requestAPI<PurchasesResponse>("mobile/purchases/index", {
-        accessToken: assertDefined(accessToken),
-      });
-      return response.products;
-    },
-    enabled: !!accessToken,
+    url: "mobile/purchases/index",
+    select: (data) => data.products,
   });
-
-  useEffect(() => {
-    if ((!isLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
-  }, [isLoading, accessToken, query.error, logout]);
-
-  return query;
 };
 
 export default function Index() {
