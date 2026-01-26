@@ -3,7 +3,7 @@ import { SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Tabs } from "expo-router";
 import { TouchableOpacity } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { useCSSVariable, useResolveClassNames } from "uniwind";
 import { useAuth } from "../../lib/auth-context";
 
 const LogoIcon = () => <StyledImage source={logoG} className="ml-3 size-6" />;
@@ -19,13 +19,14 @@ const SignOutButton = () => {
 };
 
 export default function TabsLayout() {
-  const [background, foreground, accent, muted, border] = useCSSVariable([
+  const [background, accent, muted, border] = useCSSVariable([
     "--color-background",
-    "--color-foreground",
     "--color-accent",
     "--color-muted",
     "--color-border",
   ]);
+  const headerTitleStyle = useResolveClassNames("font-sans text-foreground");
+  const tabBarLabelStyle = useResolveClassNames("font-sans font-normal text-xs");
 
   return (
     <Tabs
@@ -33,14 +34,14 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: background as string },
         headerShadowVisible: false,
         headerTintColor: accent as string,
-        headerTitleStyle: { fontFamily: "ABC Favorit", color: foreground as string },
+        headerTitleStyle,
         tabBarStyle: {
           backgroundColor: background as string,
           borderTopColor: border as string,
         },
-        tabBarActiveTintColor: foreground as string,
+        tabBarActiveTintColor: accent as string,
         tabBarInactiveTintColor: muted as string,
-        tabBarLabelStyle: { fontFamily: "ABC Favorit" },
+        tabBarLabelStyle,
       }}
     >
       <Tabs.Screen
@@ -58,7 +59,7 @@ export default function TabsLayout() {
           title: "Library",
           headerLeft: () => <LogoIcon />,
           headerRight: () => <SignOutButton />,
-          tabBarIcon: ({ color, size }) => <SolidIcon name="box" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <SolidIcon name="bookmark-heart" size={size} color={color} />,
         }}
       />
     </Tabs>
