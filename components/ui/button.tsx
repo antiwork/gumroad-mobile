@@ -24,16 +24,13 @@ const buttonVariants = cva(
           }),
         ),
         outline: cn(
-          "border-border bg-background active:bg-accent border",
+          "border-border bg-background border",
           Platform.select({
             web: "hover:bg-accent dark:hover:bg-input/50",
           }),
         ),
         secondary: cn("bg-secondary active:bg-secondary/80", Platform.select({ web: "hover:bg-secondary/80" })),
-        ghost: cn(
-          "active:bg-accent dark:active:bg-accent/50",
-          Platform.select({ web: "hover:bg-accent dark:hover:bg-accent/50" }),
-        ),
+        ghost: cn("border border-transparent", Platform.select({ web: "hover:bg-accent dark:hover:bg-accent/50" })),
         link: "",
       },
       size: {

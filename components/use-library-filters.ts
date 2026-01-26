@@ -1,4 +1,4 @@
-import { Purchase } from "@/app/index";
+import { Purchase } from "@/app/(tabs)/library";
 import { useMemo, useState } from "react";
 
 export type SortOption = "content_updated_at" | "purchased_at";

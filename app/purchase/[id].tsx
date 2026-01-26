@@ -1,4 +1,4 @@
-import { usePurchases } from "@/app/index";
+import { usePurchases } from "@/app/(tabs)/library";
 import { StyledWebView } from "@/components/styled";
 import { Screen } from "@/components/ui/screen";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
