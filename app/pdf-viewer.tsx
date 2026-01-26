@@ -1,10 +1,12 @@
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { Screen } from "@/components/ui/screen";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { updateMediaLocation } from "@/lib/media-location";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 
 type FlattenedTocItem = {
@@ -103,19 +105,11 @@ export default function PdfViewerScreen() {
         }}
       />
 
-      <Modal
-        visible={showTocModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowTocModal(false)}
-      >
-        <View className="flex-1 bg-background">
-          <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
-            <Text className="text-xl font-bold text-foreground">Table of Contents</Text>
-            <Pressable onPress={() => setShowTocModal(false)} className="p-2">
-              <LineIcon name="x" size={24} className="text-foreground" />
-            </Pressable>
-          </View>
+      <Sheet open={showTocModal} onOpenChange={setShowTocModal}>
+        <SheetHeader onClose={() => setShowTocModal(false)}>
+          <SheetTitle>Table of Contents</SheetTitle>
+        </SheetHeader>
+        <SheetContent>
           <FlatList
             data={flattenedToc}
             keyExtractor={(item, index) => `${item.pageIdx}-${index}`}
@@ -134,52 +128,42 @@ export default function PdfViewerScreen() {
               </View>
             }
           />
-        </View>
-      </Modal>
+        </SheetContent>
+      </Sheet>
 
-      <Modal
-        visible={showViewModeModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowViewModeModal(false)}
-      >
-        <View className="flex-1 bg-background">
-          <View className="flex-row items-center justify-between border-b border-border px-4 py-4">
-            <Text className="text-xl font-bold text-foreground">View Mode</Text>
-            <Pressable onPress={() => setShowViewModeModal(false)} className="p-2">
-              <LineIcon name="x" size={24} className="text-foreground" />
-            </Pressable>
-          </View>
-          <View className="p-4">
-            <TouchableOpacity
-              onPress={() => {
-                setViewMode("single");
-                setShowViewModeModal(false);
-              }}
-              className="flex-row items-center justify-between border-b border-border py-4"
-            >
-              <View className="flex-row items-center gap-3">
-                <SolidIcon name="carousel" size={24} className="text-foreground" />
-                <Text className="text-base text-foreground">Single Page</Text>
-              </View>
-              {viewMode === "single" && <LineIcon name="check" size={24} className="text-accent" />}
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                setViewMode("continuous");
-                setShowViewModeModal(false);
-              }}
-              className="flex-row items-center justify-between border-b border-border py-4"
-            >
-              <View className="flex-row items-center gap-3">
-                <LineIcon name="move-vertical" size={24} className="text-foreground" />
-                <Text className="text-base text-foreground">Continuous</Text>
-              </View>
-              {viewMode === "continuous" && <LineIcon name="check" size={24} className="text-accent" />}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <Sheet open={showViewModeModal} onOpenChange={setShowViewModeModal}>
+        <SheetHeader onClose={() => setShowViewModeModal(false)}>
+          <SheetTitle>View Mode</SheetTitle>
+        </SheetHeader>
+        <SheetContent className="p-4">
+          <TouchableOpacity
+            onPress={() => {
+              setViewMode("single");
+              setShowViewModeModal(false);
+            }}
+            className="flex-row items-center justify-between border-b border-border py-4"
+          >
+            <View className="flex-row items-center gap-3">
+              <SolidIcon name="carousel" size={24} className="text-foreground" />
+              <Text className="text-base text-foreground">Single Page</Text>
+            </View>
+            {viewMode === "single" && <LineIcon name="check" size={24} className="text-accent" />}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setViewMode("continuous");
+              setShowViewModeModal(false);
+            }}
+            className="flex-row items-center justify-between border-b border-border py-4"
+          >
+            <View className="flex-row items-center gap-3">
+              <LineIcon name="move-vertical" size={24} className="text-foreground" />
+              <Text className="text-base text-foreground">Continuous</Text>
+            </View>
+            {viewMode === "continuous" && <LineIcon name="check" size={24} className="text-accent" />}
+          </TouchableOpacity>
+        </SheetContent>
+      </Sheet>
 
       {totalPages > 0 && (
         <View className="absolute right-0 bottom-8 left-0 items-center">
