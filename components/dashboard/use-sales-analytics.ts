@@ -1,8 +1,5 @@
-import { assertDefined } from "@/lib/assert";
-import { useAuth } from "@/lib/auth-context";
-import { requestAPI, UnauthorizedError } from "@/lib/request";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useAPIRequest } from "@/lib/request";
+import { useState } from "react";
 
 export type TimeRange = "day" | "month" | "all";
 
@@ -26,25 +23,13 @@ interface AnalyticsResponse {
 }
 
 export const useSalesAnalytics = () => {
-  const { isLoading: isAuthLoading, accessToken, logout } = useAuth();
   const [timeRange, setTimeRange] = useState<TimeRange>("day");
+  const endTime = new Date().toISOString();
 
-  const query = useQuery({
+  const query = useAPIRequest<AnalyticsResponse>({
     queryKey: ["analytics", timeRange],
-    queryFn: async () => {
-      const endTime = new Date().toISOString();
-      const response = await requestAPI<AnalyticsResponse>(
-        `mobile/analytics/data_by_date.json?range=${timeRange}&end_time=${encodeURIComponent(endTime)}`,
-        { accessToken: assertDefined(accessToken) },
-      );
-      return response;
-    },
-    enabled: !!accessToken,
+    url: `mobile/analytics/data_by_date.json?range=${timeRange}&end_time=${encodeURIComponent(endTime)}`,
   });
-
-  useEffect(() => {
-    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
-  }, [isAuthLoading, accessToken, query.error, logout]);
 
   return {
     ...query,
@@ -78,22 +63,10 @@ interface SaleDetailResponse {
 }
 
 export const useSaleDetail = (saleId: string | null) => {
-  const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
-
-  const query = useQuery({
+  return useAPIRequest<SaleDetailResponse, SaleDetail>({
     queryKey: ["sale", saleId],
-    queryFn: async () => {
-      const response = await requestAPI<SaleDetailResponse>(`mobile/sales/${saleId}.json`, {
-        accessToken: assertDefined(accessToken),
-      });
-      return response.purchase;
-    },
-    enabled: !!accessToken && !!saleId,
+    url: `mobile/sales/${saleId}.json`,
+    enabled: !!saleId,
+    select: (data) => data.purchase,
   });
-
-  useEffect(() => {
-    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
-  }, [isAuthLoading, accessToken, query.error, logout]);
-
-  return query;
 };
