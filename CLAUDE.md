@@ -5,6 +5,7 @@
 - Place both hooks and components in the `components` directory
 - Prefer defining functions with const rather than the function keyword
 - Don't leave comments in the code
+- Don't remove comments, especially TODOs, unless asked to do so
 
 ## Styling
 
