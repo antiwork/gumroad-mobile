@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
 import { Redirect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 import { useUniwind } from "uniwind";
 import logoDark from "../assets/images/logo-dark.svg";
 import logoLight from "../assets/images/logo.svg";
@@ -30,7 +31,7 @@ export default function LoginScreen() {
       <StyledImage source={theme === "dark" ? logoDark : logoLight} className="aspect-158/22 w-50" />
 
       <Button variant="accent" onPress={login} disabled={isLoading}>
-        {isLoading ? <ActivityIndicator className="text-accent-foreground" /> : <Text>Sign in with Gumroad</Text>}
+        {isLoading ? <LoadingSpinner size="small" /> : <Text>Sign in with Gumroad</Text>}
       </Button>
     </View>
   );

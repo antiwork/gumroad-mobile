@@ -1,5 +1,6 @@
 import { usePurchases } from "@/app/(tabs)/library";
 import { StyledWebView } from "@/components/styled";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
@@ -9,7 +10,7 @@ import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useRef, useState } from "react";
-import { ActivityIndicator, Alert, View } from "react-native";
+import { Alert, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
 // See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
@@ -131,7 +132,7 @@ export default function DownloadScreen() {
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-body-bg">
-        <ActivityIndicator size="large" color="#ff90e8" />
+        <LoadingSpinner size="large" />
       </View>
     );
   }
@@ -151,7 +152,7 @@ export default function DownloadScreen() {
       />
       {isDownloading && (
         <View className="absolute inset-0 items-center justify-center bg-black/50">
-          <ActivityIndicator size="large" color="#ff90e8" />
+          <LoadingSpinner size="large" />
         </View>
       )}
     </Screen>

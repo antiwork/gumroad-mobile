@@ -1,13 +1,12 @@
 import { useSaleDetail } from "@/components/dashboard/use-sales-analytics";
 import { LineIcon } from "@/components/icon";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { Modal, Pressable, ScrollView, View } from "react-native";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; onClose: () => void }) => {
   const { data: sale, isLoading } = useSaleDetail(saleId);
-  const accentColor = useCSSVariable("--color-accent") as string;
 
   return (
     <Modal visible={!!saleId} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -21,7 +20,7 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
 
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color={accentColor} />
+            <LoadingSpinner size="large" />
           </View>
         ) : sale ? (
           <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, gap: 16 }}>

@@ -2,11 +2,12 @@ import { SaleDetailModal } from "@/components/dashboard/sale-detail-modal";
 import { SaleItem } from "@/components/dashboard/sale-item";
 import { SalePurchase, TimeRange, useSalesAnalytics } from "@/components/dashboard/use-sales-analytics";
 import { Button } from "@/components/ui/button";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { useState } from "react";
-import { ActivityIndicator, FlatList, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 const TimeRangeButton = ({
@@ -53,7 +54,7 @@ export default function Dashboard() {
     return (
       <Screen>
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={accentColor} />
+          <LoadingSpinner size="large" />
         </View>
       </Screen>
     );
@@ -66,7 +67,7 @@ export default function Dashboard() {
       <View className="border-b border-border p-4">
         <View className="mb-4 h-20 items-center justify-center">
           {isLoadingAnalytics ? (
-            <ActivityIndicator size="small" color={accentColor} />
+            <LoadingSpinner size="small" />
           ) : (
             <>
               <Text className="font-sans text-4xl text-foreground">{data?.formatted_revenue ?? "$0"}</Text>
@@ -86,7 +87,7 @@ export default function Dashboard() {
 
       {isLoadingAnalytics ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={accentColor} />
+          <LoadingSpinner size="large" />
         </View>
       ) : (
         <FlatList<SalePurchase>

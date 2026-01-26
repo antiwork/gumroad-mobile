@@ -1,4 +1,5 @@
 import { LibraryFilters } from "@/components/library-filters";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useLibraryFilters } from "@/components/use-library-filters";
 import { assertDefined } from "@/lib/assert";
@@ -7,7 +8,7 @@ import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator, FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 export interface Purchase {
@@ -75,7 +76,7 @@ export default function Index() {
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-body-bg">
-        <ActivityIndicator size="large" color={accentColor} />
+        <LoadingSpinner size="large" />
       </View>
     );
   }
@@ -90,7 +91,7 @@ export default function Index() {
     <Screen>
       {isLoadingPurchases ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={accentColor} />
+          <LoadingSpinner size="large" />
         </View>
       ) : (
         <LibraryFilters {...filters}>

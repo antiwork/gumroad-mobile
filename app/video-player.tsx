@@ -1,3 +1,4 @@
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
@@ -5,7 +6,7 @@ import { requestAPI } from "@/lib/request";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 const fetchStreamingPlaylistUrl = async (streamingUrl: string, accessToken: string): Promise<string> =>
   (await requestAPI<{ playlist_url: string }>(streamingUrl, { accessToken })).playlist_url;
@@ -96,7 +97,7 @@ export default function VideoPlayerScreen() {
       <View style={styles.container}>
         <Stack.Screen options={{ title: title ?? "Video" }} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ff90e8" />
+          <LoadingSpinner size="large" />
         </View>
       </View>
     );
