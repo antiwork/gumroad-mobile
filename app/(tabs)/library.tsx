@@ -22,6 +22,7 @@ export interface Purchase {
   purchased_at?: string;
   file_data?: {
     id: string;
+    name: string;
     filegroup?: string;
     streaming_url?: string;
   }[];

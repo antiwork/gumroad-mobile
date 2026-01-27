@@ -1,10 +1,12 @@
 import logoG from "@/assets/images/logo-g.svg";
 import { LineIcon, SolidIcon } from "@/components/icon";
+import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledImage } from "@/components/styled";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
 import { env } from "@/lib/env";
+import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import { Tabs } from "expo-router";
 import { createContext, useContext, useState } from "react";
 import { Linking, TouchableOpacity, View } from "react-native";
@@ -126,6 +128,12 @@ export default function TabsLayout() {
     <SearchContext.Provider value={{ isSearchActive, setSearchActive }}>
       <SettingsSheetContext.Provider value={{ isSettingsOpen, setSettingsOpen }}>
         <Tabs
+          tabBar={(props) => (
+            <View>
+              <MiniAudioPlayer />
+              <BottomTabBar {...props} />
+            </View>
+          )}
           screenOptions={{
             headerStyle: { backgroundColor: background as string },
             headerShadowVisible: false,

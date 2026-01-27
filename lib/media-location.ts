@@ -1,16 +1,7 @@
-import { env } from "@/lib/env";
-import { request } from "@/lib/request";
+import { requestAPI } from "@/lib/request";
 import { Platform } from "react-native";
 
-export type MediaLocationParams = {
-  urlRedirectId: string;
-  productFileId: string;
-  purchaseId?: string;
-  location: number;
-};
-
 type MediaLocationRequest = {
-  mobile_token: string;
   platform: "iphone" | "android";
   url_redirect_id: string;
   product_file_id: string;
@@ -23,9 +14,17 @@ export const updateMediaLocation = async ({
   productFileId,
   purchaseId,
   location,
-}: MediaLocationParams): Promise<void> => {
+  accessToken,
+}: {
+  urlRedirectId: string;
+  productFileId: string;
+  purchaseId?: string;
+  location: number;
+  accessToken: string | null;
+}): Promise<void> => {
+  if (!accessToken) return;
+
   const body: MediaLocationRequest = {
-    mobile_token: env.EXPO_PUBLIC_MOBILE_TOKEN,
     platform: Platform.OS === "ios" ? "iphone" : "android",
     url_redirect_id: urlRedirectId,
     product_file_id: productFileId,
@@ -37,10 +36,7 @@ export const updateMediaLocation = async ({
   }
 
   try {
-    await request(`${env.EXPO_PUBLIC_GUMROAD_API_URL}/mobile/media_locations`, {
-      method: "POST",
-      data: body,
-    });
+    await requestAPI("mobile/media_locations", { method: "POST", data: body, accessToken });
   } catch (error) {
     // Log but don't throw - media location sync is non-critical
     console.warn("Failed to update media location:", error);

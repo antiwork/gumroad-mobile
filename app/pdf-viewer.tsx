@@ -3,6 +3,7 @@ import { Screen } from "@/components/ui/screen";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
+import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -31,6 +32,7 @@ export default function PdfViewerScreen() {
     purchaseId?: string;
     initialPage?: string;
   }>();
+  const { accessToken } = useAuth();
   const pdfRef = useRef<PdfRef>(null);
   const [currentPage, setCurrentPage] = useState(initialPage ? Number(initialPage) : 1);
   const currentPageRef = useRefToLatest(currentPage);
@@ -51,9 +53,10 @@ export default function PdfViewerScreen() {
         // We deliberately use the latest value of the ref for the latest media location
         // eslint-disable-next-line react-hooks/exhaustive-deps
         location: currentPageRef.current,
+        accessToken,
       });
     };
-  }, [urlRedirectId, productFileId, purchaseId, currentPageRef]);
+  }, [urlRedirectId, productFileId, purchaseId, currentPageRef, accessToken]);
 
   const handleTocItemPress = (pageIdx: number) => {
     pdfRef.current?.setPage(pageIdx + 1);

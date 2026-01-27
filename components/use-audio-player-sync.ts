@@ -1,3 +1,4 @@
+import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { useCallback, useEffect, useRef } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
@@ -24,6 +25,7 @@ export const setupPlayer = async () => {
 };
 
 export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) => {
+  const { accessToken } = useAuth();
   const currentAudioRef = useRef<{
     resourceId: string;
     urlRedirectId: string;
@@ -31,19 +33,23 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     contentLength?: number;
   } | null>(null);
 
-  const syncMediaLocation = useCallback(async (position: number, isEnd = false) => {
-    const currentAudio = currentAudioRef.current;
-    if (!currentAudio) return;
+  const syncMediaLocation = useCallback(
+    async (position: number, isEnd = false) => {
+      const currentAudio = currentAudioRef.current;
+      if (!currentAudio) return;
 
-    const location = isEnd && currentAudio.contentLength ? currentAudio.contentLength : Math.floor(position);
+      const location = isEnd && currentAudio.contentLength ? currentAudio.contentLength : Math.floor(position);
 
-    await updateMediaLocation({
-      urlRedirectId: currentAudio.urlRedirectId,
-      productFileId: currentAudio.resourceId,
-      purchaseId: currentAudio.purchaseId,
-      location,
-    });
-  }, []);
+      await updateMediaLocation({
+        urlRedirectId: currentAudio.urlRedirectId,
+        productFileId: currentAudio.resourceId,
+        purchaseId: currentAudio.purchaseId,
+        location,
+        accessToken,
+      });
+    },
+    [accessToken],
+  );
 
   // TODO: Only works when the component is mounted, need to support background playback
   const sendAudioPlayerInfo = useCallback(

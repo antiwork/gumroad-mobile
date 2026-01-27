@@ -1,4 +1,5 @@
 import { usePurchases } from "@/app/(tabs)/library";
+import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
@@ -11,6 +12,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useRef, useState } from "react";
 import { Alert, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
 // See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
@@ -56,6 +58,7 @@ export default function DownloadScreen() {
   const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
+  const { bottom } = useSafeAreaInsets();
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
@@ -92,7 +95,7 @@ export default function DownloadScreen() {
             uri: downloadUrl(id, message.payload.resourceId),
             resourceId: message.payload.resourceId,
             resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
-            title: purchase?.name,
+            title: fileData?.name ?? purchase?.name,
             artist: purchase?.creator_name,
             artwork: purchase?.thumbnail_url,
             urlRedirectId: id,
@@ -155,6 +158,9 @@ export default function DownloadScreen() {
           <LoadingSpinner size="large" />
         </View>
       )}
+      <View className="bg-background" style={{ paddingBottom: bottom }}>
+        <MiniAudioPlayer />
+      </View>
     </Screen>
   );
 }
