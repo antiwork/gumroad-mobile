@@ -32,14 +32,14 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const colors = useChartColors();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  const { dates, revenue, visits, sales, topReferrers } = processedData;
+  const { dates, revenue, visits, sales } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
-  const activeIndex = selectedIndex ?? (dates.length > 0 ? dates.length - 1 : null);
+  const activeIndex = selectedIndex;
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
   const handleBarPress = useCallback((index: number) => {
-    setSelectedIndex(index);
+    setSelectedIndex((prev) => (prev === index ? null : index));
   }, []);
 
   const calculateTotals = (
@@ -66,26 +66,31 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
     return values;
   };
 
-  const revenueTotals = calculateTotals(revenue);
-  const visitsTotals = calculateTotals(visits);
-  const salesTotals = calculateTotals(sales);
+  const revenueTotals = calculateTotals(revenue.data);
+  const visitsTotals = calculateTotals(visits.data);
+  const salesTotals = calculateTotals(sales.data);
 
-  const selectedRevenueValues = getSelectedValues(revenue, activeIndex);
-  const selectedVisitsValues = getSelectedValues(visits, activeIndex);
-  const selectedSalesValues = getSelectedValues(sales, activeIndex);
+  const selectedRevenueValues = activeIndex !== null ? getSelectedValues(revenue.data, activeIndex) : revenueTotals;
+  const selectedVisitsValues = activeIndex !== null ? getSelectedValues(visits.data, activeIndex) : visitsTotals;
+  const selectedSalesValues = activeIndex !== null ? getSelectedValues(sales.data, activeIndex) : salesTotals;
 
   const totalRevenue = Object.values(revenueTotals).reduce((sum, val) => sum + val, 0);
   const totalVisits = Object.values(visitsTotals).reduce((sum, val) => sum + val, 0);
   const totalSales = Object.values(salesTotals).reduce((sum, val) => sum + val, 0);
 
+  const selectedRevenue = Object.values(selectedRevenueValues).reduce((sum, val) => sum + val, 0);
+  const selectedVisitsTotal = Object.values(selectedVisitsValues).reduce((sum, val) => sum + val, 0);
+  const selectedSalesTotal = Object.values(selectedSalesValues).reduce((sum, val) => sum + val, 0);
+
   const createStackedChartData = (
     data: { date: string; referrers: { name: string; value: number; color: string }[] }[],
   ) => {
     return data.map((item, index) => {
-      const stacks = item.referrers.map((r) => ({
-        value: r.value || 0.1,
+      const stacks = item.referrers.map((r, stackIndex) => ({
+        value: r.value || 0,
         color: r.color,
-        onPress: () => handleBarPress(index),
+        borderTopLeftRadius: stackIndex === item.referrers.length - 1 ? 4 : 0,
+        borderTopRightRadius: stackIndex === item.referrers.length - 1 ? 4 : 0,
       }));
       return {
         stacks,
@@ -94,9 +99,9 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
     });
   };
 
-  const revenueChartData = createStackedChartData(revenue);
-  const visitsChartData = createStackedChartData(visits);
-  const salesChartData = createStackedChartData(sales);
+  const revenueChartData = createStackedChartData(revenue.data);
+  const visitsChartData = createStackedChartData(visits.data);
+  const salesChartData = createStackedChartData(sales.data);
 
   const hasData = dates.length > 0;
 
@@ -108,16 +113,21 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
     );
   }
 
-  const referrerColors: Record<string, string> = {};
-  if (revenue.length > 0 && revenue[0].referrers) {
-    revenue[0].referrers.forEach((r) => {
-      referrerColors[r.name] = r.color;
-    });
-  }
+  const getReferrerColors = (
+    data: { date: string; referrers: { name: string; value: number; color: string }[] }[],
+  ): Record<string, string> => {
+    const colors: Record<string, string> = {};
+    if (data.length > 0 && data[0].referrers) {
+      data[0].referrers.forEach((r) => {
+        colors[r.name] = r.color;
+      });
+    }
+    return colors;
+  };
 
-  const showRevenueChart = hasData && totalRevenue > 0;
-  const showVisitsChart = hasData && totalVisits > 0;
-  const showSalesChart = hasData && totalSales > 0;
+  const revenueReferrerColors = getReferrerColors(revenue.data);
+  const visitsReferrerColors = getReferrerColors(visits.data);
+  const salesReferrerColors = getReferrerColors(sales.data);
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -125,11 +135,14 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
         <ChartContainer
           title="Revenue"
           selectedDate={selectedDate}
-          showChart={showRevenueChart}
+          showChart={hasData && totalRevenue > 0}
           emptyMessage="No referral revenue... yet"
         >
-          <Text className="mb-4 text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
-          <View className="mb-4">
+          <View className="mb-1 flex-row items-baseline justify-between">
+            <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
+            {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
+          </View>
+          <View>
             <BarChart
               stackData={revenueChartData}
               height={120}
@@ -140,16 +153,20 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideRules
               hideYAxisText
               disableScroll
-              barBorderRadius={2}
               yAxisThickness={0}
-              xAxisThickness={0}
+              xAxisThickness={1}
+              xAxisColor={colors.border}
+              highlightEnabled={activeIndex !== null}
+              highlightedBarIndex={activeIndex ?? undefined}
+              lowlightOpacity={0.4}
+              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
-          <View className="border-t border-border pt-3">
-            {topReferrers.map((name) => (
+          <View>
+            {revenue.topReferrers.map((name) => (
               <LegendItem
                 key={name}
-                color={referrerColors[name] || colors.muted}
+                color={revenueReferrerColors[name] || colors.muted}
                 label={name}
                 value={formatCurrency(selectedRevenueValues[name] || 0)}
               />
@@ -160,11 +177,18 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
         <ChartContainer
           title="Sales"
           selectedDate={selectedDate}
-          showChart={showSalesChart}
+          showChart={hasData && totalSales > 0}
           emptyMessage="No referral sales... yet"
         >
-          <Text className="mb-4 text-2xl font-bold text-foreground">{formatNumber(totalSales)}</Text>
-          <View className="mb-4">
+          <View className="mb-1 flex-row items-baseline justify-between">
+            <Text className="text-2xl font-bold text-foreground">{formatNumber(totalSales)}</Text>
+            {activeIndex !== null && (
+              <Text className="text-lg text-accent">
+                {formatNumber(selectedSalesTotal)} sale{selectedSalesTotal !== 1 ? "s" : ""}
+              </Text>
+            )}
+          </View>
+          <View>
             <BarChart
               stackData={salesChartData}
               height={120}
@@ -175,16 +199,20 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideRules
               hideYAxisText
               disableScroll
-              barBorderRadius={2}
               yAxisThickness={0}
-              xAxisThickness={0}
+              xAxisThickness={1}
+              xAxisColor={colors.border}
+              highlightEnabled={activeIndex !== null}
+              highlightedBarIndex={activeIndex ?? undefined}
+              lowlightOpacity={0.4}
+              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
-          <View className="border-t border-border pt-3">
-            {topReferrers.map((name) => (
+          <View>
+            {sales.topReferrers.map((name) => (
               <LegendItem
                 key={name}
-                color={referrerColors[name] || colors.muted}
+                color={salesReferrerColors[name] || colors.muted}
                 label={name}
                 value={formatNumber(selectedSalesValues[name] || 0)}
               />
@@ -195,11 +223,18 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
         <ChartContainer
           title="Visits"
           selectedDate={selectedDate}
-          showChart={showVisitsChart}
+          showChart={hasData && totalVisits > 0}
           emptyMessage="No visits... yet"
         >
-          <Text className="mb-4 text-2xl font-bold text-foreground">{formatNumber(totalVisits)}</Text>
-          <View className="mb-4">
+          <View className="mb-1 flex-row items-baseline justify-between">
+            <Text className="text-2xl font-bold text-foreground">{formatNumber(totalVisits)}</Text>
+            {activeIndex !== null && (
+              <Text className="text-lg text-accent">
+                {formatNumber(selectedVisitsTotal)} visit{selectedVisitsTotal !== 1 ? "s" : ""}
+              </Text>
+            )}
+          </View>
+          <View>
             <BarChart
               stackData={visitsChartData}
               height={120}
@@ -210,16 +245,20 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideRules
               hideYAxisText
               disableScroll
-              barBorderRadius={2}
               yAxisThickness={0}
-              xAxisThickness={0}
+              xAxisThickness={1}
+              xAxisColor={colors.border}
+              highlightEnabled={activeIndex !== null}
+              highlightedBarIndex={activeIndex ?? undefined}
+              lowlightOpacity={0.4}
+              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
-          <View className="border-t border-border pt-3">
-            {topReferrers.map((name) => (
+          <View>
+            {visits.topReferrers.map((name) => (
               <LegendItem
                 key={name}
-                color={referrerColors[name] || colors.muted}
+                color={visitsReferrerColors[name] || colors.muted}
                 label={name}
                 value={formatNumber(selectedVisitsValues[name] || 0)}
               />

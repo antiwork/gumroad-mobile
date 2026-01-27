@@ -3,13 +3,7 @@ import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { useCSSVariable } from "uniwind";
-import {
-  formatCurrency,
-  formatNumber,
-  getMinBarValue,
-  useChartColors,
-  useChartDimensions,
-} from "./analytics-bar-chart";
+import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
@@ -26,7 +20,7 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
   const { dates, totals, sales, views } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
-  const activeIndex = selectedIndex ?? (dates.length > 0 ? dates.length - 1 : null);
+  const activeIndex = selectedIndex;
 
   const totalRevenue = totals.reduce((sum, val) => sum + val, 0);
   const totalSales = sales.reduce((sum, val) => sum + val, 0);
@@ -37,25 +31,21 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
   const selectedViews = activeIndex !== null ? views[activeIndex] : 0;
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
-  const minRevenueBar = getMinBarValue(totals);
-  const minSalesBar = getMinBarValue(sales);
-  const minViewsBar = getMinBarValue(views);
-
   const handleBarPress = useCallback((index: number) => {
-    setSelectedIndex(index);
+    setSelectedIndex((prev) => (prev === index ? null : index));
   }, []);
 
-  const createChartData = (values: number[], minBar: number) => {
+  const createChartData = (values: number[]) => {
     return values.map((value, index) => ({
-      value: value === 0 ? minBar : value,
+      value: value === 0 ? 0 : value,
       frontColor: index === activeIndex ? accentColor : colors.muted,
       onPress: () => handleBarPress(index),
     }));
   };
 
-  const revenueData = createChartData(totals, minRevenueBar);
-  const salesData = createChartData(sales, minSalesBar);
-  const viewsData = createChartData(views, minViewsBar);
+  const revenueData = createChartData(totals);
+  const salesData = createChartData(sales);
+  const viewsData = createChartData(views);
 
   const hasData = dates.length > 0;
 
@@ -82,7 +72,7 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
         >
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
-            <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>
+            {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
           <View className="mt-4">
             <BarChart
@@ -94,12 +84,13 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
               endSpacing={0}
               hideRules
               hideYAxisText
-              hideAxesAndRules
               disableScroll
               isAnimated={false}
-              barBorderRadius={2}
+              barBorderTopLeftRadius={4}
+              barBorderTopRightRadius={4}
               yAxisThickness={0}
-              xAxisThickness={0}
+              xAxisThickness={1}
+              xAxisColor={colors.border}
             />
           </View>
         </ChartContainer>
@@ -112,9 +103,11 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
         >
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatNumber(totalSales)}</Text>
-            <Text className="text-lg text-accent">
-              {formatNumber(selectedSales)} sale{selectedSales !== 1 ? "s" : ""}
-            </Text>
+            {activeIndex !== null && (
+              <Text className="text-lg text-accent">
+                {formatNumber(selectedSales)} sale{selectedSales !== 1 ? "s" : ""}
+              </Text>
+            )}
           </View>
           <View className="mt-4">
             <BarChart
@@ -126,12 +119,13 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
               endSpacing={0}
               hideRules
               hideYAxisText
-              hideAxesAndRules
               disableScroll
               isAnimated={false}
-              barBorderRadius={2}
+              barBorderTopLeftRadius={4}
+              barBorderTopRightRadius={4}
               yAxisThickness={0}
-              xAxisThickness={0}
+              xAxisThickness={1}
+              xAxisColor={colors.border}
             />
           </View>
         </ChartContainer>
@@ -144,9 +138,11 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
         >
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatNumber(totalViews)}</Text>
-            <Text className="text-lg text-accent">
-              {formatNumber(selectedViews)} view{selectedViews !== 1 ? "s" : ""}
-            </Text>
+            {activeIndex !== null && (
+              <Text className="text-lg text-accent">
+                {formatNumber(selectedViews)} view{selectedViews !== 1 ? "s" : ""}
+              </Text>
+            )}
           </View>
           <View className="mt-4">
             <BarChart
@@ -158,12 +154,13 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
               endSpacing={0}
               hideRules
               hideYAxisText
-              hideAxesAndRules
               disableScroll
               isAnimated={false}
-              barBorderRadius={2}
+              barBorderTopLeftRadius={4}
+              barBorderTopRightRadius={4}
               yAxisThickness={0}
-              xAxisThickness={0}
+              xAxisThickness={1}
+              xAxisColor={colors.border}
             />
           </View>
         </ChartContainer>

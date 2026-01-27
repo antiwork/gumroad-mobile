@@ -48,14 +48,6 @@ export const formatNumber = (num: number): string => {
   return num.toLocaleString();
 };
 
-export const getMinBarValue = (values: number[]): number => {
-  const positiveValues = values.filter((v) => v > 0);
-  if (positiveValues.length === 0) return 1;
-  const minPositive = Math.min(...positiveValues);
-  const maxValue = Math.max(...values, 1);
-  return Math.min(minPositive, maxValue / 75);
-};
-
 export const useChartDimensions = (dataLength: number) => {
   const [containerWidth, setContainerWidth] = useState(0);
 
