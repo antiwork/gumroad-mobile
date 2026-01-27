@@ -29,21 +29,21 @@ export const useChartColors = () => {
 
 export const formatCurrency = (cents: number): string => {
   const dollars = cents / 100;
-  if (dollars >= 1000000) {
-    return `$${(dollars / 1000000).toFixed(1)}M`;
+  if (dollars >= 1_000_000) {
+    return `$${(dollars / 1_000_000).toFixed(1)}M`;
   }
-  if (dollars >= 1000) {
-    return `$${(dollars / 1000).toFixed(1)}K`;
+  if (dollars >= 1_000) {
+    return `$${(dollars / 1_000).toFixed(1)}K`;
   }
   return `$${dollars.toFixed(2)}`;
 };
 
 export const formatNumber = (num: number): string => {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1_000_000) {
+    return `${(num / 1_000_000).toFixed(1)}M`;
   }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
+  if (num >= 1_000) {
+    return `${(num / 1_000).toFixed(1)}K`;
   }
   return num.toLocaleString();
 };

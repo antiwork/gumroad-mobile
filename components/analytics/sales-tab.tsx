@@ -7,11 +7,7 @@ import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
-interface SalesTabProps {
-  timeRange: AnalyticsTimeRange;
-}
-
-export const SalesTab = ({ timeRange }: SalesTabProps) => {
+export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const { processedData, isLoading } = useAnalyticsByDate(timeRange);
   const colors = useChartColors();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);

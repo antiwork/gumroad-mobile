@@ -3,15 +3,19 @@ import { ReactNode } from "react";
 import { View } from "react-native";
 import { SolidIcon } from "../icon";
 
-interface ChartContainerProps {
+export const ChartContainer = ({
+  title,
+  selectedDate,
+  showChart,
+  emptyMessage,
+  children,
+}: {
   title: string;
   selectedDate?: string;
   showChart: boolean;
   emptyMessage: string;
   children: ReactNode;
-}
-
-export const ChartContainer = ({ title, selectedDate, showChart, emptyMessage, children }: ChartContainerProps) => {
+}) => {
   return (
     <View className="mb-4 rounded border border-border bg-background p-4">
       <View className="mb-2 flex-row items-baseline justify-between">
