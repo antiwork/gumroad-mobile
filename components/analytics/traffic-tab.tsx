@@ -2,7 +2,7 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { formatCurrency, formatNumber, useChartColors } from "./analytics-bar-chart";
+import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
@@ -33,6 +33,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const { dates, revenue, visits, sales, topReferrers } = processedData;
+  const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
   const activeIndex = selectedIndex ?? (dates.length > 0 ? dates.length - 1 : null);
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
@@ -107,9 +108,6 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
     );
   }
 
-  const chartWidth = hasData ? Math.max(dates.length * 30, 300) : 300;
-  const barWidth = hasData ? Math.max(16, Math.min(24, chartWidth / dates.length - 8)) : 20;
-
   const referrerColors: Record<string, string> = {};
   if (revenue.length > 0 && revenue[0].referrers) {
     revenue[0].referrers.forEach((r) => {
@@ -123,7 +121,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-      <View className="p-4 pt-0">
+      <View className="p-4 pt-0" onLayout={handleLayout}>
         <ChartContainer
           title="Revenue"
           selectedDate={selectedDate}
@@ -132,21 +130,20 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
         >
           <Text className="mb-4 text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
           <View className="mb-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <BarChart
-                stackData={revenueChartData}
-                width={chartWidth}
-                height={120}
-                barWidth={barWidth}
-                spacing={8}
-                hideRules
-                hideYAxisText
-                disableScroll
-                barBorderRadius={2}
-                yAxisThickness={0}
-                xAxisThickness={0}
-              />
-            </ScrollView>
+            <BarChart
+              stackData={revenueChartData}
+              height={120}
+              barWidth={barWidth}
+              spacing={spacing}
+              initialSpacing={0}
+              endSpacing={0}
+              hideRules
+              hideYAxisText
+              disableScroll
+              barBorderRadius={2}
+              yAxisThickness={0}
+              xAxisThickness={0}
+            />
           </View>
           <View className="border-t border-border pt-3">
             {topReferrers.map((name) => (
@@ -168,21 +165,20 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
         >
           <Text className="mb-4 text-2xl font-bold text-foreground">{formatNumber(totalSales)}</Text>
           <View className="mb-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <BarChart
-                stackData={salesChartData}
-                width={chartWidth}
-                height={120}
-                barWidth={barWidth}
-                spacing={8}
-                hideRules
-                hideYAxisText
-                disableScroll
-                barBorderRadius={2}
-                yAxisThickness={0}
-                xAxisThickness={0}
-              />
-            </ScrollView>
+            <BarChart
+              stackData={salesChartData}
+              height={120}
+              barWidth={barWidth}
+              spacing={spacing}
+              initialSpacing={0}
+              endSpacing={0}
+              hideRules
+              hideYAxisText
+              disableScroll
+              barBorderRadius={2}
+              yAxisThickness={0}
+              xAxisThickness={0}
+            />
           </View>
           <View className="border-t border-border pt-3">
             {topReferrers.map((name) => (
@@ -204,21 +200,20 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
         >
           <Text className="mb-4 text-2xl font-bold text-foreground">{formatNumber(totalVisits)}</Text>
           <View className="mb-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <BarChart
-                stackData={visitsChartData}
-                width={chartWidth}
-                height={120}
-                barWidth={barWidth}
-                spacing={8}
-                hideRules
-                hideYAxisText
-                disableScroll
-                barBorderRadius={2}
-                yAxisThickness={0}
-                xAxisThickness={0}
-              />
-            </ScrollView>
+            <BarChart
+              stackData={visitsChartData}
+              height={120}
+              barWidth={barWidth}
+              spacing={spacing}
+              initialSpacing={0}
+              endSpacing={0}
+              hideRules
+              hideYAxisText
+              disableScroll
+              barBorderRadius={2}
+              yAxisThickness={0}
+              xAxisThickness={0}
+            />
           </View>
           <View className="border-t border-border pt-3">
             {topReferrers.map((name) => (

@@ -1,3 +1,5 @@
+import { useCallback, useState } from "react";
+import { LayoutChangeEvent } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 export interface ChartDataPoint {
@@ -52,4 +54,23 @@ export const getMinBarValue = (values: number[]): number => {
   const minPositive = Math.min(...positiveValues);
   const maxValue = Math.max(...values, 1);
   return Math.min(minPositive, maxValue / 75);
+};
+
+export const useChartDimensions = (dataLength: number) => {
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    setContainerWidth(event.nativeEvent.layout.width);
+  }, []);
+
+  const spacing = 4;
+  const chartPadding = 80;
+  const availableWidth = containerWidth > 0 ? containerWidth - chartPadding : 300;
+  const barWidth = dataLength > 0 ? Math.max(4, (availableWidth - spacing * (dataLength - 1)) / dataLength) : 20;
+
+  return {
+    handleLayout,
+    barWidth,
+    spacing,
+  };
 };

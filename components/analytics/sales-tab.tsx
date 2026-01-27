@@ -3,7 +3,13 @@ import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { useCSSVariable } from "uniwind";
-import { formatCurrency, formatNumber, getMinBarValue, useChartColors } from "./analytics-bar-chart";
+import {
+  formatCurrency,
+  formatNumber,
+  getMinBarValue,
+  useChartColors,
+  useChartDimensions,
+} from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
@@ -18,6 +24,7 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
   const accentColor = useCSSVariable("--color-accent") as string;
 
   const { dates, totals, sales, views } = processedData;
+  const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
   const activeIndex = selectedIndex ?? (dates.length > 0 ? dates.length - 1 : null);
 
@@ -60,16 +67,13 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
     );
   }
 
-  const chartWidth = hasData ? Math.max(dates.length * 30, 300) : 300;
-  const barWidth = hasData ? Math.max(16, Math.min(24, chartWidth / dates.length - 8)) : 20;
-
   const showRevenueChart = hasData && totalRevenue > 0;
   const showSalesChart = hasData && totalSales > 0;
   const showViewsChart = hasData && totalViews > 0;
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-      <View className="p-4 pt-0">
+      <View className="p-4 pt-0" onLayout={handleLayout}>
         <ChartContainer
           title="Revenue"
           selectedDate={selectedDate}
@@ -81,23 +85,22 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
             <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>
           </View>
           <View className="mt-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <BarChart
-                data={revenueData}
-                width={chartWidth}
-                height={120}
-                barWidth={barWidth}
-                spacing={8}
-                hideRules
-                hideYAxisText
-                hideAxesAndRules
-                disableScroll
-                isAnimated={false}
-                barBorderRadius={2}
-                yAxisThickness={0}
-                xAxisThickness={0}
-              />
-            </ScrollView>
+            <BarChart
+              data={revenueData}
+              height={120}
+              barWidth={barWidth}
+              spacing={spacing}
+              initialSpacing={0}
+              endSpacing={0}
+              hideRules
+              hideYAxisText
+              hideAxesAndRules
+              disableScroll
+              isAnimated={false}
+              barBorderRadius={2}
+              yAxisThickness={0}
+              xAxisThickness={0}
+            />
           </View>
         </ChartContainer>
 
@@ -114,23 +117,22 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
             </Text>
           </View>
           <View className="mt-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <BarChart
-                data={salesData}
-                width={chartWidth}
-                height={120}
-                barWidth={barWidth}
-                spacing={8}
-                hideRules
-                hideYAxisText
-                hideAxesAndRules
-                disableScroll
-                isAnimated={false}
-                barBorderRadius={2}
-                yAxisThickness={0}
-                xAxisThickness={0}
-              />
-            </ScrollView>
+            <BarChart
+              data={salesData}
+              height={120}
+              barWidth={barWidth}
+              spacing={spacing}
+              initialSpacing={0}
+              endSpacing={0}
+              hideRules
+              hideYAxisText
+              hideAxesAndRules
+              disableScroll
+              isAnimated={false}
+              barBorderRadius={2}
+              yAxisThickness={0}
+              xAxisThickness={0}
+            />
           </View>
         </ChartContainer>
 
@@ -147,23 +149,22 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
             </Text>
           </View>
           <View className="mt-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <BarChart
-                data={viewsData}
-                width={chartWidth}
-                height={120}
-                barWidth={barWidth}
-                spacing={8}
-                hideRules
-                hideYAxisText
-                hideAxesAndRules
-                disableScroll
-                isAnimated={false}
-                barBorderRadius={2}
-                yAxisThickness={0}
-                xAxisThickness={0}
-              />
-            </ScrollView>
+            <BarChart
+              data={viewsData}
+              height={120}
+              barWidth={barWidth}
+              spacing={spacing}
+              initialSpacing={0}
+              endSpacing={0}
+              hideRules
+              hideYAxisText
+              hideAxesAndRules
+              disableScroll
+              isAnimated={false}
+              barBorderRadius={2}
+              yAxisThickness={0}
+              xAxisThickness={0}
+            />
           </View>
         </ChartContainer>
       </View>
