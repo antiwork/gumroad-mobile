@@ -46,14 +46,6 @@ export const formatNumber = (num: number): string => {
   return num.toLocaleString();
 };
 
-export const formatDate = (dateStr: string, groupBy: "day" | "month"): string => {
-  const date = new Date(dateStr);
-  if (groupBy === "month") {
-    return date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-  }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-};
-
 export const getMinBarValue = (values: number[]): number => {
   const positiveValues = values.filter((v) => v > 0);
   if (positiveValues.length === 0) return 1;

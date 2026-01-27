@@ -2,7 +2,7 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { formatCurrency, formatDate, formatNumber, useChartColors } from "./analytics-bar-chart";
+import { formatCurrency, formatNumber, useChartColors } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
@@ -33,10 +33,9 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const { dates, revenue, visits, sales, topReferrers } = processedData;
-  const groupBy = timeRange === "1w" || timeRange === "1m" ? "day" : "month";
 
   const activeIndex = selectedIndex ?? (dates.length > 0 ? dates.length - 1 : null);
-  const selectedDate = activeIndex !== null && dates[activeIndex] ? formatDate(dates[activeIndex], groupBy) : "";
+  const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
   const handleBarPress = useCallback((index: number) => {
     setSelectedIndex(index);
@@ -89,7 +88,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
       }));
       return {
         stacks,
-        label: index === activeIndex ? formatDate(item.date, groupBy) : "",
+        label: index === activeIndex ? item.date : "",
       };
     });
   };

@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { useCSSVariable } from "uniwind";
-import { formatCurrency, formatDate, formatNumber, getMinBarValue, useChartColors } from "./analytics-bar-chart";
+import { formatCurrency, formatNumber, getMinBarValue, useChartColors } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
@@ -18,7 +18,6 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
   const accentColor = useCSSVariable("--color-accent") as string;
 
   const { dates, totals, sales, views } = processedData;
-  const groupBy = timeRange === "1w" || timeRange === "1m" ? "day" : "month";
 
   const activeIndex = selectedIndex ?? (dates.length > 0 ? dates.length - 1 : null);
 
@@ -29,7 +28,7 @@ export const SalesTab = ({ timeRange }: SalesTabProps) => {
   const selectedRevenue = activeIndex !== null ? totals[activeIndex] : 0;
   const selectedSales = activeIndex !== null ? sales[activeIndex] : 0;
   const selectedViews = activeIndex !== null ? views[activeIndex] : 0;
-  const selectedDate = activeIndex !== null && dates[activeIndex] ? formatDate(dates[activeIndex], groupBy) : "";
+  const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
   const minRevenueBar = getMinBarValue(totals);
   const minSalesBar = getMinBarValue(sales);
