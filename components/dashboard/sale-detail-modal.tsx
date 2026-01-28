@@ -1,3 +1,4 @@
+import { RefundForm } from "@/components/dashboard/refund-form";
 import { useSaleDetail } from "@/components/dashboard/use-sales-analytics";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -51,6 +52,8 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
                 <Text>{sale.quantity}</Text>
               </CardContent>
             </Card>
+
+            <RefundForm sale={sale} />
           </ScrollView>
         ) : (
           <View className="flex-1 items-center justify-center">

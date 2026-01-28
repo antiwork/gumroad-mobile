@@ -1,4 +1,4 @@
-import { useAPIRequest } from "@/lib/request";
+import { requestAPI, useAPIRequest } from "@/lib/request";
 import { useState } from "react";
 
 export type TimeRange = "day" | "month" | "all";
@@ -40,6 +40,7 @@ export const useSalesAnalytics = () => {
 
 export interface SaleDetail {
   id: string;
+  purchase_id: string;
   order_id: number;
   name: string;
   formatted_price: string;
@@ -55,6 +56,10 @@ export interface SaleDetail {
   quantity: number;
   variants: string | null;
   offer_code: string | null;
+  currency_symbol: string;
+  amount_refundable_in_currency: string;
+  refund_fee_notice_shown: boolean;
+  in_app_purchase_platform: "apple" | "google" | null;
 }
 
 interface SaleDetailResponse {
@@ -68,5 +73,30 @@ export const useSaleDetail = (saleId: string | null) => {
     url: `mobile/sales/${saleId}.json`,
     enabled: !!saleId,
     select: (data) => data.purchase,
+  });
+};
+
+interface RefundResponse {
+  success: boolean;
+  message: string;
+}
+
+export const refundSale = async ({
+  purchaseId,
+  amount,
+  accessToken,
+}: {
+  purchaseId: string;
+  amount?: string;
+  accessToken: string;
+}): Promise<RefundResponse> => {
+  const data: { amount?: string } = {};
+  if (amount) {
+    data.amount = amount;
+  }
+  return requestAPI<RefundResponse>(`mobile/sales/${purchaseId}/refund`, {
+    method: "PATCH",
+    data,
+    accessToken,
   });
 };
