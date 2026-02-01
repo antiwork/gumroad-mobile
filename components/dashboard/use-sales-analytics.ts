@@ -48,9 +48,9 @@ export interface SaleDetail {
   full_name: string | null;
   timestamp: string;
   formatted_timestamp: string;
-  is_refunded: boolean;
-  is_partially_refunded: boolean;
-  is_chargedback: boolean;
+  refunded: boolean;
+  partially_refunded: boolean;
+  chargedback: boolean;
   ip_country: string | null;
   referrer: string | null;
   quantity: number;

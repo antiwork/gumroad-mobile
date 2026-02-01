@@ -1,5 +1,4 @@
 import { refundSale, SaleDetail } from "@/components/dashboard/use-sales-analytics";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -9,8 +8,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { useState } from "react";
-import { Alert, Keyboard, TextInput, View } from "react-native";
+import { Keyboard, Alert as NativeAlert, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { SolidIcon } from "../icon";
+import { Alert, AlertTitle } from "../ui/alert";
 
 const REFUND_FEE_HELP_URL = "https://help.gumroad.com/article/15-refunds";
 
@@ -43,13 +44,11 @@ export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefu
     );
   }
 
-  if (sale.is_refunded || refundSuccess) {
+  if (sale.refunded || sale.partially_refunded || refundSuccess) {
     return (
-      <Badge variant="outline" className="self-start bg-blue-100 dark:bg-blue-900/30">
-        <Text className="text-blue-700 dark:text-blue-300">
-          {isPartialRefund || sale.is_partially_refunded ? "Partially refunded" : "Refunded"}
-        </Text>
-      </Badge>
+      <Alert variant="info" icon={<SolidIcon name="info-circle" size={24} className="text-info" />}>
+        <AlertTitle>{isPartialRefund || sale.partially_refunded ? "Partially refunded" : "Refunded"}</AlertTitle>
+      </Alert>
     );
   }
 
@@ -63,7 +62,7 @@ export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefu
     const refundAmount = refundAmountInput.trim() || sale.amount_refundable_in_currency;
     const displayAmount = `${sale.currency_symbol}${refundAmount}`;
 
-    Alert.alert("Purchase refund", `Would you like to confirm this purchase refund of ${displayAmount}?`, [
+    NativeAlert.alert("Purchase refund", `Would you like to confirm this purchase refund of ${displayAmount}?`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Confirm refund",
