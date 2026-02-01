@@ -14,13 +14,7 @@ import { useCSSVariable } from "uniwind";
 
 const REFUND_FEE_HELP_URL = "https://help.gumroad.com/article/15-refunds";
 
-export const RefundForm = ({
-  sale,
-  onRefundSuccess,
-}: {
-  sale: SaleDetail;
-  onRefundSuccess?: () => void;
-}) => {
+export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefundSuccess?: () => void }) => {
   const { accessToken } = useAuth();
   const queryClient = useQueryClient();
   const mutedColor = useCSSVariable("--color-muted") as string;
@@ -43,9 +37,7 @@ export const RefundForm = ({
           <CardTitle>Refund</CardTitle>
         </CardHeader>
         <CardContent>
-          <Text>
-            In-app purchases cannot be refunded directly. The buyer can request a refund from {platformName}.
-          </Text>
+          <Text>In-app purchases cannot be refunded directly. The buyer can request a refund from {platformName}.</Text>
         </CardContent>
       </Card>
     );
@@ -71,18 +63,14 @@ export const RefundForm = ({
     const refundAmount = refundAmountInput.trim() || sale.amount_refundable_in_currency;
     const displayAmount = `${sale.currency_symbol}${refundAmount}`;
 
-    Alert.alert(
-      "Purchase refund",
-      `Would you like to confirm this purchase refund of ${displayAmount}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm refund",
-          style: "destructive",
-          onPress: confirmRefund,
-        },
-      ],
-    );
+    Alert.alert("Purchase refund", `Would you like to confirm this purchase refund of ${displayAmount}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Confirm refund",
+        style: "destructive",
+        onPress: confirmRefund,
+      },
+    ]);
   };
 
   const confirmRefund = async () => {
@@ -130,7 +118,7 @@ export const RefundForm = ({
       <CardContent className="gap-3">
         <View className="flex-row items-center rounded border border-border bg-background">
           <View className="items-center justify-center border-r border-border px-3 py-2">
-            <Text className="text-muted">{sale.currency_symbol}</Text>
+            <Text>{sale.currency_symbol}</Text>
           </View>
           <TextInput
             className="flex-1 px-3 py-2 font-sans text-base text-foreground"

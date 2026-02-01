@@ -15,6 +15,8 @@
   --color-accent-foreground: #000000;
   --color-destructive: #dc341e;
   --color-destructive-foreground: #ffffff;
+  --color-info: #90a8ed;
+  --color-info-foreground: #000000;
   --color-border: #000000;
 
   --color-card: var(--color-background);
@@ -43,6 +45,8 @@
       --color-accent-foreground: #000000;
       --color-destructive: #dc341e;
       --color-destructive-foreground: #ffffff;
+      --color-info: #90a8ed;
+      --color-info-foreground: #000000;
       --color-border: #000000;
     }
 
@@ -57,6 +61,8 @@
       --color-accent-foreground: #000000;
       --color-destructive: #dc341e;
       --color-destructive-foreground: #ffffff;
+      --color-info: #90a8ed;
+      --color-info-foreground: #000000;
       --color-border: #555555;
     }
   }

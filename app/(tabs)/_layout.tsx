@@ -75,25 +75,26 @@ const SettingsSheet = () => {
       <SheetHeader onClose={() => setSettingsOpen(false)}>
         <SheetTitle>Settings</SheetTitle>
       </SheetHeader>
-      <SheetContent className="p-4">
-        <Text className="mb-2 font-sans text-lg text-foreground">Account</Text>
-        <Text className="mb-4 text-sm text-muted-foreground">This will log you out of your Gumroad account.</Text>
-        <Button onPress={handleLogout}>
-          <Text>Logout</Text>
-          <LineIcon name="log-out" size={20} className="text-primary-foreground" />
-        </Button>
-
-        <View className="my-6 border-b border-border" />
-
-        <Text className="mb-2 font-sans text-lg text-foreground">Danger Zone</Text>
-        <Text className="mb-4 text-sm text-muted-foreground">
-          Deleting your account will delete all of your products and product files, as well as any credit card and
-          payout information.
-        </Text>
-        <Button variant="destructive" onPress={handleDeleteAccount}>
-          <Text>Go to account deletion page</Text>
-          <LineIcon name="right-arrow-alt" size={20} className="text-destructive-foreground" />
-        </Button>
+      <SheetContent>
+        <View className="border-b border-border p-4">
+          <Text className="mb-2 font-sans text-lg text-foreground">Account</Text>
+          <Text className="mb-4 text-sm text-muted-foreground">This will log you out of your Gumroad account.</Text>
+          <Button onPress={handleLogout}>
+            <Text>Logout</Text>
+            <LineIcon name="log-out" size={20} className="text-primary-foreground" />
+          </Button>
+        </View>
+        <View className="border-b border-border p-4">
+          <Text className="mb-2 font-sans text-lg text-foreground">Danger Zone</Text>
+          <Text className="mb-4 text-sm text-muted-foreground">
+            Deleting your account will delete all of your products and product files, as well as any credit card and
+            payout information.
+          </Text>
+          <Button variant="destructive" onPress={handleDeleteAccount}>
+            <Text>Go to account deletion page</Text>
+            <LineIcon name="right-arrow-alt" size={20} className="text-destructive-foreground" />
+          </Button>
+        </View>
       </SheetContent>
     </Sheet>
   );
