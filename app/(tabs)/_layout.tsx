@@ -5,13 +5,13 @@ import { StyledImage } from "@/components/styled";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
+import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import { Tabs } from "expo-router";
 import { createContext, useContext, useState } from "react";
 import { Linking, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
-import { useAuth } from "../../lib/auth-context";
 
 interface SearchContextValue {
   isSearchActive: boolean;
@@ -114,6 +114,7 @@ const LibraryHeaderRight = () => (
 );
 
 export default function TabsLayout() {
+  const { isCreator } = useAuth();
   const [isSearchActive, setSearchActive] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [background, accent, muted, border] = useCSSVariable([
@@ -156,6 +157,7 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="home" size={size} color={color} />,
+              href: isCreator ? undefined : null,
             }}
           />
           <Tabs.Screen
@@ -165,6 +167,7 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <LibraryHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-alt-2" size={size} color={color} />,
+              href: isCreator ? undefined : null,
             }}
           />
           <Tabs.Screen

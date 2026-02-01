@@ -9,6 +9,7 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 
 const authorizationEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/authorize`;
 const tokenEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/token`;
+const productsEndpoint = `${env.EXPO_PUBLIC_GUMROAD_API_URL}/mobile/analytics/products.json?mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 const scopes = ["mobile_api", "creator_api"];
 
 const accessTokenKey = "gumroad_access_token";
@@ -19,6 +20,7 @@ WebBrowser.maybeCompleteAuthSession();
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
+  isCreator: boolean;
   accessToken: string | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
@@ -27,9 +29,26 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+interface ProductsResponse {
+  products: { id: string }[];
+}
+
+const fetchCreatorStatus = async (token: string): Promise<boolean> => {
+  try {
+    const response = await request<ProductsResponse>(productsEndpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return (response.products?.length ?? 0) > 0;
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isCreator, setIsCreator] = useState(false);
   const router = useRouter();
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
@@ -52,7 +71,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     async function loadStoredAuth() {
       try {
         const storedToken = await SecureStore.getItemAsync(accessTokenKey);
-        if (storedToken) setAccessToken(storedToken);
+        if (storedToken) {
+          setAccessToken(storedToken);
+          const creatorStatus = await fetchCreatorStatus(storedToken);
+          setIsCreator(creatorStatus);
+        }
       } catch (error) {
         console.error("Failed to load stored auth:", error);
       } finally {
@@ -84,6 +107,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             },
           });
           await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
+          const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
+          setIsCreator(creatorStatus);
         } catch (error) {
           console.error("Failed to exchange code for tokens:", error);
         } finally {
@@ -107,6 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await SecureStore.deleteItemAsync(accessTokenKey);
       await SecureStore.deleteItemAsync(refreshTokenKey);
       setAccessToken(null);
+      setIsCreator(false);
       router.replace("/login");
     } catch (error) {
       console.error("Failed to logout:", error);
@@ -141,6 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{
         isAuthenticated: !!accessToken,
         isLoading,
+        isCreator,
         accessToken,
         login,
         logout,
