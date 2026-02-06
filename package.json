@@ -30,6 +30,7 @@
     "clsx": "^2.1.1",
     "expo": "~54.0.30",
     "expo-auth-session": "~7.0.10",
+    "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.12",
     "expo-crypto": "~15.0.8",
     "expo-dev-client": "~6.0.20",

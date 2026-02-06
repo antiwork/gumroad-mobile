@@ -40,6 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     "expo-router",
+    ...(allowLocalhost ? [require("./plugins/with-dev-ssl-bypass")] : []),
     [
       "expo-font",
       {
