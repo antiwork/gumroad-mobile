@@ -1,7 +1,5 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
-const allowLocalhost = process.env.ALLOW_LOCALHOST === "true";
-
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "gumroad-mobile",
@@ -16,10 +14,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: "com.antiwork.gumroad-mobile",
     infoPlist: {
-      NSAppTransportSecurity: {
-        NSAllowsArbitraryLoads: allowLocalhost,
-        NSAllowsLocalNetworking: true,
-      },
       UIBackgroundModes: ["audio"],
     },
   },
@@ -40,7 +34,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     "expo-router",
-    ...(allowLocalhost ? [require("./plugins/with-dev-ssl-bypass")] : []),
+    ...(process.env.IS_PRODUCTION ? [] : ["./plugins/with-network-security-config"]),
     [
       "expo-font",
       {
