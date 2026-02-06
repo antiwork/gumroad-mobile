@@ -17,19 +17,13 @@ const withNetworkSecurityConfigFile = (config) => {
   return withDangerousMod(config, [
     "android",
     async (config) => {
-      const xmlDir = join(
-        config.modRequest.platformProjectRoot,
-        "app/src/main/res/xml"
-      );
+      const xmlDir = join(config.modRequest.platformProjectRoot, "app/src/main/res/xml");
 
       if (!existsSync(xmlDir)) {
         mkdirSync(xmlDir, { recursive: true });
       }
 
-      writeFileSync(
-        join(xmlDir, "network_security_config.xml"),
-        networkSecurityConfig
-      );
+      writeFileSync(join(xmlDir, "network_security_config.xml"), networkSecurityConfig);
 
       return config;
     },
@@ -42,8 +36,7 @@ const withNetworkSecurityConfigManifest = (config) => {
     const application = manifest.application?.[0];
 
     if (application) {
-      application.$["android:networkSecurityConfig"] =
-        "@xml/network_security_config";
+      application.$["android:networkSecurityConfig"] = "@xml/network_security_config";
     }
 
     return config;
