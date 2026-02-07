@@ -1,0 +1,30 @@
+appId: ${APP_ID}
+---
+- clearState
+- clearKeychain
+# Open the development client directly, skipping the prompt to choose the URL
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - openLink:
+          link: "gumroadmobile://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8082"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - openLink:
+          link: "gumroadmobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8082"
+# Skip past the development menu prompt
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - tapOn:
+          point: 50%,10%
+- assertVisible: "Sign in with Gumroad"

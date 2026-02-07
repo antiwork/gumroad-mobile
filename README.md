@@ -48,3 +48,23 @@ To connect to a local Gumroad instance, you will need to
    ```
 
 5. Start your local Gumroad with `CUSTOM_DOMAIN=localhost bin/dev` so that pages can be accessed via localhost.
+
+## Testing
+
+### Integration tests
+
+Integration tests use [Maestro](https://maestro.dev). To run the tests:
+
+1. Install Maestro
+
+    ```bash
+    curl -fsSL "https://get.maestro.mobile.dev" | bash
+    ```
+
+2. Ensure you have the app running in either an iOS simulator or Android emulator.
+
+3. Run the tests
+
+    ```bash
+    maestro test .maestro/login-screen.yaml
+    ```
