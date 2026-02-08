@@ -50,9 +50,7 @@ describe("useLibraryFilters", () => {
     it("excludes archived products by default", () => {
       const { result } = renderHook(() => useLibraryFilters(purchases));
       expect(result.current.filteredPurchases).toHaveLength(3);
-      expect(
-        result.current.filteredPurchases.every((p) => !p.is_archived),
-      ).toBe(true);
+      expect(result.current.filteredPurchases.every((p) => !p.is_archived)).toBe(true);
     });
 
     it("shows only archived products when toggled", () => {
@@ -80,11 +78,7 @@ describe("useLibraryFilters", () => {
       const { result } = renderHook(() => useLibraryFilters(purchases));
       act(() => result.current.handleCreatorToggle("alice"));
       expect(result.current.filteredPurchases).toHaveLength(2);
-      expect(
-        result.current.filteredPurchases.every(
-          (p) => p.creator_username === "alice",
-        ),
-      ).toBe(true);
+      expect(result.current.filteredPurchases.every((p) => p.creator_username === "alice")).toBe(true);
     });
 
     it("combines search and creator filter", () => {
@@ -94,9 +88,7 @@ describe("useLibraryFilters", () => {
         result.current.setSearchText("typescript");
       });
       expect(result.current.filteredPurchases).toHaveLength(1);
-      expect(result.current.filteredPurchases[0].name).toBe(
-        "Advanced TypeScript",
-      );
+      expect(result.current.filteredPurchases[0].name).toBe("Advanced TypeScript");
     });
   });
 
@@ -104,22 +96,14 @@ describe("useLibraryFilters", () => {
     it("sorts by content_updated_at descending by default", () => {
       const { result } = renderHook(() => useLibraryFilters(purchases));
       const names = result.current.filteredPurchases.map((p) => p.name);
-      expect(names).toEqual([
-        "Learn React",
-        "Design Basics",
-        "Advanced TypeScript",
-      ]);
+      expect(names).toEqual(["Learn React", "Design Basics", "Advanced TypeScript"]);
     });
 
     it("sorts by purchased_at descending", () => {
       const { result } = renderHook(() => useLibraryFilters(purchases));
       act(() => result.current.setSortBy("purchased_at"));
       const names = result.current.filteredPurchases.map((p) => p.name);
-      expect(names).toEqual([
-        "Advanced TypeScript",
-        "Design Basics",
-        "Learn React",
-      ]);
+      expect(names).toEqual(["Advanced TypeScript", "Design Basics", "Learn React"]);
     });
 
     it("handles missing dates by pushing them to the end", () => {
@@ -154,9 +138,7 @@ describe("useLibraryFilters", () => {
     it("only includes archived creators when showArchivedOnly is true", () => {
       const { result } = renderHook(() => useLibraryFilters(purchases));
       act(() => result.current.handleToggleArchived());
-      expect(result.current.creatorCounts).toEqual([
-        { username: "charlie", name: "Charlie", count: 1 },
-      ]);
+      expect(result.current.creatorCounts).toEqual([{ username: "charlie", name: "Charlie", count: 1 }]);
     });
   });
 

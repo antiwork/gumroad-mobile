@@ -104,12 +104,7 @@ describe("processReferralData", () => {
 
     const result = processReferralData(response);
 
-    expect(result.revenue.topReferrers).toEqual([
-      "google.com",
-      "twitter.com",
-      "facebook.com",
-      "Other",
-    ]);
+    expect(result.revenue.topReferrers).toEqual(["google.com", "twitter.com", "facebook.com", "Other"]);
 
     const revenueDay = result.revenue.data[0];
     expect(revenueDay.referrers).toHaveLength(4);
@@ -155,9 +150,7 @@ describe("processReferralData", () => {
 
     expect(result.revenue.topReferrers).toEqual(["google.com", "twitter.com"]);
     expect(result.revenue.data[0].referrers).toHaveLength(2);
-    expect(
-      result.revenue.data[0].referrers.find((r) => r.name === "Other"),
-    ).toBeUndefined();
+    expect(result.revenue.data[0].referrers.find((r) => r.name === "Other")).toBeUndefined();
   });
 
   it("assigns correct colors to referrers", () => {
