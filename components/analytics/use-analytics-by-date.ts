@@ -19,18 +19,18 @@ export interface ProcessedDateData {
   views: number[];
 }
 
-const getGroupBy = (range: AnalyticsTimeRange): string => {
+export const getGroupBy = (range: AnalyticsTimeRange): string => {
   return range === "1w" || range === "1m" ? "day" : "month";
 };
 
-const sumByDateIndex = (dataByProduct: Record<string, number[]>, dateCount: number): number[] => {
+export const sumByDateIndex = (dataByProduct: Record<string, number[]>, dateCount: number): number[] => {
   const productArrays = Object.values(dataByProduct);
   return Array.from({ length: dateCount }, (_, index) =>
     productArrays.reduce((sum, arr) => sum + (arr[index] ?? 0), 0),
   );
 };
 
-const processDateData = (data: AnalyticsByDateResponse | undefined): ProcessedDateData => {
+export const processDateData = (data: AnalyticsByDateResponse | undefined): ProcessedDateData => {
   if (!data) {
     return { dates: [], totals: [], sales: [], views: [] };
   }
