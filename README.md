@@ -57,9 +57,9 @@ Integration tests use [Maestro](https://maestro.dev). To run the tests:
 
 1. Install Maestro:
 
-    ```bash
-    curl -fsSL "https://get.maestro.mobile.dev" | bash
-    ```
+   ```bash
+   curl -fsSL "https://get.maestro.mobile.dev" | bash
+   ```
 
 2. Ensure you have the app running in either an iOS simulator or Android emulator.
 
@@ -67,7 +67,7 @@ Integration tests use [Maestro](https://maestro.dev). To run the tests:
 
 4. Run a test file:
 
-    ```bash
-    npm run e2e:ios .maestro/<test>.yaml
-    npm run e2e:android .maestro/<test>.yaml
-    ```
+   ```bash
+   npm run e2e:ios .maestro/<test>.yaml
+   npm run e2e:android .maestro/<test>.yaml
+   ```
