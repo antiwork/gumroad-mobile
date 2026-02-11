@@ -63,7 +63,9 @@ Integration tests use [Maestro](https://maestro.dev). To run the tests:
 
 2. Ensure you have the app running in either an iOS simulator or Android emulator.
 
-3. Run a test file:
+3. Ensure you have Gumroad running locally with the default seed data (`rails db:seed`).
+
+4. Run a test file:
 
     ```bash
     npm run e2e:ios .maestro/<test>.yaml
