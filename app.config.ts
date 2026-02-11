@@ -4,7 +4,7 @@ const allowLocalhost = process.env.ALLOW_LOCALHOST === "true";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "gumroad-mobile",
+  name: "Gumroad",
   slug: "gumroad-mobile",
   version: "1.0.0",
   orientation: "portrait",
@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   newArchEnabled: true,
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.antiwork.gumroad-mobile",
+    bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: allowLocalhost,
@@ -25,14 +25,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
+      backgroundColor: "#FFFFFF",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
-    package: "com.antiwork.gumroadmobile",
+    package: process.env.ANDROID_BUNDLE_NAME,
   },
   web: {
     output: "static",
