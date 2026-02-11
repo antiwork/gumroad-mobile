@@ -4,7 +4,6 @@ import { AnalyticsTimeRange } from "@/components/analytics/use-analytics-by-date
 import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
-import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import { View } from "react-native";
 
@@ -20,18 +19,11 @@ const TabButton = <ValueType extends string>({
   value: ValueType;
   selected: boolean;
   onSelect: (value: ValueType) => void;
-}) => {
-  const handlePress = () => {
-    Haptics.selectionAsync();
-    onSelect(value);
-  };
-
-  return (
-    <Button variant={selected ? "outline" : "ghost"} size="sm" className="rounded-full" onPress={handlePress}>
-      <Text>{label}</Text>
-    </Button>
-  );
-};
+}) => (
+  <Button variant={selected ? "outline" : "ghost"} size="sm" className="rounded-full" onPress={() => onSelect(value)}>
+    <Text>{label}</Text>
+  </Button>
+);
 
 export default function Analytics() {
   const [activeTab, setActiveTab] = useState<TabType>("sales");

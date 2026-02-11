@@ -5,7 +5,6 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { useState } from "react";
 import { Keyboard, Alert as NativeAlert, TextInput, View } from "react-native";
@@ -57,8 +56,6 @@ export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefu
   }
 
   const handleRefund = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
     const refundAmount = refundAmountInput.trim() || sale.amount_refundable_in_currency;
     const displayAmount = `${sale.currency_symbol}${refundAmount}`;
 
@@ -89,7 +86,6 @@ export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefu
       if (response.success) {
         setRefundSuccess(true);
         setIsPartialRefund(isPartialAmount);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         queryClient.invalidateQueries({ queryKey: ["sale", sale.id] });
         queryClient.invalidateQueries({ queryKey: ["analytics"] });
@@ -97,11 +93,9 @@ export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefu
         onRefundSuccess?.();
       } else {
         setRefundError(response.message || "Refund failed");
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (error) {
       setRefundError(error instanceof Error ? error.message : "Refund failed");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsRefunding(false);
     }

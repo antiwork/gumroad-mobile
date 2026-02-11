@@ -67,14 +67,13 @@ interface SaleDetailResponse {
   purchase: SaleDetail;
 }
 
-export const useSaleDetail = (saleId: string | null) => {
-  return useAPIRequest<SaleDetailResponse, SaleDetail>({
+export const useSaleDetail = (saleId: string | null) =>
+  useAPIRequest<SaleDetailResponse, SaleDetail>({
     queryKey: ["sale", saleId],
     url: `mobile/sales/${saleId}.json`,
     enabled: !!saleId,
     select: (data) => data.purchase,
   });
-};
 
 interface RefundResponse {
   success: boolean;

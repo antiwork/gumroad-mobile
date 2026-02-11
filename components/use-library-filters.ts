@@ -50,7 +50,7 @@ export const useLibraryFilters = (purchases: Purchase[]): UseLibraryFiltersRetur
     for (const purchase of basePurchases) {
       counts.set(purchase.creator_username, {
         name: purchase.creator_name,
-        count: (counts.get(purchase.creator_name)?.count ?? 0) + 1,
+        count: (counts.get(purchase.creator_username)?.count ?? 0) + 1,
       });
     }
 
