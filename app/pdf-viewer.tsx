@@ -16,12 +16,11 @@ type FlattenedTocItem = {
   depth: number;
 };
 
-const flattenToc = (items: TableContent[], depth = 0): FlattenedTocItem[] => {
-  return items.flatMap((item) => [
+const flattenToc = (items: TableContent[], depth = 0): FlattenedTocItem[] =>
+  items.flatMap((item) => [
     { title: item.title, pageIdx: Number(item.pageIdx), depth },
     ...flattenToc(item.children ?? [], depth + 1),
   ]);
-};
 
 export default function PdfViewerScreen() {
   const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } = useLocalSearchParams<{
@@ -42,8 +41,8 @@ export default function PdfViewerScreen() {
   const [showTocModal, setShowTocModal] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (!urlRedirectId || !productFileId) return;
 
       updateMediaLocation({
@@ -51,12 +50,13 @@ export default function PdfViewerScreen() {
         productFileId,
         purchaseId,
         // We deliberately use the latest value of the ref for the latest media location
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
         location: currentPageRef.current,
         accessToken,
       });
-    };
-  }, [urlRedirectId, productFileId, purchaseId, currentPageRef, accessToken]);
+    },
+    [urlRedirectId, productFileId, purchaseId, currentPageRef, accessToken],
+  );
 
   const handleTocItemPress = (pageIdx: number) => {
     pdfRef.current?.setPage(pageIdx + 1);

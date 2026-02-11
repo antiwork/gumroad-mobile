@@ -19,9 +19,7 @@ export interface ProcessedDateData {
   views: number[];
 }
 
-export const getGroupBy = (range: AnalyticsTimeRange): string => {
-  return range === "1w" || range === "1m" ? "day" : "month";
-};
+export const getGroupBy = (range: AnalyticsTimeRange): string => (range === "1w" || range === "1m" ? "day" : "month");
 
 export const sumByDateIndex = (dataByProduct: Record<string, number[]>, dateCount: number): number[] => {
   const productArrays = Object.values(dataByProduct);

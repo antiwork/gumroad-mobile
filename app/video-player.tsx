@@ -59,8 +59,8 @@ export default function VideoPlayerScreen() {
     player.play();
   });
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (!urlRedirectId || !productFileId) return;
 
       updateMediaLocation({
@@ -68,12 +68,13 @@ export default function VideoPlayerScreen() {
         productFileId,
         purchaseId,
         // We deliberately use the latest value of the ref for the latest media location
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
         location: currentPositionRef.current,
         accessToken,
       });
-    };
-  }, [urlRedirectId, productFileId, purchaseId, currentPositionRef, accessToken]);
+    },
+    [urlRedirectId, productFileId, purchaseId, currentPositionRef, accessToken],
+  );
 
   useEffect(() => {
     if (!player || !urlRedirectId || !productFileId) return;

@@ -38,9 +38,7 @@ export const formatReferrerName = (name: string): string => {
   return name;
 };
 
-const getGroupBy = (range: AnalyticsTimeRange): string => {
-  return range === "1w" || range === "1m" ? "day" : "month";
-};
+const getGroupBy = (range: AnalyticsTimeRange): string => (range === "1w" || range === "1m" ? "day" : "month");
 
 export const aggregateByReferrer = (
   metricData: Record<string, Record<string, number[]>>,

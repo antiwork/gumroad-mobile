@@ -84,8 +84,8 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
 
   const createStackedChartData = (
     data: { date: string; referrers: { name: string; value: number; color: string }[] }[],
-  ) => {
-    return data.map((item, index) => {
+  ) =>
+    data.map((item, index) => {
       const stacks = item.referrers.map((r, stackIndex) => ({
         value: r.value || 0,
         color: r.color,
@@ -97,7 +97,6 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
         label: index === activeIndex ? item.date : "",
       };
     });
-  };
 
   const revenueChartData = createStackedChartData(revenue.data);
   const visitsChartData = createStackedChartData(visits.data);

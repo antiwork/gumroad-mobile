@@ -34,13 +34,12 @@ interface PurchasesResponse {
   user_id: string;
 }
 
-export const usePurchases = () => {
-  return useAPIRequest<PurchasesResponse, Purchase[]>({
+export const usePurchases = () =>
+  useAPIRequest<PurchasesResponse, Purchase[]>({
     queryKey: ["purchases"],
     url: "mobile/purchases/index",
     select: (data) => data.products,
   });
-};
 
 export default function Index() {
   const { isLoading } = useAuth();

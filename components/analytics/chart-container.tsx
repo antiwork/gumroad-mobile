@@ -15,21 +15,19 @@ export const ChartContainer = ({
   showChart: boolean;
   emptyMessage: string;
   children: ReactNode;
-}) => {
-  return (
-    <View className="mb-4 rounded border border-border bg-background p-4">
-      <View className="mb-2 flex-row items-baseline justify-between">
-        <Text className="text-sm font-bold">{title}</Text>
-        {showChart && selectedDate && <Text className="text-xs text-muted">{selectedDate}</Text>}
-      </View>
-      {showChart ? (
-        children
-      ) : (
-        <View className="h-38 flex-row items-center justify-center gap-2">
-          <SolidIcon name="bar-chart-alt-2" className="text-muted" size={16} />
-          <Text className="text-muted">{emptyMessage}</Text>
-        </View>
-      )}
+}) => (
+  <View className="mb-4 rounded border border-border bg-background p-4">
+    <View className="mb-2 flex-row items-baseline justify-between">
+      <Text className="text-sm font-bold">{title}</Text>
+      {showChart && selectedDate && <Text className="text-xs text-muted">{selectedDate}</Text>}
     </View>
-  );
-};
+    {showChart ? (
+      children
+    ) : (
+      <View className="h-38 flex-row items-center justify-center gap-2">
+        <SolidIcon name="bar-chart-alt-2" className="text-muted" size={16} />
+        <Text className="text-muted">{emptyMessage}</Text>
+      </View>
+    )}
+  </View>
+);

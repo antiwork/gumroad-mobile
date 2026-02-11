@@ -31,13 +31,12 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
     setSelectedIndex((prev) => (prev === index ? null : index));
   }, []);
 
-  const createChartData = (values: number[]) => {
-    return values.map((value, index) => ({
+  const createChartData = (values: number[]) =>
+    values.map((value, index) => ({
       value: value === 0 ? 0 : value,
       frontColor: index === activeIndex ? accentColor : colors.muted,
       onPress: () => handleBarPress(index),
     }));
-  };
 
   const revenueData = createChartData(totals);
   const salesData = createChartData(sales);
