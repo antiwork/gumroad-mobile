@@ -2,3 +2,38 @@ appId: ${APP_ID}
 ---
 - runFlow:
     file: utils/launch.yaml
+- tapOn: Sign in with Gumroad
+# Tap through the iOS "Sign in with gumroad.dev?" prompt
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+# The browser state isn't cleared when the app cache is cleared, so we may still be logged in from a previous session
+- runFlow:
+    when:
+      visible: Logout
+    commands:
+      - tapOn: Logout
+- scrollUntilVisible:
+    element: Login
+- tapOn: Email
+- inputText: mobile_buyer_do_not_edit@gumroad.com
+- pressKey: enter # Form validation auto-focuses the password field
+- inputText: password
+- pressKey: enter
+# Tap through the iOS password manager prompt
+- runFlow:
+    when:
+      visible: Not Now
+    commands:
+      - tapOn: Not Now
+# 2FA prompt will trigger if it hasn't already been completed
+- runFlow:
+    when:
+      visible: Authentication Token
+    commands:
+      - tapOn: Login
+- assertVisible: Authorize
+- tapOn: Authorize
+- assertVisible: Library
