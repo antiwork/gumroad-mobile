@@ -1,7 +1,5 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
-const allowLocalhost = process.env.ALLOW_LOCALHOST === "true";
-
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Gumroad",
@@ -16,10 +14,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
-      NSAppTransportSecurity: {
-        NSAllowsArbitraryLoads: allowLocalhost,
-        NSAllowsLocalNetworking: true,
-      },
       UIBackgroundModes: ["audio"],
     },
   },
