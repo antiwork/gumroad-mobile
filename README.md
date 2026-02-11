@@ -55,7 +55,7 @@ To connect to a local Gumroad instance, you will need to
 
 Integration tests use [Maestro](https://maestro.dev). To run the tests:
 
-1. Install Maestro
+1. Install Maestro:
 
     ```bash
     curl -fsSL "https://get.maestro.mobile.dev" | bash
@@ -63,8 +63,9 @@ Integration tests use [Maestro](https://maestro.dev). To run the tests:
 
 2. Ensure you have the app running in either an iOS simulator or Android emulator.
 
-3. Run the tests
+3. Run a test file:
 
     ```bash
-    maestro test .maestro/login-screen.yaml
+    npm run e2e:ios .maestro/<test>.yaml
+    npm run e2e:android .maestro/<test>.yaml
     ```
