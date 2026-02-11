@@ -9,22 +9,20 @@ type SheetProps = Omit<ModalProps, "animationType" | "presentationStyle"> & {
   onOpenChange: (open: boolean) => void;
 };
 
-const Sheet = ({ open, onOpenChange, onRequestClose, children, ...props }: SheetProps) => {
-  return (
-    <Modal
-      visible={open}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={(e) => {
-        onOpenChange(false);
-        onRequestClose?.(e);
-      }}
-      {...props}
-    >
-      <View className="flex-1 bg-background">{children}</View>
-    </Modal>
-  );
-};
+const Sheet = ({ open, onOpenChange, onRequestClose, children, ...props }: SheetProps) => (
+  <Modal
+    visible={open}
+    animationType="slide"
+    presentationStyle="pageSheet"
+    onRequestClose={(e) => {
+      onOpenChange(false);
+      onRequestClose?.(e);
+    }}
+    {...props}
+  >
+    <View className="flex-1 bg-background">{children}</View>
+  </Modal>
+);
 
 type SheetHeaderProps = {
   children?: React.ReactNode;
@@ -32,30 +30,28 @@ type SheetHeaderProps = {
   onClose: () => void;
 };
 
-const SheetHeader = ({ children, className, onClose }: SheetHeaderProps) => {
-  return (
-    <View className={cn("flex-row items-center justify-between border-b border-border px-4 py-3", className)}>
-      <View className="flex-1">{children}</View>
-      <Pressable onPress={onClose} className="p-2">
-        <LineIcon name="x" size={24} className="text-foreground" />
-      </Pressable>
-    </View>
-  );
-};
+const SheetHeader = ({ children, className, onClose }: SheetHeaderProps) => (
+  <View className={cn("flex-row items-center justify-between border-b border-border px-4 py-3", className)}>
+    <View className="flex-1">{children}</View>
+    <Pressable onPress={onClose} className="p-2">
+      <LineIcon name="x" size={24} className="text-foreground" />
+    </Pressable>
+  </View>
+);
 
 type SheetTitleProps = React.ComponentProps<typeof Text>;
 
-const SheetTitle = ({ className, ...props }: SheetTitleProps) => {
-  return <Text className={cn("font-bold text-foreground", className)} {...props} />;
-};
+const SheetTitle = ({ className, ...props }: SheetTitleProps) => (
+  <Text className={cn("font-bold text-foreground", className)} {...props} />
+);
 
 type SheetContentProps = {
   children?: React.ReactNode;
   className?: string;
 };
 
-const SheetContent = ({ children, className }: SheetContentProps) => {
-  return <View className={cn("flex-1", className)}>{children}</View>;
-};
+const SheetContent = ({ children, className }: SheetContentProps) => (
+  <View className={cn("flex-1", className)}>{children}</View>
+);
 
 export { Sheet, SheetContent, SheetHeader, SheetTitle };

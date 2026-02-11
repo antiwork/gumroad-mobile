@@ -29,20 +29,18 @@ export interface ProcessedReferralData {
   sales: MetricData;
 }
 
-const REFERRER_COLORS = ["#8a8a8a", "#23a094", "#dc341e", "#f1c40f"];
+export const REFERRER_COLORS = ["#8a8a8a", "#23a094", "#dc341e", "#f1c40f"];
 
-const formatReferrerName = (name: string): string => {
+export const formatReferrerName = (name: string): string => {
   if (name === "direct" || name === "") {
     return "Direct, email, IM";
   }
   return name;
 };
 
-const getGroupBy = (range: AnalyticsTimeRange): string => {
-  return range === "1w" || range === "1m" ? "day" : "month";
-};
+const getGroupBy = (range: AnalyticsTimeRange): string => (range === "1w" || range === "1m" ? "day" : "month");
 
-const aggregateByReferrer = (
+export const aggregateByReferrer = (
   metricData: Record<string, Record<string, number[]>>,
   dateCount: number,
 ): Record<string, number[]> => {
@@ -63,7 +61,7 @@ const aggregateByReferrer = (
   return aggregated;
 };
 
-const processReferralData = (data: AnalyticsByReferralResponse | undefined): ProcessedReferralData => {
+export const processReferralData = (data: AnalyticsByReferralResponse | undefined): ProcessedReferralData => {
   if (!data) {
     const emptyMetric = { data: [], topReferrers: [] };
     return { dates: [], revenue: emptyMetric, visits: emptyMetric, sales: emptyMetric };
