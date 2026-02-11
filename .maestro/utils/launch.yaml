@@ -1,5 +1,6 @@
 appId: ${APP_ID}
 ---
+- killApp
 - clearState
 - clearKeychain
 # Open the development client directly, skipping the prompt to choose the URL

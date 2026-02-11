@@ -13,7 +13,11 @@
     "typecheck": "tsc --noEmit",
     "generate-icons": "npx tsx scripts/generate-boxicons.ts",
     "postinstall": "npm run generate-icons",
-    "test": "jest"
+    "test": "jest",
+    "e2e:ios": "dotenv -- npm run e2e:ios:run",
+    "e2e:ios:run": "maestro test -p ios -e APP_ID=$IOS_BUNDLE_NAME",
+    "e2e:android": "dotenv -- npm run e2e:android:run",
+    "e2e:android:run": "maestro test -p android -e APP_ID=$ANDROID_BUNDLE_NAME"
   },
   "jest": {
     "preset": "jest-expo",
