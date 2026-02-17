@@ -1,6 +1,11 @@
 # Gumroad Mobile
 
-[Gumroad](https://gumroad.com) is an e-commerce platform that enables creators to sell products directly to consumers. This repository contains the source code for the Gumroad mobile application, built with [Expo](https://expo.dev).
+[Gumroad](https://gumroad.com) is an e-commerce platform that enables creators to sell products directly to consumers. This repository contains source code for an upcoming rewrite of the Gumroad mobile application, built with [Expo](https://expo.dev).
+
+> [!WARNING]
+> This is still experimental and is **not the app that's currently live on app stores.**
+
+<img width="5324" height="2822" alt="Image" src="https://github.com/user-attachments/assets/3c724bce-275a-44b7-b722-10a60d122e03" />
 
 ## Get started
 
