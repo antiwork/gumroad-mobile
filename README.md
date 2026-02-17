@@ -5,7 +5,7 @@
 > [!WARNING]
 > This is still experimental and is **not the app that's currently live on app stores.**
 
-<img width="5324" height="2822" alt="Image" src="https://github.com/user-attachments/assets/3c724bce-275a-44b7-b722-10a60d122e03" />
+<img width="5124" height="2622" alt="Image" src="https://github.com/user-attachments/assets/9c563ddd-4fba-47e8-a540-53ab91a74ac1" />
 
 ## Get started
 
