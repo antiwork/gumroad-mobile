@@ -158,7 +158,7 @@ export default function DownloadScreen() {
           <LoadingSpinner size="large" />
         </View>
       )}
-      <View className="bg-background" style={{ paddingBottom: bottom }}>
+      <View className="bg-body-bg" style={{ paddingBottom: bottom }}>
         <MiniAudioPlayer />
       </View>
     </Screen>
