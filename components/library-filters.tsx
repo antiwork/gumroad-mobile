@@ -1,5 +1,5 @@
 import { LineIcon } from "@/components/icon";
-import { CreatorCount, SortOption } from "@/components/use-library-filters";
+import { SortOption } from "@/components/use-library-purchases";
 import { useState } from "react";
 import { FlatList, Platform, TextInput, TouchableOpacity, View } from "react-native";
 import { Drawer } from "react-native-drawer-layout";
@@ -11,18 +11,23 @@ import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Text } from "./ui/text";
 
+interface Seller {
+  id: string;
+  name: string;
+  purchases_count: number;
+}
+
 export interface LibraryFiltersProps {
   searchText: string;
   setSearchText: (text: string) => void;
-  selectedCreators: Set<string>;
+  selectedSellers: Set<string>;
   showArchivedOnly: boolean;
   sortBy: SortOption;
   setSortBy: (sort: SortOption) => void;
-  hasArchivedProducts: boolean;
   hasActiveFilters: boolean;
-  creatorCounts: CreatorCount[];
-  handleCreatorToggle: (creatorName: string) => void;
-  handleSelectAllCreators: () => void;
+  sellers: Seller[];
+  handleSellerToggle: (sellerId: string) => void;
+  handleSelectAllSellers: () => void;
   handleClearFilters: () => void;
   handleToggleArchived: () => void;
   children: React.ReactNode;
@@ -31,15 +36,14 @@ export interface LibraryFiltersProps {
 export const LibraryFilters = ({
   searchText,
   setSearchText,
-  selectedCreators,
+  selectedSellers,
   showArchivedOnly,
   sortBy,
   setSortBy,
-  hasArchivedProducts,
   hasActiveFilters,
-  creatorCounts,
-  handleCreatorToggle,
-  handleSelectAllCreators,
+  sellers,
+  handleSellerToggle,
+  handleSelectAllSellers,
   handleClearFilters,
   handleToggleArchived,
   children,
@@ -90,16 +94,16 @@ export const LibraryFilters = ({
 
           <View className="flex-1 border-b border-border px-4 py-3">
             <FlatList
-              data={creatorCounts}
-              keyExtractor={(item) => item.name}
+              data={sellers}
+              keyExtractor={(item) => item.id}
               ListHeaderComponent={
                 <View className="flex flex-row items-center gap-3 py-1">
                   <Checkbox
-                    id="allCreators"
-                    checked={selectedCreators.size === 0}
-                    onCheckedChange={handleSelectAllCreators}
+                    id="allSellers"
+                    checked={selectedSellers.size === 0}
+                    onCheckedChange={handleSelectAllSellers}
                   />
-                  <Label onPress={Platform.select({ native: handleSelectAllCreators })} htmlFor="allCreators">
+                  <Label onPress={Platform.select({ native: handleSelectAllSellers })} htmlFor="allSellers">
                     All creators
                   </Label>
                 </View>
@@ -107,29 +111,27 @@ export const LibraryFilters = ({
               renderItem={({ item }) => (
                 <View className="flex flex-row items-center gap-3 py-1">
                   <Checkbox
-                    id={item.username}
-                    checked={selectedCreators.has(item.username)}
-                    onCheckedChange={() => handleCreatorToggle(item.username)}
+                    id={item.id}
+                    checked={selectedSellers.has(item.id)}
+                    onCheckedChange={() => handleSellerToggle(item.id)}
                   />
                   <Label
-                    onPress={Platform.select({ native: () => handleCreatorToggle(item.username) })}
-                    htmlFor={item.username}
+                    onPress={Platform.select({ native: () => handleSellerToggle(item.id) })}
+                    htmlFor={item.id}
                   >
-                    {item.name} ({item.count})
+                    {item.name} ({item.purchases_count})
                   </Label>
                 </View>
               )}
             />
           </View>
 
-          {hasArchivedProducts ? (
-            <View className="flex-row items-center gap-3 border-b border-border px-4 py-3">
-              <Checkbox id="archived" checked={showArchivedOnly} onCheckedChange={handleToggleArchived} />
-              <Label onPress={Platform.select({ native: handleToggleArchived })} htmlFor="archived">
-                Show archived only
-              </Label>
-            </View>
-          ) : null}
+          <View className="flex-row items-center gap-3 border-b border-border px-4 py-3">
+            <Checkbox id="archived" checked={showArchivedOnly} onCheckedChange={handleToggleArchived} />
+            <Label onPress={Platform.select({ native: handleToggleArchived })} htmlFor="archived">
+              Show archived only
+            </Label>
+          </View>
 
           <View className="px-4 pt-4">
             <Button onPress={() => setDrawerOpen(false)}>
