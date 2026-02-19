@@ -1,5 +1,6 @@
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 const BIOMETRIC_ENABLED_KEY = "gumroad_biometric_enabled";
 
@@ -20,6 +21,23 @@ export const setBiometricEnabled = async (enabled: boolean): Promise<void> => {
   } else {
     await SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY);
   }
+};
+
+export const getBiometricLabel = async (): Promise<{ label: string; icon: "scan" | "fingerprint" }> => {
+  const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+  if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+    return {
+      label: Platform.OS === "ios" ? "Face ID" : "face recognition",
+      icon: "scan",
+    };
+  }
+  if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+    return {
+      label: Platform.OS === "ios" ? "Touch ID" : "fingerprint",
+      icon: "fingerprint",
+    };
+  }
+  return { label: "biometrics", icon: "fingerprint" };
 };
 
 export const authenticate = async (): Promise<boolean> => {

@@ -13,7 +13,8 @@ import { StyledImage } from "../components/styled";
 import { useAuth } from "../lib/auth-context";
 
 export default function LoginScreen() {
-  const { isAuthenticated, isLoading, login, canUseBiometric, loginWithBiometrics } = useAuth();
+  const { isAuthenticated, isLoading, login, isBiometricSetUp, biometricLabel, biometricIcon, loginWithBiometrics } =
+    useAuth();
   const { theme } = useUniwind();
 
   useEffect(() => {
@@ -26,10 +27,10 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && canUseBiometric) {
+    if (!isLoading && !isAuthenticated && isBiometricSetUp) {
       loginWithBiometrics();
     }
-  }, [isLoading, isAuthenticated, canUseBiometric, loginWithBiometrics]);
+  }, [isLoading, isAuthenticated, isBiometricSetUp, loginWithBiometrics]);
 
   if (isAuthenticated) return <Redirect href="/" />;
 
@@ -38,26 +39,26 @@ export default function LoginScreen() {
       <StyledImage source={theme === "dark" ? logoDark : logoLight} className="aspect-158/22 w-50" />
 
       <View className="w-full items-center gap-3">
-        {canUseBiometric ? (
+        {isBiometricSetUp ? (
           <Button variant="accent" onPress={loginWithBiometrics} disabled={isLoading} className="w-full">
             {isLoading ? (
               <LoadingSpinner size="small" />
             ) : (
               <>
-                <LineIcon name="fingerprint" size={20} className="text-accent-foreground" />
-                <Text>Sign in with biometrics</Text>
+                <LineIcon name={biometricIcon} size={20} className="text-accent-foreground" />
+                <Text>Sign in with {biometricLabel}</Text>
               </>
             )}
           </Button>
         ) : null}
 
         <Button
-          variant={canUseBiometric ? "outline" : "accent"}
+          variant={isBiometricSetUp ? "outline" : "accent"}
           onPress={login}
           disabled={isLoading}
           className="w-full"
         >
-          {isLoading && !canUseBiometric ? <LoadingSpinner size="small" /> : <Text>Sign in with Gumroad</Text>}
+          {isLoading && !isBiometricSetUp ? <LoadingSpinner size="small" /> : <Text>Sign in with Gumroad</Text>}
         </Button>
       </View>
     </View>

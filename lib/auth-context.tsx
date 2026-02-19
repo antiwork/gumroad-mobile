@@ -1,12 +1,18 @@
 import { assertDefined } from "@/lib/assert";
-import { authenticate, isBiometricEnabled, isBiometricSupported, setBiometricEnabled } from "@/lib/biometric";
+import {
+  authenticate,
+  getBiometricLabel,
+  isBiometricEnabled,
+  isBiometricSupported,
+  setBiometricEnabled,
+} from "@/lib/biometric";
 import { env } from "@/lib/env";
 import { request } from "@/lib/request";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 const authorizationEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/authorize`;
@@ -25,7 +31,9 @@ interface AuthContextType {
   isCreator: boolean;
   accessToken: string | null;
   biometricEnabled: boolean;
-  canUseBiometric: boolean;
+  biometricLabel: string;
+  biometricIcon: "scan" | "fingerprint";
+  isBiometricSetUp: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<string | null>;
@@ -56,7 +64,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isCreator, setIsCreator] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState("biometrics");
+  const [biometricIcon, setBiometricIcon] = useState<"scan" | "fingerprint">("fingerprint");
   const [hasRefreshToken, setHasRefreshToken] = useState(false);
+  const isRefreshing = useRef(false);
   const router = useRouter();
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
@@ -78,10 +89,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     async function loadStoredAuth() {
       try {
-        const storedToken = await SecureStore.getItemAsync(accessTokenKey);
-        const storedRefresh = await SecureStore.getItemAsync(refreshTokenKey);
-        const bioEnabled = await isBiometricEnabled();
+        const [storedToken, storedRefresh, bioEnabled, bioLabel] = await Promise.all([
+          SecureStore.getItemAsync(accessTokenKey),
+          SecureStore.getItemAsync(refreshTokenKey),
+          isBiometricEnabled(),
+          getBiometricLabel(),
+        ]);
         setBiometricEnabledState(bioEnabled);
+        setBiometricLabel(bioLabel.label);
+        setBiometricIcon(bioLabel.icon);
         setHasRefreshToken(!!storedRefresh);
         if (storedToken) {
           setAccessToken(storedToken);
@@ -160,19 +176,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (authRequest) await promptAsync();
   }, [authRequest, promptAsync]);
 
-  const handleSessionExpiry = useCallback(async () => {
+  const refreshTokenFn = useCallback(async (): Promise<string | null> => {
     try {
-      setIsLoading(true);
+      const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+      if (!storedRefreshToken) return null;
+
+      const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
+        method: "POST",
+        data: {
+          grant_type: "refresh_token",
+          refresh_token: storedRefreshToken,
+          client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
+        },
+      });
+      await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
+      return tokenResponse.access_token;
+    } catch (error) {
+      console.error("Failed to refresh token:", error);
+      return null;
+    }
+  }, [storeTokens]);
+
+  const handleSessionExpiry = useCallback(async () => {
+    if (isRefreshing.current) return;
+    isRefreshing.current = true;
+    try {
+      const newToken = await refreshTokenFn();
+      if (newToken) {
+        const creatorStatus = await fetchCreatorStatus(newToken);
+        setIsCreator(creatorStatus);
+        return;
+      }
       await SecureStore.deleteItemAsync(accessTokenKey);
+      await SecureStore.deleteItemAsync(refreshTokenKey);
       setAccessToken(null);
+      setHasRefreshToken(false);
       setIsCreator(false);
       router.replace("/login");
     } catch (error) {
       console.error("Failed to handle session expiry:", error);
+      setAccessToken(null);
+      setIsCreator(false);
+      router.replace("/login");
     } finally {
-      setIsLoading(false);
+      isRefreshing.current = false;
     }
-  }, [router]);
+  }, [router, refreshTokenFn]);
 
   const logout = useCallback(async () => {
     try {
@@ -191,28 +240,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     }
   }, [router]);
-
-  const refreshTokenFn = useCallback(async (): Promise<string | null> => {
-    try {
-      const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
-      if (!storedRefreshToken) throw new Error("No refresh token available");
-
-      const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
-        method: "POST",
-        data: {
-          grant_type: "refresh_token",
-          refresh_token: storedRefreshToken,
-          client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-        },
-      });
-      await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
-      return tokenResponse.access_token;
-    } catch (error) {
-      console.error("Failed to refresh token:", error);
-      await handleSessionExpiry();
-      return null;
-    }
-  }, [handleSessionExpiry, storeTokens]);
 
   const loginWithBiometrics = useCallback(async () => {
     try {
@@ -244,7 +271,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isCreator,
         accessToken,
         biometricEnabled,
-        canUseBiometric: biometricEnabled && hasRefreshToken,
+        biometricLabel,
+        biometricIcon,
+        isBiometricSetUp: biometricEnabled && hasRefreshToken,
         login,
         logout,
         refreshToken: refreshTokenFn,

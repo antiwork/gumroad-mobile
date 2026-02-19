@@ -1,4 +1,4 @@
-import { authenticate, isBiometricEnabled, isBiometricSupported } from "@/lib/biometric";
+import { authenticate, getBiometricLabel, isBiometricEnabled, isBiometricSupported } from "@/lib/biometric";
 
 const mockGetItemAsync = jest.fn();
 const mockSetItemAsync = jest.fn();
@@ -11,6 +11,7 @@ jest.mock("expo-secure-store", () => ({
 
 jest.mock("@/lib/biometric", () => ({
   authenticate: jest.fn(),
+  getBiometricLabel: jest.fn(),
   isBiometricEnabled: jest.fn(),
   isBiometricSupported: jest.fn(),
   setBiometricEnabled: jest.fn(),
@@ -32,8 +33,9 @@ jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
 }));
 
+const mockReplace = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: jest.fn() }),
+  useRouter: () => ({ replace: mockReplace }),
 }));
 
 import { renderHook, act } from "@testing-library/react-native";
@@ -49,15 +51,16 @@ describe("auth-context biometric integration", () => {
     mockGetItemAsync.mockResolvedValue(null);
     (isBiometricEnabled as jest.Mock).mockResolvedValue(false);
     (isBiometricSupported as jest.Mock).mockResolvedValue(false);
+    (getBiometricLabel as jest.Mock).mockResolvedValue({ label: "biometrics", icon: "fingerprint" });
   });
 
-  it("exposes canUseBiometric as false when biometric is not enabled", async () => {
+  it("exposes isBiometricSetUp as false when biometric is not enabled", async () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
     await act(async () => {});
-    expect(result.current.canUseBiometric).toBe(false);
+    expect(result.current.isBiometricSetUp).toBe(false);
   });
 
-  it("exposes canUseBiometric as true when biometric is enabled and refresh token exists", async () => {
+  it("exposes isBiometricSetUp as true when biometric is enabled and refresh token exists", async () => {
     (isBiometricEnabled as jest.Mock).mockResolvedValue(true);
     mockGetItemAsync.mockImplementation((key: string) => {
       if (key === "gumroad_refresh_token") return Promise.resolve("stored-refresh");
@@ -66,7 +69,7 @@ describe("auth-context biometric integration", () => {
 
     const { result } = renderHook(() => useAuth(), { wrapper });
     await act(async () => {});
-    expect(result.current.canUseBiometric).toBe(true);
+    expect(result.current.isBiometricSetUp).toBe(true);
   });
 
   it("loginWithBiometrics clears refresh token when refresh fails", async () => {
@@ -85,7 +88,7 @@ describe("auth-context biometric integration", () => {
       await result.current.loginWithBiometrics();
     });
 
-    expect(result.current.canUseBiometric).toBe(false);
+    expect(result.current.isBiometricSetUp).toBe(false);
   });
 
   it("loginWithBiometrics fetches creator status on successful refresh", async () => {
@@ -123,6 +126,69 @@ describe("auth-context biometric integration", () => {
     });
 
     expect(mockRequest).not.toHaveBeenCalled();
+    expect(result.current.isAuthenticated).toBe(false);
+  });
+
+  it("handleSessionExpiry silently refreshes when refresh token is valid", async () => {
+    mockGetItemAsync.mockImplementation((key: string) => {
+      if (key === "gumroad_access_token") return Promise.resolve("old-token");
+      if (key === "gumroad_refresh_token") return Promise.resolve("valid-refresh");
+      return Promise.resolve(null);
+    });
+    mockRequest
+      .mockResolvedValueOnce({ products: [] })
+      .mockResolvedValueOnce({ access_token: "refreshed-token", refresh_token: "new-refresh" })
+      .mockResolvedValueOnce({ products: [{ id: "1" }] });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(async () => {});
+
+    expect(result.current.isAuthenticated).toBe(true);
+
+    await act(async () => {
+      await result.current.handleSessionExpiry();
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(result.current.isAuthenticated).toBe(true);
+  });
+
+  it("handleSessionExpiry redirects to login when refresh token is expired", async () => {
+    mockGetItemAsync.mockImplementation((key: string) => {
+      if (key === "gumroad_access_token") return Promise.resolve("old-token");
+      if (key === "gumroad_refresh_token") return Promise.resolve("expired-refresh");
+      return Promise.resolve(null);
+    });
+    mockRequest
+      .mockResolvedValueOnce({ products: [] })
+      .mockRejectedValueOnce(new Error("invalid_grant"));
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.handleSessionExpiry();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/login");
+    expect(result.current.isAuthenticated).toBe(false);
+  });
+
+  it("handleSessionExpiry redirects to login when no refresh token exists", async () => {
+    mockGetItemAsync.mockImplementation((key: string) => {
+      if (key === "gumroad_access_token") return Promise.resolve("old-token");
+      return Promise.resolve(null);
+    });
+    mockRequest.mockResolvedValueOnce({ products: [] });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.handleSessionExpiry();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/login");
     expect(result.current.isAuthenticated).toBe(false);
   });
 });

@@ -31,7 +31,9 @@ const baseAuth = {
   isCreator: false,
   accessToken: null,
   biometricEnabled: false,
-  canUseBiometric: false,
+  biometricLabel: "Face ID",
+  biometricIcon: "scan" as const,
+  isBiometricSetUp: false,
   login: jest.fn(),
   logout: jest.fn(),
   refreshToken: jest.fn(),
@@ -44,30 +46,37 @@ describe("LoginScreen", () => {
     jest.clearAllMocks();
   });
 
-  it("shows biometric button when canUseBiometric is true", () => {
-    mockUseAuth.mockReturnValue({ ...baseAuth, canUseBiometric: true });
+  it("shows biometric button with specific label when set up", () => {
+    mockUseAuth.mockReturnValue({ ...baseAuth, isBiometricSetUp: true, biometricLabel: "Face ID", biometricIcon: "scan" });
     render(<LoginScreen />);
-    expect(screen.getByText("Sign in with biometrics")).toBeTruthy();
+    expect(screen.getByText("Sign in with Face ID")).toBeTruthy();
     expect(screen.getByText("Sign in with Gumroad")).toBeTruthy();
   });
 
-  it("hides biometric button when canUseBiometric is false", () => {
-    mockUseAuth.mockReturnValue({ ...baseAuth, canUseBiometric: false });
+  it("shows fingerprint label when biometric type is fingerprint", () => {
+    mockUseAuth.mockReturnValue({ ...baseAuth, isBiometricSetUp: true, biometricLabel: "fingerprint", biometricIcon: "fingerprint" });
     render(<LoginScreen />);
-    expect(screen.queryByText("Sign in with biometrics")).toBeNull();
+    expect(screen.getByText("Sign in with fingerprint")).toBeTruthy();
+  });
+
+  it("hides biometric button when not set up", () => {
+    mockUseAuth.mockReturnValue({ ...baseAuth, isBiometricSetUp: false });
+    render(<LoginScreen />);
+    expect(screen.queryByText(/Sign in with Face ID/)).toBeNull();
+    expect(screen.queryByText(/Sign in with fingerprint/)).toBeNull();
     expect(screen.getByText("Sign in with Gumroad")).toBeTruthy();
   });
 
-  it("auto-triggers biometric login when canUseBiometric is true", () => {
+  it("auto-triggers biometric login when set up", () => {
     const loginWithBiometrics = jest.fn();
-    mockUseAuth.mockReturnValue({ ...baseAuth, canUseBiometric: true, loginWithBiometrics });
+    mockUseAuth.mockReturnValue({ ...baseAuth, isBiometricSetUp: true, loginWithBiometrics });
     render(<LoginScreen />);
     expect(loginWithBiometrics).toHaveBeenCalled();
   });
 
-  it("does not auto-trigger biometric login when canUseBiometric is false", () => {
+  it("does not auto-trigger biometric login when not set up", () => {
     const loginWithBiometrics = jest.fn();
-    mockUseAuth.mockReturnValue({ ...baseAuth, canUseBiometric: false, loginWithBiometrics });
+    mockUseAuth.mockReturnValue({ ...baseAuth, isBiometricSetUp: false, loginWithBiometrics });
     render(<LoginScreen />);
     expect(loginWithBiometrics).not.toHaveBeenCalled();
   });
