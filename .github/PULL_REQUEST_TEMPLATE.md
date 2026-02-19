@@ -13,7 +13,7 @@ Issue: #
 # Before/After
 
 <!-- For UI/CSS changes, include screenshots or videos showing both states -->
-<!-- Include: Desktop (light + dark) and Mobile (light + dark) -->
+<!-- Include: Mobile (light + dark) -->
 
 ---
 
