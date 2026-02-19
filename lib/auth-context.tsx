@@ -1,13 +1,10 @@
 import { assertDefined } from "@/lib/assert";
 import { env } from "@/lib/env";
 import { request } from "@/lib/request";
-import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import * as WebBrowser from "expo-web-browser";
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
 
-const authorizationEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/authorize`;
 const tokenEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/token`;
 const productsEndpoint = `${env.EXPO_PUBLIC_GUMROAD_API_URL}/mobile/analytics/products.json?mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 const scopes = ["mobile_api", "creator_api"];
@@ -15,14 +12,12 @@ const scopes = ["mobile_api", "creator_api"];
 const accessTokenKey = "gumroad_access_token";
 const refreshTokenKey = "gumroad_refresh_token";
 
-WebBrowser.maybeCompleteAuthSession();
-
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isCreator: boolean;
   accessToken: string | null;
-  login: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
 }
@@ -51,22 +46,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isCreator, setIsCreator] = useState(false);
   const router = useRouter();
 
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
-
-  const [authRequest, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-      scopes,
-      redirectUri,
-      responseType: AuthSession.ResponseType.Code,
-      usePKCE: true,
-    },
-    {
-      authorizationEndpoint,
-      tokenEndpoint,
-    },
-  );
-
   useEffect(() => {
     async function loadStoredAuth() {
       try {
@@ -91,40 +70,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAccessToken(accessToken);
   }, []);
 
-  useEffect(() => {
-    async function handleAuthResponse() {
-      if (response?.type === "success" && response.params.code && authRequest?.codeVerifier) {
-        try {
-          setIsLoading(true);
-          const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
-            method: "POST",
-            data: {
-              grant_type: "authorization_code",
-              code: response.params.code,
-              redirect_uri: redirectUri,
-              client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-              code_verifier: authRequest.codeVerifier,
-            },
-          });
-          await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
-          const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
-          setIsCreator(creatorStatus);
-        } catch (error) {
-          console.error("Failed to exchange code for tokens:", error);
-        } finally {
-          setIsLoading(false);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(tokenEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            grant_type: "password",
+            username: email,
+            password,
+            client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
+            scope: scopes.join(" "),
+          }),
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(
+            body?.error === "invalid_grant"
+              ? "Invalid email or password"
+              : (body?.error_description ?? "Login failed. Please try again."),
+          );
         }
-      } else if (response?.type === "error") {
-        console.error("Auth error:", response.error);
+        const data: { access_token: string; refresh_token?: string } = await response.json();
+        await storeTokens(data.access_token, data.refresh_token);
+        const creatorStatus = await fetchCreatorStatus(data.access_token);
+        setIsCreator(creatorStatus);
+      } finally {
         setIsLoading(false);
       }
-    }
-    handleAuthResponse();
-  }, [response, redirectUri, authRequest?.codeVerifier, storeTokens]);
-
-  const login = useCallback(async () => {
-    if (authRequest) await promptAsync();
-  }, [authRequest, promptAsync]);
+    },
+    [storeTokens],
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -157,7 +135,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
     } catch (error) {
       console.error("Failed to refresh token:", error);
-      // If refresh fails, log the user out
       await logout();
     }
   }, [logout, storeTokens]);

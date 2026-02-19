@@ -28,4 +28,4 @@ appId: ${APP_ID}
     commands:
       - tapOn:
           point: 50%,10%
-- assertVisible: "Sign in with Gumroad"
+- assertVisible: "Log in"
