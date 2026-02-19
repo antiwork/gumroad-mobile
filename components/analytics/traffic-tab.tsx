@@ -4,6 +4,7 @@ import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
+import { ChartTouchOverlay } from "./chart-touch-overlay";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
 
@@ -141,7 +142,13 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View>
+          <ChartTouchOverlay
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={dates.length}
+            onBarSelect={handleBarPress}
+            height={120}
+          >
             <BarChart
               stackData={revenueChartData}
               height={120}
@@ -152,15 +159,15 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideRules
               hideYAxisText
               disableScroll
+              disablePress
               yAxisThickness={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
               highlightEnabled={activeIndex !== null}
               highlightedBarIndex={activeIndex ?? undefined}
               lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
-          </View>
+          </ChartTouchOverlay>
           <View>
             {revenue.topReferrers.map((name) => (
               <LegendItem
@@ -187,7 +194,13 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
+          <ChartTouchOverlay
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={dates.length}
+            onBarSelect={handleBarPress}
+            height={120}
+          >
             <BarChart
               stackData={salesChartData}
               height={120}
@@ -198,15 +211,15 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideRules
               hideYAxisText
               disableScroll
+              disablePress
               yAxisThickness={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
               highlightEnabled={activeIndex !== null}
               highlightedBarIndex={activeIndex ?? undefined}
               lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
-          </View>
+          </ChartTouchOverlay>
           <View>
             {sales.topReferrers.map((name) => (
               <LegendItem
@@ -233,7 +246,13 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
+          <ChartTouchOverlay
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={dates.length}
+            onBarSelect={handleBarPress}
+            height={120}
+          >
             <BarChart
               stackData={visitsChartData}
               height={120}
@@ -244,15 +263,15 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideRules
               hideYAxisText
               disableScroll
+              disablePress
               yAxisThickness={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
               highlightEnabled={activeIndex !== null}
               highlightedBarIndex={activeIndex ?? undefined}
               lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
-          </View>
+          </ChartTouchOverlay>
           <View>
             {visits.topReferrers.map((name) => (
               <LegendItem

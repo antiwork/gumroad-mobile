@@ -48,6 +48,16 @@ export const formatNumber = (num: number): string => {
   return num.toLocaleString();
 };
 
+export const Y_AXIS_EMPTY_LABEL_WIDTH = 10;
+
+export const getBarIndexFromX = (x: number, barWidth: number, spacing: number, dataLength: number): number | null => {
+  if (dataLength <= 0) return null;
+  const adjustedX = x - Y_AXIS_EMPTY_LABEL_WIDTH;
+  if (adjustedX < 0) return 0;
+  const index = Math.floor(adjustedX / (barWidth + spacing));
+  return Math.max(0, Math.min(index, dataLength - 1));
+};
+
 export const useChartDimensions = (dataLength: number) => {
   const [containerWidth, setContainerWidth] = useState(0);
 
