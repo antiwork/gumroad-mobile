@@ -1,3 +1,4 @@
+import { LineIcon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
@@ -12,7 +13,7 @@ import { StyledImage } from "../components/styled";
 import { useAuth } from "../lib/auth-context";
 
 export default function LoginScreen() {
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading, login, canUseBiometric, loginWithBiometrics } = useAuth();
   const { theme } = useUniwind();
 
   useEffect(() => {
@@ -24,15 +25,41 @@ export default function LoginScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && canUseBiometric) {
+      loginWithBiometrics();
+    }
+  }, [isLoading, isAuthenticated, canUseBiometric, loginWithBiometrics]);
+
   if (isAuthenticated) return <Redirect href="/" />;
 
   return (
     <View className="flex-1 items-center justify-center gap-12 bg-background px-6">
       <StyledImage source={theme === "dark" ? logoDark : logoLight} className="aspect-158/22 w-50" />
 
-      <Button variant="accent" onPress={login} disabled={isLoading}>
-        {isLoading ? <LoadingSpinner size="small" /> : <Text>Sign in with Gumroad</Text>}
-      </Button>
+      <View className="w-full items-center gap-3">
+        {canUseBiometric ? (
+          <Button variant="accent" onPress={loginWithBiometrics} disabled={isLoading} className="w-full">
+            {isLoading ? (
+              <LoadingSpinner size="small" />
+            ) : (
+              <>
+                <LineIcon name="fingerprint" size={20} className="text-accent-foreground" />
+                <Text>Sign in with biometrics</Text>
+              </>
+            )}
+          </Button>
+        ) : null}
+
+        <Button
+          variant={canUseBiometric ? "outline" : "accent"}
+          onPress={login}
+          disabled={isLoading}
+          className="w-full"
+        >
+          {isLoading && !canUseBiometric ? <LoadingSpinner size="small" /> : <Text>Sign in with Gumroad</Text>}
+        </Button>
+      </View>
     </View>
   );
 }
