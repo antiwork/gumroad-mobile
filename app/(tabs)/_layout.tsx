@@ -81,7 +81,7 @@ const SettingsSheet = () => {
           <Text className="mb-4 text-sm text-muted-foreground">This will log you out of your Gumroad account.</Text>
           <Button onPress={handleLogout}>
             <Text>Logout</Text>
-            <LineIcon name="log-out" size={20} className="text-primary-foreground" />
+            <LineIcon name="door-open" size={20} className="text-primary-foreground" />
           </Button>
         </View>
         <View className="border-b border-border p-4">
@@ -92,7 +92,7 @@ const SettingsSheet = () => {
           </Text>
           <Button variant="destructive" onPress={handleDeleteAccount}>
             <Text>Go to account deletion page</Text>
-            <LineIcon name="right-arrow-alt" size={20} className="text-destructive-foreground" />
+            <LineIcon name="arrow-right-stroke" size={20} className="text-destructive-foreground" />
           </Button>
         </View>
       </SheetContent>
@@ -166,7 +166,7 @@ export default function TabsLayout() {
               title: "Analytics",
               headerLeft: () => <LogoIcon />,
               headerRight: () => <LibraryHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-alt-2" size={size} color={color} />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-big" size={size} color={color} />,
               href: isCreator ? undefined : null,
             }}
           />

@@ -81,7 +81,7 @@ export default function PdfViewerScreen() {
                 {viewMode === "continuous" ? (
                   <LineIcon name="move-vertical" size={24} className="text-accent" />
                 ) : (
-                  <SolidIcon name="carousel" size={24} className="text-accent" />
+                  <SolidIcon name="gallery-horizontal" size={24} className="text-accent" />
                 )}
               </TouchableOpacity>
             </View>
@@ -147,7 +147,7 @@ export default function PdfViewerScreen() {
             className="flex-row items-center justify-between border-b border-border py-4"
           >
             <View className="flex-row items-center gap-3">
-              <SolidIcon name="carousel" size={24} className="text-foreground" />
+              <SolidIcon name="gallery-horizontal" size={24} className="text-foreground" />
               <Text className="text-base text-foreground">Single Page</Text>
             </View>
             {viewMode === "single" && <LineIcon name="check" size={24} className="text-accent" />}

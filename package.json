@@ -43,7 +43,6 @@
     "@rn-primitives/select": "^1.2.0",
     "@rn-primitives/slot": "^1.2.0",
     "@tanstack/react-query": "^5.90.16",
-    "boxicons": "^2.1.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "expo": "~54.0.30",
@@ -88,6 +87,7 @@
     "uniwind": "^1.2.4"
   },
   "devDependencies": {
+    "@boxicons/react": "^1.0.3",
     "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29",
