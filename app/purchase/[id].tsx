@@ -1,4 +1,5 @@
 import { usePurchases } from "@/app/(tabs)/library";
+import { ContentPage, ContentPageNavigator } from "@/components/content-page-navigator";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -10,7 +11,7 @@ import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
@@ -32,6 +33,16 @@ type ClickMessage = {
   payload: ClickPayload;
 };
 
+type PageListMessage = {
+  type: "pageList";
+  payload: {
+    pages: ContentPage[];
+    activeIndex: number;
+  };
+};
+
+type WebViewMessage = ClickMessage | PageListMessage;
+
 const downloadUrl = (token: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
 
@@ -49,6 +60,8 @@ const shareFile = async (uri: string) => {
 export default function DownloadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [contentPages, setContentPages] = useState<ContentPage[] | null>(null);
+  const [activePageIndex, setActivePageIndex] = useState(0);
   const { data: purchases = [] } = usePurchases();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
@@ -60,11 +73,25 @@ export default function DownloadScreen() {
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
+  const handlePageChange = useCallback((index: number) => {
+    setActivePageIndex(index);
+    webViewRef.current?.injectJavaScript(`
+      window.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: "changePage", index: ${index} }) }));
+      true;
+    `);
+  }, []);
+
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
     try {
-      const message = JSON.parse(data) as ClickMessage;
+      const message = JSON.parse(data) as WebViewMessage;
       console.info("WebView message received:", message);
+
+      if (message.type === "pageList") {
+        setContentPages(message.payload.pages);
+        setActivePageIndex(message.payload.activeIndex);
+        return;
+      }
 
       if (message.type !== "click") {
         console.warn("Unknown message from webview:", message);
@@ -159,6 +186,9 @@ export default function DownloadScreen() {
         </View>
       )}
       <View className="bg-body-bg" style={{ paddingBottom: bottom }}>
+        {contentPages && contentPages.length > 0 ? (
+          <ContentPageNavigator pages={contentPages} activeIndex={activePageIndex} onPageChange={handlePageChange} />
+        ) : null}
         <MiniAudioPlayer />
       </View>
     </Screen>
