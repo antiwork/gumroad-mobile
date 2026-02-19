@@ -1,11 +1,19 @@
 import { assertDefined } from "@/lib/assert";
+import {
+  authenticate,
+  getBiometricLabel,
+  isBiometricEnabled,
+  isBiometricSupported,
+  setBiometricEnabled,
+} from "@/lib/biometric";
 import { env } from "@/lib/env";
 import { request } from "@/lib/request";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 
 const authorizationEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/authorize`;
 const tokenEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/token`;
@@ -22,9 +30,15 @@ interface AuthContextType {
   isLoading: boolean;
   isCreator: boolean;
   accessToken: string | null;
+  biometricEnabled: boolean;
+  biometricLabel: string;
+  biometricIcon: "scan" | "fingerprint";
+  isBiometricSetUp: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
-  refreshToken: () => Promise<void>;
+  refreshToken: () => Promise<string | null>;
+  loginWithBiometrics: () => Promise<void>;
+  handleSessionExpiry: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,6 +63,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isCreator, setIsCreator] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState("biometrics");
+  const [biometricIcon, setBiometricIcon] = useState<"scan" | "fingerprint">("fingerprint");
+  const [hasRefreshToken, setHasRefreshToken] = useState(false);
+  const isRefreshing = useRef(false);
   const router = useRouter();
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
@@ -70,7 +89,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     async function loadStoredAuth() {
       try {
-        const storedToken = await SecureStore.getItemAsync(accessTokenKey);
+        const [storedToken, storedRefresh, bioEnabled, bioLabel] = await Promise.all([
+          SecureStore.getItemAsync(accessTokenKey),
+          SecureStore.getItemAsync(refreshTokenKey),
+          isBiometricEnabled(),
+          getBiometricLabel(),
+        ]);
+        setBiometricEnabledState(bioEnabled);
+        setBiometricLabel(bioLabel.label);
+        setBiometricIcon(bioLabel.icon);
+        setHasRefreshToken(!!storedRefresh);
         if (storedToken) {
           setAccessToken(storedToken);
           const creatorStatus = await fetchCreatorStatus(storedToken);
@@ -87,8 +115,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const storeTokens = useCallback(async (accessToken: string, refreshToken?: string) => {
     await SecureStore.setItemAsync(accessTokenKey, accessToken);
-    if (refreshToken) await SecureStore.setItemAsync(refreshTokenKey, refreshToken);
+    if (refreshToken) {
+      await SecureStore.setItemAsync(refreshTokenKey, refreshToken);
+      setHasRefreshToken(true);
+    }
     setAccessToken(accessToken);
+  }, []);
+
+  const promptBiometricEnrollment = useCallback(async () => {
+    const supported = await isBiometricSupported();
+    if (!supported) return;
+    const alreadyEnabled = await isBiometricEnabled();
+    if (alreadyEnabled) return;
+
+    Alert.alert("Enable biometric login?", "Use Face ID or fingerprint to sign in faster next time.", [
+      { text: "Not now" },
+      {
+        text: "Enable",
+        onPress: async () => {
+          await setBiometricEnabled(true);
+          setBiometricEnabledState(true);
+        },
+      },
+    ]);
   }, []);
 
   useEffect(() => {
@@ -109,6 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
+          await promptBiometricEnrollment();
         } catch (error) {
           console.error("Failed to exchange code for tokens:", error);
         } finally {
@@ -120,31 +170,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     handleAuthResponse();
-  }, [response, redirectUri, authRequest?.codeVerifier, storeTokens]);
+  }, [response, redirectUri, authRequest?.codeVerifier, storeTokens, promptBiometricEnrollment]);
 
   const login = useCallback(async () => {
     if (authRequest) await promptAsync();
   }, [authRequest, promptAsync]);
 
-  const logout = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      await SecureStore.deleteItemAsync(accessTokenKey);
-      await SecureStore.deleteItemAsync(refreshTokenKey);
-      setAccessToken(null);
-      setIsCreator(false);
-      router.replace("/login");
-    } catch (error) {
-      console.error("Failed to logout:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [router]);
-
-  const refreshTokenFn = useCallback(async () => {
+  const refreshTokenFn = useCallback(async (): Promise<string | null> => {
     try {
       const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
-      if (!storedRefreshToken) throw new Error("No refresh token available");
+      if (!storedRefreshToken) return null;
 
       const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
         method: "POST",
@@ -155,12 +190,78 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
       });
       await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
+      return tokenResponse.access_token;
     } catch (error) {
       console.error("Failed to refresh token:", error);
-      // If refresh fails, log the user out
-      await logout();
+      return null;
     }
-  }, [logout, storeTokens]);
+  }, [storeTokens]);
+
+  const handleSessionExpiry = useCallback(async () => {
+    if (isRefreshing.current) return;
+    isRefreshing.current = true;
+    try {
+      const newToken = await refreshTokenFn();
+      if (newToken) {
+        const creatorStatus = await fetchCreatorStatus(newToken);
+        setIsCreator(creatorStatus);
+        return;
+      }
+      await SecureStore.deleteItemAsync(accessTokenKey);
+      await SecureStore.deleteItemAsync(refreshTokenKey);
+      setAccessToken(null);
+      setHasRefreshToken(false);
+      setIsCreator(false);
+      router.replace("/login");
+    } catch (error) {
+      console.error("Failed to handle session expiry:", error);
+      setAccessToken(null);
+      setIsCreator(false);
+      router.replace("/login");
+    } finally {
+      isRefreshing.current = false;
+    }
+  }, [router, refreshTokenFn]);
+
+  const logout = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      await SecureStore.deleteItemAsync(accessTokenKey);
+      await SecureStore.deleteItemAsync(refreshTokenKey);
+      await setBiometricEnabled(false);
+      setAccessToken(null);
+      setIsCreator(false);
+      setBiometricEnabledState(false);
+      setHasRefreshToken(false);
+      router.replace("/login");
+    } catch (error) {
+      console.error("Failed to logout:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
+
+  const loginWithBiometrics = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const success = await authenticate();
+      if (!success) return;
+      const newToken = await refreshTokenFn();
+      if (newToken) {
+        const creatorStatus = await fetchCreatorStatus(newToken);
+        setIsCreator(creatorStatus);
+      } else {
+        await SecureStore.deleteItemAsync(refreshTokenKey);
+        setHasRefreshToken(false);
+      }
+    } catch (error) {
+      console.error("Biometric login failed:", error);
+      await SecureStore.deleteItemAsync(refreshTokenKey);
+      setHasRefreshToken(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [refreshTokenFn]);
 
   return (
     <AuthContext.Provider
@@ -169,9 +270,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         isCreator,
         accessToken,
+        biometricEnabled,
+        biometricLabel,
+        biometricIcon,
+        isBiometricSetUp: biometricEnabled && hasRefreshToken,
         login,
         logout,
         refreshToken: refreshTokenFn,
+        loginWithBiometrics,
+        handleSessionExpiry,
       }}
     >
       {children}

@@ -15,6 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
       UIBackgroundModes: ["audio"],
+      NSFaceIDUsageDescription: "Use Face ID to sign in to your Gumroad account.",
     },
   },
   android: {
@@ -70,6 +71,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
+    "expo-local-authentication",
     "expo-secure-store",
     "expo-web-browser",
     "expo-video",

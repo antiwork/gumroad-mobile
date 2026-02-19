@@ -46,7 +46,7 @@ export const requestAPI = async <T>(path: string, options: RequestInit & { acces
 export const useAPIRequest = <TResponse, TData = TResponse>(
   options: Omit<UseQueryOptions<TResponse, Error, TData>, "queryFn"> & { url: string },
 ) => {
-  const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
+  const { accessToken, handleSessionExpiry, isLoading: isAuthLoading } = useAuth();
 
   const query = useQuery<TResponse, Error, TData>({
     queryFn: () => requestAPI<TResponse>(options.url, { accessToken: assertDefined(accessToken) }),
@@ -55,8 +55,8 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
   });
 
   useEffect(() => {
-    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
-  }, [isAuthLoading, accessToken, query.error, logout]);
+    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) handleSessionExpiry();
+  }, [isAuthLoading, accessToken, query.error, handleSessionExpiry]);
 
   return query;
 };
