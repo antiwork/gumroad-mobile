@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react-native";
 import { useLibraryFilters } from "@/components/use-library-filters";
-import { Purchase } from "@/app/(tabs)/library";
+import { Purchase } from "@/lib/use-purchases";
 
 const makePurchase = (overrides: Partial<Purchase> = {}): Purchase => ({
   name: "Test Product",

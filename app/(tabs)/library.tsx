@@ -3,47 +3,23 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useLibraryFilters } from "@/components/use-library-filters";
 import { useAuth } from "@/lib/auth-context";
-import { useAPIRequest } from "@/lib/request";
+import { Purchase, usePurchases } from "@/lib/use-purchases";
 import { useRouter } from "expo-router";
 import { FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-export interface Purchase {
-  name: string;
-  creator_name: string;
-  creator_username: string;
-  creator_profile_picture_url: string;
-  thumbnail_url: string | null;
-  url_redirect_token: string;
-  purchase_email: string;
-  purchase_id?: string;
-  is_archived?: boolean;
-  content_updated_at?: string;
-  purchased_at?: string;
-  file_data?: {
-    id: string;
-    name: string;
-    filegroup?: string;
-    streaming_url?: string;
-  }[];
-}
-
-interface PurchasesResponse {
-  success: boolean;
-  products: Purchase[];
-  user_id: string;
-}
-
-export const usePurchases = () =>
-  useAPIRequest<PurchasesResponse, Purchase[]>({
-    queryKey: ["purchases"],
-    url: "mobile/purchases/index",
-    select: (data) => data.products,
-  });
-
 export default function Index() {
   const { isLoading } = useAuth();
-  const { data: purchases = [], isLoading: isLoadingPurchases, error, refetch, isRefetching } = usePurchases();
+  const {
+    data: purchases = [],
+    isLoading: isLoadingPurchases,
+    error,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePurchases();
   const router = useRouter();
   const accentColor = useCSSVariable("--color-accent") as string;
 
@@ -95,6 +71,11 @@ export default function Index() {
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}
             columnWrapperStyle={{ gap: 12 }}
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={accentColor} />}
+            onEndReached={() => {
+              if (hasNextPage) fetchNextPage();
+            }}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={isFetchingNextPage ? <LoadingSpinner size="small" /> : null}
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
