@@ -1,9 +1,11 @@
 import { usePurchases } from "@/app/(tabs)/library";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
+import { TableOfContentsBar } from "@/components/table-of-contents-bar";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
+import { TOC_INJECTED_JS, useTableOfContents } from "@/components/use-table-of-contents";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { buildApiUrl } from "@/lib/request";
@@ -58,10 +60,15 @@ export default function DownloadScreen() {
   const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
+  const { pages, currentPageIndex, handleTocMessage, navigateToPage } = useTableOfContents(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
+
+    // Check if this is a table of contents message
+    if (handleTocMessage(data)) return;
+
     try {
       const message = JSON.parse(data) as ClickMessage;
       console.info("WebView message received:", message);
@@ -152,6 +159,7 @@ export default function DownloadScreen() {
         mediaPlaybackRequiresUserAction={false}
         originWhitelist={["*"]}
         onMessage={handleMessage}
+        injectedJavaScript={TOC_INJECTED_JS}
       />
       {isDownloading && (
         <View className="absolute inset-0 items-center justify-center bg-black/50">
@@ -159,6 +167,7 @@ export default function DownloadScreen() {
         </View>
       )}
       <View className="bg-body-bg" style={{ paddingBottom: bottom }}>
+        <TableOfContentsBar pages={pages} currentPageIndex={currentPageIndex} onNavigate={navigateToPage} />
         <MiniAudioPlayer />
       </View>
     </Screen>
