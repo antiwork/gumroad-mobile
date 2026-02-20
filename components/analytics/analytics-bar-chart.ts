@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { LayoutChangeEvent } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { LayoutChangeEvent, PanResponder } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 export interface ChartDataPoint {
@@ -8,6 +8,9 @@ export interface ChartDataPoint {
   frontColor?: string;
   topLabelComponent?: () => React.ReactNode;
 }
+
+export const CHART_HORIZONTAL_PADDING = 80;
+const CHART_SIDE_PADDING = CHART_HORIZONTAL_PADDING / 2;
 
 export const useChartColors = () => {
   const [accent, muted, foreground, background, border] = useCSSVariable([
@@ -56,8 +59,7 @@ export const useChartDimensions = (dataLength: number) => {
   }, []);
 
   const spacing = 4;
-  const chartPadding = 80;
-  const availableWidth = containerWidth > 0 ? containerWidth - chartPadding : 300;
+  const availableWidth = containerWidth > 0 ? containerWidth - CHART_HORIZONTAL_PADDING : 300;
   const barWidth = dataLength > 0 ? Math.max(4, (availableWidth - spacing * (dataLength - 1)) / dataLength) : 20;
 
   return {
@@ -65,4 +67,40 @@ export const useChartDimensions = (dataLength: number) => {
     barWidth,
     spacing,
   };
+};
+
+export const useChartTouchSelection = ({
+  barCount,
+  barWidth,
+  spacing,
+  onSelectIndex,
+}: {
+  barCount: number;
+  barWidth: number;
+  spacing: number;
+  onSelectIndex: (index: number) => void;
+}) => {
+  const selectIndexAtX = useCallback(
+    (locationX: number) => {
+      if (barCount < 1) return;
+
+      const step = barWidth + spacing;
+      const normalizedX = Math.max(0, locationX - CHART_SIDE_PADDING);
+      const index = Math.round((normalizedX - barWidth / 2) / step);
+      const clampedIndex = Math.max(0, Math.min(index, barCount - 1));
+      onSelectIndex(clampedIndex);
+    },
+    [barCount, barWidth, onSelectIndex, spacing],
+  );
+
+  return useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => barCount > 0,
+        onMoveShouldSetPanResponder: () => barCount > 0,
+        onPanResponderGrant: (event) => selectIndexAtX(event.nativeEvent.locationX),
+        onPanResponderMove: (event) => selectIndexAtX(event.nativeEvent.locationX),
+      }).panHandlers,
+    [barCount, selectIndexAtX],
+  );
 };

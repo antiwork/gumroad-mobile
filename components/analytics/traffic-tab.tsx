@@ -2,7 +2,13 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
+import {
+  formatCurrency,
+  formatNumber,
+  useChartColors,
+  useChartDimensions,
+  useChartTouchSelection,
+} from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
@@ -39,8 +45,14 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
   const handleBarPress = useCallback((index: number) => {
-    setSelectedIndex((prev) => (prev === index ? null : index));
+    setSelectedIndex(index);
   }, []);
+  const chartTouchHandlers = useChartTouchSelection({
+    barCount: dates.length,
+    barWidth,
+    spacing,
+    onSelectIndex: handleBarPress,
+  });
 
   const calculateTotals = (
     data: { date: string; referrers: { name: string; value: number; color: string }[] }[],
@@ -141,7 +153,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View>
+          <View className="relative">
             <BarChart
               stackData={revenueChartData}
               height={120}
@@ -160,6 +172,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               lowlightOpacity={0.4}
               onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
+            <View className="absolute inset-0" {...chartTouchHandlers} />
           </View>
           <View>
             {revenue.topReferrers.map((name) => (
@@ -187,7 +200,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
+          <View className="relative">
             <BarChart
               stackData={salesChartData}
               height={120}
@@ -206,6 +219,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               lowlightOpacity={0.4}
               onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
+            <View className="absolute inset-0" {...chartTouchHandlers} />
           </View>
           <View>
             {sales.topReferrers.map((name) => (
@@ -233,7 +247,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
+          <View className="relative">
             <BarChart
               stackData={visitsChartData}
               height={120}
@@ -252,6 +266,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               lowlightOpacity={0.4}
               onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
+            <View className="absolute inset-0" {...chartTouchHandlers} />
           </View>
           <View>
             {visits.topReferrers.map((name) => (
