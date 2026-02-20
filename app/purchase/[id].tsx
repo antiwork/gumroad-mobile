@@ -1,4 +1,4 @@
-import { usePurchases } from "@/app/(tabs)/library";
+import { usePurchase } from "@/lib/use-purchases";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -49,12 +49,10 @@ const shareFile = async (uri: string) => {
 export default function DownloadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
-  const { data: purchases = [] } = usePurchases();
+  const purchase = usePurchase(id);
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
-
-  const purchase = purchases.find((p) => p.url_redirect_token === id);
   const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);

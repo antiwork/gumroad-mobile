@@ -1,5 +1,6 @@
 import { LineIcon } from "@/components/icon";
-import { CreatorCount, SortOption } from "@/components/use-library-filters";
+import { SortOption } from "@/components/use-library-filters";
+import { Seller } from "@/lib/use-purchases";
 import { useState } from "react";
 import { FlatList, Platform, TextInput, TouchableOpacity, View } from "react-native";
 import { Drawer } from "react-native-drawer-layout";
@@ -18,10 +19,9 @@ export interface LibraryFiltersProps {
   showArchivedOnly: boolean;
   sortBy: SortOption;
   setSortBy: (sort: SortOption) => void;
-  hasArchivedProducts: boolean;
   hasActiveFilters: boolean;
-  creatorCounts: CreatorCount[];
-  handleCreatorToggle: (creatorName: string) => void;
+  sellers: Seller[];
+  handleCreatorToggle: (creatorId: string) => void;
   handleSelectAllCreators: () => void;
   handleClearFilters: () => void;
   handleToggleArchived: () => void;
@@ -35,9 +35,8 @@ export const LibraryFilters = ({
   showArchivedOnly,
   sortBy,
   setSortBy,
-  hasArchivedProducts,
   hasActiveFilters,
-  creatorCounts,
+  sellers,
   handleCreatorToggle,
   handleSelectAllCreators,
   handleClearFilters,
@@ -71,18 +70,15 @@ export const LibraryFilters = ({
           <View className="border-b border-border p-4">
             <RadioGroup value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
               <View className="flex flex-row items-center gap-3">
-                <RadioGroupItem value="content_updated_at" id="content_updated_at" />
-                <Label
-                  htmlFor="content_updated_at"
-                  onPress={Platform.select({ native: () => setSortBy("content_updated_at") })}
-                >
-                  Recently updated
+                <RadioGroupItem value="date-desc" id="date-desc" />
+                <Label htmlFor="date-desc" onPress={Platform.select({ native: () => setSortBy("date-desc") })}>
+                  Newest
                 </Label>
               </View>
               <View className="flex flex-row items-center gap-3">
-                <RadioGroupItem value="purchased_at" id="purchased_at" />
-                <Label htmlFor="purchased_at" onPress={Platform.select({ native: () => setSortBy("purchased_at") })}>
-                  Purchase date
+                <RadioGroupItem value="date-asc" id="date-asc" />
+                <Label htmlFor="date-asc" onPress={Platform.select({ native: () => setSortBy("date-asc") })}>
+                  Oldest
                 </Label>
               </View>
             </RadioGroup>
@@ -90,8 +86,8 @@ export const LibraryFilters = ({
 
           <View className="flex-1 border-b border-border px-4 py-3">
             <FlatList
-              data={creatorCounts}
-              keyExtractor={(item) => item.name}
+              data={sellers}
+              keyExtractor={(item) => item.id}
               ListHeaderComponent={
                 <View className="flex flex-row items-center gap-3 py-1">
                   <Checkbox
@@ -107,29 +103,27 @@ export const LibraryFilters = ({
               renderItem={({ item }) => (
                 <View className="flex flex-row items-center gap-3 py-1">
                   <Checkbox
-                    id={item.username}
-                    checked={selectedCreators.has(item.username)}
-                    onCheckedChange={() => handleCreatorToggle(item.username)}
+                    id={item.id}
+                    checked={selectedCreators.has(item.id)}
+                    onCheckedChange={() => handleCreatorToggle(item.id)}
                   />
                   <Label
-                    onPress={Platform.select({ native: () => handleCreatorToggle(item.username) })}
-                    htmlFor={item.username}
+                    onPress={Platform.select({ native: () => handleCreatorToggle(item.id) })}
+                    htmlFor={item.id}
                   >
-                    {item.name} ({item.count})
+                    {item.name} ({item.purchases_count})
                   </Label>
                 </View>
               )}
             />
           </View>
 
-          {hasArchivedProducts ? (
-            <View className="flex-row items-center gap-3 border-b border-border px-4 py-3">
-              <Checkbox id="archived" checked={showArchivedOnly} onCheckedChange={handleToggleArchived} />
-              <Label onPress={Platform.select({ native: handleToggleArchived })} htmlFor="archived">
-                Show archived only
-              </Label>
-            </View>
-          ) : null}
+          <View className="flex-row items-center gap-3 border-b border-border px-4 py-3">
+            <Checkbox id="archived" checked={showArchivedOnly} onCheckedChange={handleToggleArchived} />
+            <Label onPress={Platform.select({ native: handleToggleArchived })} htmlFor="archived">
+              Show archived only
+            </Label>
+          </View>
 
           <View className="px-4 pt-4">
             <Button onPress={() => setDrawerOpen(false)}>
