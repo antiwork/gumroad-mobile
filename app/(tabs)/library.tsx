@@ -107,8 +107,8 @@ export default function Index() {
   const debouncedSearch = useDebouncedValue(filters.searchText, 300);
 
   const sellerIds = useMemo(
-    () => (filters.selectedCreators.size > 0 ? Array.from(filters.selectedCreators) : undefined),
-    [filters.selectedCreators],
+    () => (filters.selectedSellers.size > 0 ? Array.from(filters.selectedSellers) : undefined),
+    [filters.selectedSellers],
   );
 
   const {

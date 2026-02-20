@@ -15,15 +15,15 @@ import { Text } from "./ui/text";
 export interface LibraryFiltersProps {
   searchText: string;
   setSearchText: (text: string) => void;
-  selectedCreators: Set<string>;
+  selectedSellers: Set<string>;
   showArchivedOnly: boolean;
   sortBy: SortOption;
   setSortBy: (sort: SortOption) => void;
   hasActiveFilters: boolean;
   sellers: Seller[];
   totalCount: number;
-  handleCreatorToggle: (sellerId: string) => void;
-  handleSelectAllCreators: () => void;
+  handleSellerToggle: (sellerId: string) => void;
+  handleSelectAllSellers: () => void;
   handleClearFilters: () => void;
   handleToggleArchived: () => void;
   children: React.ReactNode;
@@ -32,15 +32,15 @@ export interface LibraryFiltersProps {
 export const LibraryFilters = ({
   searchText,
   setSearchText,
-  selectedCreators,
+  selectedSellers,
   showArchivedOnly,
   sortBy,
   setSortBy,
   hasActiveFilters,
   sellers,
   totalCount,
-  handleCreatorToggle,
-  handleSelectAllCreators,
+  handleSellerToggle,
+  handleSelectAllSellers,
   handleClearFilters,
   handleToggleArchived,
   children,
@@ -96,12 +96,12 @@ export const LibraryFilters = ({
               ListHeaderComponent={
                 <View className="flex flex-row items-center gap-3 py-1">
                   <Checkbox
-                    id="allCreators"
-                    checked={selectedCreators.size === 0}
-                    onCheckedChange={handleSelectAllCreators}
+                    id="allSellers"
+                    checked={selectedSellers.size === 0}
+                    onCheckedChange={handleSelectAllSellers}
                   />
-                  <Label onPress={Platform.select({ native: handleSelectAllCreators })} htmlFor="allCreators">
-                    All creators
+                  <Label onPress={Platform.select({ native: handleSelectAllSellers })} htmlFor="allSellers">
+                    All sellers
                   </Label>
                 </View>
               }
@@ -109,11 +109,11 @@ export const LibraryFilters = ({
                 <View className="flex flex-row items-center gap-3 py-1">
                   <Checkbox
                     id={item.id}
-                    checked={selectedCreators.has(item.id)}
-                    onCheckedChange={() => handleCreatorToggle(item.id)}
+                    checked={selectedSellers.has(item.id)}
+                    onCheckedChange={() => handleSellerToggle(item.id)}
                   />
                   <Label
-                    onPress={Platform.select({ native: () => handleCreatorToggle(item.id) })}
+                    onPress={Platform.select({ native: () => handleSellerToggle(item.id) })}
                     htmlFor={item.id}
                   >
                     {item.name} ({item.purchases_count})

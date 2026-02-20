@@ -8,9 +8,9 @@ describe("useLibraryFilters", () => {
       expect(result.current.searchText).toBe("");
     });
 
-    it("has no selected creators", () => {
+    it("has no selected sellers", () => {
       const { result } = renderHook(() => useLibraryFilters());
-      expect(result.current.selectedCreators.size).toBe(0);
+      expect(result.current.selectedSellers.size).toBe(0);
     });
 
     it("does not show archived only by default", () => {
@@ -59,41 +59,41 @@ describe("useLibraryFilters", () => {
     });
   });
 
-  describe("handleCreatorToggle", () => {
-    it("adds a creator to selection", () => {
+  describe("handleSellerToggle", () => {
+    it("adds a seller to selection", () => {
       const { result } = renderHook(() => useLibraryFilters());
-      act(() => result.current.handleCreatorToggle("seller-1"));
-      expect(result.current.selectedCreators.has("seller-1")).toBe(true);
+      act(() => result.current.handleSellerToggle("seller-1"));
+      expect(result.current.selectedSellers.has("seller-1")).toBe(true);
     });
 
-    it("removes a creator when toggled again", () => {
+    it("removes a seller when toggled again", () => {
       const { result } = renderHook(() => useLibraryFilters());
-      act(() => result.current.handleCreatorToggle("seller-1"));
-      act(() => result.current.handleCreatorToggle("seller-1"));
-      expect(result.current.selectedCreators.has("seller-1")).toBe(false);
+      act(() => result.current.handleSellerToggle("seller-1"));
+      act(() => result.current.handleSellerToggle("seller-1"));
+      expect(result.current.selectedSellers.has("seller-1")).toBe(false);
     });
 
-    it("supports multiple selected creators", () => {
+    it("supports multiple selected sellers", () => {
       const { result } = renderHook(() => useLibraryFilters());
       act(() => {
-        result.current.handleCreatorToggle("seller-1");
-        result.current.handleCreatorToggle("seller-2");
+        result.current.handleSellerToggle("seller-1");
+        result.current.handleSellerToggle("seller-2");
       });
-      expect(result.current.selectedCreators.size).toBe(2);
-      expect(result.current.selectedCreators.has("seller-1")).toBe(true);
-      expect(result.current.selectedCreators.has("seller-2")).toBe(true);
+      expect(result.current.selectedSellers.size).toBe(2);
+      expect(result.current.selectedSellers.has("seller-1")).toBe(true);
+      expect(result.current.selectedSellers.has("seller-2")).toBe(true);
     });
   });
 
-  describe("handleSelectAllCreators", () => {
-    it("clears all selected creators", () => {
+  describe("handleSelectAllSellers", () => {
+    it("clears all selected sellers", () => {
       const { result } = renderHook(() => useLibraryFilters());
       act(() => {
-        result.current.handleCreatorToggle("seller-1");
-        result.current.handleCreatorToggle("seller-2");
+        result.current.handleSellerToggle("seller-1");
+        result.current.handleSellerToggle("seller-2");
       });
-      act(() => result.current.handleSelectAllCreators());
-      expect(result.current.selectedCreators.size).toBe(0);
+      act(() => result.current.handleSelectAllSellers());
+      expect(result.current.selectedSellers.size).toBe(0);
     });
   });
 
@@ -113,9 +113,9 @@ describe("useLibraryFilters", () => {
   });
 
   describe("hasActiveFilters", () => {
-    it("returns true when a creator is selected", () => {
+    it("returns true when a seller is selected", () => {
       const { result } = renderHook(() => useLibraryFilters());
-      act(() => result.current.handleCreatorToggle("seller-1"));
+      act(() => result.current.handleSellerToggle("seller-1"));
       expect(result.current.hasActiveFilters).toBe(true);
     });
 
@@ -128,7 +128,7 @@ describe("useLibraryFilters", () => {
     it("returns true when both filters are active", () => {
       const { result } = renderHook(() => useLibraryFilters());
       act(() => {
-        result.current.handleCreatorToggle("seller-1");
+        result.current.handleSellerToggle("seller-1");
         result.current.handleToggleArchived();
       });
       expect(result.current.hasActiveFilters).toBe(true);
@@ -137,7 +137,7 @@ describe("useLibraryFilters", () => {
     it("returns false after clearing filters", () => {
       const { result } = renderHook(() => useLibraryFilters());
       act(() => {
-        result.current.handleCreatorToggle("seller-1");
+        result.current.handleSellerToggle("seller-1");
         result.current.handleToggleArchived();
       });
       act(() => result.current.handleClearFilters());
@@ -146,16 +146,16 @@ describe("useLibraryFilters", () => {
   });
 
   describe("handleClearFilters", () => {
-    it("resets creators and archived toggle", () => {
+    it("resets sellers and archived toggle", () => {
       const { result } = renderHook(() => useLibraryFilters());
       act(() => {
-        result.current.handleCreatorToggle("seller-1");
+        result.current.handleSellerToggle("seller-1");
         result.current.handleToggleArchived();
       });
       expect(result.current.hasActiveFilters).toBe(true);
 
       act(() => result.current.handleClearFilters());
-      expect(result.current.selectedCreators.size).toBe(0);
+      expect(result.current.selectedSellers.size).toBe(0);
       expect(result.current.showArchivedOnly).toBe(false);
       expect(result.current.hasActiveFilters).toBe(false);
     });
@@ -164,7 +164,7 @@ describe("useLibraryFilters", () => {
       const { result } = renderHook(() => useLibraryFilters());
       act(() => {
         result.current.setSearchText("test");
-        result.current.handleCreatorToggle("seller-1");
+        result.current.handleSellerToggle("seller-1");
       });
       act(() => result.current.handleClearFilters());
       expect(result.current.searchText).toBe("test");
@@ -174,7 +174,7 @@ describe("useLibraryFilters", () => {
       const { result } = renderHook(() => useLibraryFilters());
       act(() => {
         result.current.setSortBy("purchased_at");
-        result.current.handleCreatorToggle("seller-1");
+        result.current.handleSellerToggle("seller-1");
       });
       act(() => result.current.handleClearFilters());
       expect(result.current.sortBy).toBe("purchased_at");

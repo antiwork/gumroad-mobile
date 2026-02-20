@@ -5,27 +5,27 @@ export type SortOption = "content_updated_at" | "purchased_at";
 export interface UseLibraryFiltersReturn {
   searchText: string;
   setSearchText: (text: string) => void;
-  selectedCreators: Set<string>;
+  selectedSellers: Set<string>;
   showArchivedOnly: boolean;
   sortBy: SortOption;
   setSortBy: (sort: SortOption) => void;
   hasActiveFilters: boolean;
-  handleCreatorToggle: (sellerId: string) => void;
-  handleSelectAllCreators: () => void;
+  handleSellerToggle: (sellerId: string) => void;
+  handleSelectAllSellers: () => void;
   handleClearFilters: () => void;
   handleToggleArchived: () => void;
 }
 
 export const useLibraryFilters = (): UseLibraryFiltersReturn => {
   const [searchText, setSearchText] = useState("");
-  const [selectedCreators, setSelectedCreators] = useState<Set<string>>(new Set());
+  const [selectedSellers, setSelectedSellers] = useState<Set<string>>(new Set());
   const [showArchivedOnly, setShowArchivedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("content_updated_at");
 
-  const hasActiveFilters = selectedCreators.size > 0 || showArchivedOnly;
+  const hasActiveFilters = selectedSellers.size > 0 || showArchivedOnly;
 
-  const handleCreatorToggle = (sellerId: string) => {
-    setSelectedCreators((prev) => {
+  const handleSellerToggle = (sellerId: string) => {
+    setSelectedSellers((prev) => {
       const next = new Set(prev);
       if (next.has(sellerId)) {
         next.delete(sellerId);
@@ -36,12 +36,12 @@ export const useLibraryFilters = (): UseLibraryFiltersReturn => {
     });
   };
 
-  const handleSelectAllCreators = () => {
-    setSelectedCreators(new Set());
+  const handleSelectAllSellers = () => {
+    setSelectedSellers(new Set());
   };
 
   const handleClearFilters = () => {
-    setSelectedCreators(new Set());
+    setSelectedSellers(new Set());
     setShowArchivedOnly(false);
   };
 
@@ -52,13 +52,13 @@ export const useLibraryFilters = (): UseLibraryFiltersReturn => {
   return {
     searchText,
     setSearchText,
-    selectedCreators,
+    selectedSellers,
     showArchivedOnly,
     sortBy,
     setSortBy,
     hasActiveFilters,
-    handleCreatorToggle,
-    handleSelectAllCreators,
+    handleSellerToggle,
+    handleSelectAllSellers,
     handleClearFilters,
     handleToggleArchived,
   };
