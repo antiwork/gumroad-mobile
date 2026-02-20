@@ -1,4 +1,5 @@
 import { usePurchases } from "@/app/(tabs)/library";
+import { ContentPage, ContentPagesFooter } from "@/components/content-pages-footer";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -10,7 +11,7 @@ import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
@@ -32,6 +33,16 @@ type ClickMessage = {
   payload: ClickPayload;
 };
 
+type ContentPagesMessage = {
+  type: "contentPages";
+  payload: {
+    pages: ContentPage[];
+    activeIndex: number;
+  };
+};
+
+type WebViewMessage = ClickMessage | ContentPagesMessage;
+
 const downloadUrl = (token: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
 
@@ -46,9 +57,98 @@ const shareFile = async (uri: string) => {
   await Sharing.shareAsync(uri);
 };
 
+// JavaScript injected into the WebView to:
+// 1. Hide the HTML table of contents / prev-next navigation
+// 2. Extract page data and send it to React Native
+// 3. Listen for page change messages from React Native
+const INJECTED_JS = `
+(function() {
+  function extractAndHideTOC() {
+    var nav = document.querySelector('[role="navigation"]');
+    if (!nav) return;
+    nav.style.display = 'none';
+
+    var pages = [];
+    var activeIndex = 0;
+    var menuItems = nav.querySelectorAll('[role="menuitemradio"]');
+
+    if (menuItems.length > 0) {
+      menuItems.forEach(function(item, index) {
+        var text = item.textContent.trim().replace(/^\\\\s+/, '');
+        var isActive = item.getAttribute('aria-checked') === 'true';
+        if (isActive) activeIndex = index;
+        pages.push({ id: 'page-' + index, title: text });
+      });
+    } else {
+      var tocButton = nav.querySelector('[aria-label="Table of Contents"]');
+      if (tocButton) {
+        tocButton.click();
+        setTimeout(function() {
+          var items = document.querySelectorAll('[role="menuitemradio"]');
+          var p = [];
+          var ai = 0;
+          items.forEach(function(item, index) {
+            var text = item.textContent.trim().replace(/^\\\\s+/, '');
+            if (item.getAttribute('aria-checked') === 'true') ai = index;
+            p.push({ id: 'page-' + index, title: text });
+          });
+          document.body.click();
+          if (p.length > 0 && window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'contentPages',
+              payload: { pages: p, activeIndex: ai }
+            }));
+          }
+        }, 100);
+        return;
+      }
+    }
+
+    if (pages.length > 0 && window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'contentPages',
+        payload: { pages: pages, activeIndex: activeIndex }
+      }));
+    }
+  }
+
+  window.addEventListener('message', function(event) {
+    try {
+      var msg = JSON.parse(event.data);
+      if (msg.type === 'changePage') {
+        var nav = document.querySelector('[role="navigation"]');
+        if (!nav) return;
+        nav.style.display = '';
+        var targetIndex = msg.payload.index;
+        var tocButton = nav.querySelector('[aria-label="Table of Contents"]');
+        if (tocButton) {
+          tocButton.click();
+          setTimeout(function() {
+            var menuItems = document.querySelectorAll('[role="menuitemradio"]');
+            if (menuItems[targetIndex]) menuItems[targetIndex].click();
+            setTimeout(extractAndHideTOC, 300);
+          }, 100);
+        } else {
+          nav.style.display = 'none';
+        }
+      }
+    } catch(e) {}
+  });
+
+  var observer = new MutationObserver(function() { extractAndHideTOC(); });
+  if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+  extractAndHideTOC();
+  setTimeout(extractAndHideTOC, 500);
+  setTimeout(extractAndHideTOC, 1500);
+})();
+true;
+`;
+
 export default function DownloadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [contentPages, setContentPages] = useState<ContentPage[]>([]);
+  const [activePageIndex, setActivePageIndex] = useState(0);
   const { data: purchases = [] } = usePurchases();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
@@ -60,11 +160,22 @@ export default function DownloadScreen() {
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
+  const handlePageChange = useCallback((index: number) => {
+    setActivePageIndex(index);
+    webViewRef.current?.postMessage(JSON.stringify({ type: "changePage", payload: { index } }));
+  }, []);
+
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
     try {
-      const message = JSON.parse(data) as ClickMessage;
+      const message = JSON.parse(data) as WebViewMessage;
       console.info("WebView message received:", message);
+
+      if (message.type === "contentPages") {
+        setContentPages(message.payload.pages);
+        setActivePageIndex(message.payload.activeIndex);
+        return;
+      }
 
       if (message.type !== "click") {
         console.warn("Unknown message from webview:", message);
@@ -152,6 +263,7 @@ export default function DownloadScreen() {
         mediaPlaybackRequiresUserAction={false}
         originWhitelist={["*"]}
         onMessage={handleMessage}
+        injectedJavaScript={INJECTED_JS}
       />
       {isDownloading && (
         <View className="absolute inset-0 items-center justify-center bg-black/50">
@@ -159,6 +271,7 @@ export default function DownloadScreen() {
         </View>
       )}
       <View className="bg-body-bg" style={{ paddingBottom: bottom }}>
+        <ContentPagesFooter pages={contentPages} activeIndex={activePageIndex} onPageChange={handlePageChange} />
         <MiniAudioPlayer />
       </View>
     </Screen>
