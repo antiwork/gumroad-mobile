@@ -3,8 +3,9 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useLibraryFilters } from "@/components/use-library-filters";
 import { useAuth } from "@/lib/auth-context";
-import { useAPIRequest } from "@/lib/request";
+import { useInfiniteAPIRequest } from "@/lib/request";
 import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
@@ -28,26 +29,118 @@ export interface Purchase {
   }[];
 }
 
-interface PurchasesResponse {
-  success: boolean;
-  products: Purchase[];
-  user_id: string;
+export interface Seller {
+  id: string;
+  name: string;
+  purchases_count: number;
 }
 
-export const usePurchases = () =>
-  useAPIRequest<PurchasesResponse, Purchase[]>({
-    queryKey: ["purchases"],
-    url: "mobile/purchases/index",
-    select: (data) => data.products,
+interface PaginationMeta {
+  count: number;
+  items: number;
+  page: number;
+  pages: number;
+  next: number | null;
+  last: number;
+}
+
+export interface PurchasesSearchResponse {
+  success: boolean;
+  purchases: Purchase[];
+  sellers: Seller[];
+  user_id: string;
+  meta: { pagination: PaginationMeta };
+}
+
+const ITEMS_PER_PAGE = 24;
+
+const useDebouncedValue = <T,>(value: T, delay: number): T => {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+};
+
+export const usePurchases = (options?: {
+  query?: string;
+  seller?: string[];
+  archived?: boolean;
+  sortBy?: string;
+}) => {
+  const params: Record<string, string | string[]> = {
+    items: String(ITEMS_PER_PAGE),
+  };
+
+  if (options?.query) {
+    params.q = options.query;
+  }
+
+  if (options?.seller && options.seller.length > 0) {
+    params["seller[]"] = options.seller;
+  }
+
+  if (options?.archived) {
+    params.archived = "true";
+  }
+
+  if (options?.sortBy === "purchased_at") {
+    params["order[]"] = "date-desc";
+  }
+
+  return useInfiniteAPIRequest<PurchasesSearchResponse>({
+    queryKey: ["purchases", params],
+    url: "mobile/purchases/search",
+    params,
+    getNextPageParam: (lastPage) => lastPage.meta.pagination.next ?? undefined,
   });
+};
 
 export default function Index() {
   const { isLoading } = useAuth();
-  const { data: purchases = [], isLoading: isLoadingPurchases, error, refetch, isRefetching } = usePurchases();
   const router = useRouter();
   const accentColor = useCSSVariable("--color-accent") as string;
 
-  const filters = useLibraryFilters(purchases);
+  const filters = useLibraryFilters();
+
+  const debouncedSearch = useDebouncedValue(filters.searchText, 300);
+
+  const sellerIds = useMemo(
+    () => (filters.selectedCreators.size > 0 ? Array.from(filters.selectedCreators) : undefined),
+    [filters.selectedCreators],
+  );
+
+  const {
+    data,
+    isLoading: isLoadingPurchases,
+    error,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePurchases({
+    query: debouncedSearch || undefined,
+    seller: sellerIds,
+    archived: filters.showArchivedOnly || undefined,
+    sortBy: filters.sortBy,
+  });
+
+  const purchases = useMemo(
+    () => data?.pages.flatMap((page) => page.purchases) ?? [],
+    [data],
+  );
+
+  const sellers = useMemo(() => data?.pages[0]?.sellers ?? [], [data]);
+
+  const totalCount = data?.pages[0]?.meta.pagination.count ?? 0;
+
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   if (error) {
     return (
@@ -65,12 +158,6 @@ export default function Index() {
     );
   }
 
-  const totalUnfilteredCount = filters.showArchivedOnly
-    ? purchases.filter((p) => p.is_archived).length
-    : purchases.filter((p) => !p.is_archived).length;
-
-  const showResultsCount = filters.filteredPurchases.length !== totalUnfilteredCount;
-
   return (
     <Screen>
       {isLoadingPurchases ? (
@@ -78,23 +165,24 @@ export default function Index() {
           <LoadingSpinner size="large" />
         </View>
       ) : (
-        <LibraryFilters {...filters}>
-          {showResultsCount && (
+        <LibraryFilters {...filters} sellers={sellers} totalCount={totalCount}>
+          {totalCount > 0 && (
             <View className="px-4 pb-4">
               <Text className="font-sans text-sm text-muted">
-                Showing {filters.filteredPurchases.length} product
-                {filters.filteredPurchases.length !== 1 ? "s" : ""}
+                {totalCount} product{totalCount !== 1 ? "s" : ""}
               </Text>
             </View>
           )}
 
           <FlatList<Purchase>
             numColumns={2}
-            data={filters.filteredPurchases}
+            data={purchases}
             keyExtractor={(item) => item.url_redirect_token}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}
             columnWrapperStyle={{ gap: 12 }}
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={accentColor} />}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.5}
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
@@ -122,6 +210,13 @@ export default function Index() {
                 </View>
               </TouchableOpacity>
             )}
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <View className="items-center py-4">
+                  <LoadingSpinner size="small" />
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View className="items-center justify-center py-20">
                 <Text className="font-sans text-lg text-muted">
