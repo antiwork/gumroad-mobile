@@ -1,11 +1,21 @@
 import { usePurchases } from "@/app/(tabs)/library";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
+import { PurchaseContentNavigationFooter } from "@/components/purchase-content-navigation-footer";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
+import {
+  CONTENT_PAGE_NAVIGATION_STATE_MESSAGE_TYPE,
+  createContentPageNavigationCommandMessage,
+  DEFAULT_CONTENT_PAGE_NAVIGATION_STATE,
+  parsePurchaseWebViewMessage,
+  purchaseContentNavigationBridgeScript,
+  type ClickMessage,
+  type MobileAppContentPageNavigationCommandAction,
+} from "@/lib/purchase-content-navigation";
 import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -14,23 +24,6 @@ import { useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
-
-// See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
-type ClickPayload = {
-  resourceId: string;
-  isDownload: boolean;
-  isPost: boolean;
-  type?: string | null;
-  extension?: string | null;
-  isPlaying?: "true" | "false" | null;
-  resumeAt?: string | null;
-  contentLength?: string | null;
-};
-
-type ClickMessage = {
-  type: "click";
-  payload: ClickPayload;
-};
 
 const downloadUrl = (token: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
@@ -49,6 +42,7 @@ const shareFile = async (uri: string) => {
 export default function DownloadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [contentPageNavigationState, setContentPageNavigationState] = useState(DEFAULT_CONTENT_PAGE_NAVIGATION_STATE);
   const { data: purchases = [] } = usePurchases();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
@@ -60,19 +54,14 @@ export default function DownloadScreen() {
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
-  const handleMessage = async (event: WebViewMessageEvent) => {
-    const data = event.nativeEvent.data;
+  const postContentPageNavigationCommand = (action: MobileAppContentPageNavigationCommandAction) => {
+    webViewRef.current?.postMessage(createContentPageNavigationCommandMessage(action));
+  };
+
+  const handleClickMessage = async (message: ClickMessage) => {
+    const fileData = purchase?.file_data?.find((f) => f.id === message.payload.resourceId);
+
     try {
-      const message = JSON.parse(data) as ClickMessage;
-      console.info("WebView message received:", message);
-
-      if (message.type !== "click") {
-        console.warn("Unknown message from webview:", message);
-        return;
-      }
-
-      const fileData = purchase?.file_data?.find((f) => f.id === message.payload.resourceId);
-
       if (message.payload.extension === "PDF" && !message.payload.isDownload) {
         router.push({
           pathname: "/pdf-viewer",
@@ -87,6 +76,7 @@ export default function DownloadScreen() {
         });
         return;
       }
+
       if (message.payload.type === "audio" && !message.payload.isDownload) {
         if (message.payload.isPlaying === "true") {
           await pauseAudio();
@@ -105,6 +95,7 @@ export default function DownloadScreen() {
         }
         return;
       }
+
       if (fileData?.filegroup === "video" && !message.payload.isDownload) {
         router.push({
           pathname: "/video-player",
@@ -120,16 +111,39 @@ export default function DownloadScreen() {
         });
         return;
       }
+    } catch (error) {
+      console.error("Download failed:", error, message);
+      Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
+      return;
+    }
 
-      setIsDownloading(true);
+    setIsDownloading(true);
+    try {
       const downloadedFile = await downloadFile(id, message.payload.resourceId);
       await shareFile(downloadedFile.uri);
     } catch (error) {
-      console.error("Download failed:", error, data);
-      Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
+      console.error("Download failed:", error, message);
+      Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handleMessage = async (event: WebViewMessageEvent) => {
+    const data = event.nativeEvent.data;
+    const message = parsePurchaseWebViewMessage(data);
+
+    if (!message) {
+      console.warn("Unknown message from webview:", data);
+      return;
+    }
+
+    if (message.type === CONTENT_PAGE_NAVIGATION_STATE_MESSAGE_TYPE) {
+      setContentPageNavigationState(message.payload);
+      return;
+    }
+
+    await handleClickMessage(message);
   };
 
   if (isLoading) {
@@ -148,6 +162,7 @@ export default function DownloadScreen() {
         source={{ uri: url }}
         className="flex-1 bg-transparent"
         webviewDebuggingEnabled
+        injectedJavaScriptBeforeContentLoaded={purchaseContentNavigationBridgeScript}
         pullToRefreshEnabled
         mediaPlaybackRequiresUserAction={false}
         originWhitelist={["*"]}
@@ -158,8 +173,15 @@ export default function DownloadScreen() {
           <LoadingSpinner size="large" />
         </View>
       )}
-      <View className="bg-body-bg" style={{ paddingBottom: bottom }}>
+      <View className="bg-body-bg" style={{ paddingBottom: contentPageNavigationState.isVisible ? 0 : bottom }}>
         <MiniAudioPlayer />
+        <PurchaseContentNavigationFooter
+          state={contentPageNavigationState}
+          bottomInset={contentPageNavigationState.isVisible ? bottom : 0}
+          onOpenTableOfContents={() => postContentPageNavigationCommand("openTableOfContents")}
+          onGoPrevious={() => postContentPageNavigationCommand("goPrevious")}
+          onGoNext={() => postContentPageNavigationCommand("goNext")}
+        />
       </View>
     </Screen>
   );
