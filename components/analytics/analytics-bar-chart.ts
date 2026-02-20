@@ -48,6 +48,25 @@ export const formatNumber = (num: number): string => {
   return num.toLocaleString();
 };
 
+// react-native-gifted-charts keeps a small left axis gutter even with hidden Y axis labels.
+// We account for that gutter when mapping touch X -> bar index.
+export const CHART_X_OFFSET = 10;
+
+export const getBarIndexFromX = (
+  x: number,
+  barWidth: number,
+  spacing: number,
+  dataLength: number,
+  initialSpacing = 0,
+  xOffset = CHART_X_OFFSET,
+): number | null => {
+  if (dataLength <= 0) return null;
+  const adjustedX = x - xOffset - initialSpacing;
+  if (adjustedX <= 0) return 0;
+  const index = Math.floor(adjustedX / (barWidth + spacing));
+  return Math.max(0, Math.min(index, dataLength - 1));
+};
+
 export const useChartDimensions = (dataLength: number) => {
   const [containerWidth, setContainerWidth] = useState(0);
 
