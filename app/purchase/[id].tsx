@@ -1,4 +1,4 @@
-import { usePurchases } from "@/app/(tabs)/library";
+import { Purchase, PurchasesSearchResponse } from "@/app/(tabs)/library";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -7,10 +7,11 @@ import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { buildApiUrl } from "@/lib/request";
+import { useQueryClient, InfiniteData } from "@tanstack/react-query";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
@@ -49,12 +50,24 @@ const shareFile = async (uri: string) => {
 export default function DownloadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
-  const { data: purchases = [] } = usePurchases();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
 
-  const purchase = purchases.find((p) => p.url_redirect_token === id);
+  const purchase = useMemo(() => {
+    const queries = queryClient.getQueriesData<InfiniteData<PurchasesSearchResponse>>({
+      queryKey: ["purchases"],
+    });
+    for (const [, data] of queries) {
+      if (!data?.pages) continue;
+      for (const page of data.pages) {
+        const found = page.purchases.find((p: Purchase) => p.url_redirect_token === id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  }, [queryClient, id]);
   const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);

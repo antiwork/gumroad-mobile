@@ -1,5 +1,11 @@
 import { env } from "@/lib/env";
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
+import {
+  InfiniteData,
+  QueryKey,
+  useInfiniteQuery,
+  useQuery,
+  UseQueryOptions,
+} from "@tanstack/react-query";
 import { useEffect } from "react";
 import { assertDefined } from "./assert";
 import { useAuth } from "./auth-context";
@@ -31,14 +37,28 @@ export const request = async <T>(url: string, options?: RequestInit & { data?: a
   return response.json();
 };
 
-export const buildApiUrl = (path: string) => {
+export const buildApiUrl = (path: string, params?: Record<string, string | string[]>) => {
   const url = new URL(path, env.EXPO_PUBLIC_GUMROAD_API_URL);
   url.searchParams.append("mobile_token", env.EXPO_PUBLIC_MOBILE_TOKEN);
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (Array.isArray(value)) {
+        for (const v of value) {
+          url.searchParams.append(key, v);
+        }
+      } else {
+        url.searchParams.append(key, value);
+      }
+    }
+  }
   return url.toString();
 };
 
-export const requestAPI = async <T>(path: string, options: RequestInit & { accessToken: string; data?: any }) =>
-  request<T>(buildApiUrl(path), {
+export const requestAPI = async <T>(
+  path: string,
+  options: RequestInit & { accessToken: string; data?: any; params?: Record<string, string | string[]> },
+) =>
+  request<T>(buildApiUrl(path, options.params), {
     ...options,
     headers: { Authorization: `Bearer ${options?.accessToken}`, ...options?.headers },
   });
@@ -51,6 +71,34 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
   const query = useQuery<TResponse, Error, TData>({
     queryFn: () => requestAPI<TResponse>(options.url, { accessToken: assertDefined(accessToken) }),
     ...options,
+    enabled: !!accessToken && (options.enabled ?? true),
+  });
+
+  useEffect(() => {
+    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
+  }, [isAuthLoading, accessToken, query.error, logout]);
+
+  return query;
+};
+
+export const useInfiniteAPIRequest = <TResponse>(options: {
+  queryKey: QueryKey;
+  url: string;
+  params?: Record<string, string | string[]>;
+  getNextPageParam: (lastPage: TResponse) => number | undefined;
+  enabled?: boolean;
+}) => {
+  const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
+
+  const query = useInfiniteQuery<TResponse, Error, InfiniteData<TResponse>, QueryKey, number>({
+    queryKey: options.queryKey,
+    queryFn: ({ pageParam }) =>
+      requestAPI<TResponse>(options.url, {
+        accessToken: assertDefined(accessToken),
+        params: { ...options.params, page: String(pageParam) },
+      }),
+    initialPageParam: 1,
+    getNextPageParam: options.getNextPageParam,
     enabled: !!accessToken && (options.enabled ?? true),
   });
 

@@ -1,5 +1,6 @@
 import { LineIcon } from "@/components/icon";
-import { CreatorCount, SortOption } from "@/components/use-library-filters";
+import { SortOption } from "@/components/use-library-filters";
+import { Seller } from "@/app/(tabs)/library";
 import { useState } from "react";
 import { FlatList, Platform, TextInput, TouchableOpacity, View } from "react-native";
 import { Drawer } from "react-native-drawer-layout";
@@ -18,10 +19,10 @@ export interface LibraryFiltersProps {
   showArchivedOnly: boolean;
   sortBy: SortOption;
   setSortBy: (sort: SortOption) => void;
-  hasArchivedProducts: boolean;
   hasActiveFilters: boolean;
-  creatorCounts: CreatorCount[];
-  handleCreatorToggle: (creatorName: string) => void;
+  sellers: Seller[];
+  totalCount: number;
+  handleCreatorToggle: (creatorId: string) => void;
   handleSelectAllCreators: () => void;
   handleClearFilters: () => void;
   handleToggleArchived: () => void;
@@ -35,9 +36,9 @@ export const LibraryFilters = ({
   showArchivedOnly,
   sortBy,
   setSortBy,
-  hasArchivedProducts,
   hasActiveFilters,
-  creatorCounts,
+  sellers,
+  totalCount,
   handleCreatorToggle,
   handleSelectAllCreators,
   handleClearFilters,
@@ -90,8 +91,8 @@ export const LibraryFilters = ({
 
           <View className="flex-1 border-b border-border px-4 py-3">
             <FlatList
-              data={creatorCounts}
-              keyExtractor={(item) => item.name}
+              data={sellers}
+              keyExtractor={(item) => item.id}
               ListHeaderComponent={
                 <View className="flex flex-row items-center gap-3 py-1">
                   <Checkbox
@@ -107,29 +108,27 @@ export const LibraryFilters = ({
               renderItem={({ item }) => (
                 <View className="flex flex-row items-center gap-3 py-1">
                   <Checkbox
-                    id={item.username}
-                    checked={selectedCreators.has(item.username)}
-                    onCheckedChange={() => handleCreatorToggle(item.username)}
+                    id={item.id}
+                    checked={selectedCreators.has(item.id)}
+                    onCheckedChange={() => handleCreatorToggle(item.id)}
                   />
                   <Label
-                    onPress={Platform.select({ native: () => handleCreatorToggle(item.username) })}
-                    htmlFor={item.username}
+                    onPress={Platform.select({ native: () => handleCreatorToggle(item.id) })}
+                    htmlFor={item.id}
                   >
-                    {item.name} ({item.count})
+                    {item.name} ({item.purchases_count})
                   </Label>
                 </View>
               )}
             />
           </View>
 
-          {hasArchivedProducts ? (
-            <View className="flex-row items-center gap-3 border-b border-border px-4 py-3">
-              <Checkbox id="archived" checked={showArchivedOnly} onCheckedChange={handleToggleArchived} />
-              <Label onPress={Platform.select({ native: handleToggleArchived })} htmlFor="archived">
-                Show archived only
-              </Label>
-            </View>
-          ) : null}
+          <View className="flex-row items-center gap-3 border-b border-border px-4 py-3">
+            <Checkbox id="archived" checked={showArchivedOnly} onCheckedChange={handleToggleArchived} />
+            <Label onPress={Platform.select({ native: handleToggleArchived })} htmlFor="archived">
+              Show archived only
+            </Label>
+          </View>
 
           <View className="px-4 pt-4">
             <Button onPress={() => setDrawerOpen(false)}>
