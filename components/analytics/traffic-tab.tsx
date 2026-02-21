@@ -4,6 +4,7 @@ import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
+import { ChartGestureHandler } from "./chart-gesture-handler";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
 
@@ -40,6 +41,10 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
 
   const handleBarPress = useCallback((index: number) => {
     setSelectedIndex((prev) => (prev === index ? null : index));
+  }, []);
+
+  const handleGestureSelect = useCallback((index: number) => {
+    setSelectedIndex(index);
   }, []);
 
   const calculateTotals = (
@@ -141,26 +146,33 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View>
-            <BarChart
-              stackData={revenueChartData}
-              height={120}
-              barWidth={barWidth}
-              spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
-            />
-          </View>
+          <ChartGestureHandler
+            dataLength={dates.length}
+            barWidth={barWidth}
+            spacing={spacing}
+            onSelectIndex={handleGestureSelect}
+          >
+            <View>
+              <BarChart
+                stackData={revenueChartData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+                highlightEnabled={activeIndex !== null}
+                highlightedBarIndex={activeIndex ?? undefined}
+                lowlightOpacity={0.4}
+                onPress={(_: unknown, index: number) => handleBarPress(index)}
+              />
+            </View>
+          </ChartGestureHandler>
           <View>
             {revenue.topReferrers.map((name) => (
               <LegendItem
@@ -187,26 +199,33 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
-            <BarChart
-              stackData={salesChartData}
-              height={120}
-              barWidth={barWidth}
-              spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
-            />
-          </View>
+          <ChartGestureHandler
+            dataLength={dates.length}
+            barWidth={barWidth}
+            spacing={spacing}
+            onSelectIndex={handleGestureSelect}
+          >
+            <View>
+              <BarChart
+                stackData={salesChartData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+                highlightEnabled={activeIndex !== null}
+                highlightedBarIndex={activeIndex ?? undefined}
+                lowlightOpacity={0.4}
+                onPress={(_: unknown, index: number) => handleBarPress(index)}
+              />
+            </View>
+          </ChartGestureHandler>
           <View>
             {sales.topReferrers.map((name) => (
               <LegendItem
@@ -233,26 +252,33 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
-            <BarChart
-              stackData={visitsChartData}
-              height={120}
-              barWidth={barWidth}
-              spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
-            />
-          </View>
+          <ChartGestureHandler
+            dataLength={dates.length}
+            barWidth={barWidth}
+            spacing={spacing}
+            onSelectIndex={handleGestureSelect}
+          >
+            <View>
+              <BarChart
+                stackData={visitsChartData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+                highlightEnabled={activeIndex !== null}
+                highlightedBarIndex={activeIndex ?? undefined}
+                lowlightOpacity={0.4}
+                onPress={(_: unknown, index: number) => handleBarPress(index)}
+              />
+            </View>
+          </ChartGestureHandler>
           <View>
             {visits.topReferrers.map((name) => (
               <LegendItem
