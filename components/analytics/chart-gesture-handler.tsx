@@ -12,7 +12,6 @@ interface ChartGestureHandlerProps {
   dataLength: number;
   barWidth: number;
   spacing: number;
-  height: number;
   onBarSelect: (index: number) => void;
   initialSpacing?: number;
   xOffset?: number;
@@ -23,7 +22,6 @@ export const ChartGestureHandler = ({
   dataLength,
   barWidth,
   spacing,
-  height,
   onBarSelect,
   initialSpacing = 0,
   xOffset = CHART_X_OFFSET,
@@ -44,9 +42,16 @@ export const ChartGestureHandler = ({
     [barWidth, spacing, dataLength, initialSpacing, xOffset, onBarSelect],
   );
 
+  const resetRef = useCallback(() => {
+    selectedIndexRef.current = null;
+  }, []);
+
   const tapGesture = useMemo(
-    () => Gesture.Tap().onStart((event) => runOnJS(selectFromX)(event.x)),
-    [selectFromX],
+    () =>
+      Gesture.Tap()
+        .onStart((event) => runOnJS(selectFromX)(event.x))
+        .onEnd(() => runOnJS(resetRef)()),
+    [selectFromX, resetRef],
   );
 
   const panGesture = useMemo(
@@ -55,15 +60,16 @@ export const ChartGestureHandler = ({
         .activeOffsetX([-PAN_ACTIVE_OFFSET_X, PAN_ACTIVE_OFFSET_X])
         .failOffsetY([-PAN_FAIL_OFFSET_Y, PAN_FAIL_OFFSET_Y])
         .onStart((event) => runOnJS(selectFromX)(event.x))
-        .onUpdate((event) => runOnJS(selectFromX)(event.x)),
-    [selectFromX],
+        .onUpdate((event) => runOnJS(selectFromX)(event.x))
+        .onEnd(() => runOnJS(resetRef)()),
+    [selectFromX, resetRef],
   );
 
   return (
     <View style={styles.container}>
       {children}
       <GestureDetector gesture={Gesture.Race(tapGesture, panGesture)}>
-        <View style={[styles.overlay, { height }]} />
+        <View style={styles.overlay} />
       </GestureDetector>
     </View>
   );
@@ -78,6 +84,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: 0,
+    bottom: 0,
     zIndex: 1,
   },
 });

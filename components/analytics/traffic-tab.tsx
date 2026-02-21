@@ -46,7 +46,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   }, [timeRange]);
 
   const handleBarSelect = useCallback((index: number) => {
-    setSelectedIndex(index);
+    setSelectedIndex((prev) => (prev === index ? null : index));
   }, []);
 
   const calculateTotals = (
@@ -92,18 +92,14 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const createStackedChartData = (
     data: { date: string; referrers: { name: string; value: number; color: string }[] }[],
   ) =>
-    data.map((item, index) => {
-      const stacks = item.referrers.map((r, stackIndex) => ({
+    data.map((item) => ({
+      stacks: item.referrers.map((r, stackIndex) => ({
         value: r.value || 0,
         color: r.color,
         borderTopLeftRadius: stackIndex === item.referrers.length - 1 ? 4 : 0,
         borderTopRightRadius: stackIndex === item.referrers.length - 1 ? 4 : 0,
-      }));
-      return {
-        stacks,
-        label: index === activeIndex ? item.date : "",
-      };
-    });
+      })),
+    }));
 
   const revenueChartData = createStackedChartData(revenue.data);
   const visitsChartData = createStackedChartData(visits.data);
@@ -154,7 +150,6 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               spacing={spacing}
               dataLength={dates.length}
               onBarSelect={handleBarSelect}
-              height={CHART_HEIGHT}
             >
               <BarChart
                 stackData={revenueChartData}
@@ -208,7 +203,6 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               spacing={spacing}
               dataLength={dates.length}
               onBarSelect={handleBarSelect}
-              height={CHART_HEIGHT}
             >
               <BarChart
                 stackData={salesChartData}
@@ -262,7 +256,6 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               spacing={spacing}
               dataLength={dates.length}
               onBarSelect={handleBarSelect}
-              height={CHART_HEIGHT}
             >
               <BarChart
                 stackData={visitsChartData}

@@ -2,7 +2,6 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { useCSSVariable } from "uniwind";
 import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartGestureHandler } from "./chart-gesture-handler";
 import { ChartContainer } from "./chart-container";
@@ -14,8 +13,6 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const { processedData, isLoading } = useAnalyticsByDate(timeRange);
   const colors = useChartColors();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const accentColor = useCSSVariable("--color-accent") as string;
-
   const { dates, totals, sales, views } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
@@ -35,13 +32,13 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
   const handleBarSelect = useCallback((index: number) => {
-    setSelectedIndex(index);
+    setSelectedIndex((prev) => (prev === index ? null : index));
   }, []);
 
   const createChartData = (values: number[]) =>
     values.map((value, index) => ({
       value: value === 0 ? 0 : value,
-      frontColor: index === activeIndex ? accentColor : colors.muted,
+      frontColor: index === activeIndex ? colors.accent : colors.muted,
     }));
 
   const revenueData = createChartData(totals);
@@ -81,7 +78,6 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               spacing={spacing}
               dataLength={dates.length}
               onBarSelect={handleBarSelect}
-              height={CHART_HEIGHT}
             >
               <BarChart
                 data={revenueData}
@@ -125,7 +121,6 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               spacing={spacing}
               dataLength={dates.length}
               onBarSelect={handleBarSelect}
-              height={CHART_HEIGHT}
             >
               <BarChart
                 data={salesData}
@@ -169,7 +164,6 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               spacing={spacing}
               dataLength={dates.length}
               onBarSelect={handleBarSelect}
-              height={CHART_HEIGHT}
             >
               <BarChart
                 data={viewsData}
