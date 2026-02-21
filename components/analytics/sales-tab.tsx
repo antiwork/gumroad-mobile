@@ -19,11 +19,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const { dates, totals, sales, views } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
-  const activeIndex = selectedIndex;
-
-  useEffect(() => {
-    setSelectedIndex((prev) => (prev !== null && prev >= dates.length ? null : prev));
-  }, [dates.length]);
+  const activeIndex = selectedIndex !== null && selectedIndex < dates.length ? selectedIndex : null;
 
   useEffect(() => {
     setSelectedIndex(null);

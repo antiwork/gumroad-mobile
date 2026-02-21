@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useRef } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
@@ -44,19 +44,20 @@ export const ChartGestureHandler = ({
     [barWidth, spacing, dataLength, initialSpacing, xOffset, onBarSelect],
   );
 
-  const tapGesture = Gesture.Tap().onStart((event) => {
-    runOnJS(selectFromX)(event.x);
-  });
+  const tapGesture = useMemo(
+    () => Gesture.Tap().onStart((event) => runOnJS(selectFromX)(event.x)),
+    [selectFromX],
+  );
 
-  const panGesture = Gesture.Pan()
-    .activeOffsetX([-PAN_ACTIVE_OFFSET_X, PAN_ACTIVE_OFFSET_X])
-    .failOffsetY([-PAN_FAIL_OFFSET_Y, PAN_FAIL_OFFSET_Y])
-    .onStart((event) => {
-      runOnJS(selectFromX)(event.x);
-    })
-    .onUpdate((event) => {
-      runOnJS(selectFromX)(event.x);
-    });
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-PAN_ACTIVE_OFFSET_X, PAN_ACTIVE_OFFSET_X])
+        .failOffsetY([-PAN_FAIL_OFFSET_Y, PAN_FAIL_OFFSET_Y])
+        .onStart((event) => runOnJS(selectFromX)(event.x))
+        .onUpdate((event) => runOnJS(selectFromX)(event.x)),
+    [selectFromX],
+  );
 
   return (
     <View style={styles.container}>

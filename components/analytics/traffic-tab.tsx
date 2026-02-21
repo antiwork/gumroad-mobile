@@ -38,12 +38,8 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const { dates, revenue, visits, sales } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
-  const activeIndex = selectedIndex;
+  const activeIndex = selectedIndex !== null && selectedIndex < dates.length ? selectedIndex : null;
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
-
-  useEffect(() => {
-    setSelectedIndex((prev) => (prev !== null && prev >= dates.length ? null : prev));
-  }, [dates.length]);
 
   useEffect(() => {
     setSelectedIndex(null);
