@@ -4,6 +4,12 @@ import { useCSSVariable } from "uniwind";
 
 export const CHART_LEFT_OFFSET = 36;
 
+export const getBarIndex = (x: number, barWidth: number, spacing: number, dataLength: number): number => {
+  const adjusted = x - CHART_LEFT_OFFSET;
+  const raw = Math.round(adjusted / (barWidth + spacing));
+  return Math.max(0, Math.min(dataLength - 1, raw));
+};
+
 export interface ChartDataPoint {
   value: number;
   label?: string;

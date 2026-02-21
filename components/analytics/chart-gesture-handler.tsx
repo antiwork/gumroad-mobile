@@ -1,4 +1,4 @@
-import { CHART_LEFT_OFFSET } from "@/components/analytics/analytics-bar-chart";
+import { getBarIndex } from "@/components/analytics/analytics-bar-chart";
 import { useRef } from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -24,27 +24,23 @@ export const ChartGestureHandler = ({
 }) => {
   const lastPanIndex = useRef(-1);
 
-  const getBarIndex = (x: number) => {
-    const adjusted = x - CHART_LEFT_OFFSET;
-    const raw = Math.round(adjusted / (barWidth + spacing));
-    return Math.max(0, Math.min(dataLength - 1, raw));
-  };
+  const resolveIndex = (x: number) => getBarIndex(x, barWidth, spacing, dataLength);
 
   const tap = Gesture.Tap()
     .maxDistance(TAP_MAX_DISTANCE)
-    .onEnd((e) => onTapBar(getBarIndex(e.x)))
+    .onEnd((e) => onTapBar(resolveIndex(e.x)))
     .runOnJS(true);
 
   const pan = Gesture.Pan()
     .activeOffsetX([-PAN_ACTIVE_OFFSET_X, PAN_ACTIVE_OFFSET_X])
     .failOffsetY([-PAN_FAIL_OFFSET_Y, PAN_FAIL_OFFSET_Y])
     .onStart((e) => {
-      const index = getBarIndex(e.x);
+      const index = resolveIndex(e.x);
       lastPanIndex.current = index;
       onScrubBar(index);
     })
     .onUpdate((e) => {
-      const index = getBarIndex(e.x);
+      const index = resolveIndex(e.x);
       if (index !== lastPanIndex.current) {
         lastPanIndex.current = index;
         onScrubBar(index);
