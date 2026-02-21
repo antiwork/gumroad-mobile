@@ -2,6 +2,8 @@ import { useCallback, useState } from "react";
 import { LayoutChangeEvent } from "react-native";
 import { useCSSVariable } from "uniwind";
 
+export const CHART_LEFT_OFFSET = 36;
+
 export interface ChartDataPoint {
   value: number;
   label?: string;
@@ -28,6 +30,7 @@ export const useChartColors = () => {
 };
 
 export const formatCurrency = (cents: number): string => {
+  if (cents == null) return "$0.00";
   const dollars = cents / 100;
   if (dollars >= 1_000_000) {
     return `$${(dollars / 1_000_000).toFixed(1)}M`;
@@ -39,6 +42,7 @@ export const formatCurrency = (cents: number): string => {
 };
 
 export const formatNumber = (num: number): string => {
+  if (num == null) return "0";
   if (num >= 1_000_000) {
     return `${(num / 1_000_000).toFixed(1)}M`;
   }
