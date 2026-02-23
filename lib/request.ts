@@ -1,5 +1,5 @@
 import { env } from "@/lib/env";
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
+import { QueryKey, useInfiniteQuery, UseInfiniteQueryOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { assertDefined } from "./assert";
 import { useAuth } from "./auth-context";
@@ -50,6 +50,28 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
 
   const query = useQuery<TResponse, Error, TData>({
     queryFn: () => requestAPI<TResponse>(options.url, { accessToken: assertDefined(accessToken) }),
+    ...options,
+    enabled: !!accessToken && (options.enabled ?? true),
+  });
+
+  useEffect(() => {
+    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
+  }, [isAuthLoading, accessToken, query.error, logout]);
+
+  return query;
+};
+
+export const useInfiniteAPIRequest = <TResponse, TData = TResponse>(
+  options: Omit<
+    UseInfiniteQueryOptions<TResponse, Error, TData, TResponse, QueryKey, number>,
+    "queryFn"
+  > & { url: (page: number) => string },
+) => {
+  const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
+
+  const query = useInfiniteQuery<TResponse, Error, TData, QueryKey, number>({
+    queryFn: ({ pageParam }) =>
+      requestAPI<TResponse>(options.url(pageParam), { accessToken: assertDefined(accessToken) }),
     ...options,
     enabled: !!accessToken && (options.enabled ?? true),
   });

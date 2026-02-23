@@ -3,9 +3,10 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useLibraryFilters } from "@/components/use-library-filters";
 import { useAuth } from "@/lib/auth-context";
-import { useAPIRequest } from "@/lib/request";
+import { useInfiniteAPIRequest } from "@/lib/request";
 import { useRouter } from "expo-router";
-import { FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
+import { useMemo } from "react";
+import { ActivityIndicator, FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 export interface Purchase {
@@ -34,18 +35,41 @@ interface PurchasesResponse {
   user_id: string;
 }
 
-export const usePurchases = () =>
-  useAPIRequest<PurchasesResponse, Purchase[]>({
+const PAGE_SIZE = 25;
+
+const usePaginatedPurchases = () => {
+  const query = useInfiniteAPIRequest<PurchasesResponse, { pages: PurchasesResponse[] }>({
     queryKey: ["purchases"],
-    url: "mobile/purchases/index",
-    select: (data) => data.products,
+    url: (page) => `mobile/purchases/index?per_page=${PAGE_SIZE}&page=${page}`,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.products.length < PAGE_SIZE ? undefined : lastPageParam + 1,
+    select: (data) => data,
   });
+
+  const purchases = useMemo(
+    () => query.data?.pages.flatMap((page) => page.products) ?? [],
+    [query.data],
+  );
+
+  return { ...query, purchases };
+};
 
 export default function Index() {
   const { isLoading } = useAuth();
-  const { data: purchases = [], isLoading: isLoadingPurchases, error, refetch, isRefetching } = usePurchases();
+  const {
+    purchases,
+    isLoading: isLoadingPurchases,
+    error,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = usePaginatedPurchases();
   const router = useRouter();
   const accentColor = useCSSVariable("--color-accent") as string;
+  const mutedColor = useCSSVariable("--color-muted") as string;
 
   const filters = useLibraryFilters(purchases);
 
@@ -94,6 +118,10 @@ export default function Index() {
             keyExtractor={(item) => item.url_redirect_token}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}
             columnWrapperStyle={{ gap: 12 }}
+            onEndReached={() => {
+              if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+            }}
+            onEndReachedThreshold={0.5}
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={accentColor} />}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -122,6 +150,13 @@ export default function Index() {
                 </View>
               </TouchableOpacity>
             )}
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <View className="items-center py-4">
+                  <ActivityIndicator color={mutedColor} />
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View className="items-center justify-center py-20">
                 <Text className="font-sans text-lg text-muted">
