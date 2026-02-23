@@ -1,0 +1,50 @@
+appId: ${APP_ID}
+---
+- runFlow:
+      file: utils/launch.yaml
+- runFlow:
+      when:
+          visible: Logout
+      commands:
+          - tapOn: Logout
+- tapOn: Sign in with Gumroad
+- runFlow:
+      when:
+          visible: Continue
+      commands:
+          - tapOn: Continue
+- scrollUntilVisible:
+      element: Login
+- tapOn: Email
+- inputText: ${TEST_EMAIL}
+- pressKey: enter
+- inputText: password
+- pressKey: enter
+- runFlow:
+      when:
+          visible: Not Now
+      commands:
+          - tapOn: Not Now
+- runFlow:
+      when:
+          visible: Authentication Token
+      commands:
+          - tapOn: Login
+- assertVisible: Authorize
+- tapOn: Authorize
+- assertVisible: Library
+- tapOn:
+      index: 0
+- runFlow:
+      when:
+          visible: Contents
+      commands:
+          - assertVisible: Prev
+          - assertVisible: Next
+          - tapOn: Next
+          - assertVisible: Contents
+          - tapOn: Contents
+          - assertVisible: Contents
+          - tapOn:
+                index: 0
+          - assertVisible: Contents
