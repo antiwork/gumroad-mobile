@@ -66,3 +66,16 @@ export const useChartDimensions = (dataLength: number) => {
     spacing,
   };
 };
+
+export const getBarIndexFromX = (
+  touchX: number,
+  barWidth: number,
+  spacing: number,
+  dataLength: number,
+): number | null => {
+  if (dataLength === 0) return null;
+  const slotWidth = barWidth + spacing;
+  const index = Math.floor(touchX / slotWidth);
+  if (index < 0 || index >= dataLength) return null;
+  return index;
+};

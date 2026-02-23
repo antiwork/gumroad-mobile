@@ -1,9 +1,9 @@
 import { Text } from "@/components/ui/text";
 import { useCallback, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { GestureResponderEvent, ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { useCSSVariable } from "uniwind";
-import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
+import { formatCurrency, formatNumber, getBarIndexFromX, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
@@ -30,6 +30,14 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const handleBarPress = useCallback((index: number) => {
     setSelectedIndex((prev) => (prev === index ? null : index));
   }, []);
+
+  const handleChartTouch = useCallback(
+    (e: GestureResponderEvent) => {
+      const index = getBarIndexFromX(e.nativeEvent.locationX, barWidth, spacing, dates.length);
+      if (index !== null) setSelectedIndex(index);
+    },
+    [barWidth, spacing, dates.length],
+  );
 
   const createChartData = (values: number[]) =>
     values.map((value, index) => ({
@@ -69,7 +77,13 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View className="mt-4">
+          <View
+            className="mt-4"
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={handleChartTouch}
+            onResponderMove={handleChartTouch}
+          >
             <BarChart
               data={revenueData}
               height={120}
@@ -104,7 +118,13 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
+          <View
+            className="mt-4"
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={handleChartTouch}
+            onResponderMove={handleChartTouch}
+          >
             <BarChart
               data={salesData}
               height={120}
@@ -139,7 +159,13 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
+          <View
+            className="mt-4"
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={handleChartTouch}
+            onResponderMove={handleChartTouch}
+          >
             <BarChart
               data={viewsData}
               height={120}
