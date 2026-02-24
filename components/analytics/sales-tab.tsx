@@ -5,6 +5,7 @@ import { BarChart } from "react-native-gifted-charts";
 import { useCSSVariable } from "uniwind";
 import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
+import { ChartGestureOverlay } from "./chart-gesture-overlay";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
 export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
@@ -35,7 +36,6 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
     values.map((value, index) => ({
       value: value === 0 ? 0 : value,
       frontColor: index === activeIndex ? accentColor : colors.muted,
-      onPress: () => handleBarPress(index),
     }));
 
   const revenueData = createChartData(totals);
@@ -70,23 +70,30 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
           <View className="mt-4">
-            <BarChart
-              data={revenueData}
-              height={120}
+            <ChartGestureOverlay
+              dataLength={dates.length}
               barWidth={barWidth}
               spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              isAnimated={false}
-              barBorderTopLeftRadius={4}
-              barBorderTopRightRadius={4}
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-            />
+              onSelectIndex={handleBarPress}
+            >
+              <BarChart
+                data={revenueData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                isAnimated={false}
+                barBorderTopLeftRadius={4}
+                barBorderTopRightRadius={4}
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+              />
+            </ChartGestureOverlay>
           </View>
         </ChartContainer>
 
@@ -105,23 +112,30 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             )}
           </View>
           <View className="mt-4">
-            <BarChart
-              data={salesData}
-              height={120}
+            <ChartGestureOverlay
+              dataLength={dates.length}
               barWidth={barWidth}
               spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              isAnimated={false}
-              barBorderTopLeftRadius={4}
-              barBorderTopRightRadius={4}
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-            />
+              onSelectIndex={handleBarPress}
+            >
+              <BarChart
+                data={salesData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                isAnimated={false}
+                barBorderTopLeftRadius={4}
+                barBorderTopRightRadius={4}
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+              />
+            </ChartGestureOverlay>
           </View>
         </ChartContainer>
 
@@ -140,23 +154,30 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             )}
           </View>
           <View className="mt-4">
-            <BarChart
-              data={viewsData}
-              height={120}
+            <ChartGestureOverlay
+              dataLength={dates.length}
               barWidth={barWidth}
               spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              isAnimated={false}
-              barBorderTopLeftRadius={4}
-              barBorderTopRightRadius={4}
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-            />
+              onSelectIndex={handleBarPress}
+            >
+              <BarChart
+                data={viewsData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                isAnimated={false}
+                barBorderTopLeftRadius={4}
+                barBorderTopRightRadius={4}
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+              />
+            </ChartGestureOverlay>
           </View>
         </ChartContainer>
       </View>
