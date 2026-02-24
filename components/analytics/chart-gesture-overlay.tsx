@@ -10,6 +10,16 @@ interface ChartGestureOverlayProps {
   children: React.ReactNode;
 }
 
+/** Map an X touch coordinate to a bar index, clamped to [0, dataLength). */
+export const getBarIndexFromX = (x: number, barWidth: number, spacing: number, dataLength: number): number | null => {
+  if (dataLength <= 0) return null;
+  const totalBarSpace = barWidth + spacing;
+  const index = Math.floor(x / totalBarSpace);
+  if (index < 0) return 0;
+  if (index >= dataLength) return dataLength - 1;
+  return index;
+};
+
 /**
  * Transparent gesture layer over a BarChart.
  * Handles tap-anywhere and pan/scrub to select bars by X position.
@@ -29,12 +39,8 @@ export const ChartGestureOverlay = ({
 
   const getIndexFromX = useCallback(
     (x: number): number | null => {
-      if (dataLength <= 0 || containerWidth.current <= 0) return null;
-      const totalBarSpace = barWidth + spacing;
-      const index = Math.floor(x / totalBarSpace);
-      if (index < 0) return 0;
-      if (index >= dataLength) return dataLength - 1;
-      return index;
+      if (containerWidth.current <= 0) return null;
+      return getBarIndexFromX(x, barWidth, spacing, dataLength);
     },
     [dataLength, barWidth, spacing],
   );
