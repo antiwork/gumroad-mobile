@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import { LayoutChangeEvent, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import * as Haptics from "expo-haptics";
 
 interface ChartGestureOverlayProps {
   dataLength: number;
@@ -52,6 +53,7 @@ export const ChartGestureOverlay = ({
     if (index !== null) {
       lastEmittedIndex.current = index;
       onSelectIndex(index);
+      Haptics.selectionAsync();
     }
   });
 
@@ -61,6 +63,7 @@ export const ChartGestureOverlay = ({
       if (index !== null) {
         lastEmittedIndex.current = index;
         onSelectIndex(index);
+        Haptics.selectionAsync();
       }
     })
     .onUpdate((e) => {
@@ -68,6 +71,7 @@ export const ChartGestureOverlay = ({
       if (index !== null && index !== lastEmittedIndex.current) {
         lastEmittedIndex.current = index;
         onSelectIndex(index);
+        Haptics.selectionAsync();
       }
     })
     .activeOffsetX([-5, 5])
