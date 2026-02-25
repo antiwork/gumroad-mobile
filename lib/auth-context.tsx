@@ -22,6 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   isCreator: boolean;
   accessToken: string | null;
+  authError: string | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
@@ -49,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isCreator, setIsCreator] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
@@ -111,11 +113,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsCreator(creatorStatus);
         } catch (error) {
           console.error("Failed to exchange code for tokens:", error);
+          setAuthError("Sign in failed. Please try again.");
         } finally {
           setIsLoading(false);
         }
       } else if (response?.type === "error") {
         console.error("Auth error:", response.error);
+        setAuthError("Sign in failed. Please try again.");
+        setIsLoading(false);
+      } else if (response?.type === "cancel" || response?.type === "dismiss") {
         setIsLoading(false);
       }
     }
@@ -123,7 +129,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [response, redirectUri, authRequest?.codeVerifier, storeTokens]);
 
   const login = useCallback(async () => {
-    if (authRequest) await promptAsync();
+    if (!authRequest) return;
+    setAuthError(null);
+    setIsLoading(true);
+    const result = await promptAsync();
+    if (result.type !== "success") {
+      setIsLoading(false);
+    }
   }, [authRequest, promptAsync]);
 
   const logout = useCallback(async () => {
@@ -157,7 +169,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
     } catch (error) {
       console.error("Failed to refresh token:", error);
-      // If refresh fails, log the user out
       await logout();
     }
   }, [logout, storeTokens]);
@@ -169,6 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         isCreator,
         accessToken,
+        authError,
         login,
         logout,
         refreshToken: refreshTokenFn,

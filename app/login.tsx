@@ -12,11 +12,10 @@ import { StyledImage } from "../components/styled";
 import { useAuth } from "../lib/auth-context";
 
 export default function LoginScreen() {
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading, authError, login } = useAuth();
   const { theme } = useUniwind();
 
   useEffect(() => {
-    // Speeds up opening the browser for the auth flow on Android
     WebBrowser.warmUpAsync();
 
     return () => {
@@ -30,9 +29,13 @@ export default function LoginScreen() {
     <View className="flex-1 items-center justify-center gap-12 bg-background px-6">
       <StyledImage source={theme === "dark" ? logoDark : logoLight} className="aspect-158/22 w-50" />
 
-      <Button variant="accent" onPress={login} disabled={isLoading}>
-        {isLoading ? <LoadingSpinner size="small" /> : <Text>Sign in with Gumroad</Text>}
-      </Button>
+      <View className="items-center gap-3">
+        <Button variant="accent" onPress={login} disabled={isLoading}>
+          {isLoading ? <LoadingSpinner size="small" /> : <Text>Sign in with Gumroad</Text>}
+        </Button>
+
+        {authError ? <Text className="text-destructive text-sm">{authError}</Text> : null}
+      </View>
     </View>
   );
 }
