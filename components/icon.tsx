@@ -10,11 +10,8 @@ import { withUniwind } from "uniwind";
 
 type RawGlyphMap = Record<string, number>;
 type BoxiconsKey = `bx-${string}`;
-type IconNameFromGlyphMap<TGlyphMap extends RawGlyphMap> = Extract<keyof TGlyphMap, BoxiconsKey> extends infer TKey
-  ? TKey extends `bx-${infer TName}`
-    ? TName
-    : never
-  : never;
+type IconNameFromGlyphMap<TGlyphMap extends RawGlyphMap> =
+  Extract<keyof TGlyphMap, BoxiconsKey> extends infer TKey ? (TKey extends `bx-${infer TName}` ? TName : never) : never;
 
 export type LineIconName = IconNameFromGlyphMap<typeof basicGlyphMap>;
 export type SolidIconName = IconNameFromGlyphMap<typeof filledGlyphMap>;

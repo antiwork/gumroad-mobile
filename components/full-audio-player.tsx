@@ -140,11 +140,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               disabled={isBuffering}
               className="size-16 items-center justify-center rounded-full bg-primary"
             >
-              <SolidIcon
-                name={isPlaying ? "pause" : "play"}
-                size={48}
-                className="text-primary-foreground"
-              />
+              <SolidIcon name={isPlaying ? "pause" : "play"} size={48} className="text-primary-foreground" />
             </TouchableOpacity>
 
             <TouchableOpacity

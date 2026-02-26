@@ -69,11 +69,7 @@ export const MiniAudioPlayer = () => {
               disabled={isBuffering}
               className="size-7 items-center justify-center rounded-full bg-primary"
             >
-              <SolidIcon
-                name={isPlaying ? "pause" : "play"}
-                size={24}
-                className="text-primary-foreground"
-              />
+              <SolidIcon name={isPlaying ? "pause" : "play"} size={24} className="text-primary-foreground" />
             </TouchableOpacity>
 
             <TouchableOpacity
