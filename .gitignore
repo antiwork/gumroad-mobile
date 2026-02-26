@@ -43,4 +43,4 @@ app-example
 /android
 
 # generated icon glyphs
-components/icons-generated.ts
+components/icons/icon-paths.ts
