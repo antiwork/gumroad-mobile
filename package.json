@@ -11,8 +11,6 @@
     "lint": "expo lint",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "generate-icons": "npx tsx scripts/generate-boxicons.ts",
-    "postinstall": "npm run generate-icons",
     "test": "jest",
     "e2e:ios": "dotenv -- npm run e2e:ios:run",
     "e2e:ios:run": "maestro test -p ios -e APP_ID=$IOS_BUNDLE_NAME",
@@ -34,7 +32,6 @@
   },
   "dependencies": {
     "@boxicons/core": "^1.0.5",
-    "@boxicons/react": "^1.0.3",
     "@expo/vector-icons": "^15.0.3",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",

@@ -156,7 +156,7 @@ export default function TabsLayout() {
               title: "Dashboard",
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="home" size={size} color={color} />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={color} />,
               href: isCreator ? undefined : null,
             }}
           />

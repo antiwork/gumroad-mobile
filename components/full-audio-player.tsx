@@ -1,7 +1,6 @@
-import { LineIcon } from "@/components/icon";
+import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
-import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -141,10 +140,10 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               disabled={isBuffering}
               className="size-16 items-center justify-center rounded-full bg-primary"
             >
-              <LineIcon
+              <SolidIcon
                 name={isPlaying ? "pause" : "play"}
                 size={48}
-                className={cn("text-primary-foreground", isPlaying ? "" : "ml-1.5")}
+                className="text-primary-foreground"
               />
             </TouchableOpacity>
 
