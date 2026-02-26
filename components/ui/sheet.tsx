@@ -1,4 +1,4 @@
-import { SolidIcon } from "@/components/icon";
+import { LineIcon } from "@/components/icon";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import * as React from "react";
@@ -34,7 +34,7 @@ const SheetHeader = ({ children, className, onClose }: SheetHeaderProps) => (
   <View className={cn("flex-row items-center justify-between border-b border-border px-4 py-3", className)}>
     <View className="flex-1">{children}</View>
     <Pressable onPress={onClose} className="p-2">
-      <SolidIcon name="x" size={24} className="text-foreground" />
+      <LineIcon name="x" size={24} className="text-foreground" />
     </Pressable>
   </View>
 );
