@@ -1,19 +1,21 @@
 import { usePurchases } from "@/app/(tabs)/library";
+import { ContentPageNav } from "@/components/content-page-nav";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
+import { useWebViewMessage } from "@/components/use-webview-message";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
+import { WebView as BaseWebView } from "react-native-webview";
 
 // See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
 type ClickPayload = {
@@ -27,9 +29,14 @@ type ClickPayload = {
   contentLength?: string | null;
 };
 
-type ClickMessage = {
-  type: "click";
-  payload: ClickPayload;
+type TocPage = {
+  page_id: string;
+  title: string | null;
+};
+
+type TocDataPayload = {
+  pages: TocPage[];
+  activePageIndex: number;
 };
 
 const downloadUrl = (token: string, productFileId: string) =>
@@ -49,88 +56,110 @@ const shareFile = async (uri: string) => {
 export default function DownloadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [tocPages, setTocPages] = useState<TocPage[]>([]);
+  const [activePageIndex, setActivePageIndex] = useState(0);
   const { data: purchases = [] } = usePurchases();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
 
   const purchase = purchases.find((p) => p.url_redirect_token === id);
-  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
+  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=expo_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
-  const handleMessage = async (event: WebViewMessageEvent) => {
-    const data = event.nativeEvent.data;
-    try {
-      const message = JSON.parse(data) as ClickMessage;
-      console.info("WebView message received:", message);
+  const handlePageChange = useCallback(
+    (pageIndex: number) => {
+      webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppPageChange", payload: { pageIndex } }));
+    },
+    [],
+  );
 
-      if (message.type !== "click") {
-        console.warn("Unknown message from webview:", message);
-        return;
-      }
+  const handleClick = useCallback(
+    async (payload: unknown) => {
+      const { resourceId, isDownload, type, extension, isPlaying, resumeAt, contentLength } =
+        payload as ClickPayload;
 
-      const fileData = purchase?.file_data?.find((f) => f.id === message.payload.resourceId);
+      const fileData = purchase?.file_data?.find((f) => f.id === resourceId);
 
-      if (message.payload.extension === "PDF" && !message.payload.isDownload) {
+      if (extension === "PDF" && !isDownload) {
         router.push({
           pathname: "/pdf-viewer",
           params: {
-            uri: downloadUrl(id, message.payload.resourceId),
+            uri: downloadUrl(id, resourceId),
             title: purchase?.name,
             urlRedirectId: id,
-            productFileId: message.payload.resourceId,
+            productFileId: resourceId,
             purchaseId: purchase?.purchase_id,
-            initialPage: message.payload.resumeAt,
+            initialPage: resumeAt,
           },
         });
         return;
       }
-      if (message.payload.type === "audio" && !message.payload.isDownload) {
-        if (message.payload.isPlaying === "true") {
+      if (type === "audio" && !isDownload) {
+        if (isPlaying === "true") {
           await pauseAudio();
         } else {
           await playAudio({
-            uri: downloadUrl(id, message.payload.resourceId),
-            resourceId: message.payload.resourceId,
-            resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
+            uri: downloadUrl(id, resourceId),
+            resourceId,
+            resumeAt: resumeAt ? Number(resumeAt) : undefined,
             title: fileData?.name ?? purchase?.name,
             artist: purchase?.creator_name,
             artwork: purchase?.thumbnail_url,
             urlRedirectId: id,
             purchaseId: purchase?.purchase_id,
-            contentLength: message.payload.contentLength ? Number(message.payload.contentLength) : undefined,
+            contentLength: contentLength ? Number(contentLength) : undefined,
           });
         }
         return;
       }
-      if (fileData?.filegroup === "video" && !message.payload.isDownload) {
+      if (fileData?.filegroup === "video" && !isDownload) {
         router.push({
           pathname: "/video-player",
           params: {
-            uri: downloadUrl(id, message.payload.resourceId),
-            streamingUrl: purchase?.file_data?.find((f) => f.id === message.payload.resourceId)?.streaming_url,
+            uri: downloadUrl(id, resourceId),
+            streamingUrl: purchase?.file_data?.find((f) => f.id === resourceId)?.streaming_url,
             title: purchase?.name,
             urlRedirectId: id,
-            productFileId: message.payload.resourceId,
+            productFileId: resourceId,
             purchaseId: purchase?.purchase_id,
-            initialPosition: message.payload.resumeAt ?? undefined,
+            initialPosition: resumeAt ?? undefined,
           },
         });
         return;
       }
 
-      setIsDownloading(true);
-      const downloadedFile = await downloadFile(id, message.payload.resourceId);
-      await shareFile(downloadedFile.uri);
-    } catch (error) {
-      console.error("Download failed:", error, data);
-      Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
+      try {
+        setIsDownloading(true);
+        const downloadedFile = await downloadFile(id, resourceId);
+        await shareFile(downloadedFile.uri);
+      } catch (error) {
+        console.error("Download failed:", error);
+        Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
+      } finally {
+        setIsDownloading(false);
+      }
+    },
+    [id, purchase, router, pauseAudio, playAudio],
+  );
+
+  const handleTocData = useCallback((payload: unknown) => {
+    const { pages, activePageIndex } = payload as TocDataPayload;
+    setTocPages(pages);
+    setActivePageIndex(activePageIndex);
+  }, []);
+
+  const messageHandlers = useMemo(
+    () => [
+      { type: "click", handler: handleClick },
+      { type: "tocData", handler: handleTocData },
+    ],
+    [handleClick, handleTocData],
+  );
+
+  const handleMessage = useWebViewMessage(messageHandlers);
 
   if (isLoading) {
     return (
@@ -157,6 +186,9 @@ export default function DownloadScreen() {
         <View className="absolute inset-0 items-center justify-center bg-black/50">
           <LoadingSpinner size="large" />
         </View>
+      )}
+      {tocPages.length > 0 && (
+        <ContentPageNav pages={tocPages} activePageIndex={activePageIndex} onPageChange={handlePageChange} />
       )}
       <View className="bg-body-bg" style={{ paddingBottom: bottom }}>
         <MiniAudioPlayer />
