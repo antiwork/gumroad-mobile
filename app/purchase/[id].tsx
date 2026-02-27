@@ -66,17 +66,14 @@ export default function DownloadScreen() {
   const webViewRef = useRef<BaseWebView>(null);
 
   const purchase = purchases.find((p) => p.url_redirect_token === id);
-  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=expo_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
+  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
-  const handleNativePageChange = useCallback(
-    (pageIndex: number) => {
-      webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppPageChange", payload: { pageIndex } }));
-    },
-    [],
-  );
+  const handleNativePageChange = useCallback((pageIndex: number) => {
+    webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppPageChange", payload: { pageIndex } }));
+  }, []);
 
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
