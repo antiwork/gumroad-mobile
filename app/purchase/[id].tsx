@@ -1,5 +1,5 @@
 import { usePurchases } from "@/app/(tabs)/library";
-import { ContentPageNav } from "@/components/content-page-nav";
+import { ContentPageNav, TocPage } from "@/components/content-page-nav";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -36,7 +36,7 @@ type ClickMessage = {
 type TocDataMessage = {
   type: "tocData";
   payload: {
-    pages: { page_id: string; title: string | null }[];
+    pages: TocPage[];
     activePageIndex: number;
   };
 };
@@ -179,12 +179,13 @@ export default function DownloadScreen() {
           <LoadingSpinner size="large" />
         </View>
       )}
+      <View className="bg-body-bg">
+        <MiniAudioPlayer />
+      </View>
       {tocPages.length > 0 && (
         <ContentPageNav pages={tocPages} activePageIndex={activePageIndex} onPageChange={handleNativePageChange} />
       )}
-      <View className="bg-body-bg" style={{ paddingBottom: bottom }}>
-        <MiniAudioPlayer />
-      </View>
+      <View style={{ paddingBottom: bottom }} />
     </Screen>
   );
 }

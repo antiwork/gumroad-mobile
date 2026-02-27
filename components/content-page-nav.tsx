@@ -1,13 +1,24 @@
-import { LineIcon } from "@/components/icon";
+import { LineIcon, LineIconName } from "@/components/icon";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { FlatList, Pressable, View } from "react-native";
 
-type TocPage = {
+export type TocPage = {
   page_id: string;
   title: string | null;
+  icon: PageIconType;
+};
+
+type PageIconType = "license-key" | "text-only" | "video-file" | "music-file" | "mixed-files";
+
+const PAGE_ICON_COMPONENTS: Record<PageIconType, LineIconName> = {
+  "license-key": "key",
+  "text-only": "file-detail",
+  "video-file": "movie-play",
+  "music-file": "music-alt",
+  "mixed-files": "file-detail",
 };
 
 export const ContentPageNav = ({
@@ -25,27 +36,27 @@ export const ContentPageNav = ({
 
   return (
     <>
-      <View className="flex-row items-center border-t border-border bg-background px-4 py-2">
+      <View className="flex-row items-center border-t border-border bg-body-bg">
+        <Pressable onPress={() => setSheetOpen(true)} className="flex-1 flex-row items-center gap-1.5 px-4 py-3">
+          <LineIcon name="list-ul" size={18} className="text-foreground" />
+          <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
+            {pages[activePageIndex].title}
+          </Text>
+        </Pressable>
+
         <Pressable
           onPress={() => onPageChange(activePageIndex - 1)}
           disabled={!hasPrevious}
-          className={cn("flex-row items-center gap-1", !hasPrevious && "opacity-50")}
+          className={cn("flex-row items-center gap-1 px-4 py-3", !hasPrevious && "opacity-50")}
         >
           <LineIcon name="chevron-left" size={20} className="text-foreground" />
           <Text className="text-sm text-foreground">Previous</Text>
         </Pressable>
 
-        <Pressable onPress={() => setSheetOpen(true)} className="flex-1 flex-row items-center justify-center gap-1.5">
-          <LineIcon name="book-content" size={18} className="text-foreground" />
-          <Text className="text-sm font-bold text-foreground">
-            {activePageIndex + 1} of {pages.length}
-          </Text>
-        </Pressable>
-
         <Pressable
           onPress={() => onPageChange(activePageIndex + 1)}
           disabled={!hasNext}
-          className={cn("flex-row items-center gap-1", !hasNext && "opacity-50")}
+          className={cn("flex-row items-center gap-1 px-4 py-3", !hasNext && "opacity-50")}
         >
           <Text className="text-sm text-foreground">Next</Text>
           <LineIcon name="chevron-right" size={20} className="text-foreground" />
@@ -68,18 +79,14 @@ export const ContentPageNav = ({
                     onPageChange(index);
                     setSheetOpen(false);
                   }}
-                  className={cn("flex-row items-center gap-3 px-4 py-3", isActive && "bg-accent")}
+                  className={cn("flex-row items-center gap-3 px-4 py-3", isActive && "bg-muted/20")}
                 >
-                  <Text className={cn("text-sm", isActive ? "font-bold text-accent-foreground" : "text-foreground")}>
-                    {index + 1}.
-                  </Text>
-                  <Text
-                    className={cn(
-                      "flex-1 text-sm",
-                      isActive ? "font-bold text-accent-foreground" : "text-foreground",
-                    )}
-                    numberOfLines={2}
-                  >
+                  <LineIcon
+                    name={PAGE_ICON_COMPONENTS[item.icon] ?? "file-detail"}
+                    size={20}
+                    className="text-foreground"
+                  />
+                  <Text className={cn("flex-1", isActive && "font-bold")} numberOfLines={2}>
                     {item.title ?? "Untitled"}
                   </Text>
                 </Pressable>

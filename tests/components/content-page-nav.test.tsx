@@ -5,6 +5,7 @@ const makePages = (count: number) =>
   Array.from({ length: count }, (_, i) => ({
     page_id: `page-${i}`,
     title: `Page ${i + 1}`,
+    icon: "text-only" as const,
   }));
 
 describe("ContentPageNav", () => {
@@ -14,9 +15,9 @@ describe("ContentPageNav", () => {
     jest.clearAllMocks();
   });
 
-  it("renders page counter with correct position", () => {
+  it("renders active page title", () => {
     render(<ContentPageNav pages={makePages(5)} activePageIndex={2} onPageChange={onPageChange} />);
-    expect(screen.getByText("3 of 5")).toBeTruthy();
+    expect(screen.getByText("Page 3")).toBeTruthy();
   });
 
   it("calls onPageChange with previous index when Previous is pressed", () => {
@@ -45,18 +46,17 @@ describe("ContentPageNav", () => {
 
   it("displays page titles with 'Untitled' for null titles in sheet", () => {
     const pages = [
-      { page_id: "p1", title: "Introduction" },
-      { page_id: "p2", title: null },
+      { page_id: "p1", title: "Introduction", icon: "text-only" as const },
+      { page_id: "p2", title: null, icon: "text-only" as const },
     ];
     render(<ContentPageNav pages={pages} activePageIndex={0} onPageChange={onPageChange} />);
-    fireEvent.press(screen.getByText("1 of 2"));
-    expect(screen.getByText("Introduction")).toBeTruthy();
+    fireEvent.press(screen.getByText("Introduction"));
     expect(screen.getByText("Untitled")).toBeTruthy();
   });
 
   it("calls onPageChange when a page is selected in the sheet", () => {
     render(<ContentPageNav pages={makePages(3)} activePageIndex={0} onPageChange={onPageChange} />);
-    fireEvent.press(screen.getByText("1 of 3"));
+    fireEvent.press(screen.getByText("Page 1"));
     fireEvent.press(screen.getByText("Page 3"));
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
