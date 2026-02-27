@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [response, redirectUri, authRequest?.codeVerifier, storeTokens]);
 
   const login = useCallback(async () => {
-    if (authRequest) await promptAsync();
+    if (authRequest) await promptAsync({ preferEphemeralWebBrowserSession: true });
   }, [authRequest, promptAsync]);
 
   const logout = useCallback(async () => {
