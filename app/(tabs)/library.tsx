@@ -96,7 +96,7 @@ export default function Index() {
             }
             ListFooterComponent={
               query.isFetchingNextPage ? (
-                <View className="items-center py-4">
+                <View className="w-full items-center py-4">
                   <LoadingSpinner size="small" />
                 </View>
               ) : null

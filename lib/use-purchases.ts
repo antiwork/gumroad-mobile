@@ -1,7 +1,7 @@
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
-import { InfiniteData, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { InfiniteData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
 export interface Purchase {
@@ -10,6 +10,7 @@ export interface Purchase {
   creator_username: string;
   creator_profile_picture_url: string;
   thumbnail_url: string | null;
+  url_redirect_external_id?: string;
   url_redirect_token: string;
   purchase_email: string;
   purchase_id?: string;
@@ -53,6 +54,12 @@ interface SearchResponse {
   purchases: Purchase[];
   sellers: Seller[];
   meta: { pagination: Pagination };
+}
+
+interface PurchaseDetailResponse {
+  success: boolean;
+  product: Purchase;
+  purchase_valid: boolean;
 }
 
 const PER_PAGE = 24;
@@ -99,13 +106,49 @@ export const usePurchases = (filters: ApiFilters = {}) => {
 
 export const usePurchase = (id: string): Purchase | undefined => {
   const queryClient = useQueryClient();
-  const queries = queryClient.getQueriesData<InfiniteData<SearchResponse>>({ queryKey: ["purchases"] });
-  for (const [, data] of queries) {
-    if (!data?.pages) continue;
-    for (const page of data.pages) {
-      const match = page.purchases.find((p) => p.url_redirect_token === id);
-      if (match) return match;
-    }
-  }
-  return undefined;
+  const { accessToken } = useAuth();
+
+  const cachedPurchase = useMemo(() => {
+    const queries = queryClient.getQueriesData<InfiniteData<SearchResponse>>({ queryKey: ["purchases"] });
+    return queries
+      .flatMap(([, data]) => data?.pages ?? [])
+      .flatMap((page) => page.purchases)
+      .find((p) => p.url_redirect_token === id);
+  }, [queryClient, id]);
+
+  const fallbackQuery = useInfiniteQuery<SearchResponse, Error>({
+    queryKey: ["purchases", {}],
+    queryFn: ({ pageParam }) =>
+      requestAPI<SearchResponse>(buildSearchPath(pageParam as number, {}), {
+        accessToken: assertDefined(accessToken),
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.meta.pagination.next ?? undefined,
+    enabled: !!accessToken && !cachedPurchase,
+  });
+
+  const fallbackPurchase = useMemo(
+    () =>
+      fallbackQuery.data?.pages
+        .flatMap((page) => page.purchases)
+        .find((p) => p.url_redirect_token === id),
+    [fallbackQuery.data, id],
+  );
+
+  const purchase = cachedPurchase ?? fallbackPurchase;
+
+  const detailQuery = useQuery<PurchaseDetailResponse>({
+    queryKey: ["purchase", id],
+    queryFn: () =>
+      requestAPI<PurchaseDetailResponse>(
+        `mobile/url_redirects/get_url_redirect_attributes/${purchase?.url_redirect_external_id}`,
+        { accessToken: assertDefined(accessToken) },
+      ),
+    enabled: !!accessToken && !!purchase?.url_redirect_external_id,
+    placeholderData: purchase
+      ? { success: true, product: purchase, purchase_valid: true }
+      : undefined,
+  });
+
+  return detailQuery.data?.product ?? purchase;
 };

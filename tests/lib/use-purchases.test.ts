@@ -31,7 +31,7 @@ const createWrapper = () => {
 };
 
 const makeSearchResponse = (
-  purchases: { name: string; url_redirect_token: string }[],
+  purchases: { name: string; url_redirect_token: string; url_redirect_external_id?: string }[],
   options: { next?: number | null; count?: number; sellers?: { id: string; name: string; purchases_count: number }[] } = {},
 ) => ({
   success: true,
@@ -131,7 +131,7 @@ describe("usePurchase", () => {
     jest.clearAllMocks();
   });
 
-  it("finds a purchase from the cached query data", async () => {
+  it("returns cached data initially", async () => {
     mockRequestAPI.mockResolvedValue(
       makeSearchResponse([
         { name: "Product A", url_redirect_token: "tok-a" },
@@ -146,9 +146,64 @@ describe("usePurchase", () => {
     expect(result.current?.name).toBe("Product B");
   });
 
-  it("returns undefined when purchase is not in cache", () => {
+  it("fetches fresh data from the detail endpoint", async () => {
+    mockRequestAPI
+      .mockResolvedValueOnce(
+        makeSearchResponse([
+          { name: "Product A", url_redirect_token: "tok-a", url_redirect_external_id: "ext-a" },
+        ]),
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        product: {
+          name: "Product A (updated)",
+          url_redirect_token: "tok-a",
+          url_redirect_external_id: "ext-a",
+          creator_name: "Creator",
+          creator_username: "creator",
+          creator_profile_picture_url: "https://example.com/pic.jpg",
+          thumbnail_url: null,
+          purchase_email: "test@example.com",
+        },
+        purchase_valid: true,
+      });
+
+    const wrapper = createWrapper();
+    const { result: purchasesResult } = renderHook(() => usePurchases(), { wrapper });
+    await waitFor(() => expect(purchasesResult.current.purchases).toHaveLength(1));
+
+    const { result } = renderHook(() => usePurchase("tok-a"), { wrapper });
+    await waitFor(() => expect(result.current?.name).toBe("Product A (updated)"));
+
+    expect(mockRequestAPI).toHaveBeenCalledWith(
+      expect.stringContaining("mobile/url_redirects/get_url_redirect_attributes/ext-a"),
+      expect.objectContaining({ accessToken: "test-token" }),
+    );
+  });
+
+  it("falls back to search when no cache (direct navigation)", async () => {
+    mockRequestAPI.mockResolvedValue(
+      makeSearchResponse([
+        { name: "Product X", url_redirect_token: "tok-x" },
+        { name: "Product Y", url_redirect_token: "tok-y" },
+      ]),
+    );
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => usePurchase("tok-y"), { wrapper });
+    await waitFor(() => expect(result.current?.name).toBe("Product Y"));
+
+    expect(mockRequestAPI).toHaveBeenCalledWith(
+      expect.stringContaining("mobile/purchases/search"),
+      expect.objectContaining({ accessToken: "test-token" }),
+    );
+  });
+
+  it("returns undefined when purchase is not in cache or search results", async () => {
+    mockRequestAPI.mockResolvedValue(makeSearchResponse([]));
     const wrapper = createWrapper();
     const { result } = renderHook(() => usePurchase("nonexistent"), { wrapper });
+    await waitFor(() => expect(mockRequestAPI).toHaveBeenCalled());
     expect(result.current).toBeUndefined();
   });
 });
