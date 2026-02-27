@@ -22,6 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   isCreator: boolean;
   accessToken: string | null;
+  error: string | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
@@ -49,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isCreator, setIsCreator] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
@@ -95,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     async function handleAuthResponse() {
       if (response?.type === "success" && response.params.code && authRequest?.codeVerifier) {
         try {
-          setIsLoading(true);
+          setError(null);
           const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
             method: "POST",
             data: {
@@ -109,13 +111,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
-        } catch (error) {
-          console.error("Failed to exchange code for tokens:", error);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : "Failed to complete sign in";
+          setError(message);
         } finally {
           setIsLoading(false);
         }
       } else if (response?.type === "error") {
-        console.error("Auth error:", response.error);
+        setError(response.error?.message ?? "Authentication failed");
+        setIsLoading(false);
+      } else if (response?.type === "cancel" || response?.type === "dismiss") {
         setIsLoading(false);
       }
     }
@@ -123,7 +128,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [response, redirectUri, authRequest?.codeVerifier, storeTokens]);
 
   const login = useCallback(async () => {
-    if (authRequest) await promptAsync();
+    if (!authRequest) return;
+    setError(null);
+    setIsLoading(true);
+    await promptAsync({ preferEphemeralSession: true });
   }, [authRequest, promptAsync]);
 
   const logout = useCallback(async () => {
@@ -169,6 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         isCreator,
         accessToken,
+        error,
         login,
         logout,
         refreshToken: refreshTokenFn,
