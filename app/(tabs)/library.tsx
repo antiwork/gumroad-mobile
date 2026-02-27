@@ -3,56 +3,27 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useLibraryFilters } from "@/components/use-library-filters";
 import { useAuth } from "@/lib/auth-context";
-import { useAPIRequest } from "@/lib/request";
+import { Purchase, usePurchases } from "@/lib/use-purchases";
 import { useRouter } from "expo-router";
 import { FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-export interface Purchase {
-  name: string;
-  creator_name: string;
-  creator_username: string;
-  creator_profile_picture_url: string;
-  thumbnail_url: string | null;
-  url_redirect_token: string;
-  purchase_email: string;
-  purchase_id?: string;
-  is_archived?: boolean;
-  content_updated_at?: string;
-  purchased_at?: string;
-  file_data?: {
-    id: string;
-    name: string;
-    filegroup?: string;
-    streaming_url?: string;
-  }[];
-}
-
-interface PurchasesResponse {
-  success: boolean;
-  products: Purchase[];
-  user_id: string;
-}
-
-export const usePurchases = () =>
-  useAPIRequest<PurchasesResponse, Purchase[]>({
-    queryKey: ["purchases"],
-    url: "mobile/purchases/index",
-    select: (data) => data.products,
-  });
-
 export default function Index() {
   const { isLoading } = useAuth();
-  const { data: purchases = [], isLoading: isLoadingPurchases, error, refetch, isRefetching } = usePurchases();
   const router = useRouter();
   const accentColor = useCSSVariable("--color-accent") as string;
 
-  const filters = useLibraryFilters(purchases);
+  const filters = useLibraryFilters();
+  const query = usePurchases(filters.apiFilters);
+  const { purchases, sellers, totalCount } = query;
 
-  if (error) {
+  if (query.error) {
     return (
       <View className="flex-1 items-center justify-center bg-body-bg">
-        <Text className="font-sans text-foreground">Error: {error.message}</Text>
+        <Text className="font-sans text-foreground">Error: {query.error.message}</Text>
+        <TouchableOpacity onPress={query.refetch} className="mt-4 rounded bg-accent px-4 py-2">
+          <Text className="font-sans text-white">Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -65,36 +36,31 @@ export default function Index() {
     );
   }
 
-  const totalUnfilteredCount = filters.showArchivedOnly
-    ? purchases.filter((p) => p.is_archived).length
-    : purchases.filter((p) => !p.is_archived).length;
-
-  const showResultsCount = filters.filteredPurchases.length !== totalUnfilteredCount;
-
   return (
     <Screen>
-      {isLoadingPurchases ? (
+      {query.isLoading ? (
         <View className="flex-1 items-center justify-center">
           <LoadingSpinner size="large" />
         </View>
       ) : (
-        <LibraryFilters {...filters}>
-          {showResultsCount && (
+        <LibraryFilters {...filters} sellers={sellers}>
+          {filters.hasActiveFilters && (
             <View className="px-4 pb-4">
               <Text className="font-sans text-sm text-muted">
-                Showing {filters.filteredPurchases.length} product
-                {filters.filteredPurchases.length !== 1 ? "s" : ""}
+                Showing {totalCount} product{totalCount !== 1 ? "s" : ""}
               </Text>
             </View>
           )}
 
           <FlatList<Purchase>
             numColumns={2}
-            data={filters.filteredPurchases}
+            data={purchases}
             keyExtractor={(item) => item.url_redirect_token}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}
             columnWrapperStyle={{ gap: 12 }}
-            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={accentColor} />}
+            refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={query.refetch} tintColor={accentColor} />}
+            onEndReached={query.fetchNextPage}
+            onEndReachedThreshold={0.5}
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
@@ -128,6 +94,13 @@ export default function Index() {
                   {filters.searchText || filters.hasActiveFilters ? "No matching products" : "No purchases yet"}
                 </Text>
               </View>
+            }
+            ListFooterComponent={
+              query.isFetchingNextPage ? (
+                <View className="items-center justify-center py-4">
+                  <LoadingSpinner size="small" />
+                </View>
+              ) : null
             }
           />
         </LibraryFilters>
