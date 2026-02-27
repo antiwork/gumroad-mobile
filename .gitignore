@@ -41,6 +41,3 @@ app-example
 # generated native folders
 /ios
 /android
-
-# generated icon glyphs
-components/icons-generated.ts
