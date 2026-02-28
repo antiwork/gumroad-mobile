@@ -11,6 +11,7 @@ export interface UseLibraryFiltersReturn {
   sortBy: SortOption;
   setSortBy: (sort: SortOption) => void;
   hasActiveFilters: boolean;
+  isSearchPending: boolean;
   apiFilters: ApiFilters;
   handleCreatorToggle: (creatorId: string) => void;
   handleSelectAllCreators: () => void;
@@ -39,6 +40,7 @@ export const useLibraryFilters = (): UseLibraryFiltersReturn => {
   }, [debouncedSearchText, selectedCreators, showArchivedOnly, sortBy]);
 
   const hasActiveFilters = selectedCreators.size > 0 || showArchivedOnly;
+  const isSearchPending = searchText.trim() !== debouncedSearchText;
 
   const handleCreatorToggle = (creatorId: string) => {
     setSelectedCreators((prev) => {
@@ -73,6 +75,7 @@ export const useLibraryFilters = (): UseLibraryFiltersReturn => {
     sortBy,
     setSortBy,
     hasActiveFilters,
+    isSearchPending,
     apiFilters,
     handleCreatorToggle,
     handleSelectAllCreators,

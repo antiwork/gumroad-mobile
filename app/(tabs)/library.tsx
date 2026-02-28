@@ -33,22 +33,24 @@ export default function Index() {
     );
   }
 
+  const isFilterLoading = filters.isSearchPending || (query.isFetching && !query.isFetchingNextPage);
+
   return (
     <Screen>
-      {query.isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <LoadingSpinner size="large" />
-        </View>
-      ) : (
-        <LibraryFilters {...filters} sellers={sellers}>
-          {filters.hasActiveFilters && (
-            <View className="px-4 pb-4">
-              <Text className="font-sans text-sm text-muted">
-                Showing {totalCount} product{totalCount !== 1 ? "s" : ""}
-              </Text>
-            </View>
-          )}
+      <LibraryFilters {...filters} sellers={sellers}>
+        {filters.hasActiveFilters && !isFilterLoading && (
+          <View className="px-4 pb-4">
+            <Text className="font-sans text-sm text-muted">
+              Showing {totalCount} product{totalCount !== 1 ? "s" : ""}
+            </Text>
+          </View>
+        )}
 
+        {isFilterLoading && purchases.length === 0 ? (
+          <View className="flex-1 items-center justify-center">
+            <LoadingSpinner size="large" />
+          </View>
+        ) : (
           <FlatList<Purchase>
             numColumns={2}
             data={purchases}
@@ -60,6 +62,13 @@ export default function Index() {
               if (query.hasNextPage) query.fetchNextPage();
             }}
             onEndReachedThreshold={0.5}
+            ListHeaderComponent={
+              isFilterLoading ? (
+                <View className="items-center py-4">
+                  <LoadingSpinner size="small" />
+                </View>
+              ) : null
+            }
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
@@ -88,11 +97,13 @@ export default function Index() {
               </TouchableOpacity>
             )}
             ListEmptyComponent={
-              <View className="items-center justify-center py-20">
-                <Text className="font-sans text-lg text-muted">
-                  {filters.searchText || filters.hasActiveFilters ? "No matching products" : "No purchases yet"}
-                </Text>
-              </View>
+              !isFilterLoading ? (
+                <View className="items-center justify-center py-20">
+                  <Text className="font-sans text-lg text-muted">
+                    {filters.searchText || filters.hasActiveFilters ? "No matching products" : "No purchases yet"}
+                  </Text>
+                </View>
+              ) : null
             }
             ListFooterComponent={
               query.isFetchingNextPage ? (
@@ -102,8 +113,8 @@ export default function Index() {
               ) : null
             }
           />
-        </LibraryFilters>
-      )}
+        )}
+      </LibraryFilters>
     </Screen>
   );
 }

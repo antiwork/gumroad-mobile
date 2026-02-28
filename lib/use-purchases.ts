@@ -1,7 +1,7 @@
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
-import { InfiniteData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { InfiniteData, keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
 export interface Purchase {
@@ -89,6 +89,7 @@ export const usePurchases = (filters: ApiFilters = {}) => {
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.meta.pagination.next ?? undefined,
     enabled: !!accessToken,
+    placeholderData: keepPreviousData,
   });
 
   const purchases = useMemo(() => query.data?.pages.flatMap((page) => page.purchases) ?? [], [query.data]);

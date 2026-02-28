@@ -71,6 +71,21 @@ describe("useLibraryFilters", () => {
     });
   });
 
+  describe("isSearchPending", () => {
+    it("returns true while search text is pending debounce", () => {
+      const { result } = renderHook(() => useLibraryFilters());
+      act(() => result.current.setSearchText("react"));
+      expect(result.current.isSearchPending).toBe(true);
+      act(() => jest.advanceTimersByTime(300));
+      expect(result.current.isSearchPending).toBe(false);
+    });
+
+    it("returns false when search text is empty", () => {
+      const { result } = renderHook(() => useLibraryFilters());
+      expect(result.current.isSearchPending).toBe(false);
+    });
+  });
+
   describe("state handlers", () => {
     it("handleCreatorToggle adds and removes creators", () => {
       const { result } = renderHook(() => useLibraryFilters());
