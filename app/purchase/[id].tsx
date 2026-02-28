@@ -1,4 +1,5 @@
 import { usePurchases } from "@/app/(tabs)/library";
+import { ContentPageNav, TocPage } from "@/components/content-page-nav";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -10,7 +11,7 @@ import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
@@ -32,6 +33,14 @@ type ClickMessage = {
   payload: ClickPayload;
 };
 
+type TocDataMessage = {
+  type: "tocData";
+  payload: {
+    pages: TocPage[];
+    activePageIndex: number;
+  };
+};
+
 const downloadUrl = (token: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
 
@@ -49,6 +58,8 @@ const shareFile = async (uri: string) => {
 export default function DownloadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [tocPages, setTocPages] = useState<TocDataMessage["payload"]["pages"]>([]);
+  const [activePageIndex, setActivePageIndex] = useState(0);
   const { data: purchases = [] } = usePurchases();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
@@ -60,11 +71,21 @@ export default function DownloadScreen() {
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
+  const handleNativePageChange = useCallback((pageIndex: number) => {
+    webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppPageChange", payload: { pageIndex } }));
+  }, []);
+
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
     try {
-      const message = JSON.parse(data) as ClickMessage;
+      const message = JSON.parse(data) as ClickMessage | TocDataMessage;
       console.info("WebView message received:", message);
+
+      if (message.type === "tocData") {
+        setTocPages(message.payload.pages);
+        setActivePageIndex(message.payload.activePageIndex);
+        return;
+      }
 
       if (message.type !== "click") {
         console.warn("Unknown message from webview:", message);
@@ -158,9 +179,13 @@ export default function DownloadScreen() {
           <LoadingSpinner size="large" />
         </View>
       )}
-      <View className="bg-body-bg" style={{ paddingBottom: bottom }}>
+      <View className="bg-body-bg">
         <MiniAudioPlayer />
       </View>
+      {tocPages.length > 0 && (
+        <ContentPageNav pages={tocPages} activePageIndex={activePageIndex} onPageChange={handleNativePageChange} />
+      )}
+      <View style={{ paddingBottom: bottom }} />
     </Screen>
   );
 }
