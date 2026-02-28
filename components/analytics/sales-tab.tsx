@@ -1,22 +1,25 @@
 import { Text } from "@/components/ui/text";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { useCSSVariable } from "uniwind";
 import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
+import { ChartGestureHandler } from "./chart-gesture-handler";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
 export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const { processedData, isLoading } = useAnalyticsByDate(timeRange);
   const colors = useChartColors();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const accentColor = useCSSVariable("--color-accent") as string;
 
   const { dates, totals, sales, views } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
-  const activeIndex = selectedIndex;
+  useEffect(() => {
+    setSelectedIndex(null);
+  }, [timeRange]);
+
+  const activeIndex = selectedIndex !== null && selectedIndex < dates.length ? selectedIndex : null;
 
   const totalRevenue = totals.reduce((sum, val) => sum + val, 0);
   const totalSales = sales.reduce((sum, val) => sum + val, 0);
@@ -31,11 +34,14 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
     setSelectedIndex((prev) => (prev === index ? null : index));
   }, []);
 
+  const handleBarScrub = useCallback((index: number) => {
+    setSelectedIndex(index);
+  }, []);
+
   const createChartData = (values: number[]) =>
     values.map((value, index) => ({
       value: value === 0 ? 0 : value,
-      frontColor: index === activeIndex ? accentColor : colors.muted,
-      onPress: () => handleBarPress(index),
+      frontColor: index === activeIndex ? colors.accent : colors.muted,
     }));
 
   const revenueData = createChartData(totals);
@@ -69,25 +75,33 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View className="mt-4">
-            <BarChart
-              data={revenueData}
-              height={120}
-              barWidth={barWidth}
-              spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              isAnimated={false}
-              barBorderTopLeftRadius={4}
-              barBorderTopRightRadius={4}
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-            />
-          </View>
+          <ChartGestureHandler
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={dates.length}
+            onTapBar={handleBarPress}
+            onScrubBar={handleBarScrub}
+          >
+            <View className="mt-4">
+              <BarChart
+                data={revenueData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                isAnimated={false}
+                barBorderTopLeftRadius={4}
+                barBorderTopRightRadius={4}
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+              />
+            </View>
+          </ChartGestureHandler>
         </ChartContainer>
 
         <ChartContainer
@@ -104,25 +118,33 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
-            <BarChart
-              data={salesData}
-              height={120}
-              barWidth={barWidth}
-              spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              isAnimated={false}
-              barBorderTopLeftRadius={4}
-              barBorderTopRightRadius={4}
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-            />
-          </View>
+          <ChartGestureHandler
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={dates.length}
+            onTapBar={handleBarPress}
+            onScrubBar={handleBarScrub}
+          >
+            <View className="mt-4">
+              <BarChart
+                data={salesData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                isAnimated={false}
+                barBorderTopLeftRadius={4}
+                barBorderTopRightRadius={4}
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+              />
+            </View>
+          </ChartGestureHandler>
         </ChartContainer>
 
         <ChartContainer
@@ -139,25 +161,33 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
-            <BarChart
-              data={viewsData}
-              height={120}
-              barWidth={barWidth}
-              spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              isAnimated={false}
-              barBorderTopLeftRadius={4}
-              barBorderTopRightRadius={4}
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-            />
-          </View>
+          <ChartGestureHandler
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={dates.length}
+            onTapBar={handleBarPress}
+            onScrubBar={handleBarScrub}
+          >
+            <View className="mt-4">
+              <BarChart
+                data={viewsData}
+                height={120}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                isAnimated={false}
+                barBorderTopLeftRadius={4}
+                barBorderTopRightRadius={4}
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+              />
+            </View>
+          </ChartGestureHandler>
         </ChartContainer>
       </View>
     </ScrollView>
