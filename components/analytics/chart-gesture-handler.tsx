@@ -1,21 +1,11 @@
-import { ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { ReactNode, useCallback, useMemo, useRef } from "react";
+import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
-import { CHART_X_OFFSET, getBarIndexFromX } from "./analytics-bar-chart";
+import { getBarIndexFromX } from "./analytics-bar-chart";
 
 const PAN_ACTIVE_OFFSET_X = 4;
 const PAN_FAIL_OFFSET_Y = 12;
-
-interface ChartGestureHandlerProps {
-  children: ReactNode;
-  dataLength: number;
-  barWidth: number;
-  spacing: number;
-  onBarSelect: (index: number) => void;
-  initialSpacing?: number;
-  xOffset?: number;
-}
 
 export const ChartGestureHandler = ({
   children,
@@ -23,23 +13,23 @@ export const ChartGestureHandler = ({
   barWidth,
   spacing,
   onBarSelect,
-  initialSpacing = 0,
-  xOffset = CHART_X_OFFSET,
-}: ChartGestureHandlerProps) => {
+}: {
+  children: ReactNode;
+  dataLength: number;
+  barWidth: number;
+  spacing: number;
+  onBarSelect: (index: number) => void;
+}) => {
   const selectedIndexRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    selectedIndexRef.current = null;
-  }, [dataLength, barWidth, spacing, initialSpacing, xOffset]);
 
   const selectFromX = useCallback(
     (x: number) => {
-      const index = getBarIndexFromX(x, barWidth, spacing, dataLength, initialSpacing, xOffset);
+      const index = getBarIndexFromX(x, barWidth, spacing, dataLength);
       if (index === null || selectedIndexRef.current === index) return;
       selectedIndexRef.current = index;
       onBarSelect(index);
     },
-    [barWidth, spacing, dataLength, initialSpacing, xOffset, onBarSelect],
+    [barWidth, spacing, dataLength, onBarSelect],
   );
 
   const resetRef = useCallback(() => {
@@ -65,26 +55,17 @@ export const ChartGestureHandler = ({
     [selectFromX, resetRef],
   );
 
+  const composedGesture = useMemo(
+    () => Gesture.Race(tapGesture, panGesture),
+    [tapGesture, panGesture],
+  );
+
   return (
-    <View style={styles.container}>
+    <View className="relative">
       {children}
-      <GestureDetector gesture={Gesture.Race(tapGesture, panGesture)}>
-        <View style={styles.overlay} />
+      <GestureDetector gesture={composedGesture}>
+        <View className="absolute inset-0 z-10" />
       </GestureDetector>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    position: "relative",
-  },
-  overlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
-});
