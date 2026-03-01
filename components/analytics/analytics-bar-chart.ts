@@ -28,6 +28,7 @@ export const useChartColors = () => {
 };
 
 export const formatCurrency = (cents: number): string => {
+  if (cents == null) return "$0.00";
   const dollars = cents / 100;
   if (dollars >= 1_000_000) {
     return `$${(dollars / 1_000_000).toFixed(1)}M`;
@@ -39,6 +40,7 @@ export const formatCurrency = (cents: number): string => {
 };
 
 export const formatNumber = (num: number): string => {
+  if (num == null) return "0";
   if (num >= 1_000_000) {
     return `${(num / 1_000_000).toFixed(1)}M`;
   }
@@ -46,6 +48,23 @@ export const formatNumber = (num: number): string => {
     return `${(num / 1_000).toFixed(1)}K`;
   }
   return num.toLocaleString();
+};
+
+export const CHART_X_OFFSET = 10;
+
+export const getBarIndexFromX = (
+  x: number,
+  barWidth: number,
+  spacing: number,
+  dataLength: number,
+  initialSpacing = 0,
+  xOffset = CHART_X_OFFSET,
+): number | null => {
+  if (dataLength <= 0) return null;
+  const adjustedX = x - xOffset - initialSpacing;
+  if (adjustedX <= 0) return 0;
+  const index = Math.floor(adjustedX / (barWidth + spacing));
+  return Math.max(0, Math.min(index, dataLength - 1));
 };
 
 export const useChartDimensions = (dataLength: number) => {
