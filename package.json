@@ -12,10 +12,11 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "e2e:ios": "dotenv -- npm run e2e:ios:run",
+    "e2e:ios": "dotenv-flow -- npm run e2e:ios:run",
     "e2e:ios:run": "maestro test -p ios -e APP_ID=$IOS_BUNDLE_NAME",
-    "e2e:android": "dotenv -- npm run e2e:android:run",
-    "e2e:android:run": "maestro test -p android -e APP_ID=$ANDROID_BUNDLE_NAME"
+    "e2e:android": "dotenv-flow -- npm run e2e:android:run",
+    "e2e:android:run": "maestro test -p android -e APP_ID=$ANDROID_BUNDLE_NAME",
+    "eas": "dotenv-flow eas --"
   },
   "jest": {
     "preset": "jest-expo",
@@ -90,6 +91,7 @@
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29",
     "@types/react": "~19.1.0",
+    "dotenv-flow-cli": "^1.1.1",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "jest": "^29",
