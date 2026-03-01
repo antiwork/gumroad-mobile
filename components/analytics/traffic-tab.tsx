@@ -95,6 +95,18 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
       return {
         stacks,
         label: index === activeIndex ? item.date : "",
+        onPress: () => handleBarPress(index),
+        topLabelComponent: () => (
+          <View 
+            style={{
+              height: 120,
+              width: barWidth + spacing,
+              backgroundColor: 'transparent',
+              marginLeft: -(spacing / 2),
+            }}
+            onTouchStart={() => handleBarPress(index)}
+          />
+        ),
       };
     });
 
