@@ -48,6 +48,20 @@ export const formatNumber = (num: number): string => {
   return num.toLocaleString();
 };
 
+export const getBarIndexAtX = (x: number, dataLength: number, barWidth: number, spacing: number): number | null => {
+  if (dataLength <= 0 || !Number.isFinite(x)) {
+    return null;
+  }
+
+  const stride = barWidth + spacing;
+  if (stride <= 0) {
+    return 0;
+  }
+
+  const rawIndex = Math.round((x - barWidth / 2) / stride);
+  return Math.max(0, Math.min(dataLength - 1, rawIndex));
+};
+
 export const useChartDimensions = (dataLength: number) => {
   const [containerWidth, setContainerWidth] = useState(0);
 

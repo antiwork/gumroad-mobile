@@ -1,9 +1,9 @@
 import { Text } from "@/components/ui/text";
 import { useCallback, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { GestureResponderEvent, ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { useCSSVariable } from "uniwind";
-import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
+import { formatCurrency, formatNumber, getBarIndexAtX, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
@@ -28,14 +28,23 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
   const handleBarPress = useCallback((index: number) => {
-    setSelectedIndex((prev) => (prev === index ? null : index));
+    setSelectedIndex(index);
   }, []);
+
+  const handleChartTouch = useCallback(
+    (event: GestureResponderEvent) => {
+      const index = getBarIndexAtX(event.nativeEvent.locationX, dates.length, barWidth, spacing);
+      if (index !== null) {
+        handleBarPress(index);
+      }
+    },
+    [barWidth, dates.length, handleBarPress, spacing],
+  );
 
   const createChartData = (values: number[]) =>
     values.map((value, index) => ({
       value: value === 0 ? 0 : value,
       frontColor: index === activeIndex ? accentColor : colors.muted,
-      onPress: () => handleBarPress(index),
     }));
 
   const revenueData = createChartData(totals);
@@ -69,7 +78,13 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View className="mt-4">
+          <View
+            className="mt-4"
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={handleChartTouch}
+            onResponderMove={handleChartTouch}
+          >
             <BarChart
               data={revenueData}
               height={120}
@@ -86,6 +101,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               yAxisThickness={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
+              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
         </ChartContainer>
@@ -104,7 +120,13 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
+          <View
+            className="mt-4"
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={handleChartTouch}
+            onResponderMove={handleChartTouch}
+          >
             <BarChart
               data={salesData}
               height={120}
@@ -121,6 +143,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               yAxisThickness={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
+              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
         </ChartContainer>
@@ -139,7 +162,13 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
+          <View
+            className="mt-4"
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={handleChartTouch}
+            onResponderMove={handleChartTouch}
+          >
             <BarChart
               data={viewsData}
               height={120}
@@ -156,6 +185,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               yAxisThickness={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
+              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
         </ChartContainer>
