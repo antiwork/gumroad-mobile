@@ -33,15 +33,26 @@ export interface UseLibraryFiltersReturn {
   handleToggleArchived: () => void;
 }
 
-export const useLibraryFilters = (purchases: Purchase[]): UseLibraryFiltersReturn => {
+interface CreatorCountsByArchivedState {
+  active: CreatorCount[];
+  archived: CreatorCount[];
+}
+
+interface UseLibraryFiltersOptions {
+  creatorCountsByArchivedState?: CreatorCountsByArchivedState;
+  hasArchivedProducts?: boolean;
+}
+
+export const useLibraryFilters = (purchases: Purchase[], options: UseLibraryFiltersOptions = {}): UseLibraryFiltersReturn => {
   const [searchText, setSearchText] = useState("");
   const [selectedCreators, setSelectedCreators] = useState<Set<string>>(new Set());
   const [showArchivedOnly, setShowArchivedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("content_updated_at");
 
-  const hasArchivedProducts = useMemo(() => purchases.some((p) => p.is_archived), [purchases]);
+  const localHasArchivedProducts = useMemo(() => purchases.some((p) => p.is_archived), [purchases]);
+  const hasArchivedProducts = options.hasArchivedProducts ?? localHasArchivedProducts;
 
-  const creatorCounts = useMemo(() => {
+  const localCreatorCounts = useMemo(() => {
     const basePurchases = showArchivedOnly
       ? purchases.filter((p) => p.is_archived)
       : purchases.filter((p) => !p.is_archived);
@@ -62,6 +73,13 @@ export const useLibraryFilters = (purchases: Purchase[]): UseLibraryFiltersRetur
       .map(([username, { name, count }]) => ({ username, name, count }));
   }, [purchases, showArchivedOnly]);
 
+  const creatorCounts = useMemo(() => {
+    if (!options.creatorCountsByArchivedState) {
+      return localCreatorCounts;
+    }
+    return showArchivedOnly ? options.creatorCountsByArchivedState.archived : options.creatorCountsByArchivedState.active;
+  }, [localCreatorCounts, options.creatorCountsByArchivedState, showArchivedOnly]);
+
   const filteredPurchases = useMemo(() => {
     let result = showArchivedOnly ? purchases.filter((p) => p.is_archived) : purchases.filter((p) => !p.is_archived);
 
@@ -73,7 +91,7 @@ export const useLibraryFilters = (purchases: Purchase[]): UseLibraryFiltersRetur
     }
 
     if (selectedCreators.size > 0) {
-      result = result.filter((p) => selectedCreators.has(p.creator_username));
+      result = result.filter((p) => selectedCreators.has(p.creator_username) || selectedCreators.has(p.creator_name));
     }
 
     result = [...result].sort((a, b) => {

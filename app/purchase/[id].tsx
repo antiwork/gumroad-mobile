@@ -60,7 +60,7 @@ export default function DownloadScreen() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [tocPages, setTocPages] = useState<TocDataMessage["payload"]["pages"]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
-  const { data: purchases = [] } = usePurchases();
+  const { purchases } = usePurchases();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
