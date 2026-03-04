@@ -129,10 +129,7 @@ export const usePurchase = (id: string): Purchase | undefined => {
   });
 
   const fallbackPurchase = useMemo(
-    () =>
-      fallbackQuery.data?.pages
-        .flatMap((page) => page.purchases)
-        .find((p) => p.url_redirect_token === id),
+    () => fallbackQuery.data?.pages.flatMap((page) => page.purchases).find((p) => p.url_redirect_token === id),
     [fallbackQuery.data, id],
   );
 
@@ -146,9 +143,7 @@ export const usePurchase = (id: string): Purchase | undefined => {
         { accessToken: assertDefined(accessToken) },
       ),
     enabled: !!accessToken && !!purchase?.url_redirect_external_id,
-    placeholderData: purchase
-      ? { success: true, product: purchase, purchase_valid: true }
-      : undefined,
+    placeholderData: purchase ? { success: true, product: purchase, purchase_valid: true } : undefined,
   });
 
   return detailQuery.data?.product ?? purchase;

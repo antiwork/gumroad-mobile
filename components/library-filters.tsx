@@ -107,10 +107,7 @@ export const LibraryFilters = ({
                     checked={selectedCreators.has(item.id)}
                     onCheckedChange={() => handleCreatorToggle(item.id)}
                   />
-                  <Label
-                    onPress={Platform.select({ native: () => handleCreatorToggle(item.id) })}
-                    htmlFor={item.id}
-                  >
+                  <Label onPress={Platform.select({ native: () => handleCreatorToggle(item.id) })} htmlFor={item.id}>
                     {item.name} ({item.purchases_count})
                   </Label>
                 </View>

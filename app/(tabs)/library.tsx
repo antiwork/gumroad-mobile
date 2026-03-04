@@ -57,7 +57,9 @@ export default function Index() {
             keyExtractor={(item) => item.url_redirect_token}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}
             columnWrapperStyle={{ gap: 12 }}
-            refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={query.refetch} tintColor={accentColor} />}
+            refreshControl={
+              <RefreshControl refreshing={query.isRefetching} onRefresh={query.refetch} tintColor={accentColor} />
+            }
             onEndReached={() => {
               if (query.hasNextPage) query.fetchNextPage();
             }}

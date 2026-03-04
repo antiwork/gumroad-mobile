@@ -32,7 +32,11 @@ const createWrapper = () => {
 
 const makeSearchResponse = (
   purchases: { name: string; url_redirect_token: string; url_redirect_external_id?: string }[],
-  options: { next?: number | null; count?: number; sellers?: { id: string; name: string; purchases_count: number }[] } = {},
+  options: {
+    next?: number | null;
+    count?: number;
+    sellers?: { id: string; name: string; purchases_count: number }[];
+  } = {},
 ) => ({
   success: true,
   user_id: "user-1",
@@ -96,9 +100,7 @@ describe("usePurchases", () => {
   });
 
   it("has no next page when pagination.next is null", async () => {
-    mockRequestAPI.mockResolvedValue(
-      makeSearchResponse([{ name: "P1", url_redirect_token: "t1" }], { next: null }),
-    );
+    mockRequestAPI.mockResolvedValue(makeSearchResponse([{ name: "P1", url_redirect_token: "t1" }], { next: null }));
     const { result } = renderHook(() => usePurchases(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.purchases).toHaveLength(1));
     expect(result.current.hasNextPage).toBe(false);
@@ -109,18 +111,14 @@ describe("usePurchases", () => {
       { id: "s1", name: "Alice", purchases_count: 3 },
       { id: "s2", name: "Bob", purchases_count: 1 },
     ];
-    mockRequestAPI.mockResolvedValue(
-      makeSearchResponse([{ name: "P1", url_redirect_token: "t1" }], { sellers }),
-    );
+    mockRequestAPI.mockResolvedValue(makeSearchResponse([{ name: "P1", url_redirect_token: "t1" }], { sellers }));
     const { result } = renderHook(() => usePurchases(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.sellers).toHaveLength(2));
     expect(result.current.sellers).toEqual(sellers);
   });
 
   it("exposes totalCount from pagination metadata", async () => {
-    mockRequestAPI.mockResolvedValue(
-      makeSearchResponse([{ name: "P1", url_redirect_token: "t1" }], { count: 42 }),
-    );
+    mockRequestAPI.mockResolvedValue(makeSearchResponse([{ name: "P1", url_redirect_token: "t1" }], { count: 42 }));
     const { result } = renderHook(() => usePurchases(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.totalCount).toBe(42));
   });
@@ -149,9 +147,7 @@ describe("usePurchase", () => {
   it("fetches fresh data from the detail endpoint", async () => {
     mockRequestAPI
       .mockResolvedValueOnce(
-        makeSearchResponse([
-          { name: "Product A", url_redirect_token: "tok-a", url_redirect_external_id: "ext-a" },
-        ]),
+        makeSearchResponse([{ name: "Product A", url_redirect_token: "tok-a", url_redirect_external_id: "ext-a" }]),
       )
       .mockResolvedValueOnce({
         success: true,
