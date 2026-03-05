@@ -1,9 +1,10 @@
 import { Text } from "@/components/ui/text";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
+import { InteractiveChart } from "./interactive-chart";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
 
@@ -38,8 +39,17 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const activeIndex = selectedIndex;
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
+  const lastPanIndex = useRef<number | null>(null);
+
   const handleBarPress = useCallback((index: number) => {
     setSelectedIndex((prev) => (prev === index ? null : index));
+    lastPanIndex.current = null;
+  }, []);
+
+  const handleBarPan = useCallback((index: number) => {
+    if (lastPanIndex.current === index) return;
+    lastPanIndex.current = index;
+    setSelectedIndex(index);
   }, []);
 
   const calculateTotals = (
@@ -141,7 +151,12 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View>
+          <InteractiveChart
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={revenue.data.length}
+            onBarSelect={handleBarPan}
+          >
             <BarChart
               stackData={revenueChartData}
               height={120}
@@ -160,7 +175,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               lowlightOpacity={0.4}
               onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
-          </View>
+          </InteractiveChart>
           <View>
             {revenue.topReferrers.map((name) => (
               <LegendItem
@@ -187,7 +202,12 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
+          <InteractiveChart
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={sales.data.length}
+            onBarSelect={handleBarPan}
+          >
             <BarChart
               stackData={salesChartData}
               height={120}
@@ -206,7 +226,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               lowlightOpacity={0.4}
               onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
-          </View>
+          </InteractiveChart>
           <View>
             {sales.topReferrers.map((name) => (
               <LegendItem
@@ -233,7 +253,12 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
+          <InteractiveChart
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={visits.data.length}
+            onBarSelect={handleBarPan}
+          >
             <BarChart
               stackData={visitsChartData}
               height={120}
@@ -252,7 +277,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               lowlightOpacity={0.4}
               onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
-          </View>
+          </InteractiveChart>
           <View>
             {visits.topReferrers.map((name) => (
               <LegendItem

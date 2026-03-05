@@ -1,10 +1,11 @@
 import { Text } from "@/components/ui/text";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { useCSSVariable } from "uniwind";
 import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
+import { InteractiveChart } from "./interactive-chart";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
 export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
@@ -27,8 +28,17 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const selectedViews = activeIndex !== null ? views[activeIndex] : 0;
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
+  const lastPanIndex = useRef<number | null>(null);
+
   const handleBarPress = useCallback((index: number) => {
     setSelectedIndex((prev) => (prev === index ? null : index));
+    lastPanIndex.current = null;
+  }, []);
+
+  const handleBarPan = useCallback((index: number) => {
+    if (lastPanIndex.current === index) return;
+    lastPanIndex.current = index;
+    setSelectedIndex(index);
   }, []);
 
   const createChartData = (values: number[]) =>
@@ -69,7 +79,12 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View className="mt-4">
+          <InteractiveChart
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={totals.length}
+            onBarSelect={handleBarPan}
+          >
             <BarChart
               data={revenueData}
               height={120}
@@ -87,7 +102,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               xAxisThickness={1}
               xAxisColor={colors.border}
             />
-          </View>
+          </InteractiveChart>
         </ChartContainer>
 
         <ChartContainer
@@ -104,7 +119,12 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
+          <InteractiveChart
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={sales.length}
+            onBarSelect={handleBarPan}
+          >
             <BarChart
               data={salesData}
               height={120}
@@ -122,7 +142,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               xAxisThickness={1}
               xAxisColor={colors.border}
             />
-          </View>
+          </InteractiveChart>
         </ChartContainer>
 
         <ChartContainer
@@ -139,7 +159,12 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
+          <InteractiveChart
+            barWidth={barWidth}
+            spacing={spacing}
+            dataLength={views.length}
+            onBarSelect={handleBarPan}
+          >
             <BarChart
               data={viewsData}
               height={120}
@@ -157,7 +182,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               xAxisThickness={1}
               xAxisColor={colors.border}
             />
-          </View>
+          </InteractiveChart>
         </ChartContainer>
       </View>
     </ScrollView>
