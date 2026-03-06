@@ -3,7 +3,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useLibraryFilters } from "@/components/use-library-filters";
 import { useAuth } from "@/lib/auth-context";
-import { Purchase, usePurchases } from "@/lib/use-purchases";
+import { Purchase, usePurchases, useSellers } from "@/lib/use-purchases";
 import { useRouter } from "expo-router";
 import { useRef } from "react";
 import { FlatList, Image, NativeScrollEvent, NativeSyntheticEvent, Text, TouchableOpacity, View } from "react-native";
@@ -14,7 +14,8 @@ export default function Index() {
 
   const filters = useLibraryFilters();
   const query = usePurchases(filters.apiFilters);
-  const { purchases, sellers, totalCount } = query;
+  const { purchases, totalCount } = query;
+  const sellers = useSellers(filters.apiFilters);
 
   // Pull-to-refresh without rendering the native RefreshControl UI
   const isPulling = useRef(false);

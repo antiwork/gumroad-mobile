@@ -105,6 +105,11 @@ export const usePurchases = (filters: ApiFilters = {}) => {
   return { ...query, purchases, sellers, totalCount };
 };
 
+export const useSellers = ({ seller, ...filtersWithoutSeller }: ApiFilters = {}) => {
+  const { sellers } = usePurchases(filtersWithoutSeller);
+  return sellers;
+};
+
 export const usePurchase = (id: string): Purchase | undefined => {
   const queryClient = useQueryClient();
   const { accessToken } = useAuth();
