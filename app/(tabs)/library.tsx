@@ -5,17 +5,35 @@ import { useLibraryFilters } from "@/components/use-library-filters";
 import { useAuth } from "@/lib/auth-context";
 import { Purchase, usePurchases } from "@/lib/use-purchases";
 import { useRouter } from "expo-router";
-import { FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { useRef } from "react";
+import { FlatList, Image, NativeScrollEvent, NativeSyntheticEvent, Text, TouchableOpacity, View } from "react-native";
 
 export default function Index() {
   const { isLoading } = useAuth();
   const router = useRouter();
-  const accentColor = useCSSVariable("--color-accent") as string;
 
   const filters = useLibraryFilters();
   const query = usePurchases(filters.apiFilters);
   const { purchases, sellers, totalCount } = query;
+
+  // Pull-to-refresh without rendering the native RefreshControl UI
+  const isPulling = useRef(false);
+  const onScrollBeginDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (e.nativeEvent.contentOffset.y <= 0) isPulling.current = true;
+  };
+  const onScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isPulling.current && e.nativeEvent.contentOffset.y < -80) query.refetch();
+    isPulling.current = false;
+  };
+
+  // onEndReachedThreshold is unreliable because of the layouts FlatList is inside; just loading on scroll works better
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distanceFromEnd = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    if (distanceFromEnd < layoutMeasurement.height * 3 && query.hasNextPage && !query.isFetchingNextPage) {
+      query.fetchNextPage();
+    }
+  };
 
   if (query.error) {
     return (
@@ -46,7 +64,7 @@ export default function Index() {
           </View>
         )}
 
-        {isFilterLoading && purchases.length === 0 ? (
+        {isFilterLoading ? (
           <View className="flex-1 items-center justify-center">
             <LoadingSpinner size="large" />
           </View>
@@ -54,16 +72,13 @@ export default function Index() {
           <FlatList<Purchase>
             numColumns={2}
             data={purchases}
-            keyExtractor={(item) => item.url_redirect_token}
+            keyExtractor={(item, index) => item.purchase_id ?? index.toString()}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}
             columnWrapperStyle={{ gap: 12 }}
-            refreshControl={
-              <RefreshControl refreshing={query.isRefetching} onRefresh={query.refetch} tintColor={accentColor} />
-            }
-            onEndReached={() => {
-              if (query.hasNextPage) query.fetchNextPage();
-            }}
-            onEndReachedThreshold={0.5}
+            onScrollBeginDrag={onScrollBeginDrag}
+            onScrollEndDrag={onScrollEndDrag}
+            onScroll={onScroll}
+            scrollEventThrottle={200}
             ListHeaderComponent={
               isFilterLoading ? (
                 <View className="items-center py-4">
@@ -94,7 +109,9 @@ export default function Index() {
                 </View>
                 <View className="mt-auto flex-row items-center gap-2 border-t border-border p-2">
                   <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" />
-                  <Text className="font-sans text-sm text-foreground">{item.creator_name}</Text>
+                  <Text className="flex-1 font-sans text-sm text-foreground" numberOfLines={1}>
+                    {item.creator_name}
+                  </Text>
                 </View>
               </TouchableOpacity>
             )}
