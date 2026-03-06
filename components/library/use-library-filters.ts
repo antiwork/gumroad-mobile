@@ -1,4 +1,4 @@
-import { ApiFilters } from "@/lib/use-purchases";
+import { ApiFilters } from "@/components/library/use-purchases";
 import { useEffect, useMemo, useState } from "react";
 
 export type SortOption = "date-desc" | "date-asc";

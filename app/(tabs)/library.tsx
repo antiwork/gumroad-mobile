@@ -1,9 +1,10 @@
-import { LibraryFilters } from "@/components/library-filters";
+import { LibraryFilters } from "@/components/library/library-filters";
+import { useLibraryFilters } from "@/components/library/use-library-filters";
+import { Purchase, usePurchases, useSellers } from "@/components/library/use-purchases";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
-import { useLibraryFilters } from "@/components/use-library-filters";
 import { useAuth } from "@/lib/auth-context";
-import { Purchase, usePurchases, useSellers } from "@/lib/use-purchases";
+import { cn } from "@/lib/utils";
 import { useRouter } from "expo-router";
 import { useRef } from "react";
 import { FlatList, Image, NativeScrollEvent, NativeSyntheticEvent, Text, TouchableOpacity, View } from "react-native";
@@ -65,7 +66,7 @@ export default function Index() {
           </View>
         )}
 
-        {isFilterLoading ? (
+        {isFilterLoading && purchases.length === 0 ? (
           <View className="flex-1 items-center justify-center">
             <LoadingSpinner size="large" />
           </View>
@@ -80,17 +81,13 @@ export default function Index() {
             onScrollEndDrag={onScrollEndDrag}
             onScroll={onScroll}
             scrollEventThrottle={200}
-            ListHeaderComponent={
-              isFilterLoading ? (
-                <View className="items-center py-4">
-                  <LoadingSpinner size="small" />
-                </View>
-              ) : null
-            }
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
-                className="max-w-1/2 flex-1 overflow-hidden rounded border border-border bg-background"
+                className={cn(
+                  "max-w-1/2 flex-1 overflow-hidden rounded border border-border bg-background",
+                  isFilterLoading && "opacity-50",
+                )}
               >
                 {item.thumbnail_url ? (
                   <Image

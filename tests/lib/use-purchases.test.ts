@@ -1,6 +1,8 @@
-import { renderHook, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
+
+import { usePurchase, usePurchases } from "@/components/library/use-purchases";
 
 const mockRequestAPI = jest.fn();
 jest.mock("@/lib/request", () => ({
@@ -21,8 +23,6 @@ jest.mock("@/lib/auth-context", () => ({
 jest.mock("@/lib/assert", () => ({
   assertDefined: <T>(value: T) => value,
 }));
-
-import { usePurchases, usePurchase } from "@/lib/use-purchases";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

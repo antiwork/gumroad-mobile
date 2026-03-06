@@ -1,5 +1,5 @@
-import { renderHook, act } from "@testing-library/react-native";
-import { useLibraryFilters } from "@/components/use-library-filters";
+import { useLibraryFilters } from "@/components/library/use-library-filters";
+import { act, renderHook } from "@testing-library/react-native";
 
 describe("useLibraryFilters", () => {
   beforeEach(() => {

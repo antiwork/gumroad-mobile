@@ -1,5 +1,5 @@
-import { usePurchase } from "@/lib/use-purchases";
 import { ContentPageNav, TocPage } from "@/components/content-page-nav";
+import { usePurchase } from "@/components/library/use-purchases";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
