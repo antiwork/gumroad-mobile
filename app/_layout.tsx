@@ -22,7 +22,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: background as string }}>
       <QueryProvider>
         <AuthProvider>
           <Stack
@@ -32,11 +32,12 @@ export default function RootLayout() {
               headerTintColor: accent as string,
               headerTitleStyle: { fontFamily: "ABC Favorit", color: foreground as string },
               headerBackButtonDisplayMode: "minimal",
+              contentStyle: { backgroundColor: background as string },
             }}
           >
             <Stack.Screen name="login" options={{ title: "Sign In", headerShown: false }} />
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="index" options={{ headerShown: false, animation: "none" }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: "none" }} />
             <Stack.Screen name="purchase/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
           </Stack>
