@@ -1,11 +1,14 @@
 import { Text } from "@/components/ui/text";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
+import { ChartGestureHandler } from "./chart-gesture-handler";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
+
+const CHART_HEIGHT = 120;
 
 interface TrafficTabProps {
   timeRange: AnalyticsTimeRange;
@@ -35,10 +38,14 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const { dates, revenue, visits, sales } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
 
-  const activeIndex = selectedIndex;
+  const activeIndex = selectedIndex !== null && selectedIndex < dates.length ? selectedIndex : null;
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
-  const handleBarPress = useCallback((index: number) => {
+  useEffect(() => {
+    setSelectedIndex(null);
+  }, [timeRange]);
+
+  const handleBarSelect = useCallback((index: number) => {
     setSelectedIndex((prev) => (prev === index ? null : index));
   }, []);
 
@@ -85,18 +92,15 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const createStackedChartData = (
     data: { date: string; referrers: { name: string; value: number; color: string }[] }[],
   ) =>
-    data.map((item, index) => {
-      const stacks = item.referrers.map((r, stackIndex) => ({
+    data.map((item, index) => ({
+      stacks: item.referrers.map((r, stackIndex) => ({
         value: r.value || 0,
         color: r.color,
         borderTopLeftRadius: stackIndex === item.referrers.length - 1 ? 4 : 0,
         borderTopRightRadius: stackIndex === item.referrers.length - 1 ? 4 : 0,
-      }));
-      return {
-        stacks,
-        label: index === activeIndex ? item.date : "",
-      };
-    });
+      })),
+      label: index === activeIndex ? item.date : "",
+    }));
 
   const revenueChartData = createStackedChartData(revenue.data);
   const visitsChartData = createStackedChartData(visits.data);
@@ -142,24 +146,31 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
           <View>
-            <BarChart
-              stackData={revenueChartData}
-              height={120}
+            <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
-            />
+              dataLength={dates.length}
+              onBarSelect={handleBarSelect}
+            >
+              <BarChart
+                stackData={revenueChartData}
+                height={CHART_HEIGHT}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+                highlightEnabled={activeIndex !== null}
+                highlightedBarIndex={activeIndex ?? undefined}
+                lowlightOpacity={0.4}
+                disablePress
+              />
+            </ChartGestureHandler>
           </View>
           <View>
             {revenue.topReferrers.map((name) => (
@@ -188,24 +199,31 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             )}
           </View>
           <View>
-            <BarChart
-              stackData={salesChartData}
-              height={120}
+            <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
-            />
+              dataLength={dates.length}
+              onBarSelect={handleBarSelect}
+            >
+              <BarChart
+                stackData={salesChartData}
+                height={CHART_HEIGHT}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+                highlightEnabled={activeIndex !== null}
+                highlightedBarIndex={activeIndex ?? undefined}
+                lowlightOpacity={0.4}
+                disablePress
+              />
+            </ChartGestureHandler>
           </View>
           <View>
             {sales.topReferrers.map((name) => (
@@ -234,24 +252,31 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             )}
           </View>
           <View>
-            <BarChart
-              stackData={visitsChartData}
-              height={120}
+            <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}
-              initialSpacing={0}
-              endSpacing={0}
-              hideRules
-              hideYAxisText
-              disableScroll
-              yAxisThickness={0}
-              xAxisThickness={1}
-              xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
-            />
+              dataLength={dates.length}
+              onBarSelect={handleBarSelect}
+            >
+              <BarChart
+                stackData={visitsChartData}
+                height={CHART_HEIGHT}
+                barWidth={barWidth}
+                spacing={spacing}
+                initialSpacing={0}
+                endSpacing={0}
+                hideRules
+                hideYAxisText
+                disableScroll
+                yAxisThickness={0}
+                xAxisThickness={1}
+                xAxisColor={colors.border}
+                highlightEnabled={activeIndex !== null}
+                highlightedBarIndex={activeIndex ?? undefined}
+                lowlightOpacity={0.4}
+                disablePress
+              />
+            </ChartGestureHandler>
           </View>
           <View>
             {visits.topReferrers.map((name) => (
