@@ -1,5 +1,5 @@
-import { usePurchases } from "@/app/(tabs)/library";
 import { ContentPageNav, TocPage } from "@/components/content-page-nav";
+import { usePurchase } from "@/components/library/use-purchases";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -60,12 +60,10 @@ export default function DownloadScreen() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [tocPages, setTocPages] = useState<TocDataMessage["payload"]["pages"]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
-  const { data: purchases = [] } = usePurchases();
+  const purchase = usePurchase(id);
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
-
-  const purchase = purchases.find((p) => p.url_redirect_token === id);
   const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
