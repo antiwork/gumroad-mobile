@@ -7,7 +7,7 @@ import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
 
-const authorizationEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/authorize`;
+const authorizationEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/mobile_pre_authorization/new`;
 const tokenEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/token`;
 const productsEndpoint = `${env.EXPO_PUBLIC_GUMROAD_API_URL}/mobile/analytics/products.json?mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 const scopes = ["mobile_api", "creator_api"];
