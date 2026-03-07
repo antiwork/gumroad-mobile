@@ -36,6 +36,17 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
       value: value === 0 ? 0 : value,
       frontColor: index === activeIndex ? accentColor : colors.muted,
       onPress: () => handleBarPress(index),
+      topLabelComponent: () => (
+        <View 
+          style={{
+            height: 120, // 匹配 BarChart 的高度
+            width: barWidth + spacing,
+            backgroundColor: 'transparent',
+            marginLeft: -(spacing / 2),
+          }}
+          onTouchStart={() => handleBarPress(index)}
+        />
+      ),
     }));
 
   const revenueData = createChartData(totals);
