@@ -40,14 +40,16 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
 
   const { dates, revenue, visits, sales } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
-  const { selectedIndex: activeIndex, scrollRef, getChartTouchProps } = useChartScrubbing(barWidth, spacing, dates.length);
+  const {
+    selectedIndex: activeIndex,
+    scrollRef,
+    getChartTouchProps,
+  } = useChartScrubbing(barWidth, spacing, dates.length);
 
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
   const selectionOverlay =
-    activeIndex !== null ? (
-      <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
-    ) : null;
+    activeIndex !== null ? <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} /> : null;
 
   const calculateTotals = (
     data: { date: string; referrers: { name: string; value: number; color: string }[] }[],

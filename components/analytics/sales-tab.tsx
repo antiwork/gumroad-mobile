@@ -19,7 +19,11 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
 
   const { dates, totals, sales, views } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
-  const { selectedIndex: activeIndex, scrollRef, getChartTouchProps } = useChartScrubbing(barWidth, spacing, dates.length);
+  const {
+    selectedIndex: activeIndex,
+    scrollRef,
+    getChartTouchProps,
+  } = useChartScrubbing(barWidth, spacing, dates.length);
 
   const totalRevenue = totals.reduce((sum, val) => sum + val, 0);
   const totalSales = sales.reduce((sum, val) => sum + val, 0);
@@ -37,9 +41,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
     }));
 
   const selectionOverlay =
-    activeIndex !== null ? (
-      <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
-    ) : null;
+    activeIndex !== null ? <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} /> : null;
 
   const revenueData = createChartData(totals);
   const salesData = createChartData(sales);
