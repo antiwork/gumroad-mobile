@@ -8,9 +8,12 @@ import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
+import * as Application from "expo-application";
+import Constants from "expo-constants";
 import { Tabs } from "expo-router";
-import { createContext, useContext, useState } from "react";
-import { Linking, TouchableOpacity, View } from "react-native";
+import * as Updates from "expo-updates";
+import { createContext, useContext, useRef, useState } from "react";
+import { Alert, Linking, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
 
 interface SearchContextValue {
@@ -25,7 +28,37 @@ const SearchContext = createContext<SearchContextValue>({
 
 export const useDashboardSearch = () => useContext(SearchContext);
 
-const LogoIcon = () => <StyledImage source={logoG} className="ml-3 size-6" />;
+// Tap the logo 5 times <1.5 seconds apart to show the version and build number
+const TAP_COUNT_THRESHOLD = 5;
+const TAP_TIMEOUT_MS = 1500;
+
+const LogoIcon = () => {
+  const tapCountRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePress = () => {
+    tapCountRef.current += 1;
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => (tapCountRef.current = 0), TAP_TIMEOUT_MS);
+
+    if (tapCountRef.current >= TAP_COUNT_THRESHOLD) {
+      tapCountRef.current = 0;
+      if (timerRef.current) clearTimeout(timerRef.current);
+
+      Alert.alert(
+        "Gumroad",
+        `Version ${Constants.expoConfig?.version ?? "unknown"} (${Application.nativeBuildVersion ?? "dev"})${Updates.updateId ? `\nUpdate ${Updates.updateId}` : ""}`,
+      );
+    }
+  };
+
+  return (
+    <Pressable onPress={handlePress}>
+      <StyledImage source={logoG} className="ml-3 size-6" />
+    </Pressable>
+  );
+};
 
 const SearchButton = () => {
   const { isSearchActive, setSearchActive } = useDashboardSearch();
