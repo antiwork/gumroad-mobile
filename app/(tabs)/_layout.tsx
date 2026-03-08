@@ -125,7 +125,6 @@ export default function TabsLayout() {
   ]);
   const headerTitleStyle = useResolveClassNames("font-sans text-foreground");
   const tabBarLabelStyle = useResolveClassNames("font-sans font-normal text-xs");
-
   return (
     <SearchContext.Provider value={{ isSearchActive, setSearchActive }}>
       <SettingsSheetContext.Provider value={{ isSettingsOpen, setSettingsOpen }}>

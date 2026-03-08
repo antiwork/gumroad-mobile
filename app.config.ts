@@ -71,10 +71,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
+    "expo-updates",
     "expo-secure-store",
     "expo-web-browser",
     "expo-video",
   ],
+  updates: {
+    enabled: true,
+    url: `https://u.expo.dev/${process.env.EAS_PROJECT_ID}`,
+    fallbackToCacheTimeout: 0,
+    checkAutomatically: "ON_LOAD",
+  },
+  runtimeVersion: {
+    policy: "appVersion",
+  },
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
