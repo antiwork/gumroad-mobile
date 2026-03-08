@@ -25,7 +25,7 @@ export const ChartContainer = ({
       children
     ) : (
       <View className="h-38 flex-row items-center justify-center gap-2">
-        <SolidIcon name="bar-chart-alt-2" className="text-muted" size={16} />
+        <SolidIcon name="bar-chart-big" className="text-muted" size={16} />
         <Text className="text-muted">{emptyMessage}</Text>
       </View>
     )}

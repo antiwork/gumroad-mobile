@@ -1,8 +1,7 @@
 import { FullAudioPlayer } from "@/components/full-audio-player";
-import { LineIcon } from "@/components/icon";
+import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
-import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Pressable, TouchableOpacity, View } from "react-native";
 import TrackPlayer, { State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
@@ -70,11 +69,7 @@ export const MiniAudioPlayer = () => {
               disabled={isBuffering}
               className="size-7 items-center justify-center rounded-full bg-primary"
             >
-              <LineIcon
-                name={isPlaying ? "pause" : "play"}
-                size={24}
-                className={cn("text-primary-foreground", isPlaying ? "" : "ml-0.5")}
-              />
+              <SolidIcon name={isPlaying ? "pause" : "play"} size={24} className="text-primary-foreground" />
             </TouchableOpacity>
 
             <TouchableOpacity

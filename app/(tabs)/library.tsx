@@ -1,58 +1,46 @@
-import { LibraryFilters } from "@/components/library-filters";
+import { LibraryFilters } from "@/components/library/library-filters";
+import { useLibraryFilters } from "@/components/library/use-library-filters";
+import { Purchase, usePurchases, useSellers } from "@/components/library/use-purchases";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
-import { useLibraryFilters } from "@/components/use-library-filters";
 import { useAuth } from "@/lib/auth-context";
-import { useAPIRequest } from "@/lib/request";
+import { cn } from "@/lib/utils";
 import { useRouter } from "expo-router";
-import { FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
-import { useCSSVariable } from "uniwind";
-
-export interface Purchase {
-  name: string;
-  creator_name: string;
-  creator_username: string;
-  creator_profile_picture_url: string;
-  thumbnail_url: string | null;
-  url_redirect_token: string;
-  purchase_email: string;
-  purchase_id?: string;
-  is_archived?: boolean;
-  content_updated_at?: string;
-  purchased_at?: string;
-  file_data?: {
-    id: string;
-    name: string;
-    filegroup?: string;
-    streaming_url?: string;
-  }[];
-}
-
-interface PurchasesResponse {
-  success: boolean;
-  products: Purchase[];
-  user_id: string;
-}
-
-export const usePurchases = () =>
-  useAPIRequest<PurchasesResponse, Purchase[]>({
-    queryKey: ["purchases"],
-    url: "mobile/purchases/index",
-    select: (data) => data.products,
-  });
+import { useRef } from "react";
+import { FlatList, Image, NativeScrollEvent, NativeSyntheticEvent, Text, TouchableOpacity, View } from "react-native";
 
 export default function Index() {
   const { isLoading } = useAuth();
-  const { data: purchases = [], isLoading: isLoadingPurchases, error, refetch, isRefetching } = usePurchases();
   const router = useRouter();
-  const accentColor = useCSSVariable("--color-accent") as string;
 
-  const filters = useLibraryFilters(purchases);
+  const filters = useLibraryFilters();
+  const query = usePurchases(filters.apiFilters);
+  const { purchases, totalCount } = query;
+  const sellers = useSellers(filters.apiFilters);
 
-  if (error) {
+  // Pull-to-refresh without rendering the native RefreshControl UI
+  const isPulling = useRef(false);
+  const onScrollBeginDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (e.nativeEvent.contentOffset.y <= 0) isPulling.current = true;
+  };
+  const onScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isPulling.current && e.nativeEvent.contentOffset.y < -80) query.refetch();
+    isPulling.current = false;
+  };
+
+  // onEndReachedThreshold is unreliable because of the layouts FlatList is inside; just loading on scroll works better
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distanceFromEnd = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    if (distanceFromEnd < layoutMeasurement.height * 3 && query.hasNextPage && !query.isFetchingNextPage) {
+      query.fetchNextPage();
+    }
+  };
+
+  if (query.error) {
     return (
       <View className="flex-1 items-center justify-center bg-body-bg">
-        <Text className="font-sans text-foreground">Error: {error.message}</Text>
+        <Text className="font-sans text-foreground">Error: {query.error.message}</Text>
       </View>
     );
   }
@@ -65,40 +53,41 @@ export default function Index() {
     );
   }
 
-  const totalUnfilteredCount = filters.showArchivedOnly
-    ? purchases.filter((p) => p.is_archived).length
-    : purchases.filter((p) => !p.is_archived).length;
-
-  const showResultsCount = filters.filteredPurchases.length !== totalUnfilteredCount;
+  const isFilterLoading = filters.isSearchPending || (query.isFetching && !query.isFetchingNextPage);
 
   return (
     <Screen>
-      {isLoadingPurchases ? (
-        <View className="flex-1 items-center justify-center">
-          <LoadingSpinner size="large" />
-        </View>
-      ) : (
-        <LibraryFilters {...filters}>
-          {showResultsCount && (
-            <View className="px-4 pb-4">
-              <Text className="font-sans text-sm text-muted">
-                Showing {filters.filteredPurchases.length} product
-                {filters.filteredPurchases.length !== 1 ? "s" : ""}
-              </Text>
-            </View>
-          )}
+      <LibraryFilters {...filters} sellers={sellers}>
+        {filters.hasActiveFilters && !isFilterLoading && (
+          <View className="px-4 pb-4">
+            <Text className="font-sans text-sm text-muted">
+              Showing {totalCount} product{totalCount !== 1 ? "s" : ""}
+            </Text>
+          </View>
+        )}
 
+        {isFilterLoading && purchases.length === 0 ? (
+          <View className="flex-1 items-center justify-center">
+            <LoadingSpinner size="large" />
+          </View>
+        ) : (
           <FlatList<Purchase>
             numColumns={2}
-            data={filters.filteredPurchases}
-            keyExtractor={(item) => item.url_redirect_token}
+            data={purchases}
+            keyExtractor={(item, index) => item.purchase_id ?? index.toString()}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}
             columnWrapperStyle={{ gap: 12 }}
-            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={accentColor} />}
+            onScrollBeginDrag={onScrollBeginDrag}
+            onScrollEndDrag={onScrollEndDrag}
+            onScroll={onScroll}
+            scrollEventThrottle={200}
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
-                className="max-w-1/2 flex-1 overflow-hidden rounded border border-border bg-background"
+                className={cn(
+                  "max-w-1/2 flex-1 overflow-hidden rounded border border-border bg-background",
+                  isFilterLoading && "opacity-50",
+                )}
               >
                 {item.thumbnail_url ? (
                   <Image
@@ -118,20 +107,31 @@ export default function Index() {
                 </View>
                 <View className="mt-auto flex-row items-center gap-2 border-t border-border p-2">
                   <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" />
-                  <Text className="font-sans text-sm text-foreground">{item.creator_name}</Text>
+                  <Text className="flex-1 font-sans text-sm text-foreground" numberOfLines={1}>
+                    {item.creator_name}
+                  </Text>
                 </View>
               </TouchableOpacity>
             )}
             ListEmptyComponent={
-              <View className="items-center justify-center py-20">
-                <Text className="font-sans text-lg text-muted">
-                  {filters.searchText || filters.hasActiveFilters ? "No matching products" : "No purchases yet"}
-                </Text>
-              </View>
+              !isFilterLoading ? (
+                <View className="items-center justify-center py-20">
+                  <Text className="font-sans text-lg text-muted">
+                    {filters.searchText || filters.hasActiveFilters ? "No matching products" : "No purchases yet"}
+                  </Text>
+                </View>
+              ) : null
+            }
+            ListFooterComponent={
+              query.isFetchingNextPage ? (
+                <View className="w-full items-center py-4">
+                  <LoadingSpinner size="small" />
+                </View>
+              ) : null
             }
           />
-        </LibraryFilters>
-      )}
+        )}
+      </LibraryFilters>
     </Screen>
   );
 }

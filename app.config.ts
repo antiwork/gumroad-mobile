@@ -3,8 +3,8 @@ import { ConfigContext, ExpoConfig } from "expo/config";
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Gumroad",
-  slug: "gumroad-mobile",
-  version: "1.0.0",
+  slug: "gumroad",
+  version: "2026.02.01",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "gumroadmobile",
@@ -15,6 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
       UIBackgroundModes: ["audio"],
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
@@ -77,5 +78,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
+  },
+  extra: {
+    eas: {
+      projectId: process.env.EAS_PROJECT_ID,
+    },
   },
 });
