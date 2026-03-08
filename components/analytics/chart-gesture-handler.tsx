@@ -55,10 +55,7 @@ export const ChartGestureHandler = ({
     [selectFromX, resetRef],
   );
 
-  const composedGesture = useMemo(
-    () => Gesture.Race(tapGesture, panGesture),
-    [tapGesture, panGesture],
-  );
+  const composedGesture = useMemo(() => Gesture.Race(tapGesture, panGesture), [tapGesture, panGesture]);
 
   return (
     <View className="relative">

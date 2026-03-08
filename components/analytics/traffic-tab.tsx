@@ -2,7 +2,14 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { CHART_HEIGHT, formatCurrency, formatNumber, SelectionOverlay, useChartColors, useChartDimensions } from "./analytics-bar-chart";
+import {
+  CHART_HEIGHT,
+  formatCurrency,
+  formatNumber,
+  SelectionOverlay,
+  useChartColors,
+  useChartDimensions,
+} from "./analytics-bar-chart";
 import { ChartGestureHandler } from "./chart-gesture-handler";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
