@@ -46,6 +46,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "expo": "~54.0.30",
+    "expo-application": "~7.0.8",
     "expo-auth-session": "~7.0.10",
     "expo-constants": "~18.0.12",
     "expo-crypto": "~15.0.8",
