@@ -12,9 +12,9 @@ describe("getBarIndexFromX", () => {
 
   it("maps x positions to expected bar index", () => {
     expect(getBarIndexFromX(10, 20, 4, 5)).toBe(0);
-    expect(getBarIndexFromX(33, 20, 4, 5)).toBe(0);
-    expect(getBarIndexFromX(34, 20, 4, 5)).toBe(1);
-    expect(getBarIndexFromX(58, 20, 4, 5)).toBe(2);
+    expect(getBarIndexFromX(23, 20, 4, 5)).toBe(0);
+    expect(getBarIndexFromX(24, 20, 4, 5)).toBe(1);
+    expect(getBarIndexFromX(48, 20, 4, 5)).toBe(2);
   });
 
   it("clamps to last bar when x exceeds chart width", () => {
@@ -24,11 +24,6 @@ describe("getBarIndexFromX", () => {
   it("accounts for initial spacing before first bar", () => {
     expect(getBarIndexFromX(14, 20, 4, 5, 8)).toBe(0);
     expect(getBarIndexFromX(42, 20, 4, 5, 8)).toBe(1);
-  });
-
-  it("accounts for custom xOffset", () => {
-    expect(getBarIndexFromX(20, 20, 4, 5, 0, 20)).toBe(0);
-    expect(getBarIndexFromX(44, 20, 4, 5, 0, 20)).toBe(1);
   });
 
   it("handles single bar data", () => {

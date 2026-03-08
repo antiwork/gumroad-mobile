@@ -10,8 +10,8 @@ import {
   useChartColors,
   useChartDimensions,
 } from "./analytics-bar-chart";
-import { ChartGestureHandler } from "./chart-gesture-handler";
 import { ChartContainer } from "./chart-container";
+import { ChartGestureHandler } from "./chart-gesture-handler";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
 
@@ -171,6 +171,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
                 hideYAxisText
                 disableScroll
                 yAxisThickness={0}
+                yAxisLabelWidth={0}
                 xAxisThickness={1}
                 xAxisColor={colors.border}
                 highlightEnabled={activeIndex !== null}
@@ -227,6 +228,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
                 hideYAxisText
                 disableScroll
                 yAxisThickness={0}
+                yAxisLabelWidth={0}
                 xAxisThickness={1}
                 xAxisColor={colors.border}
                 highlightEnabled={activeIndex !== null}
@@ -283,6 +285,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
                 hideYAxisText
                 disableScroll
                 yAxisThickness={0}
+                yAxisLabelWidth={0}
                 xAxisThickness={1}
                 xAxisColor={colors.border}
                 highlightEnabled={activeIndex !== null}
