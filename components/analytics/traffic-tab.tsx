@@ -1,8 +1,15 @@
 import { Text } from "@/components/ui/text";
-import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
+import {
+  CHART_HEIGHT,
+  formatCurrency,
+  formatNumber,
+  SelectionOverlay,
+  useChartColors,
+  useChartDimensions,
+  useChartScrubbing,
+} from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
@@ -30,17 +37,17 @@ const LegendItem = ({ color, label, value }: LegendItemProps) => (
 export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const { processedData, isLoading } = useAnalyticsByReferral(timeRange);
   const colors = useChartColors();
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const { dates, revenue, visits, sales } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
+  const { selectedIndex: activeIndex, scrollRef, getChartTouchProps } = useChartScrubbing(barWidth, spacing, dates.length);
 
-  const activeIndex = selectedIndex;
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
-  const handleBarPress = useCallback((index: number) => {
-    setSelectedIndex((prev) => (prev === index ? null : index));
-  }, []);
+  const selectionOverlay =
+    activeIndex !== null ? (
+      <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
+    ) : null;
 
   const calculateTotals = (
     data: { date: string; referrers: { name: string; value: number; color: string }[] }[],
@@ -129,7 +136,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
   const salesReferrerColors = getReferrerColors(sales.data);
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+    <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false}>
       <View className="p-4 pt-0" onLayout={handleLayout}>
         <ChartContainer
           title="Revenue"
@@ -141,10 +148,11 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View>
+          <View className="mt-4" {...getChartTouchProps("revenue")}>
+            {selectionOverlay}
             <BarChart
               stackData={revenueChartData}
-              height={120}
+              height={CHART_HEIGHT}
               barWidth={barWidth}
               spacing={spacing}
               initialSpacing={0}
@@ -153,12 +161,9 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideYAxisText
               disableScroll
               yAxisThickness={0}
+              yAxisLabelWidth={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
           <View>
@@ -187,10 +192,11 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
+          <View className="mt-4" {...getChartTouchProps("sales")}>
+            {selectionOverlay}
             <BarChart
               stackData={salesChartData}
-              height={120}
+              height={CHART_HEIGHT}
               barWidth={barWidth}
               spacing={spacing}
               initialSpacing={0}
@@ -199,12 +205,9 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideYAxisText
               disableScroll
               yAxisThickness={0}
+              yAxisLabelWidth={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
           <View>
@@ -233,10 +236,11 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               </Text>
             )}
           </View>
-          <View>
+          <View className="mt-4" {...getChartTouchProps("visits")}>
+            {selectionOverlay}
             <BarChart
               stackData={visitsChartData}
-              height={120}
+              height={CHART_HEIGHT}
               barWidth={barWidth}
               spacing={spacing}
               initialSpacing={0}
@@ -245,12 +249,9 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
               hideYAxisText
               disableScroll
               yAxisThickness={0}
+              yAxisLabelWidth={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
-              highlightEnabled={activeIndex !== null}
-              highlightedBarIndex={activeIndex ?? undefined}
-              lowlightOpacity={0.4}
-              onPress={(_: unknown, index: number) => handleBarPress(index)}
             />
           </View>
           <View>

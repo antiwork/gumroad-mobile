@@ -1,22 +1,25 @@
 import { Text } from "@/components/ui/text";
-import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { useCSSVariable } from "uniwind";
-import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
+import {
+  CHART_HEIGHT,
+  formatCurrency,
+  formatNumber,
+  SelectionOverlay,
+  useChartColors,
+  useChartDimensions,
+  useChartScrubbing,
+} from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
 export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const { processedData, isLoading } = useAnalyticsByDate(timeRange);
   const colors = useChartColors();
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const accentColor = useCSSVariable("--color-accent") as string;
 
   const { dates, totals, sales, views } = processedData;
   const { handleLayout, barWidth, spacing } = useChartDimensions(dates.length);
-
-  const activeIndex = selectedIndex;
+  const { selectedIndex: activeIndex, scrollRef, getChartTouchProps } = useChartScrubbing(barWidth, spacing, dates.length);
 
   const totalRevenue = totals.reduce((sum, val) => sum + val, 0);
   const totalSales = sales.reduce((sum, val) => sum + val, 0);
@@ -27,16 +30,16 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const selectedViews = activeIndex !== null ? views[activeIndex] : 0;
   const selectedDate = activeIndex !== null && dates[activeIndex] ? dates[activeIndex] : "";
 
-  const handleBarPress = useCallback((index: number) => {
-    setSelectedIndex((prev) => (prev === index ? null : index));
-  }, []);
-
   const createChartData = (values: number[]) =>
     values.map((value, index) => ({
       value: value === 0 ? 0 : value,
-      frontColor: index === activeIndex ? accentColor : colors.muted,
-      onPress: () => handleBarPress(index),
+      frontColor: index === activeIndex ? colors.accent : colors.muted,
     }));
+
+  const selectionOverlay =
+    activeIndex !== null ? (
+      <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
+    ) : null;
 
   const revenueData = createChartData(totals);
   const salesData = createChartData(sales);
@@ -57,7 +60,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const showViewsChart = hasData && totalViews > 0;
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+    <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false}>
       <View className="p-4 pt-0" onLayout={handleLayout}>
         <ChartContainer
           title="Revenue"
@@ -69,10 +72,11 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
-          <View className="mt-4">
+          <View className="mt-4" {...getChartTouchProps("revenue")}>
+            {selectionOverlay}
             <BarChart
               data={revenueData}
-              height={120}
+              height={CHART_HEIGHT}
               barWidth={barWidth}
               spacing={spacing}
               initialSpacing={0}
@@ -84,6 +88,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               barBorderTopLeftRadius={4}
               barBorderTopRightRadius={4}
               yAxisThickness={0}
+              yAxisLabelWidth={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
             />
@@ -104,10 +109,11 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
+          <View className="mt-4" {...getChartTouchProps("sales")}>
+            {selectionOverlay}
             <BarChart
               data={salesData}
-              height={120}
+              height={CHART_HEIGHT}
               barWidth={barWidth}
               spacing={spacing}
               initialSpacing={0}
@@ -119,6 +125,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               barBorderTopLeftRadius={4}
               barBorderTopRightRadius={4}
               yAxisThickness={0}
+              yAxisLabelWidth={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
             />
@@ -139,10 +146,11 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               </Text>
             )}
           </View>
-          <View className="mt-4">
+          <View className="mt-4" {...getChartTouchProps("views")}>
+            {selectionOverlay}
             <BarChart
               data={viewsData}
-              height={120}
+              height={CHART_HEIGHT}
               barWidth={barWidth}
               spacing={spacing}
               initialSpacing={0}
@@ -154,6 +162,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               barBorderTopLeftRadius={4}
               barBorderTopRightRadius={4}
               yAxisThickness={0}
+              yAxisLabelWidth={0}
               xAxisThickness={1}
               xAxisColor={colors.border}
             />
