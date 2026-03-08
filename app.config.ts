@@ -16,6 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     infoPlist: {
       UIBackgroundModes: ["audio"],
       ITSAppUsesNonExemptEncryption: false,
+      UIDesignRequiresCompatibility: true,
     },
   },
   android: {
