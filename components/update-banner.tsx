@@ -1,24 +1,16 @@
 import { cn } from "@/lib/utils";
 import { Pressable, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LineIcon } from "./icon";
 import { Text } from "./ui/text";
-// import { useOTAUpdate } from "./use-ota-update";
-
-export const useUpdateBannerVisible = () =>
-  // const { isUpdateReady } = useOTAUpdate();
-  // return isUpdateReady;
-  true;
+import { useOTAUpdate } from "./use-ota-update";
 
 export const UpdateBanner = () => {
-  // const { isUpdateReady, apply, dismiss } = useOTAUpdate();
-  const { isUpdateReady, apply, dismiss } = { isUpdateReady: true, apply: async () => {}, dismiss: () => {} };
-  const { top } = useSafeAreaInsets();
+  const { isUpdateReady, apply, dismiss } = useOTAUpdate();
 
   if (!isUpdateReady) return null;
 
   return (
-    <View className="bg-background p-2" style={{ paddingTop: top }}>
+    <View className="bg-body-bg px-4 pt-2">
       <View className="flex-row items-center justify-between rounded border border-border bg-background px-4 py-2">
         <Text className="flex-1 text-sm">App update available</Text>
         <View className="flex-row items-center gap-4">

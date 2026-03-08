@@ -5,7 +5,6 @@ import { StyledImage } from "@/components/styled";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
-import { UpdateBanner } from "@/components/update-banner";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
@@ -126,13 +125,9 @@ export default function TabsLayout() {
   ]);
   const headerTitleStyle = useResolveClassNames("font-sans text-foreground");
   const tabBarLabelStyle = useResolveClassNames("font-sans font-normal text-xs");
-  // const { isUpdateReady } = useOTAUpdate();
-  const isUpdateReady = true;
-
   return (
     <SearchContext.Provider value={{ isSearchActive, setSearchActive }}>
       <SettingsSheetContext.Provider value={{ isSettingsOpen, setSettingsOpen }}>
-        <UpdateBanner />
         <Tabs
           tabBar={(props) => (
             <View>
@@ -145,7 +140,6 @@ export default function TabsLayout() {
             headerShadowVisible: false,
             headerTintColor: accent as string,
             headerTitleStyle,
-            ...(isUpdateReady && { headerStatusBarHeight: 0 }),
             tabBarStyle: {
               backgroundColor: background as string,
               borderTopColor: border as string,
