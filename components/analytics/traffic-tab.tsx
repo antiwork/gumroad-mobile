@@ -2,13 +2,11 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
+import { CHART_HEIGHT, formatCurrency, formatNumber, SelectionOverlay, useChartColors, useChartDimensions } from "./analytics-bar-chart";
 import { ChartGestureHandler } from "./chart-gesture-handler";
 import { ChartContainer } from "./chart-container";
 import { AnalyticsTimeRange } from "./use-analytics-by-date";
 import { useAnalyticsByReferral } from "./use-analytics-by-referral";
-
-const CHART_HEIGHT = 120;
 
 interface TrafficTabProps {
   timeRange: AnalyticsTimeRange;
@@ -146,6 +144,9 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
           <View>
+            {activeIndex !== null && (
+              <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
+            )}
             <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}
@@ -199,6 +200,9 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             )}
           </View>
           <View>
+            {activeIndex !== null && (
+              <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
+            )}
             <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}
@@ -252,6 +256,9 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
             )}
           </View>
           <View>
+            {activeIndex !== null && (
+              <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
+            )}
             <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}

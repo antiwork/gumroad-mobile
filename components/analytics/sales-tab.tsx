@@ -2,12 +2,17 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { formatCurrency, formatNumber, useChartColors, useChartDimensions } from "./analytics-bar-chart";
-import { ChartGestureHandler } from "./chart-gesture-handler";
+import {
+  CHART_HEIGHT,
+  formatCurrency,
+  formatNumber,
+  SelectionOverlay,
+  useChartColors,
+  useChartDimensions,
+} from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
+import { ChartGestureHandler } from "./chart-gesture-handler";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
-
-const CHART_HEIGHT = 120;
 
 export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const { processedData, isLoading } = useAnalyticsByDate(timeRange);
@@ -73,6 +78,9 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
           </View>
           <View className="mt-4">
+            {activeIndex !== null && (
+              <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
+            )}
             <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}
@@ -93,6 +101,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
                 barBorderTopLeftRadius={4}
                 barBorderTopRightRadius={4}
                 yAxisThickness={0}
+                yAxisLabelWidth={0}
                 xAxisThickness={1}
                 xAxisColor={colors.border}
                 disablePress
@@ -116,6 +125,9 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             )}
           </View>
           <View className="mt-4">
+            {activeIndex !== null && (
+              <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
+            )}
             <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}
@@ -136,6 +148,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
                 barBorderTopLeftRadius={4}
                 barBorderTopRightRadius={4}
                 yAxisThickness={0}
+                yAxisLabelWidth={0}
                 xAxisThickness={1}
                 xAxisColor={colors.border}
                 disablePress
@@ -159,6 +172,9 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
             )}
           </View>
           <View className="mt-4">
+            {activeIndex !== null && (
+              <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
+            )}
             <ChartGestureHandler
               barWidth={barWidth}
               spacing={spacing}
@@ -179,6 +195,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
                 barBorderTopLeftRadius={4}
                 barBorderTopRightRadius={4}
                 yAxisThickness={0}
+                yAxisLabelWidth={0}
                 xAxisThickness={1}
                 xAxisColor={colors.border}
                 disablePress

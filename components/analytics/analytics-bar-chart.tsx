@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { LayoutChangeEvent } from "react-native";
+import { LayoutChangeEvent, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 export interface ChartDataPoint {
@@ -50,7 +50,7 @@ export const formatNumber = (num: number): string => {
   return num.toLocaleString();
 };
 
-export const CHART_X_OFFSET = 10;
+export const CHART_X_OFFSET = 0;
 
 export const getBarIndexFromX = (
   x: number,
@@ -66,6 +66,10 @@ export const getBarIndexFromX = (
   const index = Math.floor(adjustedX / (barWidth + spacing));
   return Math.max(0, Math.min(index, dataLength - 1));
 };
+
+export const CHART_HEIGHT = 120;
+export const X_AXIS_THICKNESS = 1;
+export const SELECTION_OVERLAY_HEIGHT = CHART_HEIGHT + X_AXIS_THICKNESS;
 
 export const useChartDimensions = (dataLength: number) => {
   const [containerWidth, setContainerWidth] = useState(0);
@@ -84,4 +88,29 @@ export const useChartDimensions = (dataLength: number) => {
     barWidth,
     spacing,
   };
+};
+
+export const SelectionOverlay = ({
+  activeIndex,
+  barWidth,
+  spacing,
+}: {
+  activeIndex: number;
+  barWidth: number;
+  spacing: number;
+}) => {
+  const [bodyBg] = useCSSVariable(["--color-body-bg"]);
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: 4,
+        height: SELECTION_OVERLAY_HEIGHT,
+        left: activeIndex * (barWidth + spacing),
+        width: barWidth,
+        backgroundColor: bodyBg as string,
+      }}
+    />
+  );
 };
