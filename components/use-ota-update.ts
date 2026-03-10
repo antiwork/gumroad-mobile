@@ -1,7 +1,5 @@
 import * as Updates from "expo-updates";
 import { useCallback, useEffect, useState } from "react";
-import * as Sentry from "@sentry/react-native";
-
 export const useOTAUpdate = () => {
   const [isUpdateReady, setIsUpdateReady] = useState(false);
 
@@ -10,16 +8,15 @@ export const useOTAUpdate = () => {
 
     const checkAndDownload = async () => {
       try {
-        Sentry.addBreadcrumb({ message: "Checking for updates" });
+        console.info("Checking for updates");
         const update = await Updates.checkForUpdateAsync();
-        Sentry.addBreadcrumb({ message: "Checked for updates", data: update });
+        console.info("Checked for updates", update);
         if (update.isAvailable) {
           await Updates.fetchUpdateAsync();
           setIsUpdateReady(true);
-          Sentry.addBreadcrumb({ message: "Fetched update" });
+          console.info("Fetched update");
         }
       } catch (e) {
-        Sentry.captureException(e);
         console.error("Error checking/downloading OTA update:", e);
       }
     };

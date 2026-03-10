@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
+import { flushReplayBuffer } from "@/lib/sentry";
 import { showFeedbackWidget } from "@sentry/react-native";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
@@ -106,6 +107,7 @@ const SettingsSheet = () => {
 
   const handleSendFeedback = () => {
     setSettingsOpen(false);
+    flushReplayBuffer();
     showFeedbackWidget();
   };
 

@@ -3,7 +3,6 @@ import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { assertDefined } from "./assert";
 import { useAuth } from "./auth-context";
-
 export class UnauthorizedError extends Error {
   constructor(message: string) {
     super(message);
@@ -21,13 +20,22 @@ export const request = async <T>(url: string, options?: RequestInit & { data?: a
     },
     body,
   });
+  const details = {
+    // Including the token in the logged URL makes Sentry exclude the whole string. We can remove this when we use the public API
+    url: url.replace(env.EXPO_PUBLIC_MOBILE_TOKEN, "[filtered]"),
+    method: options?.method ?? "GET",
+    status: response.status,
+  };
   if (response.status === 401) {
+    console.info("HTTP request", details);
     throw new UnauthorizedError("Unauthorized");
   }
   if (!response.ok) {
     const error = await response.text();
+    console.info("HTTP request", { ...details, error });
     throw new Error(`Request failed: ${response.status} ${error}`);
   }
+  console.info("HTTP request", details);
   return response.json();
 };
 
