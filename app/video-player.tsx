@@ -3,6 +3,7 @@ import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
+import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
@@ -41,6 +42,7 @@ export default function VideoPlayerScreen() {
           setVideoUrl(uri);
         }
       } catch (error) {
+        Sentry.captureException(error);
         console.warn("Failed to fetch streaming URL, falling back to direct URL:", error);
         setVideoUrl(uri);
       } finally {

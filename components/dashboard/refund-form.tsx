@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { useState } from "react";
@@ -95,6 +96,7 @@ export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefu
         setRefundError(response.message || "Refund failed");
       }
     } catch (error) {
+      Sentry.captureException(error);
       setRefundError(error instanceof Error ? error.message : "Refund failed");
     } finally {
       setIsRefunding(false);

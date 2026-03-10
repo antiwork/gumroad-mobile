@@ -1,6 +1,7 @@
 import { assertDefined } from "@/lib/assert";
 import { env } from "@/lib/env";
 import { request } from "@/lib/request";
+import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -40,6 +41,7 @@ const fetchCreatorStatus = async (token: string): Promise<boolean> => {
     });
     return (response.products?.length ?? 0) > 0;
   } catch (e) {
+    Sentry.captureException(e);
     console.error(e);
     return false;
   }
@@ -73,10 +75,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const storedToken = await SecureStore.getItemAsync(accessTokenKey);
         if (storedToken) {
           setAccessToken(storedToken);
+          Sentry.setUser({ id: storedToken });
           const creatorStatus = await fetchCreatorStatus(storedToken);
           setIsCreator(creatorStatus);
         }
       } catch (error) {
+        Sentry.captureException(error);
         console.error("Failed to load stored auth:", error);
       } finally {
         setIsLoading(false);
@@ -107,14 +111,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             },
           });
           await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
+          Sentry.setUser({ id: tokenResponse.access_token });
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
         } catch (error) {
+          Sentry.captureException(error);
           console.error("Failed to exchange code for tokens:", error);
         } finally {
           setIsLoading(false);
         }
       } else if (response?.type === "error") {
+        Sentry.captureException(response.error);
         console.error("Auth error:", response.error);
         setIsLoading(false);
       }
@@ -133,8 +140,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await SecureStore.deleteItemAsync(refreshTokenKey);
       setAccessToken(null);
       setIsCreator(false);
+      Sentry.setUser(null);
       router.replace("/login");
     } catch (error) {
+      Sentry.captureException(error);
       console.error("Failed to logout:", error);
     } finally {
       setIsLoading(false);
@@ -156,6 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
     } catch (error) {
+      Sentry.captureException(error);
       console.error("Failed to refresh token:", error);
       // If refresh fails, log the user out
       await logout();

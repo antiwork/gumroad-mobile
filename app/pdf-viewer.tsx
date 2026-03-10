@@ -5,6 +5,7 @@ import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
+import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -104,6 +105,7 @@ export default function PdfViewerScreen() {
         }}
         onPageChanged={(page) => setCurrentPage(page)}
         onError={(error) => {
+          Sentry.captureException(error);
           console.error("PDF Error:", error);
         }}
       />

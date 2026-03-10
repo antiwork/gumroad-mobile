@@ -1,4 +1,5 @@
 import { requestAPI } from "@/lib/request";
+import * as Sentry from "@sentry/react-native";
 import { Platform } from "react-native";
 
 type MediaLocationRequest = {
@@ -38,6 +39,7 @@ export const updateMediaLocation = async ({
   try {
     await requestAPI("mobile/media_locations", { method: "POST", data: body, accessToken });
   } catch (error) {
+    Sentry.captureException(error);
     // Log but don't throw - media location sync is non-critical
     console.warn("Failed to update media location:", error);
   }

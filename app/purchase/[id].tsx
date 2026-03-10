@@ -12,6 +12,7 @@ import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
+import * as Sentry from "@sentry/react-native";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
@@ -144,6 +145,7 @@ export default function DownloadScreen() {
       const downloadedFile = await downloadFile(id, message.payload.resourceId);
       await shareFile(downloadedFile.uri);
     } catch (error) {
+      Sentry.captureException(error);
       console.error("Download failed:", error, data);
       Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
     } finally {
