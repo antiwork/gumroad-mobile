@@ -2,7 +2,9 @@ import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { useCallback, useEffect, useRef } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
+import * as SecureStore from "expo-secure-store";
 import type { WebView } from "react-native-webview";
+import { getStoredPlaybackSpeed } from "./full-audio-player";
 
 type AudioPlayerInfo = {
   fileId: string;
@@ -150,6 +152,9 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
       }
 
       currentAudioRef.current = audio;
+
+      const storedSpeed = await getStoredPlaybackSpeed();
+      if (storedSpeed) await TrackPlayer.setRate(storedSpeed);
 
       await TrackPlayer.play();
       await sendAudioPlayerInfo({ isPlaying: true });

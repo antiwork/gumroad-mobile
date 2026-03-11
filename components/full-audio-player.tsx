@@ -1,12 +1,24 @@
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrackPlayer, { State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
+import * as SecureStore from "expo-secure-store";
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2, 0.5];
+const PLAYBACK_SPEED_KEY = "audio_playback_speed";
+
+export const getStoredPlaybackSpeed = async () => {
+  const stored = await SecureStore.getItemAsync(PLAYBACK_SPEED_KEY);
+  if (stored) {
+    const speed = parseFloat(stored);
+    if (PLAYBACK_SPEEDS.includes(speed)) return speed;
+  }
+};
+
+const setStoredPlaybackSpeed = (speed: number) => SecureStore.setItemAsync(PLAYBACK_SPEED_KEY, speed.toString());
 
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -20,6 +32,14 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   const { position, duration } = useProgress();
   const { top, bottom } = useSafeAreaInsets();
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+
+  useEffect(() => {
+    const loadSpeed = async () => {
+      const speed = await TrackPlayer.getRate();
+      if (PLAYBACK_SPEEDS.includes(speed)) setPlaybackSpeed(speed);
+    };
+    if (visible) loadSpeed();
+  }, [visible]);
 
   const isPlaying = playbackState.state === State.Playing;
   const isBuffering = playbackState.state === State.Buffering || playbackState.state === State.Loading;
@@ -56,6 +76,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     const newSpeed = PLAYBACK_SPEEDS[nextIndex];
     setPlaybackSpeed(newSpeed);
     await TrackPlayer.setRate(newSpeed);
+    await setStoredPlaybackSpeed(newSpeed);
   };
 
   const handleSeek = async (locationX: number, width: number) => {
