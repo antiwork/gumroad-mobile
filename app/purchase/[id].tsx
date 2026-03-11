@@ -111,16 +111,20 @@ export default function DownloadScreen() {
         if (message.payload.isPlaying === "true") {
           await pauseAudio();
         } else {
-          await playAudio({
-            uri: downloadUrl(id, message.payload.resourceId),
-            resourceId: message.payload.resourceId,
-            resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
-            title: fileData?.name ?? purchase?.name,
-            artist: purchase?.creator_name,
-            artwork: purchase?.thumbnail_url,
+          const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
+          const allAudioTracks = allAudioFiles.map((fileData) => ({
+            uri: downloadUrl(id, fileData.id),
+            resourceId: fileData.id,
+            title: fileData.name ?? purchase?.name,
             urlRedirectId: id,
             purchaseId: purchase?.purchase_id,
-            contentLength: message.payload.contentLength ? Number(message.payload.contentLength) : undefined,
+          }));
+          await playAudio({
+            resourceId: message.payload.resourceId,
+            resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
+            artist: purchase?.creator_name,
+            artwork: purchase?.thumbnail_url,
+            tracks: allAudioTracks,
           });
         }
         return;

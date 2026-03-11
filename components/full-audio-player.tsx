@@ -1,7 +1,7 @@
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrackPlayer, { State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
@@ -32,6 +32,19 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   const { position, duration } = useProgress();
   const { top, bottom } = useSafeAreaInsets();
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [queueLength, setQueueLength] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const updateQueueState = useCallback(async () => {
+    const queue = await TrackPlayer.getQueue();
+    setQueueLength(queue.length);
+    const index = await TrackPlayer.getActiveTrackIndex();
+    setCurrentIndex(index ?? 0);
+  }, []);
+
+  useEffect(() => {
+    if (visible) updateQueueState();
+  }, [visible, activeTrack?.url, updateQueueState]);
 
   useEffect(() => {
     const loadSpeed = async () => {
@@ -78,6 +91,19 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     await TrackPlayer.setRate(newSpeed);
     await setStoredPlaybackSpeed(newSpeed);
   };
+
+  const handlePreviousTrack = async () => {
+    await TrackPlayer.skipToPrevious();
+    await updateQueueState();
+  };
+
+  const handleNextTrack = async () => {
+    await TrackPlayer.skipToNext();
+    await updateQueueState();
+  };
+
+  const hasPrevious = queueLength > 1 && currentIndex > 0;
+  const hasNext = queueLength > 1 && currentIndex < queueLength - 1;
 
   const handleSeek = async (locationX: number, width: number) => {
     const percentage = locationX / width;
@@ -148,7 +174,16 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             <Text className="text-xs text-muted-foreground">{formatTime(duration)}</Text>
           </View>
 
-          <View className="mb-8 flex-row items-center justify-center gap-6">
+          <View className="mb-8 flex-row items-center justify-center gap-4">
+            <TouchableOpacity
+              onPress={handlePreviousTrack}
+              disabled={!hasPrevious}
+              className="size-10 items-center justify-center"
+              style={{ opacity: hasPrevious ? 1 : 0.3 }}
+            >
+              <SolidIcon name="skip-previous" size={24} className="text-foreground" />
+            </TouchableOpacity>
+
             <TouchableOpacity
               onPress={handleSkipBack}
               className="size-14 items-center justify-center rounded-full border-2 border-foreground"
@@ -169,6 +204,15 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               className="size-14 items-center justify-center rounded-full border-2 border-foreground"
             >
               <Text className="text-sm font-bold text-foreground">+30</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleNextTrack}
+              disabled={!hasNext}
+              className="size-10 items-center justify-center"
+              style={{ opacity: hasNext ? 1 : 0.3 }}
+            >
+              <SolidIcon name="skip-next" size={24} className="text-foreground" />
             </TouchableOpacity>
           </View>
 
