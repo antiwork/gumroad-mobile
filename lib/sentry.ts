@@ -13,7 +13,27 @@ Sentry.init({
   tracesSampleRate: 1.0,
   replaysSessionSampleRate: __DEV__ ? 1 : 0,
   replaysOnErrorSampleRate: 1.0,
-  integrations: [navigationIntegration, mobileReplay, Sentry.feedbackIntegration()],
+  integrations: [
+    navigationIntegration,
+    mobileReplay,
+    Sentry.feedbackIntegration({
+      colorScheme: "system",
+      themeLight: {
+        background: "#ffffff",
+        foreground: "#000000",
+        accentBackground: "#ff90e8",
+        accentForeground: "#000000",
+        border: "#000000",
+      },
+      themeDark: {
+        background: "#000000",
+        foreground: "#dedede",
+        accentBackground: "#ff90e8",
+        accentForeground: "#000000",
+        border: "#555555",
+      },
+    }),
+  ],
 });
 
 Sentry.getClient()?.on("beforeSendFeedback", (feedbackEvent) => {

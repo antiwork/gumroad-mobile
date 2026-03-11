@@ -75,7 +75,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const storedToken = await SecureStore.getItemAsync(accessTokenKey);
         if (storedToken) {
           setAccessToken(storedToken);
-          Sentry.setUser({ id: storedToken });
           const creatorStatus = await fetchCreatorStatus(storedToken);
           setIsCreator(creatorStatus);
         }
@@ -111,7 +110,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             },
           });
           await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
-          Sentry.setUser({ id: tokenResponse.access_token });
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
         } catch (error) {
@@ -140,7 +138,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await SecureStore.deleteItemAsync(refreshTokenKey);
       setAccessToken(null);
       setIsCreator(false);
-      Sentry.setUser(null);
       router.replace("/login");
     } catch (error) {
       Sentry.captureException(error);
