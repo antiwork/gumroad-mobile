@@ -11,4 +11,5 @@ export const env = {
     "EXPO_PUBLIC_GUMROAD_CLIENT_ID is not set",
   ),
   EXPO_PUBLIC_MOBILE_TOKEN: assertDefined(process.env.EXPO_PUBLIC_MOBILE_TOKEN, "EXPO_PUBLIC_MOBILE_TOKEN is not set"),
+  EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
 };

@@ -7,6 +7,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
+import { flushReplayBuffer } from "@/lib/sentry";
+import { showFeedbackWidget } from "@sentry/react-native";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
@@ -103,12 +105,26 @@ const SettingsSheet = () => {
     Linking.openURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/settings/advanced`);
   };
 
+  const handleSendFeedback = () => {
+    setSettingsOpen(false);
+    flushReplayBuffer();
+    showFeedbackWidget();
+  };
+
   return (
     <Sheet open={isSettingsOpen} onOpenChange={setSettingsOpen}>
       <SheetHeader onClose={() => setSettingsOpen(false)}>
         <SheetTitle>Settings</SheetTitle>
       </SheetHeader>
       <SheetContent>
+        <View className="border-b border-border p-4">
+          <Text className="mb-2 font-sans text-lg text-foreground">Feedback</Text>
+          <Text className="mb-4 text-sm text-muted-foreground">Report a bug or suggest an improvement.</Text>
+          <Button variant="outline" onPress={handleSendFeedback}>
+            <Text>Send Feedback</Text>
+            <LineIcon name="message-bubble-dots" size={20} className="text-foreground" />
+          </Button>
+        </View>
         <View className="border-b border-border p-4">
           <Text className="mb-2 font-sans text-lg text-foreground">Account</Text>
           <Text className="mb-4 text-sm text-muted-foreground">This will log you out of your Gumroad account.</Text>

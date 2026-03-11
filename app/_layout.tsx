@@ -1,14 +1,16 @@
 import { PortalHost } from "@rn-primitives/portal";
-import { Stack } from "expo-router";
+import { useNavigationContainerRef, Stack } from "expo-router";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useCSSVariable } from "uniwind";
 import { setupPlayer } from "../components/use-audio-player-sync";
 import { AuthProvider } from "../lib/auth-context";
 import { QueryProvider } from "../lib/query-client";
+import { Sentry, navigationIntegration } from "../lib/sentry";
 import "./global.css";
 
-export default function RootLayout() {
+const RootLayout = () => {
+  const ref = useNavigationContainerRef();
   const [background, foreground, accent] = useCSSVariable([
     "--color-background",
     "--color-foreground",
@@ -16,7 +18,14 @@ export default function RootLayout() {
   ]);
 
   useEffect(() => {
+    if (ref?.current) {
+      navigationIntegration.registerNavigationContainer(ref);
+    }
+  }, [ref]);
+
+  useEffect(() => {
     setupPlayer().catch((error) => {
+      Sentry.captureException(error);
       console.error("Failed to setup player:", error);
     });
   }, []);
@@ -46,4 +55,6 @@ export default function RootLayout() {
       </QueryProvider>
     </GestureHandlerRootView>
   );
-}
+};
+
+export default Sentry.wrap(RootLayout);

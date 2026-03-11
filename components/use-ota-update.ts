@@ -1,6 +1,5 @@
 import * as Updates from "expo-updates";
 import { useCallback, useEffect, useState } from "react";
-
 export const useOTAUpdate = () => {
   const [isUpdateReady, setIsUpdateReady] = useState(false);
 
@@ -9,10 +8,13 @@ export const useOTAUpdate = () => {
 
     const checkAndDownload = async () => {
       try {
+        console.info("Checking for updates");
         const update = await Updates.checkForUpdateAsync();
+        console.info("Checked for updates", update);
         if (update.isAvailable) {
           await Updates.fetchUpdateAsync();
           setIsUpdateReady(true);
+          console.info("Fetched update");
         }
       } catch (e) {
         console.error("Error checking/downloading OTA update:", e);
