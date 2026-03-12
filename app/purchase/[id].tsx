@@ -70,6 +70,15 @@ export default function DownloadScreen() {
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
+  const handleShouldStartLoadWithRequest = useCallback(
+    (request: { url: string; navigationType: string }) => {
+      if (request.url === url || request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL)) return true;
+      Linking.openURL(request.url);
+      return false;
+    },
+    [url],
+  );
+
   const handleNativePageChange = useCallback((pageIndex: number) => {
     webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppPageChange", payload: { pageIndex } }));
   }, []);
@@ -176,6 +185,7 @@ export default function DownloadScreen() {
         pullToRefreshEnabled
         mediaPlaybackRequiresUserAction={false}
         originWhitelist={["*"]}
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onMessage={handleMessage}
       />
       {isDownloading && (
