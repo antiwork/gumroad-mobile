@@ -1,16 +1,37 @@
-import TrackPlayer, { Event } from "react-native-track-player";
+import { getAudioAccessToken, getAudioContext } from "@/lib/audio-player-store";
+import { updateMediaLocation } from "@/lib/media-location";
+import TrackPlayer, { Event, State } from "react-native-track-player";
+
+const syncCurrentPosition = async (isEnd = false) => {
+  const context = getAudioContext();
+  const accessToken = getAudioAccessToken();
+  if (!context || !context.urlRedirectId || !accessToken) return;
+
+  const { position } = await TrackPlayer.getProgress();
+  const location = isEnd && context.contentLength ? context.contentLength : Math.floor(position);
+
+  await updateMediaLocation({
+    urlRedirectId: context.urlRedirectId,
+    productFileId: context.resourceId,
+    purchaseId: context.purchaseId,
+    location,
+    accessToken,
+  });
+};
 
 export const playbackService = async () => {
   TrackPlayer.addEventListener(Event.RemotePlay, () => {
     TrackPlayer.play();
   });
 
-  TrackPlayer.addEventListener(Event.RemotePause, () => {
-    TrackPlayer.pause();
+  TrackPlayer.addEventListener(Event.RemotePause, async () => {
+    await TrackPlayer.pause();
+    await syncCurrentPosition();
   });
 
-  TrackPlayer.addEventListener(Event.RemoteStop, () => {
-    TrackPlayer.stop();
+  TrackPlayer.addEventListener(Event.RemoteStop, async () => {
+    await TrackPlayer.stop();
+    await syncCurrentPosition();
   });
 
   TrackPlayer.addEventListener(Event.RemoteNext, () => {
@@ -30,4 +51,13 @@ export const playbackService = async () => {
     const { position } = await TrackPlayer.getProgress();
     await TrackPlayer.seekTo(Math.max(0, position - interval));
   });
+
+  setInterval(async () => {
+    try {
+      const { state } = await TrackPlayer.getPlaybackState();
+      if (state === State.Playing) {
+        await syncCurrentPosition();
+      }
+    } catch {}
+  }, 5000);
 };

@@ -1,4 +1,5 @@
 import { useAuth } from "@/lib/auth-context";
+import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
 import { updateMediaLocation } from "@/lib/media-location";
 import { useCallback, useEffect, useRef } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
@@ -52,9 +53,14 @@ export const setupPlayer = async () => {
 
 export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) => {
   const { accessToken } = useAuth();
+
+  useEffect(() => {
+    setAudioAccessToken(accessToken);
+  }, [accessToken]);
+
   const currentAudioRef = useRef<{
     resourceId: string;
-    urlRedirectId: string;
+    urlRedirectId?: string;
     purchaseId?: string;
     contentLength?: number;
   } | null>(null);
@@ -62,7 +68,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
   const syncMediaLocation = useCallback(
     async (position: number, isEnd = false) => {
       const currentAudio = currentAudioRef.current;
-      if (!currentAudio) return;
+      if (!currentAudio || !currentAudio.urlRedirectId) return;
 
       const location = isEnd && currentAudio.contentLength ? currentAudio.contentLength : Math.floor(position);
 
@@ -77,7 +83,6 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     [accessToken],
   );
 
-  // TODO: Only works when the component is mounted, need to support background playback
   const sendAudioPlayerInfo = useCallback(
     async ({ isPlaying, isEnd: forceIsEnd }: { isPlaying: boolean; isEnd?: boolean }) => {
       const currentAudio = currentAudioRef.current;
@@ -143,7 +148,11 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
 
   const updateCurrentAudioRef = useCallback((resourceId: string, duration?: number) => {
     const track = allTracksRef.current.find((t) => t.resourceId === resourceId);
-    if (track) currentAudioRef.current = { ...track, contentLength: duration };
+    if (track) {
+      const context = { ...track, contentLength: duration };
+      currentAudioRef.current = context;
+      setAudioContext(context);
+    }
   }, []);
 
   useEffect(() => {
@@ -222,6 +231,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
       }
 
       currentAudioRef.current = audio;
+      setAudioContext(audio);
 
       const storedSpeed = await getStoredPlaybackSpeed();
       if (storedSpeed) await TrackPlayer.setRate(storedSpeed);
