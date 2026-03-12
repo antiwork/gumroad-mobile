@@ -176,12 +176,14 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
       resourceId,
       resumeAt,
       artist,
+      artistUrl,
       artwork,
       tracks,
     }: {
       resourceId: string;
       resumeAt?: number;
       artist?: string;
+      artistUrl?: string;
       artwork?: string | null;
       tracks: AudioTrackInfo[];
     }) => {
@@ -211,6 +213,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
             url: track.uri,
             title: track.title || "Audio Track",
             artist: artist || "Gumroad",
+            artistUrl,
             artwork: artwork || undefined,
           })),
         );

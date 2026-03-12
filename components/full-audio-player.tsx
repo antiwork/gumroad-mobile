@@ -2,7 +2,7 @@ import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
 import { useCallback, useEffect, useState } from "react";
-import { Modal, TouchableOpacity, View } from "react-native";
+import { Linking, Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrackPlayer, { State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
 import * as SecureStore from "expo-secure-store";
@@ -146,9 +146,14 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               {activeTrack.title || "Unknown Track"}
             </Text>
             {activeTrack.artist && (
-              <Text className="mt-1 text-center text-base text-muted-foreground" numberOfLines={1}>
-                {activeTrack.artist}
-              </Text>
+              <TouchableOpacity
+                disabled={!activeTrack.artistUrl}
+                onPress={() => activeTrack.artistUrl && Linking.openURL(activeTrack.artistUrl)}
+              >
+                <Text className="mt-1 text-center text-base text-muted-foreground" numberOfLines={1}>
+                  {activeTrack.artist}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         </View>

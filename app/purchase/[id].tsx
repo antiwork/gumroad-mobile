@@ -132,6 +132,7 @@ export default function DownloadScreen() {
             resourceId: message.payload.resourceId,
             resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
             artist: purchase?.creator_name,
+            artistUrl: purchase?.creator_profile_url,
             artwork: purchase?.thumbnail_url,
             tracks: allAudioTracks,
           });
