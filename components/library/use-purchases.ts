@@ -8,6 +8,7 @@ export interface Purchase {
   name: string;
   creator_name: string;
   creator_username: string;
+  creator_profile_url: string;
   creator_profile_picture_url: string;
   thumbnail_url: string | null;
   url_redirect_external_id?: string;
