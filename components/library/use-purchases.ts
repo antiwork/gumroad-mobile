@@ -4,10 +4,33 @@ import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { InfiniteData, keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
+export interface PostFile {
+  id: string;
+  name: string;
+  filegroup?: string;
+  streaming_url?: string;
+}
+
+export interface Post {
+  external_id: string;
+  name: string;
+  message: string;
+  installment_type?: string;
+  published_at: string;
+  url_redirect_external_id?: string;
+  creator_name: string;
+  creator_profile_url: string;
+  creator_profile_picture_url: string;
+  call_to_action_text?: string;
+  call_to_action_url?: string;
+  files_data?: PostFile[];
+}
+
 export interface Purchase {
   name: string;
   creator_name: string;
   creator_username: string;
+  creator_profile_url: string;
   creator_profile_picture_url: string;
   thumbnail_url: string | null;
   url_redirect_external_id?: string;
@@ -17,12 +40,8 @@ export interface Purchase {
   is_archived?: boolean;
   content_updated_at?: string;
   purchased_at?: string;
-  file_data?: {
-    id: string;
-    name: string;
-    filegroup?: string;
-    streaming_url?: string;
-  }[];
+  file_data?: PostFile[];
+  product_updates_data?: Post[];
 }
 
 export interface Seller {
@@ -108,6 +127,14 @@ export const usePurchases = (filters: ApiFilters = {}) => {
 export const useSellers = ({ seller, ...filtersWithoutSeller }: ApiFilters = {}) => {
   const { sellers } = usePurchases(filtersWithoutSeller);
   return sellers;
+};
+
+export const usePost = (urlRedirectToken: string, postExternalId: string): Post | undefined => {
+  const purchase = usePurchase(urlRedirectToken);
+  return useMemo(
+    () => purchase?.product_updates_data?.find((p) => p.external_id === postExternalId),
+    [purchase, postExternalId],
+  );
 };
 
 export const usePurchase = (id: string): Purchase | undefined => {

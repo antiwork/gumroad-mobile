@@ -93,6 +93,17 @@ export default function DownloadScreen() {
 
       const fileData = purchase?.file_data?.find((f) => f.id === message.payload.resourceId);
 
+      if (message.payload.isPost) {
+        router.push({
+          pathname: "/post/[id]",
+          params: {
+            id: message.payload.resourceId,
+            urlRedirectToken: id,
+          },
+        });
+        return;
+      }
+
       if (message.payload.extension === "PDF" && !message.payload.isDownload) {
         router.push({
           pathname: "/pdf-viewer",

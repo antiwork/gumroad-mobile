@@ -48,6 +48,7 @@ const RootLayout = () => {
             <Stack.Screen name="index" options={{ headerShown: false, animation: "none" }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: "none" }} />
             <Stack.Screen name="purchase/[id]" options={{ title: "" }} />
+            <Stack.Screen name="post/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
           </Stack>
           <PortalHost />
