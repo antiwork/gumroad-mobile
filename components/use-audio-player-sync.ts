@@ -69,6 +69,8 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     async (position: number, isEnd = false) => {
       const currentAudio = currentAudioRef.current;
       if (!currentAudio || !currentAudio.urlRedirectId) return;
+      // Avoid saving the location 0:01, it's not useful
+      if (!isEnd && position > 0 && position < 3) return;
 
       const location = isEnd && currentAudio.contentLength ? currentAudio.contentLength : Math.floor(position);
 
