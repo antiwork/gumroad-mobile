@@ -15,7 +15,7 @@ export type AudioTrackInfo = {
   uri: string;
   resourceId: string;
   title?: string;
-  urlRedirectId: string;
+  urlRedirectId?: string;
   purchaseId?: string;
 };
 

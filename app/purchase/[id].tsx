@@ -13,7 +13,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
-import { Alert, View } from "react-native";
+import { Alert, Linking, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
@@ -108,7 +108,7 @@ export default function DownloadScreen() {
           params: {
             uri: downloadUrl(id, message.payload.resourceId),
             title: purchase?.name,
-            urlRedirectId: id,
+            urlRedirectId: purchase?.url_redirect_external_id,
             productFileId: message.payload.resourceId,
             purchaseId: purchase?.purchase_id,
             initialPage: message.payload.resumeAt,
@@ -125,7 +125,7 @@ export default function DownloadScreen() {
             uri: downloadUrl(id, fileData.id),
             resourceId: fileData.id,
             title: fileData.name ?? purchase?.name,
-            urlRedirectId: id,
+            urlRedirectId: purchase?.url_redirect_external_id,
             purchaseId: purchase?.purchase_id,
           }));
           await playAudio({
@@ -145,7 +145,7 @@ export default function DownloadScreen() {
             uri: downloadUrl(id, message.payload.resourceId),
             streamingUrl: purchase?.file_data?.find((f) => f.id === message.payload.resourceId)?.streaming_url,
             title: purchase?.name,
-            urlRedirectId: id,
+            urlRedirectId: purchase?.url_redirect_external_id,
             productFileId: message.payload.resourceId,
             purchaseId: purchase?.purchase_id,
             initialPosition: message.payload.resumeAt ?? undefined,
