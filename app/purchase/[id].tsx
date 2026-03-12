@@ -98,7 +98,7 @@ export default function DownloadScreen() {
           pathname: "/post/[id]",
           params: {
             id: message.payload.resourceId,
-            title: purchase?.name,
+            urlRedirectToken: id,
           },
         });
         return;
