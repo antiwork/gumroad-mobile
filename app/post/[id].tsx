@@ -11,7 +11,6 @@ import * as Sentry from "@sentry/react-native";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
-import * as WebBrowser from "expo-web-browser";
 import { useCallback, useRef, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
