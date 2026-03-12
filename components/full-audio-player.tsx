@@ -1,16 +1,30 @@
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
-import { useState } from "react";
-import { Modal, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Linking, Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrackPlayer, { State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
+import * as SecureStore from "expo-secure-store";
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2, 0.5];
+const PLAYBACK_SPEED_KEY = "audio_playback_speed";
+
+export const getStoredPlaybackSpeed = async () => {
+  const stored = await SecureStore.getItemAsync(PLAYBACK_SPEED_KEY);
+  if (stored) {
+    const speed = parseFloat(stored);
+    if (PLAYBACK_SPEEDS.includes(speed)) return speed;
+  }
+};
+
+const setStoredPlaybackSpeed = (speed: number) => SecureStore.setItemAsync(PLAYBACK_SPEED_KEY, speed.toString());
 
 const formatTime = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
+  if (hrs > 0) return `${hrs}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
@@ -20,6 +34,27 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   const { position, duration } = useProgress();
   const { top, bottom } = useSafeAreaInsets();
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [queueLength, setQueueLength] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const updateQueueState = useCallback(async () => {
+    const queue = await TrackPlayer.getQueue();
+    setQueueLength(queue.length);
+    const index = await TrackPlayer.getActiveTrackIndex();
+    setCurrentIndex(index ?? 0);
+  }, []);
+
+  useEffect(() => {
+    if (visible) updateQueueState();
+  }, [visible, activeTrack?.url, updateQueueState]);
+
+  useEffect(() => {
+    const loadSpeed = async () => {
+      const speed = await TrackPlayer.getRate();
+      if (PLAYBACK_SPEEDS.includes(speed)) setPlaybackSpeed(speed);
+    };
+    if (visible) loadSpeed();
+  }, [visible]);
 
   const isPlaying = playbackState.state === State.Playing;
   const isBuffering = playbackState.state === State.Buffering || playbackState.state === State.Loading;
@@ -56,7 +91,21 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     const newSpeed = PLAYBACK_SPEEDS[nextIndex];
     setPlaybackSpeed(newSpeed);
     await TrackPlayer.setRate(newSpeed);
+    await setStoredPlaybackSpeed(newSpeed);
   };
+
+  const handlePreviousTrack = async () => {
+    await TrackPlayer.skipToPrevious();
+    await updateQueueState();
+  };
+
+  const handleNextTrack = async () => {
+    await TrackPlayer.skipToNext();
+    await updateQueueState();
+  };
+
+  const hasPrevious = queueLength > 1 && currentIndex > 0;
+  const hasNext = queueLength > 1 && currentIndex < queueLength - 1;
 
   const handleSeek = async (locationX: number, width: number) => {
     const percentage = locationX / width;
@@ -97,9 +146,14 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               {activeTrack.title || "Unknown Track"}
             </Text>
             {activeTrack.artist && (
-              <Text className="mt-1 text-center text-base text-muted-foreground" numberOfLines={1}>
-                {activeTrack.artist}
-              </Text>
+              <TouchableOpacity
+                disabled={!activeTrack.artistUrl}
+                onPress={() => activeTrack.artistUrl && Linking.openURL(activeTrack.artistUrl)}
+              >
+                <Text className="mt-1 text-center text-base text-muted-foreground" numberOfLines={1}>
+                  {activeTrack.artist}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -127,7 +181,16 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             <Text className="text-xs text-muted-foreground">{formatTime(duration)}</Text>
           </View>
 
-          <View className="mb-8 flex-row items-center justify-center gap-6">
+          <View className="mb-8 flex-row items-center justify-center gap-4">
+            <TouchableOpacity
+              onPress={handlePreviousTrack}
+              disabled={!hasPrevious}
+              className="size-10 items-center justify-center"
+              style={{ opacity: hasPrevious ? 1 : 0.3 }}
+            >
+              <SolidIcon name="skip-previous" size={24} className="text-foreground" />
+            </TouchableOpacity>
+
             <TouchableOpacity
               onPress={handleSkipBack}
               className="size-14 items-center justify-center rounded-full border-2 border-foreground"
@@ -148,6 +211,15 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               className="size-14 items-center justify-center rounded-full border-2 border-foreground"
             >
               <Text className="text-sm font-bold text-foreground">+30</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleNextTrack}
+              disabled={!hasNext}
+              className="size-10 items-center justify-center"
+              style={{ opacity: hasNext ? 1 : 0.3 }}
+            >
+              <SolidIcon name="skip-next" size={24} className="text-foreground" />
             </TouchableOpacity>
           </View>
 
