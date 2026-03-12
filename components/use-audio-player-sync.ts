@@ -32,8 +32,19 @@ export const setupPlayer = async () => {
       Capability.Stop,
       Capability.SkipToNext,
       Capability.SkipToPrevious,
+      Capability.JumpForward,
+      Capability.JumpBackward,
     ],
-    notificationCapabilities: [Capability.Play, Capability.Pause, Capability.SkipToNext, Capability.SkipToPrevious],
+    notificationCapabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+      Capability.JumpForward,
+      Capability.JumpBackward,
+    ],
+    forwardJumpInterval: 30,
+    backwardJumpInterval: 15,
   });
   await TrackPlayer.setRepeatMode(RepeatMode.Off);
   isPlayerSetup = true;

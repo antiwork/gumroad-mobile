@@ -20,4 +20,14 @@ export const playbackService = async () => {
   TrackPlayer.addEventListener(Event.RemotePrevious, () => {
     TrackPlayer.skipToPrevious();
   });
+
+  TrackPlayer.addEventListener(Event.RemoteJumpForward, async ({ interval }) => {
+    const { position } = await TrackPlayer.getProgress();
+    await TrackPlayer.seekTo(position + interval);
+  });
+
+  TrackPlayer.addEventListener(Event.RemoteJumpBackward, async ({ interval }) => {
+    const { position } = await TrackPlayer.getProgress();
+    await TrackPlayer.seekTo(Math.max(0, position - interval));
+  });
 };
