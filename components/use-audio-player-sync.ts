@@ -1,13 +1,23 @@
 import { useAuth } from "@/lib/auth-context";
+import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
 import { updateMediaLocation } from "@/lib/media-location";
 import { useCallback, useEffect, useRef } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
 import type { WebView } from "react-native-webview";
+import { getStoredPlaybackSpeed } from "./full-audio-player";
 
 type AudioPlayerInfo = {
   fileId: string;
   isPlaying: boolean;
   latestMediaLocation?: string;
+};
+
+export type AudioTrackInfo = {
+  uri: string;
+  resourceId: string;
+  title?: string;
+  urlRedirectId?: string;
+  purchaseId?: string;
 };
 
 let isPlayerSetup = false;
@@ -17,8 +27,25 @@ export const setupPlayer = async () => {
 
   await TrackPlayer.setupPlayer();
   await TrackPlayer.updateOptions({
-    capabilities: [Capability.Play, Capability.Pause, Capability.Stop],
-    notificationCapabilities: [Capability.Play, Capability.Pause],
+    capabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.Stop,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+      Capability.JumpForward,
+      Capability.JumpBackward,
+    ],
+    notificationCapabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+      Capability.JumpForward,
+      Capability.JumpBackward,
+    ],
+    forwardJumpInterval: 30,
+    backwardJumpInterval: 15,
   });
   await TrackPlayer.setRepeatMode(RepeatMode.Off);
   isPlayerSetup = true;
@@ -26,9 +53,14 @@ export const setupPlayer = async () => {
 
 export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) => {
   const { accessToken } = useAuth();
+
+  useEffect(() => {
+    setAudioAccessToken(accessToken);
+  }, [accessToken]);
+
   const currentAudioRef = useRef<{
     resourceId: string;
-    urlRedirectId: string;
+    urlRedirectId?: string;
     purchaseId?: string;
     contentLength?: number;
   } | null>(null);
@@ -36,7 +68,9 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
   const syncMediaLocation = useCallback(
     async (position: number, isEnd = false) => {
       const currentAudio = currentAudioRef.current;
-      if (!currentAudio) return;
+      if (!currentAudio || !currentAudio.urlRedirectId) return;
+      // Avoid saving the location 0:01, it's not useful
+      if (!isEnd && position > 0 && position < 3) return;
 
       const location = isEnd && currentAudio.contentLength ? currentAudio.contentLength : Math.floor(position);
 
@@ -51,7 +85,6 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     [accessToken],
   );
 
-  // TODO: Only works when the component is mounted, need to support background playback
   const sendAudioPlayerInfo = useCallback(
     async ({ isPlaying, isEnd: forceIsEnd }: { isPlaying: boolean; isEnd?: boolean }) => {
       const currentAudio = currentAudioRef.current;
@@ -113,43 +146,100 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     await sendAudioPlayerInfo({ isPlaying: false });
   }, [sendAudioPlayerInfo]);
 
+  const allTracksRef = useRef<AudioTrackInfo[]>([]);
+
+  const updateCurrentAudioRef = useCallback((resourceId: string, duration?: number) => {
+    const track = allTracksRef.current.find((t) => t.resourceId === resourceId);
+    if (track) {
+      const context = { ...track, contentLength: duration };
+      currentAudioRef.current = context;
+      setAudioContext(context);
+    }
+  }, []);
+
+  useEffect(() => {
+    const subscription = TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async (event) => {
+      if (event.track?.id) {
+        const previousContext = currentAudioRef.current;
+        if (previousContext && previousContext.resourceId !== event.track.id) {
+          const position = event.lastPosition ?? 0;
+          await syncMediaLocation(position);
+        }
+        updateCurrentAudioRef(event.track.id, event.track.duration);
+      }
+    });
+    return () => subscription.remove();
+  }, [syncMediaLocation, updateCurrentAudioRef]);
+
   const playAudio = useCallback(
-    async (audio: {
-      uri: string;
+    async ({
+      resourceId,
+      resumeAt,
+      artist,
+      artistUrl,
+      artwork,
+      tracks,
+    }: {
       resourceId: string;
       resumeAt?: number;
-      title?: string;
       artist?: string;
+      artistUrl?: string;
       artwork?: string | null;
-      urlRedirectId: string;
-      purchaseId?: string;
-      contentLength?: number;
+      tracks: AudioTrackInfo[];
     }) => {
+      const audio = tracks.find((track) => track.resourceId === resourceId);
+      if (!audio) {
+        console.warn(`Couldn't find track ${resourceId}. Available:`, tracks);
+        return;
+      }
       const previousContext = currentAudioRef.current;
 
-      // If switching tracks, sync the previous track's position first
       if (previousContext && previousContext.resourceId !== audio.resourceId) {
         const { position } = await TrackPlayer.getProgress();
         await syncMediaLocation(position);
       }
 
-      if (!previousContext || previousContext.resourceId !== audio.resourceId) {
-        // TODO: Should add multiple tracks when there are multiple audio files in the purchase
-        await TrackPlayer.reset();
-        await TrackPlayer.add({
-          id: audio.resourceId,
-          url: audio.uri,
-          title: audio.title || "Audio Track",
-          artist: audio.artist || "Gumroad",
-          artwork: audio.artwork || undefined,
-        });
+      const isNewPlaylist =
+        !previousContext ||
+        allTracksRef.current.length !== tracks.length ||
+        !allTracksRef.current.every((t, i) => t.resourceId === tracks[i].resourceId);
 
-        if (audio.resumeAt) {
-          await TrackPlayer.seekTo(audio.resumeAt);
+      if (isNewPlaylist) {
+        allTracksRef.current = tracks;
+        await TrackPlayer.reset();
+        await TrackPlayer.add(
+          tracks.map((track) => ({
+            id: track.resourceId,
+            url: track.uri,
+            title: track.title || "Audio Track",
+            artist: artist || "Gumroad",
+            artistUrl,
+            artwork: artwork || undefined,
+          })),
+        );
+
+        const trackIndex = tracks.findIndex((t) => t.resourceId === audio.resourceId);
+        if (trackIndex > 0) {
+          await TrackPlayer.skip(trackIndex);
+        }
+
+        if (resumeAt) {
+          await TrackPlayer.seekTo(resumeAt);
+        }
+      } else if (previousContext?.resourceId !== audio.resourceId) {
+        const trackIndex = tracks.findIndex((t) => t.resourceId === audio.resourceId);
+        await TrackPlayer.skip(trackIndex);
+
+        if (resumeAt) {
+          await TrackPlayer.seekTo(resumeAt);
         }
       }
 
       currentAudioRef.current = audio;
+      setAudioContext(audio);
+
+      const storedSpeed = await getStoredPlaybackSpeed();
+      if (storedSpeed) await TrackPlayer.setRate(storedSpeed);
 
       await TrackPlayer.play();
       await sendAudioPlayerInfo({ isPlaying: true });

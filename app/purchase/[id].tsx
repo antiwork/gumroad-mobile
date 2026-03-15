@@ -13,7 +13,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
-import { Alert, View } from "react-native";
+import { Alert, Linking, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
@@ -70,6 +70,15 @@ export default function DownloadScreen() {
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
+  const handleShouldStartLoadWithRequest = useCallback(
+    (request: { url: string; navigationType: string }) => {
+      if (request.url === url || request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL)) return true;
+      Linking.openURL(request.url);
+      return false;
+    },
+    [url],
+  );
+
   const handleNativePageChange = useCallback((pageIndex: number) => {
     webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppPageChange", payload: { pageIndex } }));
   }, []);
@@ -110,7 +119,7 @@ export default function DownloadScreen() {
           params: {
             uri: downloadUrl(id, message.payload.resourceId),
             title: purchase?.name,
-            urlRedirectId: id,
+            urlRedirectId: purchase?.url_redirect_external_id,
             productFileId: message.payload.resourceId,
             purchaseId: purchase?.purchase_id,
             initialPage: message.payload.resumeAt,
@@ -122,16 +131,21 @@ export default function DownloadScreen() {
         if (message.payload.isPlaying === "true") {
           await pauseAudio();
         } else {
+          const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
+          const allAudioTracks = allAudioFiles.map((fileData) => ({
+            uri: downloadUrl(id, fileData.id),
+            resourceId: fileData.id,
+            title: fileData.name ?? purchase?.name,
+            urlRedirectId: purchase?.url_redirect_external_id,
+            purchaseId: purchase?.purchase_id,
+          }));
           await playAudio({
-            uri: downloadUrl(id, message.payload.resourceId),
             resourceId: message.payload.resourceId,
             resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
-            title: fileData?.name ?? purchase?.name,
             artist: purchase?.creator_name,
+            artistUrl: purchase?.creator_profile_url,
             artwork: purchase?.thumbnail_url,
-            urlRedirectId: id,
-            purchaseId: purchase?.purchase_id,
-            contentLength: message.payload.contentLength ? Number(message.payload.contentLength) : undefined,
+            tracks: allAudioTracks,
           });
         }
         return;
@@ -143,7 +157,7 @@ export default function DownloadScreen() {
             uri: downloadUrl(id, message.payload.resourceId),
             streamingUrl: purchase?.file_data?.find((f) => f.id === message.payload.resourceId)?.streaming_url,
             title: purchase?.name,
-            urlRedirectId: id,
+            urlRedirectId: purchase?.url_redirect_external_id,
             productFileId: message.payload.resourceId,
             purchaseId: purchase?.purchase_id,
             initialPosition: message.payload.resumeAt ?? undefined,
@@ -183,6 +197,7 @@ export default function DownloadScreen() {
         pullToRefreshEnabled
         mediaPlaybackRequiresUserAction={false}
         originWhitelist={["*"]}
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onMessage={handleMessage}
       />
       {isDownloading && (
