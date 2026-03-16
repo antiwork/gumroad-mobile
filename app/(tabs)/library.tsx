@@ -1,7 +1,7 @@
 import { LibraryFilters } from "@/components/library/library-filters";
 import { useLibraryFilters } from "@/components/library/use-library-filters";
 import { Purchase, usePurchases, useSellers } from "@/components/library/use-purchases";
-import { useRecentProducts } from "@/components/library/use-recent-products";
+import { MAX_RECENT, useRecentProducts } from "@/components/library/use-recent-products";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
@@ -61,11 +61,17 @@ export default function Index() {
   );
 
   const carouselItems = useMemo(() => {
-    const recent = recentProducts.purchases;
-    if (recent.length >= 5) return recent.slice(0, 5);
-    const recentIds = new Set(recent.map((p) => p.unique_permalink));
-    const filler = purchases.filter((p) => !recentIds.has(p.unique_permalink));
-    return [...recent, ...filler].slice(0, 5);
+    let items = recentProducts.purchases;
+
+    if (items.length < MAX_RECENT) {
+      items.push(
+        ...purchases
+          .filter((purchase) => !items.some(({ unique_permalink }) => purchase.unique_permalink === unique_permalink))
+          .slice(0, MAX_RECENT - items.length),
+      );
+    }
+
+    return items;
   }, [recentProducts.purchases, purchases]);
 
   // Pull-to-refresh without rendering the native RefreshControl UI
@@ -106,7 +112,8 @@ export default function Index() {
     );
   }
 
-  const isFilterLoading = filters.isSearchPending || (query.isFetching && !query.isFetchingNextPage);
+  const isFilterLoading =
+    filters.isSearchPending || (query.isFetching && !query.isFetchingNextPage) || recentProducts.isLoading;
 
   return (
     <Screen>
