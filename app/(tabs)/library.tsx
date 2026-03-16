@@ -74,7 +74,10 @@ export default function Index() {
     if (e.nativeEvent.contentOffset.y <= 0) isPulling.current = true;
   };
   const onScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (isPulling.current && e.nativeEvent.contentOffset.y < -80) query.refetch();
+    if (isPulling.current && e.nativeEvent.contentOffset.y < -80) {
+      query.refetch();
+      recentProducts.refetch();
+    }
     isPulling.current = false;
   };
 
