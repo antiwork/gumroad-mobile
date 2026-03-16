@@ -27,6 +27,7 @@ export interface Post {
 }
 
 export interface Purchase {
+  product_id: string;
   name: string;
   creator_name: string;
   creator_username: string;
@@ -68,7 +69,7 @@ interface Pagination {
   last: number;
 }
 
-interface SearchResponse {
+export interface SearchResponse {
   success: boolean;
   user_id: string;
   purchases: Purchase[];

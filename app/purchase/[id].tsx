@@ -4,6 +4,7 @@ import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
+import { addRecentProduct } from "@/components/library/use-recent-products";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
@@ -11,7 +12,7 @@ import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
 import { Alert, Linking, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -69,6 +70,10 @@ export default function DownloadScreen() {
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (purchase?.product_id) addRecentProduct(purchase.product_id);
+  }, [purchase?.product_id]);
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; navigationType: string }) => {

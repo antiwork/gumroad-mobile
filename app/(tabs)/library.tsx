@@ -1,13 +1,14 @@
 import { LibraryFilters } from "@/components/library/library-filters";
 import { useLibraryFilters } from "@/components/library/use-library-filters";
 import { Purchase, usePurchases, useSellers } from "@/components/library/use-purchases";
+import { useRecentProducts } from "@/components/library/use-recent-products";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
-import { useRouter } from "expo-router";
-import { useMemo, useRef } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useRef } from "react";
 import {
   FlatList,
   Image,
@@ -51,7 +52,21 @@ export default function Index() {
   const { purchases, totalCount } = query;
   const sellers = useSellers(filters.apiFilters);
 
-  const carouselItems = useMemo(() => purchases.slice(0, 5), [purchases]);
+  const recentProducts = useRecentProducts();
+  useFocusEffect(
+    useCallback(() => {
+      recentProducts.refresh();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [recentProducts.refresh]),
+  );
+
+  const carouselItems = useMemo(() => {
+    const recent = recentProducts.purchases;
+    if (recent.length >= 5) return recent.slice(0, 5);
+    const recentIds = new Set(recent.map((p) => p.product_id));
+    const filler = purchases.filter((p) => !recentIds.has(p.product_id));
+    return [...recent, ...filler].slice(0, 5);
+  }, [recentProducts.purchases, purchases]);
 
   // Pull-to-refresh without rendering the native RefreshControl UI
   const isPulling = useRef(false);
@@ -93,14 +108,6 @@ export default function Index() {
   return (
     <Screen>
       <LibraryFilters {...filters} sellers={sellers}>
-        {filters.hasActiveFilters && !isFilterLoading && (
-          <View className="px-4 pb-4">
-            <Text className="text-sm text-muted">
-              Showing {totalCount} product{totalCount !== 1 ? "s" : ""}
-            </Text>
-          </View>
-        )}
-
         {isFilterLoading && purchases.length === 0 ? (
           <View className="flex-1 items-center justify-center">
             <LoadingSpinner size="large" />
