@@ -27,13 +27,12 @@ export interface Post {
 }
 
 export interface Purchase {
-  product_id: string;
   name: string;
+  unique_permalink: string;
   creator_name: string;
   creator_username: string;
   creator_profile_url: string;
   creator_profile_picture_url: string;
-  creator_profile_url: string;
   thumbnail_url: string | null;
   url_redirect_external_id?: string;
   url_redirect_token: string;
@@ -55,6 +54,7 @@ export interface Seller {
 export interface ApiFilters {
   q?: string;
   seller?: string[];
+  products?: string[];
   archived?: boolean;
   order?: "date-desc" | "date-asc";
 }
@@ -85,13 +85,16 @@ interface PurchaseDetailResponse {
 
 const PER_PAGE = 24;
 
-const buildSearchPath = (page: number, filters: ApiFilters) => {
+export const buildSearchPath = (page: number, filters: ApiFilters) => {
   const params = new URLSearchParams();
   params.set("items", String(PER_PAGE));
   params.set("page", String(page));
   if (filters.q) params.set("q", filters.q);
   if (filters.seller?.length) {
     for (const id of filters.seller) params.append("seller[]", id);
+  }
+  if (filters.products?.length) {
+    for (const id of filters.products) params.append("products[]", id);
   }
   if (filters.archived !== undefined) params.set("archived", String(filters.archived));
   if (filters.order) params.set("order", filters.order);

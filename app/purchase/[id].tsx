@@ -72,8 +72,8 @@ export default function DownloadScreen() {
   const { bottom } = useSafeAreaInsets();
 
   useEffect(() => {
-    if (purchase?.product_id) addRecentProduct(purchase.product_id);
-  }, [purchase?.product_id]);
+    if (purchase?.unique_permalink) addRecentProduct(purchase.unique_permalink);
+  }, [purchase?.unique_permalink]);
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; navigationType: string }) => {

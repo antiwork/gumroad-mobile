@@ -63,8 +63,8 @@ export default function Index() {
   const carouselItems = useMemo(() => {
     const recent = recentProducts.purchases;
     if (recent.length >= 5) return recent.slice(0, 5);
-    const recentIds = new Set(recent.map((p) => p.product_id));
-    const filler = purchases.filter((p) => !recentIds.has(p.product_id));
+    const recentIds = new Set(recent.map((p) => p.unique_permalink));
+    const filler = purchases.filter((p) => !recentIds.has(p.unique_permalink));
     return [...recent, ...filler].slice(0, 5);
   }, [recentProducts.purchases, purchases]);
 
