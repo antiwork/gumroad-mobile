@@ -3,8 +3,10 @@ import { LineIcon, SolidIcon } from "@/components/icon";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledImage } from "@/components/styled";
 import { Button } from "@/components/ui/button";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
+import { useUser } from "@/components/use-user";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { flushReplayBuffer } from "@/lib/sentry";
@@ -95,6 +97,7 @@ const SettingsButton = () => {
 const SettingsSheet = () => {
   const { isSettingsOpen, setSettingsOpen } = useSettingsSheet();
   const { logout } = useAuth();
+  const { data: user, isLoading: isUserLoading } = useUser();
 
   const handleLogout = () => {
     setSettingsOpen(false);
@@ -117,6 +120,27 @@ const SettingsSheet = () => {
         <SheetTitle>Settings</SheetTitle>
       </SheetHeader>
       <SheetContent>
+        <View className="flex-row items-center gap-3 border-b border-border p-4">
+          {isUserLoading ? (
+            <LoadingSpinner size="small" />
+          ) : user ? (
+            <>
+              {user.profile_picture_url ? (
+                <StyledImage source={{ uri: user.profile_picture_url }} className="size-10 rounded-full" />
+              ) : (
+                <View className="size-10 items-center justify-center rounded-full bg-accent">
+                  <Text className="text-lg font-bold text-accent-foreground">
+                    {user.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View className="flex-1">
+                <Text className="font-sans text-lg text-foreground">{user.name}</Text>
+                <Text className="text-sm text-muted">{user.email}</Text>
+              </View>
+            </>
+          ) : null}
+        </View>
         <View className="border-b border-border p-4">
           <Text className="mb-2 font-sans text-lg text-foreground">Feedback</Text>
           <Text className="mb-4 text-sm text-muted-foreground">Report a bug or suggest an improvement.</Text>

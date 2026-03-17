@@ -11,7 +11,7 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 const authorizationEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/mobile_pre_authorization/new`;
 const tokenEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/token`;
 const productsEndpoint = `${env.EXPO_PUBLIC_GUMROAD_API_URL}/mobile/analytics/products.json?mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
-const scopes = ["mobile_api", "creator_api"];
+const scopes = ["mobile_api", "creator_api", "account"];
 
 const accessTokenKey = "gumroad_access_token";
 const refreshTokenKey = "gumroad_refresh_token";
