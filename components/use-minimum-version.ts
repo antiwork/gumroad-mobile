@@ -11,7 +11,6 @@ export const checkUpdateRequirement = (
   minimumVersion: string,
   minimumUpdateCreatedAt: string,
 ): UpdateRequirement => {
-  console.log("checking min", { appVersion, updateCreatedAt, minimumVersion, minimumUpdateCreatedAt });
   if (appVersion && appVersion < minimumVersion) return "native";
   if (updateCreatedAt && updateCreatedAt < new Date(minimumUpdateCreatedAt)) return "ota";
   return null;
