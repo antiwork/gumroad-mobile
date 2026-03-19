@@ -9,6 +9,7 @@ import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { Platform, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { LoadingSpinner } from "./ui/loading-spinner";
 
 const appStoreUrl = Platform.select({
   ios: `https://apps.apple.com/app/id${Constants.expoConfig?.extra?.eas?.appleAppId ?? ""}`,
@@ -17,12 +18,7 @@ const appStoreUrl = Platform.select({
 
 const NativeUpdateContent = () => (
   <>
-    <Text variant="h3" className="text-center">
-      Update Required
-    </Text>
-    <Text variant="muted" className="text-center">
-      A new version of Gumroad is available. Please update to continue using the app.
-    </Text>
+    <Text className="text-center">A new version is available. Please update to continue using the app.</Text>
     <Button
       variant="accent"
       onPress={() => {
@@ -37,25 +33,22 @@ const NativeUpdateContent = () => (
 const OTAUpdateContent = () => {
   const { isUpdateReady, apply } = useOTAUpdate();
 
-  return (
+  return isUpdateReady ? (
     <>
-      <Text variant="h3" className="text-center">
-        {isUpdateReady ? "Update Ready" : "Updating..."}
+      <Text variant="muted" className="text-center">
+        An update has been downloaded. Restart to apply it.
       </Text>
-      {isUpdateReady ? (
-        <>
-          <Text variant="muted" className="text-center">
-            An update has been downloaded. Restart to apply it.
-          </Text>
-          <Button variant="accent" onPress={apply}>
-            <Text>Restart</Text>
-          </Button>
-        </>
-      ) : (
-        <Text variant="muted" className="text-center">
-          A required update is being downloaded. This should only take a moment.
-        </Text>
-      )}
+      <Button variant="accent" onPress={apply}>
+        <Text>Restart</Text>
+      </Button>
+    </>
+  ) : (
+    <>
+      <LoadingSpinner size="small" />
+      <Text className="text-center">A required update is being downloaded. This should only take a moment.</Text>
+      <Text variant="muted" className="text-center">
+        If the download seems stuck, try restarting the app.
+      </Text>
     </>
   );
 };

@@ -31,7 +31,7 @@ export const request = async <T>(url: string, options?: RequestInit & { data?: a
     throw new UnauthorizedError("Unauthorized");
   }
   if (!response.ok) {
-    const error = await response.text();
+    const error = (await response.text()).slice(0, 10000);
     console.info("HTTP request", { ...details, error });
     throw new Error(`Request failed: ${response.status} ${error}`);
   }
