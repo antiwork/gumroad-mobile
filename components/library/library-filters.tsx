@@ -131,10 +131,10 @@ export const LibraryFilters = ({
       )}
     >
       <View className="flex-row items-center gap-2 px-4 py-4">
-        <View className="flex-1 flex-row items-center rounded border border-border bg-background px-3 py-2">
+        <View className="h-10 flex-1 flex-row items-center rounded border border-border bg-background px-3">
           <LineIcon name="search" size={20} className="text-muted" />
           <TextInput
-            className="ml-2 flex-1 font-sans text-base text-foreground"
+            className="ml-2 flex-1 py-0 font-sans text-base text-foreground"
             placeholder="Search products..."
             placeholderTextColor={mutedColor}
             value={searchText}
@@ -150,7 +150,7 @@ export const LibraryFilters = ({
         </View>
         <TouchableOpacity
           onPress={() => setDrawerOpen(true)}
-          className="rounded border border-border bg-background p-2"
+          className="size-10 items-center justify-center rounded border border-border bg-background px-2"
         >
           <LineIcon name="filter" size={24} className={hasActiveFilters ? "text-accent" : "text-foreground"} />
         </TouchableOpacity>

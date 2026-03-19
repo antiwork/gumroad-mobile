@@ -5,11 +5,15 @@ import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
+import { File, Paths } from "expo-file-system";
+import * as NavigationBar from "expo-navigation-bar";
+import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Dimensions, FlatList, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
+import { cn } from "@/lib/utils";
 
 type FlattenedTocItem = {
   title: string;
@@ -41,6 +45,19 @@ export default function PdfViewerScreen() {
   const [tableOfContents, setTableOfContents] = useState<TableContent[]>([]);
   const [showTocModal, setShowTocModal] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      NavigationBar.setVisibilityAsync("hidden");
+      NavigationBar.setBehaviorAsync("overlay-swipe");
+    }
+    return () => {
+      if (Platform.OS === "android") {
+        NavigationBar.setVisibilityAsync("visible");
+      }
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -72,7 +89,28 @@ export default function PdfViewerScreen() {
         options={{
           title: title ?? "PDF",
           headerRight: () => (
-            <View className="flex-row items-center">
+            <View className="flex-row items-center gap-1">
+              <TouchableOpacity
+                disabled={isSharing}
+                onPress={async () => {
+                  setIsSharing(true);
+                  try {
+                    const isAvailable = await Sharing.isAvailableAsync();
+                    if (!isAvailable) return;
+                    const downloaded = await File.downloadFileAsync(uri, Paths.cache, { idempotent: true });
+                    await Sharing.shareAsync(downloaded.uri);
+                  } finally {
+                    setIsSharing(false);
+                  }
+                }}
+                className={cn("p-2", isSharing && "opacity-50")}
+              >
+                <LineIcon
+                  name={Platform.OS === "ios" ? "arrow-out-right-square-half" : "share"}
+                  size={24}
+                  className={cn("text-accent", Platform.OS === "ios" && "-rotate-90")}
+                />
+              </TouchableOpacity>
               {tableOfContents.length > 0 && (
                 <TouchableOpacity onPress={() => setShowTocModal(true)} className="p-2">
                   <SolidIcon name="book-content" size={24} className="text-accent" />

@@ -2,27 +2,34 @@ import { LineIcon } from "@/components/icon";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import * as React from "react";
-import { Modal, Pressable, View, type ModalProps } from "react-native";
+import { Modal, Platform, Pressable, View, type ModalProps } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type SheetProps = Omit<ModalProps, "animationType" | "presentationStyle"> & {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-const Sheet = ({ open, onOpenChange, onRequestClose, children, ...props }: SheetProps) => (
-  <Modal
-    visible={open}
-    animationType="slide"
-    presentationStyle="pageSheet"
-    onRequestClose={(e) => {
-      onOpenChange(false);
-      onRequestClose?.(e);
-    }}
-    {...props}
-  >
-    <View className="flex-1 bg-background">{children}</View>
-  </Modal>
-);
+const Sheet = ({ open, onOpenChange, onRequestClose, children, ...props }: SheetProps) => {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal
+      visible={open}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={(e) => {
+        onOpenChange(false);
+        onRequestClose?.(e);
+      }}
+      {...props}
+    >
+      <View className="flex-1 bg-background" style={Platform.OS === "android" ? { paddingTop: insets.top } : undefined}>
+        {children}
+      </View>
+    </Modal>
+  );
+};
 
 type SheetHeaderProps = {
   children?: React.ReactNode;

@@ -1,6 +1,9 @@
+import * as NavigationBar from "expo-navigation-bar";
 import { PortalHost } from "@rn-primitives/portal";
 import { useNavigationContainerRef, Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useCSSVariable } from "uniwind";
 import { setupPlayer } from "../components/use-audio-player-sync";
@@ -22,6 +25,12 @@ const RootLayout = () => {
       navigationIntegration.registerNavigationContainer(ref);
     }
   }, [ref]);
+
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      NavigationBar.setBackgroundColorAsync(background as string);
+    }
+  }, [background]);
 
   useEffect(() => {
     setupPlayer().catch((error) => {
@@ -51,6 +60,7 @@ const RootLayout = () => {
             <Stack.Screen name="post/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
           </Stack>
+          <StatusBar style="auto" />
           <PortalHost />
         </AuthProvider>
       </QueryProvider>
