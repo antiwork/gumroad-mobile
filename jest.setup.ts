@@ -23,6 +23,5 @@ jest.mock("@sentry/react-native", () => ({
 jest.mock("@expo/vector-icons/build/createIconSet", () => {
   const React = require("react");
   const { Text } = require("react-native");
-  return () => (props: Record<string, unknown>) =>
-    React.createElement(Text, props);
+  return () => (props: Record<string, unknown>) => React.createElement(Text, props);
 });

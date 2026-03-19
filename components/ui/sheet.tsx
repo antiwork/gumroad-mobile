@@ -24,10 +24,7 @@ const Sheet = ({ open, onOpenChange, onRequestClose, children, ...props }: Sheet
       }}
       {...props}
     >
-      <View
-        className="flex-1 bg-background"
-        style={Platform.OS === "android" ? { paddingTop: insets.top } : undefined}
-      >
+      <View className="flex-1 bg-background" style={Platform.OS === "android" ? { paddingTop: insets.top } : undefined}>
         {children}
       </View>
     </Modal>
