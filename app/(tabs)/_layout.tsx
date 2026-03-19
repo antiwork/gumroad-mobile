@@ -15,7 +15,7 @@ import Constants from "expo-constants";
 import { Tabs } from "expo-router";
 import * as Updates from "expo-updates";
 import { createContext, useContext, useRef, useState } from "react";
-import { Alert, Linking, Platform, Pressable, TouchableOpacity, View } from "react-native";
+import { Alert, Linking, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
 
 interface SearchContextValue {
