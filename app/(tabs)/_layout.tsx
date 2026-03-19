@@ -57,7 +57,7 @@ const LogoIcon = () => {
 
   return (
     <Pressable onPress={handlePress}>
-      <StyledImage source={logoG} className="ml-3 size-6" />
+      <StyledImage source={logoG} className="mr-2 ml-3 size-6" />
     </Pressable>
   );
 };
