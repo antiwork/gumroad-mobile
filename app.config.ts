@@ -30,6 +30,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     predictiveBackGestureEnabled: false,
     package: process.env.ANDROID_BUNDLE_NAME,
   },
+  androidNavigationBar: {
+    enforceContrast: false,
+  },
   web: {
     output: "static",
     favicon: "./assets/images/favicon.png",
