@@ -8,29 +8,30 @@ import { buildSearchPath, Purchase, SearchResponse } from "./use-purchases";
 
 export const MAX_RECENT = 5;
 
-const STORAGE_KEY = "recent_product_permalinks";
+const STORAGE_KEY = "recent_purchase_ids";
 const QUERY_KEY = ["recent-products"];
 
-const getStoredPermalinks = async (): Promise<string[]> => {
+const getStoredPurchaseIds = async (): Promise<string[]> => {
   const raw = await SecureStore.getItemAsync(STORAGE_KEY);
   return raw ? JSON.parse(raw) : [];
 };
 
-const storePermalinks = async (permalinks: string[]) => {
-  await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(permalinks));
+const storePurchaseIds = async (ids: string[]) => {
+  await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(ids));
 };
 
-export const useAddRecentProduct = () => {
+export const useAddRecentPurchase = () => {
   const queryClient = useQueryClient();
 
   return useCallback(
     async (purchase: Purchase) => {
-      const permalinks = await getStoredPermalinks();
-      const updated = [purchase.unique_permalink, ...permalinks.filter((p) => p !== purchase.unique_permalink)];
-      await storePermalinks(updated.slice(0, MAX_RECENT));
+      if (!purchase.purchase_id) return;
+      const ids = await getStoredPurchaseIds();
+      const updated = [purchase.purchase_id, ...ids.filter((id) => id !== purchase.purchase_id)];
+      await storePurchaseIds(updated.slice(0, MAX_RECENT));
 
       queryClient.setQueryData<Purchase[]>(QUERY_KEY, (old = []) => {
-        const filtered = old.filter((p) => p.unique_permalink !== purchase.unique_permalink);
+        const filtered = old.filter((p) => p.purchase_id !== purchase.purchase_id);
         return [purchase, ...filtered].slice(0, MAX_RECENT);
       });
     },
@@ -38,33 +39,33 @@ export const useAddRecentProduct = () => {
   );
 };
 
-export const useRecentProducts = () => {
+export const useRecentPurchases = () => {
   const { accessToken } = useAuth();
-  const [permalinks, setPermalinks] = useState<string[]>([]);
+  const [purchaseIds, setPurchaseIds] = useState<string[]>([]);
 
   useEffect(() => {
-    getStoredPermalinks().then(setPermalinks);
+    getStoredPurchaseIds().then(setPurchaseIds);
   }, []);
 
-  const refresh = useCallback(async () => setPermalinks(await getStoredPermalinks()), []);
+  const refresh = useCallback(async () => setPurchaseIds(await getStoredPurchaseIds()), []);
 
   const query = useQuery<Purchase[]>({
     queryKey: QUERY_KEY,
     queryFn: async () => {
-      const response = await requestAPI<SearchResponse>(buildSearchPath(1, { products: permalinks }), {
+      const response = await requestAPI<SearchResponse>(buildSearchPath(1, { purchase_ids: purchaseIds }), {
         accessToken: assertDefined(accessToken),
       });
       return response.purchases;
     },
-    enabled: !!accessToken && permalinks.length > 0,
+    enabled: !!accessToken && purchaseIds.length > 0,
   });
 
   const purchases = useMemo(() => {
     if (!query.data?.length) return [];
     return [...query.data].sort(
-      (a, b) => permalinks.indexOf(a.unique_permalink) - permalinks.indexOf(b.unique_permalink),
+      (a, b) => purchaseIds.indexOf(a.purchase_id ?? "") - purchaseIds.indexOf(b.purchase_id ?? ""),
     );
-  }, [query.data, permalinks]);
+  }, [query.data, purchaseIds]);
 
-  return { purchases, refresh, refetch: query.refetch, isLoading: query.isLoading && permalinks.length > 0 };
+  return { purchases, refresh, refetch: query.refetch, isLoading: query.isLoading && purchaseIds.length > 0 };
 };

@@ -4,7 +4,7 @@ import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
-import { useAddRecentProduct } from "@/components/library/use-recent-products";
+import { useAddRecentPurchase } from "@/components/library/use-recent-products";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
@@ -63,7 +63,7 @@ export default function DownloadScreen() {
   const [tocPages, setTocPages] = useState<TocDataMessage["payload"]["pages"]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
   const purchase = usePurchase(id);
-  const addRecentProduct = useAddRecentProduct();
+  const addRecentPurchase = useAddRecentPurchase();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
@@ -73,7 +73,7 @@ export default function DownloadScreen() {
   const { bottom } = useSafeAreaInsets();
 
   useEffect(() => {
-    if (purchase) addRecentProduct(purchase);
+    if (purchase) addRecentPurchase(purchase);
   }, [purchase?.unique_permalink]);
 
   const handleShouldStartLoadWithRequest = useCallback(

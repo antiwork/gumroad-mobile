@@ -1,7 +1,7 @@
 import { LibraryFilters } from "@/components/library/library-filters";
 import { useLibraryFilters } from "@/components/library/use-library-filters";
 import { Purchase, usePurchases, useSellers } from "@/components/library/use-purchases";
-import { MAX_RECENT, useRecentProducts } from "@/components/library/use-recent-products";
+import { MAX_RECENT, useRecentPurchases } from "@/components/library/use-recent-products";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
@@ -52,16 +52,16 @@ export default function Index() {
   const { purchases, totalCount } = query;
   const sellers = useSellers(filters.apiFilters);
 
-  const recentProducts = useRecentProducts();
+  const recentPurchases = useRecentPurchases();
   useFocusEffect(
     useCallback(() => {
-      recentProducts.refresh();
+      recentPurchases.refresh();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [recentProducts.refresh]),
+    }, [recentPurchases.refresh]),
   );
 
   const carouselItems = useMemo(() => {
-    let items = recentProducts.purchases;
+    let items = recentPurchases.purchases;
 
     if (items.length < MAX_RECENT) {
       items.push(
@@ -72,7 +72,7 @@ export default function Index() {
     }
 
     return items;
-  }, [recentProducts.purchases, purchases]);
+  }, [recentPurchases.purchases, purchases]);
 
   // Pull-to-refresh without rendering the native RefreshControl UI
   const isPulling = useRef(false);
@@ -82,7 +82,7 @@ export default function Index() {
   const onScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (isPulling.current && e.nativeEvent.contentOffset.y < -80) {
       query.refetch();
-      recentProducts.refetch();
+      recentPurchases.refetch();
     }
     isPulling.current = false;
   };
@@ -113,7 +113,7 @@ export default function Index() {
   }
 
   const isFilterLoading =
-    filters.isSearchPending || (query.isFetching && !query.isFetchingNextPage) || recentProducts.isLoading;
+    filters.isSearchPending || (query.isFetching && !query.isFetchingNextPage) || recentPurchases.isLoading;
 
   return (
     <Screen>

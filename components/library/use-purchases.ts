@@ -55,6 +55,7 @@ export interface ApiFilters {
   q?: string;
   seller?: string[];
   products?: string[];
+  purchase_ids?: string[];
   archived?: boolean;
   order?: "date-desc" | "date-asc";
 }
@@ -95,6 +96,9 @@ export const buildSearchPath = (page: number, filters: ApiFilters) => {
   }
   if (filters.products?.length) {
     for (const id of filters.products) params.append("products[]", id);
+  }
+  if (filters.purchase_ids?.length) {
+    for (const id of filters.purchase_ids) params.append("purchase_ids[]", id);
   }
   if (filters.archived !== undefined) params.set("archived", String(filters.archived));
   if (filters.order) params.set("order", filters.order);
