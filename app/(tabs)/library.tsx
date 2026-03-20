@@ -143,7 +143,7 @@ export default function Index() {
                       <CarouselItem
                         key={item.purchase_id ?? item.url_redirect_token}
                         item={item}
-                        onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
+                        onPress={() => router.push({ pathname: "/purchase/[token]", params: { token: item.url_redirect_token, urlRedirectExternalId: item.url_redirect_external_id } })}
                       />
                     ))}
                   </ScrollView>
@@ -155,7 +155,7 @@ export default function Index() {
             }
             renderItem={({ item }) => (
               <TouchableOpacity
-                onPress={() => router.push(`/purchase/${item.url_redirect_token}`)}
+                onPress={() => router.push({ pathname: "/purchase/[token]", params: { token: item.url_redirect_token, urlRedirectExternalId: item.url_redirect_external_id } })}
                 className={cn("flex-row items-center gap-4 border-b border-border", isFilterLoading && "opacity-50")}
               >
                 {item.thumbnail_url ? (

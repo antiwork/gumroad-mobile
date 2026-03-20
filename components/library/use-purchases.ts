@@ -146,7 +146,7 @@ export const usePost = (urlRedirectToken: string, postExternalId: string): Post 
   );
 };
 
-export const usePurchase = (id: string): Purchase | undefined => {
+export const usePurchase = (url_redirect_external_id: string | undefined): Purchase | undefined => {
   const queryClient = useQueryClient();
   const { accessToken } = useAuth();
 
@@ -155,37 +155,19 @@ export const usePurchase = (id: string): Purchase | undefined => {
     return queries
       .flatMap(([, data]) => data?.pages ?? [])
       .flatMap((page) => page.purchases)
-      .find((p) => p.url_redirect_token === id);
-  }, [queryClient, id]);
-
-  const fallbackQuery = useInfiniteQuery<SearchResponse, Error>({
-    queryKey: ["purchases", {}],
-    queryFn: ({ pageParam }) =>
-      requestAPI<SearchResponse>(buildSearchPath(pageParam as number, {}), {
-        accessToken: assertDefined(accessToken),
-      }),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => lastPage.meta.pagination.next ?? undefined,
-    enabled: !!accessToken && !cachedPurchase,
-  });
-
-  const fallbackPurchase = useMemo(
-    () => fallbackQuery.data?.pages.flatMap((page) => page.purchases).find((p) => p.url_redirect_token === id),
-    [fallbackQuery.data, id],
-  );
-
-  const purchase = cachedPurchase ?? fallbackPurchase;
+      .find((p) => p.url_redirect_external_id === url_redirect_external_id);
+  }, [queryClient, url_redirect_external_id]);
 
   const detailQuery = useQuery<PurchaseDetailResponse>({
-    queryKey: ["purchase", id],
+    queryKey: ["purchase", url_redirect_external_id],
     queryFn: () =>
       requestAPI<PurchaseDetailResponse>(
-        `mobile/url_redirects/get_url_redirect_attributes/${purchase?.url_redirect_external_id}`,
+        `mobile/url_redirects/get_url_redirect_attributes/${url_redirect_external_id}`,
         { accessToken: assertDefined(accessToken) },
       ),
-    enabled: !!accessToken && !!purchase?.url_redirect_external_id,
-    placeholderData: purchase ? { success: true, product: purchase, purchase_valid: true } : undefined,
+    enabled: !!accessToken && !!url_redirect_external_id,
+    placeholderData: cachedPurchase ? { success: true, product: cachedPurchase, purchase_valid: true } : undefined,
   });
 
-  return detailQuery.data?.product ?? purchase;
+  return detailQuery.data?.product;
 };

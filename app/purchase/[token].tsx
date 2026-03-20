@@ -58,22 +58,23 @@ const shareFile = async (uri: string) => {
 };
 
 export default function DownloadScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { token, urlRedirectExternalId } = useLocalSearchParams<{ token: string; urlRedirectExternalId: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
   const [tocPages, setTocPages] = useState<TocDataMessage["payload"]["pages"]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
-  const purchase = usePurchase(id);
+  const purchase = usePurchase(urlRedirectExternalId);
   const addRecentPurchase = useAddRecentPurchase();
   const router = useRouter();
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
-  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${id}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
+  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${token}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
   useEffect(() => {
     if (purchase) addRecentPurchase(purchase);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purchase?.unique_permalink]);
 
   const handleShouldStartLoadWithRequest = useCallback(
@@ -113,7 +114,7 @@ export default function DownloadScreen() {
           pathname: "/post/[id]",
           params: {
             id: message.payload.resourceId,
-            urlRedirectToken: id,
+            urlRedirectToken: token,
           },
         });
         return;
@@ -123,7 +124,7 @@ export default function DownloadScreen() {
         router.push({
           pathname: "/pdf-viewer",
           params: {
-            uri: downloadUrl(id, message.payload.resourceId),
+            uri: downloadUrl(token, message.payload.resourceId),
             title: purchase?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
             productFileId: message.payload.resourceId,
@@ -139,7 +140,7 @@ export default function DownloadScreen() {
         } else {
           const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
           const allAudioTracks = allAudioFiles.map((fileData) => ({
-            uri: downloadUrl(id, fileData.id),
+            uri: downloadUrl(token, fileData.id),
             resourceId: fileData.id,
             title: fileData.name ?? purchase?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
@@ -160,7 +161,7 @@ export default function DownloadScreen() {
         router.push({
           pathname: "/video-player",
           params: {
-            uri: downloadUrl(id, message.payload.resourceId),
+            uri: downloadUrl(token, message.payload.resourceId),
             streamingUrl: purchase?.file_data?.find((f) => f.id === message.payload.resourceId)?.streaming_url,
             title: purchase?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
@@ -173,7 +174,7 @@ export default function DownloadScreen() {
       }
 
       setIsDownloading(true);
-      const downloadedFile = await downloadFile(id, message.payload.resourceId);
+      const downloadedFile = await downloadFile(token, message.payload.resourceId);
       await shareFile(downloadedFile.uri);
     } catch (error) {
       Sentry.captureException(error);

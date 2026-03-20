@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth-context";
 import { requestAPI } from "@/lib/request";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback } from "react";
 import { buildSearchPath, Purchase, SearchResponse } from "./use-purchases";
 
 export const MAX_RECENT = 5;
@@ -41,31 +41,21 @@ export const useAddRecentPurchase = () => {
 
 export const useRecentPurchases = () => {
   const { accessToken } = useAuth();
-  const [purchaseIds, setPurchaseIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    getStoredPurchaseIds().then(setPurchaseIds);
-  }, []);
-
-  const refresh = useCallback(async () => setPurchaseIds(await getStoredPurchaseIds()), []);
 
   const query = useQuery<Purchase[]>({
     queryKey: QUERY_KEY,
     queryFn: async () => {
+      const purchaseIds = await getStoredPurchaseIds();
+      if (purchaseIds.length === 0) return [];
       const response = await requestAPI<SearchResponse>(buildSearchPath(1, { purchase_ids: purchaseIds }), {
         accessToken: assertDefined(accessToken),
       });
-      return response.purchases;
+      return [...response.purchases].sort(
+        (a, b) => purchaseIds.indexOf(a.purchase_id ?? "") - purchaseIds.indexOf(b.purchase_id ?? ""),
+      );
     },
-    enabled: !!accessToken && purchaseIds.length > 0,
+    enabled: !!accessToken,
   });
 
-  const purchases = useMemo(() => {
-    if (!query.data?.length) return [];
-    return [...query.data].sort(
-      (a, b) => purchaseIds.indexOf(a.purchase_id ?? "") - purchaseIds.indexOf(b.purchase_id ?? ""),
-    );
-  }, [query.data, purchaseIds]);
-
-  return { purchases, refresh, refetch: query.refetch, isLoading: query.isLoading && purchaseIds.length > 0 };
+  return { purchases: query.data ?? [], refresh: query.refetch, refetch: query.refetch, isLoading: query.isLoading };
 };
