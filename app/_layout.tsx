@@ -46,7 +46,6 @@ const RootLayout = () => {
 
   useEffect(() => {
     setupPlayer().catch((error) => {
-      Sentry.captureException(error);
       console.error("Failed to setup player:", error);
     });
   }, []);
