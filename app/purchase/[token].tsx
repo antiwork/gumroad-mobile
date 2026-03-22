@@ -79,7 +79,13 @@ export default function DownloadScreen() {
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; navigationType: string }) => {
-      if (request.url === url || request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL)) return true;
+      if (
+        request.url === url ||
+        request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL) ||
+        request.url.startsWith("https://challenges.cloudflare.com/") ||
+        !/^https?:\/\//.test(request.url)
+      )
+        return true;
       Linking.openURL(request.url);
       return false;
     },
