@@ -66,7 +66,7 @@ const RootLayout = () => {
               contentStyle: { backgroundColor: background as string },
             }}
           >
-            <Stack.Screen name="login" options={{ title: "Sign In", headerShown: false }} />
+            <Stack.Screen name="login" options={{ title: "Sign In", headerShown: false, animation: "none" }} />
             <Stack.Screen name="index" options={{ headerShown: false, animation: "none" }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: "none" }} />
             <Stack.Screen name="purchase/[token]" options={{ title: "" }} />
