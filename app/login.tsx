@@ -17,16 +17,14 @@ export default function LoginScreen() {
   const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
+    if (isAuthenticated) return;
+
     // Speeds up opening the browser for the auth flow on Android
-    WebBrowser.warmUpAsync();
+    WebBrowser.warmUpAsync().catch(() => {});
 
     return () => {
-      WebBrowser.coolDownAsync();
+      WebBrowser.coolDownAsync().catch(() => {});
     };
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) setIsSigningIn(false);
   }, [isAuthenticated]);
 
   const handleLogin = useCallback(async () => {
