@@ -63,8 +63,8 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
   });
 
   useEffect(() => {
-    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
-  }, [isAuthLoading, accessToken, query.error, logout]);
+    if (query.error instanceof UnauthorizedError) logout();
+  }, [query.error, logout]);
 
   return query;
 };

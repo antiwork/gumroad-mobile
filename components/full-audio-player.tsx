@@ -133,15 +133,15 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
           {activeTrack.artwork ? (
             <StyledImage
               source={{ uri: activeTrack.artwork }}
-              className="aspect-square w-full max-w-80 rounded-lg bg-muted"
+              className="aspect-square size-72 md:size-96 rounded-lg bg-muted"
             />
           ) : (
-            <View className="aspect-square w-full max-w-80 items-center justify-center rounded-lg bg-muted">
+            <View className="aspect-square size-72 md:size-96 items-center justify-center rounded-lg bg-muted">
               <LineIcon name="music" size={80} className="text-muted-foreground" />
             </View>
           )}
 
-          <View className="mt-8 w-full max-w-80">
+          <View className="mt-8 w-72 md:w-96">
             <Text className="text-center text-xl font-bold text-foreground" numberOfLines={2}>
               {activeTrack.title || "Unknown Track"}
             </Text>

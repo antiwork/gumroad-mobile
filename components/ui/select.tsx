@@ -51,12 +51,12 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       ref={ref}
       className={cn(
-        "flex h-10 flex-row items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 shadow-sm shadow-black/5 sm:h-9 dark:bg-input/30 dark:active:bg-input/50",
+        "flex h-10 flex-row items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 shadow-sm shadow-black/5 dark:bg-input/30 dark:active:bg-input/50",
         Platform.select({
           web: "w-fit font-sans text-base whitespace-nowrap transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:hover:bg-input/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         }),
         props.disabled && "opacity-50",
-        size === "sm" && "h-8 py-2 sm:py-1.5",
+        size === "sm" && "h-8 py-2",
         className,
       )}
       {...props}
@@ -136,10 +136,7 @@ function SelectLabel({
   ...props
 }: SelectPrimitive.LabelProps & React.RefAttributes<SelectPrimitive.LabelRef>) {
   return (
-    <SelectPrimitive.Label
-      className={cn("px-2 py-2 font-sans text-xs text-muted-foreground sm:py-1.5", className)}
-      {...props}
-    />
+    <SelectPrimitive.Label className={cn("px-2 py-2 font-sans text-xs text-muted-foreground", className)} {...props} />
   );
 }
 
@@ -151,7 +148,7 @@ function SelectItem({
   return (
     <SelectPrimitive.Item
       className={cn(
-        "group relative flex w-full flex-row items-center gap-2 rounded-sm py-2 pr-8 pl-2 active:bg-accent sm:py-1.5",
+        "group relative flex w-full flex-row items-center gap-2 rounded-sm py-2 pr-8 pl-2 active:bg-accent",
         Platform.select({
           web: "cursor-default outline-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none [&_svg]:pointer-events-none *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         }),

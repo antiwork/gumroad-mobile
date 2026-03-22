@@ -29,7 +29,7 @@ export const useMinimumVersion = () => {
     if (!data) return null;
     return checkUpdateRequirement(
       Constants.expoConfig?.version,
-      Updates.createdAt ?? new Date("2025-03-01"),
+      Updates.createdAt ?? undefined,
       data.minimum_version,
       data.minimum_update_created_at,
     );
