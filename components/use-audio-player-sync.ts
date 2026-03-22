@@ -115,6 +115,10 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
 
   useEffect(() => {
     const intervalId = setInterval(async () => {
+      if (!isPlayerSetup) {
+        console.warn("Audio polling called before player setup");
+        return;
+      }
       const { state } = await TrackPlayer.getPlaybackState();
       if (state === State.Playing) {
         await sendAudioPlayerInfo({ isPlaying: true });
@@ -142,6 +146,10 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
   }, [sendAudioPlayerInfo, syncMediaLocation]);
 
   const pauseAudio = useCallback(async () => {
+    if (!isPlayerSetup) {
+      console.warn("pauseAudio called before player setup");
+      return;
+    }
     await TrackPlayer.pause();
     await sendAudioPlayerInfo({ isPlaying: false });
   }, [sendAudioPlayerInfo]);
@@ -187,6 +195,10 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
       artwork?: string | null;
       tracks: AudioTrackInfo[];
     }) => {
+      if (!isPlayerSetup) {
+        console.warn("playAudio called before player setup");
+        return;
+      }
       const audio = tracks.find((track) => track.resourceId === resourceId);
       if (!audio) {
         console.warn(`Couldn't find track ${resourceId}. Available:`, tracks);
