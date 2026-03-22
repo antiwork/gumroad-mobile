@@ -36,8 +36,6 @@ export default function LoginScreen() {
     }
   }, [login]);
 
-  console.log({ isLoading, isCreator, isAuthenticated });
-
   if (isAuthenticated) return <Redirect href={isCreator ? "/(tabs)/dashboard" : "/(tabs)/library"} />;
 
   const busy = isLoading || isSigningIn;
