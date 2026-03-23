@@ -1,6 +1,6 @@
 import { LibraryFilters } from "@/components/library/library-filters";
 import { useLibraryFilters } from "@/components/library/use-library-filters";
-import { Purchase, usePurchases, useSellers } from "@/components/library/use-purchases";
+import { Purchase, useArchivePurchase, usePurchases, useSellers } from "@/components/library/use-purchases";
 import { MAX_RECENT, useRecentPurchases } from "@/components/library/use-recent-products";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
@@ -10,14 +10,17 @@ import { cn } from "@/lib/utils";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Pressable,
   ScrollView,
   TouchableOpacity,
   View,
 } from "react-native";
+import ContextMenu from "react-native-context-menu-view";
 
 const CarouselItem = ({ item, onPress }: { item: Purchase; onPress: () => void }) => (
   <TouchableOpacity onPress={onPress} className="size-50 overflow-hidden rounded">
@@ -51,6 +54,21 @@ export default function Index() {
   const query = usePurchases(filters.apiFilters);
   const { purchases, totalCount } = query;
   const sellers = useSellers(filters.apiFilters);
+
+  const archivePurchase = useArchivePurchase();
+
+  const handleArchive = useCallback(
+    async (item: Purchase) => {
+      if (!item.purchase_id) return;
+      const isArchived = item.is_archived;
+      try {
+        await archivePurchase(item.purchase_id, !isArchived);
+      } catch {
+        Alert.alert("Error", `Failed to ${isArchived ? "unarchive" : "archive"} product`);
+      }
+    },
+    [archivePurchase],
+  );
 
   const recentPurchases = useRecentPurchases();
   useFocusEffect(
@@ -162,34 +180,51 @@ export default function Index() {
               </>
             }
             renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/purchase/[token]",
-                    params: { token: item.url_redirect_token, urlRedirectExternalId: item.url_redirect_external_id },
-                  })
-                }
-                className={cn("flex-row items-center gap-4 border-b border-border", isFilterLoading && "opacity-50")}
-              >
-                {item.thumbnail_url ? (
-                  <Image source={{ uri: item.thumbnail_url }} className="size-17 bg-muted" resizeMode="cover" />
-                ) : (
-                  <View className="size-17 items-center justify-center bg-muted">
-                    <Text className="text-2xl">📦</Text>
-                  </View>
-                )}
-                <View className="flex-1 gap-1">
-                  <Text className="text-base font-bold" numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <View className="flex-row items-center gap-1.5">
-                    <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" />
-                    <Text className="text-sm text-muted" numberOfLines={1}>
-                      {item.creator_name}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
+              <>
+                <ContextMenu
+                  actions={[
+                    {
+                      title: item.is_archived ? "Unarchive from library" : "Archive from library",
+                      destructive: !item.is_archived,
+                      systemIcon: item.is_archived ? "tray.and.arrow.up" : "archivebox",
+                    },
+                  ]}
+                  onPress={() => handleArchive(item)}
+                >
+                  <Pressable
+                    onPress={() =>
+                      router.push({
+                        pathname: "/purchase/[token]",
+                        params: {
+                          token: item.url_redirect_token,
+                          urlRedirectExternalId: item.url_redirect_external_id,
+                        },
+                      })
+                    }
+                    className={cn("flex-row items-center gap-4", isFilterLoading && "opacity-50")}
+                  >
+                    {item.thumbnail_url ? (
+                      <Image source={{ uri: item.thumbnail_url }} className="size-17 bg-muted" resizeMode="cover" />
+                    ) : (
+                      <View className="size-17 items-center justify-center bg-muted">
+                        <Text className="text-2xl">📦</Text>
+                      </View>
+                    )}
+                    <View className="flex-1 gap-1">
+                      <Text className="text-base font-bold" numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <View className="flex-row items-center gap-1.5">
+                        <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" />
+                        <Text className="text-sm text-muted" numberOfLines={1}>
+                          {item.creator_name}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                </ContextMenu>
+                <View className="h-px bg-border" />
+              </>
             )}
             ListEmptyComponent={
               !isFilterLoading ? (

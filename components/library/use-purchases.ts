@@ -2,7 +2,7 @@ import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { InfiniteData, keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 export interface PostFile {
   id: string;
@@ -170,4 +170,21 @@ export const usePurchase = (url_redirect_external_id: string | undefined): Purch
   });
 
   return detailQuery.data?.product;
+};
+
+export const useArchivePurchase = () => {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    async (purchaseId: string, archive: boolean) => {
+      const action = archive ? "archive" : "unarchive";
+      await requestAPI(`purchases/${purchaseId}/${action}`, {
+        accessToken: assertDefined(accessToken),
+        method: "POST",
+      });
+      queryClient.invalidateQueries({ queryKey: ["purchases"] });
+    },
+    [accessToken, queryClient],
+  );
 };
