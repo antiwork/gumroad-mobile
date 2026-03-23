@@ -1,6 +1,12 @@
 import { LibraryFilters } from "@/components/library/library-filters";
 import { useLibraryFilters } from "@/components/library/use-library-filters";
-import { Purchase, useArchivePurchase, usePurchases, useSellers } from "@/components/library/use-purchases";
+import {
+  Purchase,
+  useArchivePurchase,
+  useDeletePurchase,
+  usePurchases,
+  useSellers,
+} from "@/components/library/use-purchases";
 import { MAX_RECENT, useRecentPurchases } from "@/components/library/use-recent-products";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
@@ -21,6 +27,7 @@ import {
   View,
 } from "react-native";
 import ContextMenu from "react-native-context-menu-view";
+import * as Sentry from "@sentry/react-native";
 
 const CarouselItem = ({ item, onPress }: { item: Purchase; onPress: () => void }) => (
   <TouchableOpacity onPress={onPress} className="size-50 overflow-hidden rounded">
@@ -56,18 +63,40 @@ export default function Index() {
   const sellers = useSellers(filters.apiFilters);
 
   const archivePurchase = useArchivePurchase();
+  const deletePurchase = useDeletePurchase();
 
   const handleArchive = useCallback(
     async (item: Purchase) => {
       if (!item.purchase_id) return;
-      const isArchived = item.is_archived;
       try {
-        await archivePurchase(item.purchase_id, !isArchived);
-      } catch {
-        Alert.alert("Error", `Failed to ${isArchived ? "unarchive" : "archive"} product`);
+        await archivePurchase(item.purchase_id, !item.is_archived);
+      } catch (e) {
+        Sentry.captureException(e);
+        Alert.alert("Error", `Failed to ${item.is_archived ? "unarchive" : "archive"} product`);
       }
     },
     [archivePurchase],
+  );
+
+  const handleDelete = useCallback(
+    (item: Purchase) => {
+      if (!item.purchase_id) return;
+      Alert.alert("Delete permanently?", `"${item.name}" will be removed from your library. This cannot be undone.`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deletePurchase(item.purchase_id!);
+            } catch {
+              Alert.alert("Error", "Failed to delete product");
+            }
+          },
+        },
+      ]);
+    },
+    [deletePurchase],
   );
 
   const recentPurchases = useRecentPurchases();
@@ -184,12 +213,19 @@ export default function Index() {
                 <ContextMenu
                   actions={[
                     {
-                      title: item.is_archived ? "Unarchive from library" : "Archive from library",
-                      destructive: !item.is_archived,
+                      title: item.is_archived ? "Unarchive" : "Archive",
                       systemIcon: item.is_archived ? "tray.and.arrow.up" : "archivebox",
                     },
+                    {
+                      title: "Delete permanently",
+                      destructive: true,
+                      systemIcon: "trash",
+                    },
                   ]}
-                  onPress={() => handleArchive(item)}
+                  onPress={(e) => {
+                    if (e.nativeEvent.index === 0) handleArchive(item);
+                    else if (e.nativeEvent.index === 1) handleDelete(item);
+                  }}
                 >
                   <Pressable
                     onPress={() =>

@@ -172,18 +172,71 @@ export const usePurchase = (url_redirect_external_id: string | undefined): Purch
   return detailQuery.data?.product;
 };
 
+const removePurchaseFromCache = (queryClient: ReturnType<typeof useQueryClient>, purchaseId: string) => {
+  const previousData = new Map<string, InfiniteData<SearchResponse>>();
+  const queries = queryClient.getQueriesData<InfiniteData<SearchResponse>>({ queryKey: ["purchases"] });
+  for (const [key, data] of queries) {
+    if (!data) continue;
+    previousData.set(JSON.stringify(key), data);
+    queryClient.setQueryData<InfiniteData<SearchResponse>>(key, {
+      ...data,
+      pages: data.pages.map((page) => ({
+        ...page,
+        purchases: page.purchases.filter((p) => p.purchase_id !== purchaseId),
+        meta: {
+          ...page.meta,
+          pagination: { ...page.meta.pagination, count: page.meta.pagination.count - 1 },
+        },
+      })),
+    });
+  }
+  return () => {
+    for (const [key, data] of previousData) {
+      queryClient.setQueryData(JSON.parse(key), data);
+    }
+  };
+};
+
 export const useArchivePurchase = () => {
   const { accessToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useCallback(
     async (purchaseId: string, archive: boolean) => {
-      const action = archive ? "archive" : "unarchive";
-      await requestAPI(`purchases/${purchaseId}/${action}`, {
-        accessToken: assertDefined(accessToken),
-        method: "POST",
-      });
-      queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      const rollback = removePurchaseFromCache(queryClient, purchaseId);
+      try {
+        const action = archive ? "archive" : "unarchive";
+        await requestAPI(`mobile/purchases/${purchaseId}/${action}`, {
+          accessToken: assertDefined(accessToken),
+          method: "POST",
+        });
+        queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      } catch (e) {
+        rollback();
+        throw e;
+      }
+    },
+    [accessToken, queryClient],
+  );
+};
+
+export const useDeletePurchase = () => {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    async (purchaseId: string) => {
+      const rollback = removePurchaseFromCache(queryClient, purchaseId);
+      try {
+        await requestAPI(`purchases/${purchaseId}`, {
+          accessToken: assertDefined(accessToken),
+          method: "DELETE",
+        });
+        queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      } catch (e) {
+        rollback();
+        throw e;
+      }
     },
     [accessToken, queryClient],
   );
