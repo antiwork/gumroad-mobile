@@ -210,7 +210,6 @@ export const useArchivePurchase = () => {
           accessToken: assertDefined(accessToken),
           method: "POST",
         });
-        queryClient.invalidateQueries({ queryKey: ["purchases"] });
       } catch (e) {
         rollback();
         throw e;
@@ -228,11 +227,10 @@ export const useDeletePurchase = () => {
     async (purchaseId: string) => {
       const rollback = removePurchaseFromCache(queryClient, purchaseId);
       try {
-        await requestAPI(`purchases/${purchaseId}`, {
+        await requestAPI(`mobile/purchases/${purchaseId}`, {
           accessToken: assertDefined(accessToken),
           method: "DELETE",
         });
-        queryClient.invalidateQueries({ queryKey: ["purchases"] });
       } catch (e) {
         rollback();
         throw e;
