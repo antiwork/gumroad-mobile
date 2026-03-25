@@ -31,7 +31,7 @@ export default function LoginScreen() {
     setIsSigningIn(true);
     try {
       await login();
-    } catch {
+    } finally {
       setIsSigningIn(false);
     }
   }, [login]);
