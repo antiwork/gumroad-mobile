@@ -112,7 +112,7 @@ export default function Dashboard() {
               <>
                 <Text className="font-sans text-4xl text-foreground">{data?.formatted_revenue ?? "$0"}</Text>
                 <Text className="font-sans text-sm text-foreground">
-                  from {salesCount} sale{salesCount !== 1 ? "s" : ""}
+                  from {salesCount.toLocaleString()} sale{salesCount !== 1 ? "s" : ""}
                 </Text>
               </>
             )}
