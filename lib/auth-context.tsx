@@ -1,4 +1,5 @@
 import { assertDefined } from "@/lib/assert";
+import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
 import { request } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
@@ -138,6 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await SecureStore.deleteItemAsync(refreshTokenKey);
       setAccessToken(null);
       setIsCreator(false);
+      queryClient.clear();
       router.replace("/login");
     } catch (error) {
       Sentry.captureException(error);

@@ -208,6 +208,7 @@ export default function DownloadScreen() {
         className="flex-1 bg-transparent"
         webviewDebuggingEnabled
         pullToRefreshEnabled
+        incognito
         mediaPlaybackRequiresUserAction={false}
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
