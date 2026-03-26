@@ -21,7 +21,7 @@ export type AudioTrackInfo = {
 };
 
 let isPlayerSetup = false;
-let playerSetupListeners: Array<() => void> = [];
+let playerSetupListeners: (() => void)[] = [];
 
 export const isPlayerInitialized = () => isPlayerSetup;
 
