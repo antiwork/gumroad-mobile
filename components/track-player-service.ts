@@ -1,6 +1,7 @@
 import { getAudioAccessToken, getAudioContext } from "@/lib/audio-player-store";
 import { updateMediaLocation } from "@/lib/media-location";
 import TrackPlayer, { Event, State } from "react-native-track-player";
+import { isPlayerInitialized } from "./use-audio-player-sync";
 
 const syncCurrentPosition = async (isEnd = false) => {
   const context = getAudioContext();
@@ -53,6 +54,7 @@ export const playbackService = async () => {
   });
 
   setInterval(async () => {
+    if (!isPlayerInitialized()) return;
     try {
       const { state } = await TrackPlayer.getPlaybackState();
       if (state === State.Playing) {

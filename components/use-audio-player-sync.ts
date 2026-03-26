@@ -1,7 +1,7 @@
 import { useAuth } from "@/lib/auth-context";
 import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
 import { updateMediaLocation } from "@/lib/media-location";
-import { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
 import type { WebView } from "react-native-webview";
 import { getStoredPlaybackSpeed } from "./full-audio-player";
@@ -21,6 +21,29 @@ export type AudioTrackInfo = {
 };
 
 let isPlayerSetup = false;
+let playerSetupListeners: Array<() => void> = [];
+
+export const isPlayerInitialized = () => isPlayerSetup;
+
+export const withPlayerReady = <P extends object>(Component: React.ComponentType<P>): React.FC<P> => {
+  const Wrapped: React.FC<P> = (props) => {
+    const [ready, setReady] = useState(isPlayerSetup);
+    useEffect(() => {
+      if (isPlayerSetup) {
+        setReady(true);
+        return;
+      }
+      const listener = () => setReady(true);
+      playerSetupListeners.push(listener);
+      return () => {
+        playerSetupListeners = playerSetupListeners.filter((l) => l !== listener);
+      };
+    }, []);
+    if (!ready) return null;
+    return React.createElement(Component, props);
+  };
+  return Wrapped;
+};
 
 export const setupPlayer = async () => {
   if (isPlayerSetup) return;
@@ -49,6 +72,8 @@ export const setupPlayer = async () => {
   });
   await TrackPlayer.setRepeatMode(RepeatMode.Off);
   isPlayerSetup = true;
+  playerSetupListeners.forEach((l) => l());
+  playerSetupListeners = [];
 };
 
 export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) => {

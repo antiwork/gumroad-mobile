@@ -2,11 +2,12 @@ import { FullAudioPlayer } from "@/components/full-audio-player";
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
+import { withPlayerReady } from "@/components/use-audio-player-sync";
 import { useEffect, useState } from "react";
 import { Pressable, TouchableOpacity, View } from "react-native";
 import TrackPlayer, { State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
 
-export const MiniAudioPlayer = () => {
+const MiniAudioPlayerBase = () => {
   const playbackState = usePlaybackState();
   const activeTrack = useActiveTrack();
   const { position, duration } = useProgress();
@@ -85,3 +86,5 @@ export const MiniAudioPlayer = () => {
     </>
   );
 };
+
+export const MiniAudioPlayer = withPlayerReady(MiniAudioPlayerBase);
