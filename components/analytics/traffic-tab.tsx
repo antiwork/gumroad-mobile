@@ -148,7 +148,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
         >
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
-            {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
+            {activeIndex !== null && <Text className="text-lg text-foreground">{formatCurrency(selectedRevenue)}</Text>}
           </View>
           <View>
             {activeIndex !== null && (
@@ -202,7 +202,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatNumber(totalSales)}</Text>
             {activeIndex !== null && (
-              <Text className="text-lg text-accent">
+              <Text className="text-lg text-foreground">
                 {formatNumber(selectedSalesTotal)} sale{selectedSalesTotal !== 1 ? "s" : ""}
               </Text>
             )}
@@ -259,7 +259,7 @@ export const TrafficTab = ({ timeRange }: TrafficTabProps) => {
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatNumber(totalVisits)}</Text>
             {activeIndex !== null && (
-              <Text className="text-lg text-accent">
+              <Text className="text-lg text-foreground">
                 {formatNumber(selectedVisitsTotal)} visit{selectedVisitsTotal !== 1 ? "s" : ""}
               </Text>
             )}

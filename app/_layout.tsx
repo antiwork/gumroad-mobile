@@ -57,10 +57,10 @@ const RootLayout = () => {
           <ForceUpdateGuard />
           <Stack
             screenOptions={{
-              headerStyle: { backgroundColor: background as string },
+              headerStyle: { backgroundColor: "black" },
               headerShadowVisible: false,
               headerTintColor: accent as string,
-              headerTitleStyle: { fontFamily: "ABC Favorit", color: foreground as string },
+              headerTitleStyle: { fontFamily: "ABC Favorit", color: "white" },
               headerBackButtonDisplayMode: "minimal",
               contentStyle: { backgroundColor: background as string },
             }}
@@ -72,7 +72,7 @@ const RootLayout = () => {
             <Stack.Screen name="post/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
           </Stack>
-          <StatusBar style="auto" />
+          <StatusBar style="light" />
           <PortalHost />
         </AuthProvider>
       </QueryProvider>

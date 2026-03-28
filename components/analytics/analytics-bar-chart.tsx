@@ -33,8 +33,11 @@ export const formatCurrency = (cents: number): string => {
   if (dollars >= 1_000_000) {
     return `$${(dollars / 1_000_000).toFixed(1)}M`;
   }
-  if (dollars >= 1_000) {
+  if (dollars >= 9_999) {
     return `$${(dollars / 1_000).toFixed(1)}K`;
+  }
+  if (Math.floor(dollars) === dollars) {
+    return `$${dollars}`;
   }
   return `$${dollars.toFixed(2)}`;
 };
