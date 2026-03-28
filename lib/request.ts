@@ -31,8 +31,15 @@ export const request = async <T>(url: string, options?: RequestInit & { data?: a
     throw new UnauthorizedError("Unauthorized");
   }
   if (!response.ok) {
-    const error = (await response.text()).slice(0, 10000);
-    console.info("HTTP request", { ...details, error });
+    const rawError = (await response.text()).slice(0, 10000);
+    const isHtml =
+      rawError.trimStart().startsWith("<!DOCTYPE") ||
+      rawError.trimStart().startsWith("<html") ||
+      (response.headers.get("content-type") ?? "").includes("text/html");
+    const error = isHtml
+      ? rawError.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || "HTML error page"
+      : rawError.slice(0, 200);
+    console.info("HTTP request", { ...details, error: rawError.slice(0, 500) });
     throw new Error(`Request failed: ${response.status} ${error}`);
   }
   console.info("HTTP request", details);
