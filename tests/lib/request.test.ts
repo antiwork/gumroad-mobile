@@ -29,13 +29,11 @@ describe("request", () => {
   it("includes plain-text error body in thrown error (truncated to 200 chars)", async () => {
     const longError = "x".repeat(300);
     mockFetch(500, longError);
-    await expect(request("https://api.example.com/test")).rejects.toThrow(
-      `Request failed: 500 ${"x".repeat(200)}`,
-    );
+    await expect(request("https://api.example.com/test")).rejects.toThrow(`Request failed: 500 ${"x".repeat(200)}`);
   });
 
   it("extracts <title> from HTML error responses instead of including raw HTML", async () => {
-    const html = '<!DOCTYPE html><html><head><title>Page not found</title></head><body><h1>404</h1></body></html>';
+    const html = "<!DOCTYPE html><html><head><title>Page not found</title></head><body><h1>404</h1></body></html>";
     mockFetch(404, html);
     await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 404 Page not found");
   });
