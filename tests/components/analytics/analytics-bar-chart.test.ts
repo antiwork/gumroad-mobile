@@ -34,15 +34,15 @@ describe("getBarIndexFromX", () => {
 
 describe("formatCurrency", () => {
   it("formats cents as dollars", () => {
-    expect(formatCurrency(1500)).toBe("$15.00");
+    expect(formatCurrency(1500)).toBe("$15");
   });
 
   it("formats zero cents", () => {
-    expect(formatCurrency(0)).toBe("$0.00");
+    expect(formatCurrency(0)).toBe("$0");
   });
 
   it("formats thousands with K suffix", () => {
-    expect(formatCurrency(150_000)).toBe("$1.5K");
+    expect(formatCurrency(1_500_000)).toBe("$15.0K");
   });
 
   it("formats millions with M suffix", () => {

@@ -26,11 +26,7 @@ const ForceUpdateGuard = () => {
 
 const RootLayout = () => {
   const ref = useNavigationContainerRef();
-  const [background, foreground, accent] = useCSSVariable([
-    "--color-background",
-    "--color-foreground",
-    "--color-accent",
-  ]);
+  const [background, accent] = useCSSVariable(["--color-background", "--color-accent"]);
 
   useEffect(() => {
     if (ref?.current) {
