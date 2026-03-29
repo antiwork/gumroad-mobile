@@ -61,15 +61,12 @@ export default function PdfViewerScreen() {
   }, []);
 
   const appStateRef = useRef(AppState.currentState ?? "active");
-  const handleAppStateChange = useCallback(
-    (nextAppState: string) => {
-      if (Platform.OS === "android" && appStateRef.current !== "active" && nextAppState === "active") {
-        setPdfKey((k) => k + 1);
-      }
-      appStateRef.current = nextAppState as typeof appStateRef.current;
-    },
-    [],
-  );
+  const handleAppStateChange = useCallback((nextAppState: string) => {
+    if (Platform.OS === "android" && appStateRef.current !== "active" && nextAppState === "active") {
+      setPdfKey((k) => k + 1);
+    }
+    appStateRef.current = nextAppState as typeof appStateRef.current;
+  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", handleAppStateChange);
