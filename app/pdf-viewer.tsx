@@ -10,8 +10,8 @@ import * as NavigationBar from "expo-navigation-bar";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Dimensions, FlatList, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, Dimensions, FlatList, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +46,7 @@ export default function PdfViewerScreen() {
   const [showTocModal, setShowTocModal] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [pdfKey, setPdfKey] = useState(0);
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -58,6 +59,19 @@ export default function PdfViewerScreen() {
       }
     };
   }, []);
+
+  const appStateRef = useRef(AppState.currentState ?? "active");
+  const handleAppStateChange = useCallback((nextAppState: string) => {
+    if (Platform.OS === "android" && appStateRef.current !== "active" && nextAppState === "active") {
+      setPdfKey((k) => k + 1);
+    }
+    appStateRef.current = nextAppState as typeof appStateRef.current;
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [handleAppStateChange]);
 
   useEffect(
     () => () => {
@@ -128,7 +142,7 @@ export default function PdfViewerScreen() {
         }}
       />
       <Pdf
-        key={viewMode}
+        key={`${viewMode}-${pdfKey}`}
         ref={pdfRef}
         source={{ uri }}
         style={styles.pdf}
