@@ -120,8 +120,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsLoading(false);
         }
       } else if (response?.type === "error") {
-        Sentry.captureException(response.error);
-        console.error("Auth error:", response.error);
+        if (response.error?.code === "access_denied") {
+          console.warn("OAuth access denied by user:", response.error.message);
+        } else {
+          Sentry.captureException(response.error);
+          console.error("Auth error:", response.error);
+        }
         setIsLoading(false);
       }
     }
