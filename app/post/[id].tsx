@@ -11,6 +11,7 @@ import * as Sentry from "@sentry/react-native";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
+import * as WebBrowser from "expo-web-browser";
 import { useCallback, useRef, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -80,11 +81,17 @@ export default function PostScreen() {
   };
 
   const handleCreatorPress = () => {
-    if (post?.creator_profile_url) Linking.openURL(post.creator_profile_url);
+    if (post?.creator_profile_url)
+      Linking.openURL(post.creator_profile_url).catch(() => {
+        WebBrowser.openBrowserAsync(post.creator_profile_url!);
+      });
   };
 
   const handleCtaPress = () => {
-    if (post?.call_to_action_url) Linking.openURL(post.call_to_action_url);
+    if (post?.call_to_action_url)
+      Linking.openURL(post.call_to_action_url).catch(() => {
+        WebBrowser.openBrowserAsync(post.call_to_action_url!);
+      });
   };
 
   if (!post) {

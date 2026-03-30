@@ -12,6 +12,7 @@ import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
+import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
 import { Alert, Linking, View } from "react-native";
@@ -86,7 +87,9 @@ export default function DownloadScreen() {
         !/^https?:\/\//.test(request.url)
       )
         return true;
-      Linking.openURL(request.url);
+      Linking.openURL(request.url).catch(() => {
+        WebBrowser.openBrowserAsync(request.url);
+      });
       return false;
     },
     [url],
