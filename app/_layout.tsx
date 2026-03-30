@@ -67,6 +67,7 @@ const RootLayout = () => {
             <Stack.Screen name="purchase/[token]" options={{ title: "" }} />
             <Stack.Screen name="post/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
+            <Stack.Screen name="+not-found" options={{ title: "Not Found" }} />
           </Stack>
           <StatusBar style="light" />
           <PortalHost />
