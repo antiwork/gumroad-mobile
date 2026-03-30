@@ -4,7 +4,7 @@ import { updateMediaLocation } from "@/lib/media-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
 import type { WebView } from "react-native-webview";
-import { getStoredPlaybackSpeed } from "./full-audio-player";
+import { getStoredPlaybackSpeed, getStoredRepeatMode } from "./full-audio-player";
 
 type AudioPlayerInfo = {
   fileId: string;
@@ -70,7 +70,8 @@ export const setupPlayer = async () => {
     forwardJumpInterval: 30,
     backwardJumpInterval: 15,
   });
-  await TrackPlayer.setRepeatMode(RepeatMode.Off);
+  const storedRepeatMode = await getStoredRepeatMode();
+  await TrackPlayer.setRepeatMode(storedRepeatMode);
   isPlayerSetup = true;
   playerSetupListeners.forEach((l) => l());
   playerSetupListeners = [];
