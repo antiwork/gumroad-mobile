@@ -1,7 +1,7 @@
 import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
-import { request } from "@/lib/request";
+import { request, UnauthorizedError } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
@@ -42,11 +42,22 @@ const fetchCreatorStatus = async (token: string): Promise<boolean> => {
     });
     return (response.products?.length ?? 0) > 0;
   } catch (e) {
+    if (e instanceof UnauthorizedError) throw e;
     Sentry.captureException(e);
     console.error(e);
     return false;
   }
 };
+
+const refreshAccessToken = async (storedRefreshToken: string): Promise<{ access_token: string; refresh_token?: string }> =>
+  request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
+    method: "POST",
+    data: {
+      grant_type: "refresh_token",
+      refresh_token: storedRefreshToken,
+      client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
+    },
+  });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -76,8 +87,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const storedToken = await SecureStore.getItemAsync(accessTokenKey);
         if (storedToken) {
           setAccessToken(storedToken);
-          const creatorStatus = await fetchCreatorStatus(storedToken);
-          setIsCreator(creatorStatus);
+          try {
+            const creatorStatus = await fetchCreatorStatus(storedToken);
+            setIsCreator(creatorStatus);
+          } catch (e) {
+            if (e instanceof UnauthorizedError) {
+              const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+              if (storedRefreshToken) {
+                try {
+                  const tokenResponse = await refreshAccessToken(storedRefreshToken);
+                  await SecureStore.setItemAsync(accessTokenKey, tokenResponse.access_token);
+                  if (tokenResponse.refresh_token) await SecureStore.setItemAsync(refreshTokenKey, tokenResponse.refresh_token);
+                  setAccessToken(tokenResponse.access_token);
+                  const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
+                  setIsCreator(creatorStatus);
+                } catch {
+                  await SecureStore.deleteItemAsync(accessTokenKey);
+                  await SecureStore.deleteItemAsync(refreshTokenKey);
+                  setAccessToken(null);
+                }
+              } else {
+                await SecureStore.deleteItemAsync(accessTokenKey);
+                setAccessToken(null);
+              }
+            } else {
+              throw e;
+            }
+          }
         }
       } catch (error) {
         Sentry.captureException(error);
@@ -154,14 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
       if (!storedRefreshToken) throw new Error("No refresh token available");
 
-      const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
-        method: "POST",
-        data: {
-          grant_type: "refresh_token",
-          refresh_token: storedRefreshToken,
-          client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-        },
-      });
+      const tokenResponse = await refreshAccessToken(storedRefreshToken);
       await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
     } catch (error) {
       Sentry.captureException(error);
