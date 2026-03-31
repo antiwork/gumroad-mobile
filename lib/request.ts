@@ -10,7 +10,10 @@ export class UnauthorizedError extends Error {
   }
 }
 
-export const request = async <T>(url: string, options?: RequestInit & { data?: any; skipResponseBody?: boolean }): Promise<T> => {
+export const request = async <T>(
+  url: string,
+  options?: RequestInit & { data?: any; skipResponseBody?: boolean },
+): Promise<T> => {
   const body = options?.data ? JSON.stringify(options.data) : options?.body;
   const response = await fetch(url, {
     ...options,
@@ -46,7 +49,10 @@ export const buildApiUrl = (path: string) => {
   return url.toString();
 };
 
-export const requestAPI = async <T>(path: string, options: RequestInit & { accessToken: string; data?: any; skipResponseBody?: boolean }) =>
+export const requestAPI = async <T>(
+  path: string,
+  options: RequestInit & { accessToken: string; data?: any; skipResponseBody?: boolean },
+) =>
   request<T>(buildApiUrl(path), {
     ...options,
     headers: { Authorization: `Bearer ${options?.accessToken}`, ...options?.headers },
