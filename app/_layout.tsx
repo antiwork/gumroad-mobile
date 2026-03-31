@@ -9,10 +9,16 @@ import { Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useCSSVariable } from "uniwind";
 import { setupPlayer } from "../components/use-audio-player-sync";
+import { usePushNotifications } from "../components/use-push-notifications";
 import { AuthProvider } from "../lib/auth-context";
 import { QueryProvider } from "../lib/query-client";
 import { Sentry, navigationIntegration } from "../lib/sentry";
 import "./global.css";
+
+const PushNotificationRegistrar = () => {
+  usePushNotifications();
+  return null;
+};
 
 const ForceUpdateGuard = () => {
   const { updateRequirement } = useMinimumVersion();
@@ -50,6 +56,7 @@ const RootLayout = () => {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: background as string }}>
       <QueryProvider>
         <AuthProvider>
+          <PushNotificationRegistrar />
           <ForceUpdateGuard />
           <Stack
             screenOptions={{

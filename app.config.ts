@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
-      UIBackgroundModes: ["audio"],
+      UIBackgroundModes: ["audio", "remote-notification"],
       ITSAppUsesNonExemptEncryption: false,
       UIDesignRequiresCompatibility: true,
     },
