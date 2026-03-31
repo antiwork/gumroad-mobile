@@ -4,11 +4,18 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import TrackPlayer, { State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
+import TrackPlayer, {
+  RepeatMode,
+  State,
+  useActiveTrack,
+  usePlaybackState,
+  useProgress,
+} from "react-native-track-player";
 import * as SecureStore from "expo-secure-store";
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2, 0.5];
 const PLAYBACK_SPEED_KEY = "audio_playback_speed";
+const LOOP_ENABLED_KEY = "audio_loop_enabled";
 
 export const getStoredPlaybackSpeed = async () => {
   const stored = await SecureStore.getItemAsync(PLAYBACK_SPEED_KEY);
@@ -19,6 +26,13 @@ export const getStoredPlaybackSpeed = async () => {
 };
 
 const setStoredPlaybackSpeed = (speed: number) => SecureStore.setItemAsync(PLAYBACK_SPEED_KEY, speed.toString());
+
+export const getStoredLoopEnabled = async () => {
+  const stored = await SecureStore.getItemAsync(LOOP_ENABLED_KEY);
+  return stored !== "false";
+};
+
+const setStoredLoopEnabled = (enabled: boolean) => SecureStore.setItemAsync(LOOP_ENABLED_KEY, enabled.toString());
 
 const formatTime = (seconds: number) => {
   const hrs = Math.floor(seconds / 3600);
@@ -34,6 +48,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   const { position, duration } = useProgress();
   const { top, bottom } = useSafeAreaInsets();
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [loopEnabled, setLoopEnabled] = useState(true);
   const [queueLength, setQueueLength] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -49,11 +64,13 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   }, [visible, activeTrack?.url, updateQueueState]);
 
   useEffect(() => {
-    const loadSpeed = async () => {
+    const loadSettings = async () => {
       const speed = await TrackPlayer.getRate();
       if (PLAYBACK_SPEEDS.includes(speed)) setPlaybackSpeed(speed);
+      const loop = await getStoredLoopEnabled();
+      setLoopEnabled(loop);
     };
-    if (visible) loadSpeed();
+    if (visible) loadSettings();
   }, [visible]);
 
   const isPlaying = playbackState.state === State.Playing;
@@ -92,6 +109,13 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     setPlaybackSpeed(newSpeed);
     await TrackPlayer.setRate(newSpeed);
     await setStoredPlaybackSpeed(newSpeed);
+  };
+
+  const handleToggleLoop = async () => {
+    const newValue = !loopEnabled;
+    setLoopEnabled(newValue);
+    await TrackPlayer.setRepeatMode(newValue ? RepeatMode.Queue : RepeatMode.Off);
+    await setStoredLoopEnabled(newValue);
   };
 
   const handlePreviousTrack = async () => {
@@ -223,9 +247,16 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             </TouchableOpacity>
           </View>
 
-          <View className="flex-row items-center justify-center">
+          <View className="flex-row items-center justify-center gap-6">
             <TouchableOpacity onPress={handleCycleSpeed} className="h-10 min-w-16 items-center justify-center px-3">
               <Text className="font-bold text-foreground">{playbackSpeed}x</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleToggleLoop}
+              className="h-10 min-w-16 flex-row items-center justify-center gap-2 px-3"
+            >
+              <LineIcon name="repeat-alt-2" size={22} className={loopEnabled ? "text-accent" : "text-foreground"} />
+              {!loopEnabled && <Text>Off</Text>}
             </TouchableOpacity>
           </View>
         </View>
