@@ -166,10 +166,9 @@ export const useInstallment = (
   const { data } = useQuery<InstallmentResponse>({
     queryKey: ["installment", installmentId, query],
     queryFn: () =>
-      requestAPI<InstallmentResponse>(
-        `mobile/installments/${installmentId}${query ? `?${query}` : ""}`,
-        { accessToken: assertDefined(accessToken) },
-      ),
+      requestAPI<InstallmentResponse>(`mobile/installments/${installmentId}${query ? `?${query}` : ""}`, {
+        accessToken: assertDefined(accessToken),
+      }),
     enabled: !!accessToken && !!installmentId,
   });
 
