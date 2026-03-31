@@ -4,7 +4,13 @@ import { Text } from "@/components/ui/text";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import TrackPlayer, { RepeatMode, State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
+import TrackPlayer, {
+  RepeatMode,
+  State,
+  useActiveTrack,
+  usePlaybackState,
+  useProgress,
+} from "react-native-track-player";
 import * as SecureStore from "expo-secure-store";
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2, 0.5];
@@ -245,8 +251,12 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             <TouchableOpacity onPress={handleCycleSpeed} className="h-10 min-w-16 items-center justify-center px-3">
               <Text className="font-bold text-foreground">{playbackSpeed}x</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleToggleLoop} className="h-10 min-w-16 items-center justify-center px-3">
-              <LineIcon name="repeat" size={22} className={loopEnabled ? "text-primary" : "text-muted-foreground"} />
+            <TouchableOpacity
+              onPress={handleToggleLoop}
+              className="h-10 min-w-16 flex-row items-center justify-center gap-2 px-3"
+            >
+              <LineIcon name="repeat-alt-2" size={22} className={loopEnabled ? "text-accent" : "text-foreground"} />
+              {!loopEnabled && <Text>Off</Text>}
             </TouchableOpacity>
           </View>
         </View>
