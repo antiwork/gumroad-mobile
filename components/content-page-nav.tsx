@@ -31,8 +31,9 @@ export const ContentPageNav = ({
   onPageChange: (index: number) => void;
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const hasPrevious = activePageIndex > 0;
-  const hasNext = activePageIndex < pages.length - 1;
+  const safeIndex = Math.max(0, Math.min(activePageIndex, pages.length - 1));
+  const hasPrevious = safeIndex > 0;
+  const hasNext = safeIndex < pages.length - 1;
 
   return (
     <>
@@ -40,12 +41,12 @@ export const ContentPageNav = ({
         <Pressable onPress={() => setSheetOpen(true)} className="flex-1 flex-row items-center gap-1.5 px-4 py-3">
           <LineIcon name="list-ul" size={18} className="text-foreground" />
           <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
-            {pages[activePageIndex].title}
+            {pages[safeIndex]?.title ?? "Untitled"}
           </Text>
         </Pressable>
 
         <Pressable
-          onPress={() => onPageChange(activePageIndex - 1)}
+          onPress={() => onPageChange(safeIndex - 1)}
           disabled={!hasPrevious}
           className={cn("flex-row items-center gap-1 px-4 py-3", !hasPrevious && "opacity-50")}
         >
@@ -54,7 +55,7 @@ export const ContentPageNav = ({
         </Pressable>
 
         <Pressable
-          onPress={() => onPageChange(activePageIndex + 1)}
+          onPress={() => onPageChange(safeIndex + 1)}
           disabled={!hasNext}
           className={cn("flex-row items-center gap-1 px-4 py-3", !hasNext && "opacity-50")}
         >
@@ -72,7 +73,7 @@ export const ContentPageNav = ({
             data={pages}
             keyExtractor={(item) => item.page_id}
             renderItem={({ item, index }) => {
-              const isActive = index === activePageIndex;
+              const isActive = index === safeIndex;
               return (
                 <Pressable
                   onPress={() => {

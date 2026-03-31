@@ -54,6 +54,16 @@ describe("ContentPageNav", () => {
     expect(screen.getByText("Untitled")).toBeTruthy();
   });
 
+  it("clamps out-of-bounds activePageIndex to last page", () => {
+    render(<ContentPageNav pages={makePages(3)} activePageIndex={10} onPageChange={onPageChange} />);
+    expect(screen.getByText("Page 3")).toBeTruthy();
+  });
+
+  it("clamps negative activePageIndex to first page", () => {
+    render(<ContentPageNav pages={makePages(3)} activePageIndex={-5} onPageChange={onPageChange} />);
+    expect(screen.getByText("Page 1")).toBeTruthy();
+  });
+
   it("calls onPageChange when a page is selected in the sheet", () => {
     render(<ContentPageNav pages={makePages(3)} activePageIndex={0} onPageChange={onPageChange} />);
     fireEvent.press(screen.getByText("Page 1"));

@@ -103,8 +103,9 @@ export default function DownloadScreen() {
       console.info("WebView message received:", message);
 
       if (message.type === "tocData") {
-        setTocPages(message.payload.pages);
-        setActivePageIndex(message.payload.activePageIndex);
+        const pages = message.payload.pages;
+        setTocPages(pages);
+        setActivePageIndex(Math.min(message.payload.activePageIndex, Math.max(pages.length - 1, 0)));
         return;
       }
 
