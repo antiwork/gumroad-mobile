@@ -17,6 +17,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       UIBackgroundModes: ["audio"],
       ITSAppUsesNonExemptEncryption: false,
       UIDesignRequiresCompatibility: true,
+      NSPhotoLibraryAddUsageDescription:
+        "Gumroad needs access to save files to your photo library when you choose to download content.",
     },
   },
   android: {
