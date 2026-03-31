@@ -49,7 +49,9 @@ const fetchCreatorStatus = async (token: string): Promise<boolean> => {
   }
 };
 
-const refreshAccessToken = async (storedRefreshToken: string): Promise<{ access_token: string; refresh_token?: string }> =>
+const refreshAccessToken = async (
+  storedRefreshToken: string,
+): Promise<{ access_token: string; refresh_token?: string }> =>
   request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
     method: "POST",
     data: {
@@ -97,7 +99,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 try {
                   const tokenResponse = await refreshAccessToken(storedRefreshToken);
                   await SecureStore.setItemAsync(accessTokenKey, tokenResponse.access_token);
-                  if (tokenResponse.refresh_token) await SecureStore.setItemAsync(refreshTokenKey, tokenResponse.refresh_token);
+                  if (tokenResponse.refresh_token)
+                    await SecureStore.setItemAsync(refreshTokenKey, tokenResponse.refresh_token);
                   setAccessToken(tokenResponse.access_token);
                   const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
                   setIsCreator(creatorStatus);

@@ -48,8 +48,7 @@ import * as Sentry from "@sentry/react-native";
 import { UnauthorizedError } from "@/lib/request";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 
-const wrapper = ({ children }: { children: React.ReactNode }) =>
-  React.createElement(AuthProvider, null, children);
+const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(AuthProvider, null, children);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -64,9 +63,7 @@ describe("fetchCreatorStatus", () => {
     renderHook(() => useAuth(), { wrapper });
 
     await waitFor(() => {
-      expect(Sentry.captureException).not.toHaveBeenCalledWith(
-        expect.objectContaining({ name: "UnauthorizedError" }),
-      );
+      expect(Sentry.captureException).not.toHaveBeenCalledWith(expect.objectContaining({ name: "UnauthorizedError" }));
     });
   });
 
@@ -85,9 +82,7 @@ describe("fetchCreatorStatus", () => {
 
 describe("loadStoredAuth with expired token", () => {
   it("refreshes the token when fetchCreatorStatus returns UnauthorizedError", async () => {
-    mockGetItemAsync
-      .mockResolvedValueOnce("expired-token")
-      .mockResolvedValueOnce("stored-refresh-token");
+    mockGetItemAsync.mockResolvedValueOnce("expired-token").mockResolvedValueOnce("stored-refresh-token");
 
     mockRequest
       .mockRejectedValueOnce(new UnauthorizedError("Unauthorized"))
@@ -107,9 +102,7 @@ describe("loadStoredAuth with expired token", () => {
   });
 
   it("clears tokens when refresh also fails", async () => {
-    mockGetItemAsync
-      .mockResolvedValueOnce("expired-token")
-      .mockResolvedValueOnce("stored-refresh-token");
+    mockGetItemAsync.mockResolvedValueOnce("expired-token").mockResolvedValueOnce("stored-refresh-token");
 
     mockRequest
       .mockRejectedValueOnce(new UnauthorizedError("Unauthorized"))
@@ -127,9 +120,7 @@ describe("loadStoredAuth with expired token", () => {
   });
 
   it("clears access token when no refresh token is available", async () => {
-    mockGetItemAsync
-      .mockResolvedValueOnce("expired-token")
-      .mockResolvedValueOnce(null);
+    mockGetItemAsync.mockResolvedValueOnce("expired-token").mockResolvedValueOnce(null);
 
     mockRequest.mockRejectedValueOnce(new UnauthorizedError("Unauthorized"));
 
