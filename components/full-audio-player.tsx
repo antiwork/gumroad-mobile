@@ -95,12 +95,16 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   };
 
   const handlePreviousTrack = async () => {
-    await TrackPlayer.skipToPrevious();
+    try {
+      await TrackPlayer.skipToPrevious();
+    } catch {}
     await updateQueueState();
   };
 
   const handleNextTrack = async () => {
-    await TrackPlayer.skipToNext();
+    try {
+      await TrackPlayer.skipToNext();
+    } catch {}
     await updateQueueState();
   };
 
