@@ -3,6 +3,9 @@ import { playbackService } from "./components/track-player-service";
 
 TrackPlayer.registerPlaybackService(() => playbackService);
 
-// Start the app after registering the playback service (needs to be done before running any app code on Android)
+// Register Android widget task handler
+import "./components/revenue-widget-android-handler";
+
+// Start the app after registering services (needs to be done before running any app code on Android)
 // eslint-disable-next-line import/first
 import "expo-router/entry";

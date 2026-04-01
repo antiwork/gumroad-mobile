@@ -94,6 +94,27 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     [
+      "react-native-android-widget",
+      {
+        fonts: [
+          "./assets/fonts/ABCFavorit-Regular-custom.ttf",
+          "./assets/fonts/ABCFavorit-Bold-custom.ttf",
+        ],
+        widgets: [
+          {
+            name: "RevenueWidget",
+            label: "Gumroad",
+            description: "Revenue totals",
+            minWidth: "180dp",
+            minHeight: "180dp",
+            targetCellWidth: 2,
+            targetCellHeight: 2,
+            updatePeriodMillis: 1800000,
+          },
+        ],
+      },
+    ],
+    [
       "@sentry/react-native/expo",
       {
         organization: process.env.SENTRY_ORG,

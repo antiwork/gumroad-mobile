@@ -1,8 +1,7 @@
-import RevenueWidget from "@/components/revenue-widget";
-import { env } from "@/lib/env";
 import { buildApiUrl, request, useAPIRequest } from "@/lib/request";
 import { useAuth } from "@/lib/auth-context";
 import { useEffect } from "react";
+import { Platform } from "react-native";
 import * as BackgroundFetch from "expo-background-fetch";
 import * as TaskManager from "expo-task-manager";
 import * as SecureStore from "expo-secure-store";
@@ -16,8 +15,48 @@ interface RevenueTotalsResponse {
   year: { formatted_revenue: string };
 }
 
+type WidgetData = {
+  today: string;
+  week: string;
+  month: string;
+  year: string;
+  isLoggedIn: boolean;
+  hasError: boolean;
+};
+
+const updateIOSWidget = async (data: WidgetData) => {
+  const { default: RevenueWidget } = await import("@/components/revenue-widget");
+  RevenueWidget.updateSnapshot(data);
+};
+
+const updateAndroidWidget = async (data: WidgetData) => {
+  const { requestWidgetUpdate } = await import("react-native-android-widget");
+  const { RevenueWidgetAndroid } = await import("@/components/revenue-widget-android");
+  await requestWidgetUpdate({
+    widgetName: "RevenueWidget",
+    renderWidget: () => (
+      <RevenueWidgetAndroid
+        today={data.today}
+        week={data.week}
+        month={data.month}
+        year={data.year}
+        isLoggedIn={data.isLoggedIn}
+        hasError={data.hasError}
+      />
+    ),
+  });
+};
+
+const updateWidget = (data: WidgetData) => {
+  if (Platform.OS === "ios") {
+    updateIOSWidget(data);
+  } else if (Platform.OS === "android") {
+    updateAndroidWidget(data);
+  }
+};
+
 const updateWidgetWithData = (data: RevenueTotalsResponse) => {
-  RevenueWidget.updateSnapshot({
+  updateWidget({
     today: data.day.formatted_revenue,
     week: data.week.formatted_revenue,
     month: data.month.formatted_revenue,
@@ -28,25 +67,11 @@ const updateWidgetWithData = (data: RevenueTotalsResponse) => {
 };
 
 const updateWidgetLoggedOut = () => {
-  RevenueWidget.updateSnapshot({
-    today: "",
-    week: "",
-    month: "",
-    year: "",
-    isLoggedIn: false,
-    hasError: false,
-  });
+  updateWidget({ today: "", week: "", month: "", year: "", isLoggedIn: false, hasError: false });
 };
 
 const updateWidgetError = () => {
-  RevenueWidget.updateSnapshot({
-    today: "",
-    week: "",
-    month: "",
-    year: "",
-    isLoggedIn: true,
-    hasError: true,
-  });
+  updateWidget({ today: "", week: "", month: "", year: "", isLoggedIn: true, hasError: true });
 };
 
 const fetchRevenueTotals = async (accessToken: string) => {
@@ -74,6 +99,8 @@ TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
 });
 
 const registerBackgroundFetch = async () => {
+  if (Platform.OS !== "ios") return;
+
   const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_FETCH_TASK);
   if (isRegistered) return;
 

@@ -76,6 +76,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-android-widget": "^0.20.1",
     "react-native-blob-util": "^0.24.6",
     "react-native-css": "^3.0.1",
     "react-native-drawer-layout": "^4.2.1",
