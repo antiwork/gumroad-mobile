@@ -2,7 +2,6 @@ import { useAuth } from "@/lib/auth-context";
 import { requestAPI } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import * as Application from "expo-application";
-import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -20,7 +19,7 @@ Notifications.setNotificationHandler({
 
 const registerDeviceToken = async (expoPushToken: string, accessToken: string) => {
   const appVersion = Application.nativeApplicationVersion ?? "unknown";
-  await requestAPI("/devices", {
+  await requestAPI("/mobile/devices", {
     accessToken,
     method: "POST",
     data: {
@@ -45,8 +44,15 @@ const getExpoPushToken = async () => {
 
   if (finalStatus !== "granted") return null;
 
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "Default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+    });
+  }
+
+  const tokenData = await Notifications.getDevicePushTokenAsync();
   return tokenData.data;
 };
 
