@@ -27,6 +27,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     predictiveBackGestureEnabled: false,
     package: process.env.ANDROID_BUNDLE_NAME,
+    googleServicesFile: "./google-services.json",
   },
   web: {
     output: "static",
