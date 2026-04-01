@@ -36,16 +36,10 @@ beforeEach(() => {
 });
 
 const renderWithProvider = (response: AuthSession.AuthSessionResult | null) => {
-  mockUseAuthRequest.mockReturnValue([
-    { codeVerifier: "test-verifier" },
-    response,
-    jest.fn(),
-  ]);
+  mockUseAuthRequest.mockReturnValue([{ codeVerifier: "test-verifier" }, response, jest.fn()]);
 
   return renderHook(() => ({}), {
-    wrapper: ({ children }: { children: React.ReactNode }) => (
-      <AuthProvider>{children}</AuthProvider>
-    ),
+    wrapper: ({ children }: { children: React.ReactNode }) => <AuthProvider>{children}</AuthProvider>,
   });
 };
 
@@ -54,7 +48,10 @@ describe("AuthProvider handleAuthResponse", () => {
     renderWithProvider({
       type: "error",
       errorCode: "access_denied",
-      error: { code: "access_denied", message: "The resource owner or authorization server denied the request." } as unknown as AuthSession.AuthError,
+      error: {
+        code: "access_denied",
+        message: "The resource owner or authorization server denied the request.",
+      } as unknown as AuthSession.AuthError,
       params: {},
       authentication: null,
       url: "",
