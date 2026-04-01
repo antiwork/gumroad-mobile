@@ -136,26 +136,28 @@ export default function PdfViewerScreen() {
           ),
         }}
       />
-      {pdfMounted && <Pdf
-        key={viewMode}
-        ref={pdfRef}
-        source={{ uri }}
-        style={styles.pdf}
-        trustAllCerts={false}
-        fitPolicy={0}
-        enablePaging={viewMode === "single"}
-        horizontal={viewMode === "single"}
-        page={initialPage ? Number(initialPage) : 1}
-        onLoadComplete={(numberOfPages, _path, _size, toc) => {
-          setTotalPages(numberOfPages);
-          setTableOfContents(toc ?? []);
-        }}
-        onPageChanged={(page) => setCurrentPage(page)}
-        onError={(error) => {
-          Sentry.captureException(error);
-          console.error("PDF Error:", error);
-        }}
-      />}
+      {pdfMounted && (
+        <Pdf
+          key={viewMode}
+          ref={pdfRef}
+          source={{ uri }}
+          style={styles.pdf}
+          trustAllCerts={false}
+          fitPolicy={0}
+          enablePaging={viewMode === "single"}
+          horizontal={viewMode === "single"}
+          page={initialPage ? Number(initialPage) : 1}
+          onLoadComplete={(numberOfPages, _path, _size, toc) => {
+            setTotalPages(numberOfPages);
+            setTableOfContents(toc ?? []);
+          }}
+          onPageChanged={(page) => setCurrentPage(page)}
+          onError={(error) => {
+            Sentry.captureException(error);
+            console.error("PDF Error:", error);
+          }}
+        />
+      )}
 
       <Sheet open={showTocModal} onOpenChange={setShowTocModal}>
         <SheetHeader onClose={() => setShowTocModal(false)}>
