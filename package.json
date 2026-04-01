@@ -50,6 +50,7 @@
     "expo": "^55.0.0",
     "expo-application": "~55.0.10",
     "expo-auth-session": "~55.0.10",
+    "expo-background-fetch": "~55.0.10",
     "expo-constants": "~55.0.9",
     "expo-crypto": "~55.0.10",
     "expo-dev-client": "~55.0.19",

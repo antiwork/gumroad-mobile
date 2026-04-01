@@ -93,19 +93,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "react-native-android-widget",
       {
-        fonts: [
-          "./assets/fonts/ABCFavorit-Regular-custom.ttf",
-          "./assets/fonts/ABCFavorit-Bold-custom.ttf",
-        ],
+        fonts: ["./assets/fonts/ABCFavorit-Regular-custom.ttf", "./assets/fonts/ABCFavorit-Bold-custom.ttf"],
         widgets: [
           {
             name: "RevenueWidget",
             label: "Gumroad",
             description: "Revenue totals",
-            minWidth: "180dp",
-            minHeight: "180dp",
+            previewImage: "./assets/images/widget-preview.png",
+            minWidth: "110dp",
+            minHeight: "110dp",
             targetCellWidth: 2,
             targetCellHeight: 2,
+            resizeMode: "horizontal|vertical",
             updatePeriodMillis: 1800000,
           },
         ],

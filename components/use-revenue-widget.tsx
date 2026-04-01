@@ -1,3 +1,5 @@
+"use no memo";
+
 import { buildApiUrl, request, useAPIRequest } from "@/lib/request";
 import { useAuth } from "@/lib/auth-context";
 import { useEffect } from "react";

@@ -1,3 +1,5 @@
+"use no memo";
+
 import { buildApiUrl, request } from "@/lib/request";
 import * as SecureStore from "expo-secure-store";
 import { registerWidgetTaskHandler, type WidgetTaskHandlerProps } from "react-native-android-widget";
