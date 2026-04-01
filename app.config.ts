@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
-      UIBackgroundModes: ["audio", "remote-notification"],
+      UIBackgroundModes: ["audio", "remote-notification", "fetch"],
       ITSAppUsesNonExemptEncryption: false,
       UIDesignRequiresCompatibility: true,
     },
@@ -79,6 +79,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-web-browser",
     "expo-video",
+    [
+      "expo-widgets",
+      {
+        widgets: [
+          {
+            name: "RevenueWidget",
+            displayName: "Gumroad",
+            description: "Revenue totals",
+            contentMarginsDisabled: true,
+            supportedFamilies: ["systemSmall"],
+          },
+        ],
+      },
+    ],
     [
       "@sentry/react-native/expo",
       {

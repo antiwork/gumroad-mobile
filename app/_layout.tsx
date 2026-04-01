@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useCSSVariable } from "uniwind";
 import { setupPlayer } from "../components/use-audio-player-sync";
 import { usePushNotifications } from "../components/use-push-notifications";
+import { useRevenueWidget } from "../components/use-revenue-widget";
 import { AuthProvider } from "../lib/auth-context";
 import { QueryProvider } from "../lib/query-client";
 import { Sentry, navigationIntegration } from "../lib/sentry";
@@ -17,6 +18,11 @@ import "./global.css";
 
 const PushNotificationRegistrar = () => {
   usePushNotifications();
+  return null;
+};
+
+const RevenueWidgetUpdater = () => {
+  useRevenueWidget();
   return null;
 };
 
@@ -57,6 +63,7 @@ const RootLayout = () => {
       <QueryProvider>
         <AuthProvider>
           <PushNotificationRegistrar />
+          <RevenueWidgetUpdater />
           <ForceUpdateGuard />
           <Stack
             screenOptions={{
