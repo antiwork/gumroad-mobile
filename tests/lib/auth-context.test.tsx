@@ -53,7 +53,10 @@ describe("AuthProvider handleAuthResponse", () => {
   it("does not report access_denied errors to Sentry", async () => {
     renderWithProvider({
       type: "error",
+      errorCode: "access_denied",
       error: { code: "access_denied", message: "The resource owner or authorization server denied the request." } as unknown as AuthSession.AuthError,
+      params: {},
+      authentication: null,
       url: "",
     });
 
@@ -67,7 +70,10 @@ describe("AuthProvider handleAuthResponse", () => {
 
     renderWithProvider({
       type: "error",
+      errorCode: "server_error",
       error: serverError,
+      params: {},
+      authentication: null,
       url: "",
     });
 
