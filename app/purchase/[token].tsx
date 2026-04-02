@@ -120,7 +120,7 @@ export default function DownloadScreen() {
           pathname: "/post/[id]",
           params: {
             id: message.payload.resourceId,
-            urlRedirectToken: token,
+            purchaseId: purchase?.purchase_id,
           },
         });
         return;

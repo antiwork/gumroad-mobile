@@ -117,7 +117,7 @@ export default function VideoPlayerScreen() {
           headerTintColor: "#fff",
         }}
       />
-      <VideoView style={styles.video} player={player} allowsFullscreen allowsPictureInPicture />
+      <VideoView style={styles.video} player={player} allowsPictureInPicture fullscreenOptions={{ enable: true }} />
     </View>
   );
 }

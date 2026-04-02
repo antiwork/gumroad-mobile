@@ -1,5 +1,5 @@
 import { LineIcon } from "@/components/icon";
-import { usePost } from "@/components/library/use-purchases";
+import { useInstallment } from "@/components/library/use-purchases";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledImage } from "@/components/styled";
 import { Button } from "@/components/ui/button";
@@ -32,11 +32,13 @@ const downloadFile = (urlRedirectToken: string, productFileId: string) =>
   );
 
 export default function PostScreen() {
-  const { id, urlRedirectToken } = useLocalSearchParams<{
+  const { id, purchaseId, subscriptionId, followerId } = useLocalSearchParams<{
     id: string;
-    urlRedirectToken: string;
+    purchaseId?: string;
+    subscriptionId?: string;
+    followerId?: string;
   }>();
-  const post = usePost(urlRedirectToken, id);
+  const post = useInstallment(id, { purchaseId, subscriptionId, followerId });
   const { bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [bodyHeight, setBodyHeight] = useState(0);
@@ -67,7 +69,8 @@ export default function PostScreen() {
   const handleFileDownload = async (fileId: string) => {
     try {
       setDownloadingFileId(fileId);
-      const downloadedFile = await downloadFile(urlRedirectToken, fileId);
+      if (!post?.url_redirect_external_id) throw new Error("Missing URL redirect token");
+      const downloadedFile = await downloadFile(post.url_redirect_external_id, fileId);
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) throw new Error("Sharing is not available on this device");
       await Sharing.shareAsync(downloadedFile.uri);

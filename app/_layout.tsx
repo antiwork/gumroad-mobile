@@ -1,18 +1,29 @@
 import { ForceUpdateScreen } from "@/components/force-update-screen";
 import { useMinimumVersion } from "@/components/use-minimum-version";
-import * as NavigationBar from "expo-navigation-bar";
 import { PortalHost } from "@rn-primitives/portal";
 import { useNavigationContainerRef, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useCSSVariable } from "uniwind";
 import { setupPlayer } from "../components/use-audio-player-sync";
+import { usePushNotifications } from "../components/use-push-notifications";
+import { useRevenueWidget } from "@/components/use-revenue-widget";
 import { AuthProvider } from "../lib/auth-context";
 import { QueryProvider } from "../lib/query-client";
 import { Sentry, navigationIntegration } from "../lib/sentry";
 import "./global.css";
+
+const PushNotificationRegistrar = () => {
+  usePushNotifications();
+  return null;
+};
+
+const RevenueWidgetUpdater = () => {
+  useRevenueWidget();
+  return null;
+};
 
 const ForceUpdateGuard = () => {
   const { updateRequirement } = useMinimumVersion();
@@ -35,12 +46,6 @@ const RootLayout = () => {
   }, [ref]);
 
   useEffect(() => {
-    if (Platform.OS === "android") {
-      NavigationBar.setBackgroundColorAsync(background as string);
-    }
-  }, [background]);
-
-  useEffect(() => {
     setupPlayer().catch((error) => {
       console.error("Failed to setup player:", error);
     });
@@ -50,6 +55,8 @@ const RootLayout = () => {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: background as string }}>
       <QueryProvider>
         <AuthProvider>
+          <PushNotificationRegistrar />
+          <RevenueWidgetUpdater />
           <ForceUpdateGuard />
           <Stack
             screenOptions={{
