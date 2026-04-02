@@ -131,6 +131,8 @@ export const useRevenueWidget = () => {
     refetchInterval: 5 * 60 * 1000,
   });
 
+  console.log("useRevenueWidget");
+
   useEffect(() => {
     if (isAuthLoading) return;
 
@@ -138,6 +140,7 @@ export const useRevenueWidget = () => {
       updateWidgetLoggedOut();
       return;
     }
+    console.log("updating widget", data, error);
 
     if (data) {
       updateWidgetWithData(data);
