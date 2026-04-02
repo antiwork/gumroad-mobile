@@ -1,7 +1,7 @@
 import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
-import { request } from "@/lib/request";
+import { request, UnauthorizedError } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
@@ -42,8 +42,15 @@ const fetchCreatorStatus = async (token: string): Promise<boolean> => {
     });
     return (response.products?.length ?? 0) > 0;
   } catch (e) {
-    Sentry.captureException(e);
-    console.error(e);
+    // UnauthorizedError (401) is expected here: we updated the required token
+    // scopes, so older tokens may lack access to this endpoint. This is a
+    // normal auth-refresh path, not a bug worth reporting to Sentry.
+    if (e instanceof UnauthorizedError) {
+      console.warn(e);
+    } else {
+      Sentry.captureException(e);
+      console.error(e);
+    }
     return false;
   }
 };
