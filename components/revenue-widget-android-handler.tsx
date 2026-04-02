@@ -16,9 +16,7 @@ const renderRevenueWidget = async () => {
   const accessToken = await SecureStore.getItemAsync("gumroad_access_token");
 
   if (!accessToken) {
-    return (
-      <RevenueWidgetAndroid today="" week="" month="" year="" isLoggedIn={false} hasError={false} />
-    );
+    return <RevenueWidgetAndroid today="" week="" month="" year="" isLoggedIn={false} hasError={false} />;
   }
 
   try {
@@ -38,9 +36,7 @@ const renderRevenueWidget = async () => {
       />
     );
   } catch {
-    return (
-      <RevenueWidgetAndroid today="" week="" month="" year="" isLoggedIn={true} hasError={true} />
-    );
+    return <RevenueWidgetAndroid today="" week="" month="" year="" isLoggedIn={true} hasError={true} />;
   }
 };
 

@@ -6,10 +6,7 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="81" height="81"
 
 const RevenueRow = ({ label, value }: { label: string; value: string }) => (
   <FlexWidget style={{ flexDirection: "row", width: "match_parent" }}>
-    <TextWidget
-      text={label}
-      style={{ fontSize: 13, fontFamily: "ABCFavorit-Regular-custom", color: "#999999" }}
-    />
+    <TextWidget text={label} style={{ fontSize: 13, fontFamily: "ABCFavorit-Regular-custom", color: "#999999" }} />
     <FlexWidget style={{ flex: 1 }} />
     <TextWidget
       text={value}
