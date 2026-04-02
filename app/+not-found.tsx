@@ -11,7 +11,7 @@ export default function NotFoundScreen() {
     <Screen>
       <View className="flex-1 items-center justify-center gap-6 px-6">
         <Text variant="h2">Page not found</Text>
-        <Text variant="muted">The page you're looking for doesn't exist.</Text>
+        <Text variant="muted">The page you&apos;re looking for doesn&apos;t exist.</Text>
         <Button variant="accent" onPress={() => router.back()}>
           <Text>Go back</Text>
         </Button>
