@@ -17,9 +17,6 @@ jest.mock("expo-web-browser", () => ({
 jest.mock("expo-router", () => ({
   useRouter: () => ({ replace: jest.fn() }),
 }));
-jest.mock("@/lib/assert", () => ({
-  assertDefined: <T,>(value: T) => value,
-}));
 jest.mock("@/lib/request", () => ({
   request: jest.fn(),
 }));
