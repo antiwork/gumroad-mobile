@@ -33,6 +33,7 @@ export const RevenueWidgetAndroid = ({
   if (!isLoggedIn) {
     return (
       <FlexWidget
+        clickAction="OPEN_APP"
         style={{
           width: "match_parent",
           height: "match_parent",
@@ -54,6 +55,7 @@ export const RevenueWidgetAndroid = ({
   if (hasError) {
     return (
       <FlexWidget
+        clickAction="OPEN_APP"
         style={{
           width: "match_parent",
           height: "match_parent",
@@ -74,6 +76,7 @@ export const RevenueWidgetAndroid = ({
 
   return (
     <FlexWidget
+      clickAction="OPEN_APP"
       style={{
         width: "match_parent",
         height: "match_parent",
