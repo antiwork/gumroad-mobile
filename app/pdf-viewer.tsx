@@ -45,6 +45,8 @@ export default function PdfViewerScreen() {
   const [showTocModal, setShowTocModal] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [pdfError, setPdfError] = useState(false);
+  const [pdfKey, setPdfKey] = useState(0);
 
   useEffect(
     () => () => {
@@ -114,26 +116,44 @@ export default function PdfViewerScreen() {
           ),
         }}
       />
-      <Pdf
-        key={viewMode}
-        ref={pdfRef}
-        source={{ uri }}
-        style={styles.pdf}
-        trustAllCerts={false}
-        fitPolicy={0}
-        enablePaging={viewMode === "single"}
-        horizontal={viewMode === "single"}
-        page={initialPage ? Number(initialPage) : 1}
-        onLoadComplete={(numberOfPages, _path, _size, toc) => {
-          setTotalPages(numberOfPages);
-          setTableOfContents(toc ?? []);
-        }}
-        onPageChanged={(page) => setCurrentPage(page)}
-        onError={(error) => {
-          Sentry.captureException(error);
-          console.error("PDF Error:", error);
-        }}
-      />
+      {pdfError ? (
+        <View className="flex-1 items-center justify-center gap-4 px-8">
+          <Text className="text-center text-lg text-foreground">
+            Unable to load this PDF. The file may be temporarily unavailable.
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setPdfError(false);
+              setPdfKey((k) => k + 1);
+            }}
+            className="rounded-lg bg-accent px-6 py-3"
+          >
+            <Text className="text-base font-semibold text-white">Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <Pdf
+          key={`${viewMode}-${pdfKey}`}
+          ref={pdfRef}
+          source={{ uri }}
+          style={styles.pdf}
+          trustAllCerts={false}
+          fitPolicy={0}
+          enablePaging={viewMode === "single"}
+          horizontal={viewMode === "single"}
+          page={initialPage ? Number(initialPage) : 1}
+          onLoadComplete={(numberOfPages, _path, _size, toc) => {
+            setTotalPages(numberOfPages);
+            setTableOfContents(toc ?? []);
+          }}
+          onPageChanged={(page) => setCurrentPage(page)}
+          onError={(error) => {
+            Sentry.captureException(error);
+            console.error("PDF Error:", error);
+            setPdfError(true);
+          }}
+        />
+      )}
 
       <Sheet open={showTocModal} onOpenChange={setShowTocModal}>
         <SheetHeader onClose={() => setShowTocModal(false)}>
