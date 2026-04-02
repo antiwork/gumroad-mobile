@@ -42,6 +42,9 @@ const fetchCreatorStatus = async (token: string): Promise<boolean> => {
     });
     return (response.products?.length ?? 0) > 0;
   } catch (e) {
+    // UnauthorizedError (401) is expected here: we updated the required token
+    // scopes, so older tokens may lack access to this endpoint. This is a
+    // normal auth-refresh path, not a bug worth reporting to Sentry.
     if (e instanceof UnauthorizedError) {
       console.warn(e);
     } else {
