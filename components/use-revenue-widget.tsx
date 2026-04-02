@@ -26,8 +26,17 @@ type WidgetData = {
   hasError: boolean;
 };
 
+let iosWidgetPromise: Promise<typeof import("@/components/revenue-widget")> | null = null;
+
+const getIOSWidget = () => {
+  if (!iosWidgetPromise) {
+    iosWidgetPromise = import("@/components/revenue-widget");
+  }
+  return iosWidgetPromise;
+};
+
 const updateIOSWidget = async (data: WidgetData) => {
-  const { default: RevenueWidget } = await import("@/components/revenue-widget");
+  const { default: RevenueWidget } = await getIOSWidget();
   RevenueWidget.updateSnapshot(data);
 };
 
@@ -114,15 +123,17 @@ const registerBackgroundFetch = async () => {
 };
 
 export const useRevenueWidget = () => {
-  const { accessToken } = useAuth();
+  const { accessToken, isLoading: isAuthLoading } = useAuth();
 
-  const { data } = useAPIRequest<RevenueTotalsResponse>({
+  const { data, error } = useAPIRequest<RevenueTotalsResponse>({
     queryKey: ["revenue_totals"],
     url: "mobile/analytics/revenue_totals.json",
     refetchInterval: 5 * 60 * 1000,
   });
 
   useEffect(() => {
+    if (isAuthLoading) return;
+
     if (!accessToken) {
       updateWidgetLoggedOut();
       return;
@@ -130,10 +141,13 @@ export const useRevenueWidget = () => {
 
     if (data) {
       updateWidgetWithData(data);
+    } else if (error) {
+      updateWidgetError();
     }
-  }, [data, accessToken]);
+  }, [data, error, accessToken, isAuthLoading]);
 
   useEffect(() => {
+    if (Platform.OS === "ios") getIOSWidget();
     registerBackgroundFetch();
   }, []);
 };
