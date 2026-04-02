@@ -9,12 +9,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: "./assets/images/icon.png",
   scheme: "gumroadmobile",
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
   ios: {
     supportsTablet: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
-      UIBackgroundModes: ["audio"],
+      UIBackgroundModes: ["audio", "remote-notification"],
       ITSAppUsesNonExemptEncryption: false,
       UIDesignRequiresCompatibility: true,
     },
@@ -26,12 +25,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: process.env.ANDROID_BUNDLE_NAME,
-  },
-  androidNavigationBar: {
-    enforceContrast: false,
+    googleServicesFile: "./google-services.json",
   },
   web: {
     output: "static",
@@ -79,6 +75,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-web-browser",
     "expo-video",
+    "expo-image",
+    "expo-sharing",
     [
       "@sentry/react-native/expo",
       {

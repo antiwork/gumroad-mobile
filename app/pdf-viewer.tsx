@@ -6,7 +6,6 @@ import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { File, Paths } from "expo-file-system";
-import * as NavigationBar from "expo-navigation-bar";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -46,18 +45,6 @@ export default function PdfViewerScreen() {
   const [showTocModal, setShowTocModal] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
-
-  useEffect(() => {
-    if (Platform.OS === "android") {
-      NavigationBar.setVisibilityAsync("hidden");
-      NavigationBar.setBehaviorAsync("overlay-swipe");
-    }
-    return () => {
-      if (Platform.OS === "android") {
-        NavigationBar.setVisibilityAsync("visible");
-      }
-    };
-  }, []);
 
   useEffect(
     () => () => {
