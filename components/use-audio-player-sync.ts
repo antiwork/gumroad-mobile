@@ -2,7 +2,7 @@ import { useAuth } from "@/lib/auth-context";
 import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
 import { updateMediaLocation } from "@/lib/media-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
+import TrackPlayer, { Capability, Event, IOSCategory, IOSCategoryMode, RepeatMode, State } from "react-native-track-player";
 import type { WebView } from "react-native-webview";
 import { getStoredLoopEnabled, getStoredPlaybackSpeed } from "./full-audio-player";
 
@@ -48,7 +48,11 @@ export const withPlayerReady = <P extends object>(Component: React.ComponentType
 export const setupPlayer = async () => {
   if (isPlayerSetup) return;
 
-  await TrackPlayer.setupPlayer();
+  await TrackPlayer.setupPlayer({
+    iosCategory: IOSCategory.Playback,
+    iosCategoryMode: IOSCategoryMode.Default,
+    autoHandleInterruptions: true,
+  });
   await TrackPlayer.updateOptions({
     capabilities: [
       Capability.Play,
