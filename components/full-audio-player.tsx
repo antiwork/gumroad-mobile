@@ -1,8 +1,9 @@
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
+import { safeOpenURL } from "@/lib/open-url";
 import { useCallback, useEffect, useState } from "react";
-import { Linking, Modal, TouchableOpacity, View } from "react-native";
+import { Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrackPlayer, {
   RepeatMode,
@@ -172,7 +173,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             {activeTrack.artist && (
               <TouchableOpacity
                 disabled={!activeTrack.artistUrl}
-                onPress={() => activeTrack.artistUrl && Linking.openURL(activeTrack.artistUrl)}
+                onPress={() => activeTrack.artistUrl && safeOpenURL(activeTrack.artistUrl)}
               >
                 <Text className="mt-1 text-center text-base text-muted-foreground" numberOfLines={1}>
                   {activeTrack.artist}

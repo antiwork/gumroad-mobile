@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
+import { safeOpenURL } from "@/lib/open-url";
 import { buildApiUrl } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useRef, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { Alert, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView } from "react-native-webview";
 import { useCSSVariable } from "uniwind";
@@ -83,11 +84,11 @@ export default function PostScreen() {
   };
 
   const handleCreatorPress = () => {
-    if (post?.creator_profile_url) Linking.openURL(post.creator_profile_url);
+    if (post?.creator_profile_url) safeOpenURL(post.creator_profile_url);
   };
 
   const handleCtaPress = () => {
-    if (post?.call_to_action_url) Linking.openURL(post.call_to_action_url);
+    if (post?.call_to_action_url) safeOpenURL(post.call_to_action_url);
   };
 
   if (!post) {
