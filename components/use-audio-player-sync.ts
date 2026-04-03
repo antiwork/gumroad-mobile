@@ -2,7 +2,14 @@ import { useAuth } from "@/lib/auth-context";
 import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
 import { updateMediaLocation } from "@/lib/media-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import TrackPlayer, { Capability, Event, IOSCategory, IOSCategoryMode, RepeatMode, State } from "react-native-track-player";
+import TrackPlayer, {
+  Capability,
+  Event,
+  IOSCategory,
+  IOSCategoryMode,
+  RepeatMode,
+  State,
+} from "react-native-track-player";
 import type { WebView } from "react-native-webview";
 import { getStoredLoopEnabled, getStoredPlaybackSpeed } from "./full-audio-player";
 
