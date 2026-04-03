@@ -33,6 +33,10 @@ export const request = async <T>(
     console.info("HTTP request", details);
     throw new UnauthorizedError("Unauthorized");
   }
+  if (response.redirected && new URL(response.url).pathname === "/login") {
+    console.info("HTTP request", details);
+    throw new UnauthorizedError("Unauthorized");
+  }
   if (!response.ok) {
     const error = response.status === 404 ? "Not found" : (await response.text()).slice(0, 10000);
     console.info("HTTP request", { ...details, error });
