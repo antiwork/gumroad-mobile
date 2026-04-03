@@ -35,12 +35,15 @@ export const playbackService = async () => {
     await syncCurrentPosition();
   });
 
-  TrackPlayer.addEventListener(Event.RemoteNext, () => {
-    TrackPlayer.skipToNext();
+  TrackPlayer.addEventListener(Event.RemoteNext, async () => {
+    const queue = await TrackPlayer.getQueue();
+    const index = await TrackPlayer.getActiveTrackIndex();
+    if (index !== undefined && index < queue.length - 1) await TrackPlayer.skipToNext();
   });
 
-  TrackPlayer.addEventListener(Event.RemotePrevious, () => {
-    TrackPlayer.skipToPrevious();
+  TrackPlayer.addEventListener(Event.RemotePrevious, async () => {
+    const index = await TrackPlayer.getActiveTrackIndex();
+    if (index !== undefined && index > 0) await TrackPlayer.skipToPrevious();
   });
 
   TrackPlayer.addEventListener(Event.RemoteJumpForward, async ({ interval }) => {
