@@ -38,16 +38,12 @@ export const playbackService = async () => {
   TrackPlayer.addEventListener(Event.RemoteNext, async () => {
     const queue = await TrackPlayer.getQueue();
     const index = await TrackPlayer.getActiveTrackIndex();
-    if (index !== undefined && index < queue.length - 1) {
-      await TrackPlayer.skipToNext();
-    }
+    if (index !== undefined && index < queue.length - 1) await TrackPlayer.skipToNext();
   });
 
   TrackPlayer.addEventListener(Event.RemotePrevious, async () => {
     const index = await TrackPlayer.getActiveTrackIndex();
-    if (index !== undefined && index > 0) {
-      await TrackPlayer.skipToPrevious();
-    }
+    if (index !== undefined && index > 0) await TrackPlayer.skipToPrevious();
   });
 
   TrackPlayer.addEventListener(Event.RemoteJumpForward, async ({ interval }) => {

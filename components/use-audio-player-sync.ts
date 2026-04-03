@@ -267,9 +267,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
         const trackIndex = tracks.findIndex((t) => t.resourceId === audio.resourceId);
         if (trackIndex >= 0) {
           await TrackPlayer.skip(trackIndex);
-          if (resumeAt) {
-            await TrackPlayer.seekTo(resumeAt);
-          }
+          if (resumeAt) await TrackPlayer.seekTo(resumeAt);
         }
       }
 
