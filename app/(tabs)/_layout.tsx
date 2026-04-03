@@ -9,6 +9,7 @@ import { Text } from "@/components/ui/text";
 import { useUser } from "@/components/use-user";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
+import { safeOpenURL } from "@/lib/open-url";
 import { flushReplayBuffer } from "@/lib/sentry";
 import { showFeedbackWidget } from "@sentry/react-native";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
@@ -17,7 +18,7 @@ import Constants from "expo-constants";
 import { Tabs } from "expo-router";
 import * as Updates from "expo-updates";
 import { createContext, useContext, useRef, useState } from "react";
-import { Alert, Linking, Pressable, TouchableOpacity, View } from "react-native";
+import { Alert, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
 
 interface SearchContextValue {
@@ -105,7 +106,7 @@ const SettingsSheet = () => {
   };
 
   const handleDeleteAccount = () => {
-    Linking.openURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/settings/advanced`);
+    safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/settings/advanced`);
   };
 
   const handleSendFeedback = () => {
