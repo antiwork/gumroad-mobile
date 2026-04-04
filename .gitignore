@@ -19,6 +19,7 @@ build-*
 *.key
 *.mobileprovision
 google-services.json
+play-store-key.json
 
 # Metro
 .metro-health-check*

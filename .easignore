@@ -18,6 +18,7 @@ build-*
 *.p12
 *.key
 *.mobileprovision
+play-store-key.json
 
 # Metro
 .metro-health-check*
