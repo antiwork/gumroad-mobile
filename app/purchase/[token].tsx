@@ -190,8 +190,8 @@ export default function DownloadScreen() {
       const downloadedFile = await downloadFile(token, message.payload.resourceId);
       await shareFile(downloadedFile.uri);
     } catch (error) {
-      Sentry.captureException(error);
       console.error("Download failed:", error, data);
+      Sentry.captureException(error);
       Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
     } finally {
       setIsDownloading(false);

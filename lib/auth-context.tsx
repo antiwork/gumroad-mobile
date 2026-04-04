@@ -48,8 +48,8 @@ const fetchCreatorStatus = async (token: string): Promise<boolean> => {
     if (e instanceof UnauthorizedError) {
       console.warn(e);
     } else {
-      Sentry.captureException(e);
       console.error(e);
+      Sentry.captureException(e);
     }
     return false;
   }
@@ -93,8 +93,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (isKeychainUnavailableError(error)) {
           console.warn("Keychain unavailable (device may be locked):", error);
         } else {
-          Sentry.captureException(error);
           console.error("Failed to load stored auth:", error);
+          Sentry.captureException(error);
         }
       } finally {
         setIsLoading(false);
@@ -128,8 +128,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
         } catch (error) {
-          Sentry.captureException(error);
           console.error("Failed to exchange code for tokens:", error);
+          Sentry.captureException(error);
         } finally {
           setIsLoading(false);
         }
@@ -137,8 +137,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (response.error?.code === "access_denied" || response.error?.code === "state_mismatch") {
           console.warn("OAuth error:", response.error.code, response.error.message);
         } else {
-          Sentry.captureException(response.error);
           console.error("Auth error:", response.error);
+          Sentry.captureException(response.error);
         }
         setIsLoading(false);
       }
@@ -160,8 +160,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       queryClient.clear();
       router.replace("/login");
     } catch (error) {
-      Sentry.captureException(error);
       console.error("Failed to logout:", error);
+      Sentry.captureException(error);
     } finally {
       setIsLoading(false);
     }
@@ -186,8 +186,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.warn("Keychain unavailable (device may be locked):", error);
         return;
       }
-      Sentry.captureException(error);
       console.error("Failed to refresh token:", error);
+      Sentry.captureException(error);
       await logout();
     }
   }, [logout, storeTokens]);

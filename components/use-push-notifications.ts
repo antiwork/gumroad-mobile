@@ -69,8 +69,8 @@ export const usePushNotifications = () => {
         if (token) registerDeviceToken(token, accessToken);
       })
       .catch((error) => {
-        Sentry.captureException(error);
         console.error("Failed to register for push notifications:", error);
+        Sentry.captureException(error);
       });
   }, [isAuthenticated, accessToken]);
 

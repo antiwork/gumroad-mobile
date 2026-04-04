@@ -42,8 +42,8 @@ export default function VideoPlayerScreen() {
           setVideoUrl(uri);
         }
       } catch (error) {
-        Sentry.captureException(error);
         console.warn("Failed to fetch streaming URL, falling back to direct URL:", error);
+        Sentry.captureException(error);
         setVideoUrl(uri);
       } finally {
         setIsLoading(false);

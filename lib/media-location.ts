@@ -39,8 +39,8 @@ export const updateMediaLocation = async ({
   try {
     await requestAPI("mobile/media_locations", { method: "POST", data: body, accessToken, skipResponseBody: true });
   } catch (error) {
-    Sentry.captureException(error);
     // Log but don't throw - media location sync is non-critical
     console.warn("Failed to update media location:", error);
+    Sentry.captureException(error);
   }
 };
