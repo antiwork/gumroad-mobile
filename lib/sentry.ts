@@ -6,7 +6,9 @@ export const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: true,
 });
 
-const mobileReplay = Sentry.mobileReplayIntegration();
+const mobileReplay = Sentry.mobileReplayIntegration({
+  excludedViewClasses: ["ExpoVideo.VideoView"],
+});
 
 Sentry.init({
   dsn: env.EXPO_PUBLIC_SENTRY_DSN,
