@@ -45,6 +45,15 @@ export default function PdfViewerScreen() {
   const [showTocModal, setShowTocModal] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [pdfMounted, setPdfMounted] = useState(true);
+
+  const switchViewMode = (mode: "single" | "continuous") => {
+    // Unmount the PDF component first to let the native rendering thread finish
+    // before the document is closed, avoiding IllegalStateException: Already closed
+    setPdfMounted(false);
+    setViewMode(mode);
+    requestAnimationFrame(() => setPdfMounted(true));
+  };
 
   useEffect(
     () => () => {
@@ -114,26 +123,28 @@ export default function PdfViewerScreen() {
           ),
         }}
       />
-      <Pdf
-        key={viewMode}
-        ref={pdfRef}
-        source={{ uri }}
-        style={styles.pdf}
-        trustAllCerts={false}
-        fitPolicy={0}
-        enablePaging={viewMode === "single"}
-        horizontal={viewMode === "single"}
-        page={initialPage ? Number(initialPage) : 1}
-        onLoadComplete={(numberOfPages, _path, _size, toc) => {
-          setTotalPages(numberOfPages);
-          setTableOfContents(toc ?? []);
-        }}
-        onPageChanged={(page) => setCurrentPage(page)}
-        onError={(error) => {
-          console.error("PDF Error:", error);
-          Sentry.captureException(error);
-        }}
-      />
+      {pdfMounted && (
+        <Pdf
+          key={viewMode}
+          ref={pdfRef}
+          source={{ uri }}
+          style={styles.pdf}
+          trustAllCerts={false}
+          fitPolicy={0}
+          enablePaging={viewMode === "single"}
+          horizontal={viewMode === "single"}
+          page={initialPage ? Number(initialPage) : 1}
+          onLoadComplete={(numberOfPages, _path, _size, toc) => {
+            setTotalPages(numberOfPages);
+            setTableOfContents(toc ?? []);
+          }}
+          onPageChanged={(page) => setCurrentPage(page)}
+          onError={(error) => {
+            console.error("PDF Error:", error);
+            Sentry.captureException(error);
+          }}
+        />
+      )}
 
       <Sheet open={showTocModal} onOpenChange={setShowTocModal}>
         <SheetHeader onClose={() => setShowTocModal(false)}>
@@ -168,7 +179,7 @@ export default function PdfViewerScreen() {
         <SheetContent className="p-4">
           <TouchableOpacity
             onPress={() => {
-              setViewMode("single");
+              switchViewMode("single");
               setShowViewModeModal(false);
             }}
             className="flex-row items-center justify-between border-b border-border py-4"
@@ -181,7 +192,7 @@ export default function PdfViewerScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
-              setViewMode("continuous");
+              switchViewMode("continuous");
               setShowViewModeModal(false);
             }}
             className="flex-row items-center justify-between border-b border-border py-4"
