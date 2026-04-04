@@ -16,9 +16,7 @@ Sentry.init({
   replaysSessionSampleRate: __DEV__ ? 1 : 0,
   replaysOnErrorSampleRate: __DEV__ ? 1 : 0.1,
   beforeSend(event) {
-    const message =
-      event.exception?.values?.[0]?.value ??
-      event.exception?.values?.[0]?.type;
+    const message = event.exception?.values?.[0]?.value ?? event.exception?.values?.[0]?.type;
     if (message === "Network request failed" || message === "TypeError: Network request failed") {
       return null;
     }
