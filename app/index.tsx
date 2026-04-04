@@ -6,7 +6,7 @@ import { useEffect } from "react";
 SplashScreen.preventAutoHideAsync();
 
 export default function Index() {
-  const { isLoading, isCreator } = useAuth();
+  const { isLoading, isAuthenticated, isCreator } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
@@ -16,6 +16,10 @@ export default function Index() {
 
   if (isLoading) {
     return null;
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/login" />;
   }
 
   return <Redirect href={isCreator ? "/(tabs)/dashboard" : "/(tabs)/library"} />;
