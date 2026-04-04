@@ -2,8 +2,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
 import { Redirect } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { View } from "react-native";
 import { useUniwind } from "uniwind";
 import logoDark from "../assets/images/logo-dark.svg";
@@ -15,17 +14,6 @@ export default function LoginScreen() {
   const { isAuthenticated, isCreator, isLoading, login } = useAuth();
   const { theme } = useUniwind();
   const [isSigningIn, setIsSigningIn] = useState(false);
-
-  useEffect(() => {
-    if (isAuthenticated) return;
-
-    // Speeds up opening the browser for the auth flow on Android
-    WebBrowser.warmUpAsync().catch(() => {});
-
-    return () => {
-      WebBrowser.coolDownAsync().catch(() => {});
-    };
-  }, [isAuthenticated]);
 
   const handleLogin = useCallback(async () => {
     setIsSigningIn(true);
