@@ -16,7 +16,8 @@
     "e2e:ios:run": "maestro test -p ios -e APP_ID=$IOS_BUNDLE_NAME",
     "e2e:android": "dotenv-flow -- npm run e2e:android:run",
     "e2e:android:run": "maestro test -p android -e APP_ID=$ANDROID_BUNDLE_NAME",
-    "eas": "dotenv-flow eas --"
+    "eas": "dotenv-flow eas --",
+    "postinstall": "patch-package"
   },
   "jest": {
     "preset": "jest-expo",
@@ -71,6 +72,7 @@
     "expo-video": "~55.0.11",
     "expo-web-browser": "~55.0.10",
     "expo-widgets": "^55.0.8",
+    "patch-package": "^8.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.4",
