@@ -36,6 +36,7 @@ Update the `version` field in `app.config.ts` to today's date in `YYYY.MM.DD` fo
 ### 3. Clear build cache
 
 Run these commands:
+
 ```
 rm -rf $TMPDIR/haste-map-* $TMPDIR/metro-cache
 ```
