@@ -55,6 +55,9 @@ const fetchCreatorStatus = async (token: string): Promise<boolean> => {
   }
 };
 
+const isKeychainUnavailableError = (error: unknown): boolean =>
+  error instanceof Error && error.message.includes("User interaction is not allowed");
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -87,8 +90,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsCreator(creatorStatus);
         }
       } catch (error) {
-        Sentry.captureException(error);
-        console.error("Failed to load stored auth:", error);
+        if (isKeychainUnavailableError(error)) {
+          console.warn("Keychain unavailable (device may be locked):", error);
+        } else {
+          Sentry.captureException(error);
+          console.error("Failed to load stored auth:", error);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -175,9 +182,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
     } catch (error) {
+      if (isKeychainUnavailableError(error)) {
+        console.warn("Keychain unavailable (device may be locked):", error);
+        return;
+      }
       Sentry.captureException(error);
       console.error("Failed to refresh token:", error);
-      // If refresh fails, log the user out
       await logout();
     }
   }, [logout, storeTokens]);
