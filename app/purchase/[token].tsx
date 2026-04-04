@@ -18,6 +18,12 @@ import { Alert, Linking, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
+const WEBVIEW_ALLOWED_DOMAINS = [
+  "https://challenges.cloudflare.com/",
+  "https://connect-js.stripe.com/",
+  "https://cdn.iframe.ly/",
+];
+
 // See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
 type ClickPayload = {
   resourceId: string;
@@ -82,7 +88,7 @@ export default function DownloadScreen() {
       if (
         request.url === url ||
         request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL) ||
-        request.url.startsWith("https://challenges.cloudflare.com/") ||
+        !WEBVIEW_ALLOWED_DOMAINS.some((domain) => request.url.startsWith(domain)) ||
         !/^https?:\/\//.test(request.url)
       )
         return true;
