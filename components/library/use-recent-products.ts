@@ -52,8 +52,7 @@ export const useRecentPurchases = () => {
         { accessToken: assertDefined(accessToken) },
       );
       return [...response.purchases].sort(
-        (a, b) =>
-          purchaseIds.indexOf(a.purchase_id ?? "") - purchaseIds.indexOf(b.purchase_id ?? ""),
+        (a, b) => purchaseIds.indexOf(a.purchase_id ?? "") - purchaseIds.indexOf(b.purchase_id ?? ""),
       );
     },
     enabled: !!accessToken,
