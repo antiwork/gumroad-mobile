@@ -18,6 +18,12 @@ import { Alert, Linking, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
+const WEBVIEW_ALLOWED_DOMAINS = [
+  "https://challenges.cloudflare.com/",
+  "https://connect-js.stripe.com/",
+  "https://cdn.iframe.ly/",
+];
+
 // See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
 type ClickPayload = {
   resourceId: string;
@@ -82,7 +88,7 @@ export default function DownloadScreen() {
       if (
         request.url === url ||
         request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL) ||
-        request.url.startsWith("https://challenges.cloudflare.com/") ||
+        WEBVIEW_ALLOWED_DOMAINS.some((domain) => request.url.startsWith(domain)) ||
         !/^https?:\/\//.test(request.url)
       )
         return true;
@@ -103,8 +109,9 @@ export default function DownloadScreen() {
       console.info("WebView message received:", message);
 
       if (message.type === "tocData") {
-        setTocPages(message.payload.pages);
-        setActivePageIndex(message.payload.activePageIndex);
+        const pages = message.payload.pages;
+        setTocPages(pages);
+        setActivePageIndex(Math.min(message.payload.activePageIndex, Math.max(pages.length - 1, 0)));
         return;
       }
 
@@ -120,7 +127,7 @@ export default function DownloadScreen() {
           pathname: "/post/[id]",
           params: {
             id: message.payload.resourceId,
-            urlRedirectToken: token,
+            purchaseId: purchase?.purchase_id,
           },
         });
         return;
@@ -183,8 +190,8 @@ export default function DownloadScreen() {
       const downloadedFile = await downloadFile(token, message.payload.resourceId);
       await shareFile(downloadedFile.uri);
     } catch (error) {
-      Sentry.captureException(error);
       console.error("Download failed:", error, data);
+      Sentry.captureException(error);
       Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
     } finally {
       setIsDownloading(false);
@@ -208,6 +215,7 @@ export default function DownloadScreen() {
         className="flex-1 bg-transparent"
         webviewDebuggingEnabled
         pullToRefreshEnabled
+        incognito
         mediaPlaybackRequiresUserAction={false}
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}

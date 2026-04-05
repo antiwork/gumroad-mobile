@@ -39,7 +39,7 @@ export const useLibraryFilters = (): UseLibraryFiltersReturn => {
     return filters;
   }, [debouncedSearchText, selectedCreators, showArchivedOnly, sortBy]);
 
-  const hasActiveFilters = selectedCreators.size > 0 || showArchivedOnly;
+  const hasActiveFilters = selectedCreators.size > 0 || showArchivedOnly || searchText.length > 0;
   const isSearchPending = searchText.trim() !== debouncedSearchText;
 
   const handleCreatorToggle = (creatorId: string) => {

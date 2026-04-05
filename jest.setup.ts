@@ -20,6 +20,41 @@ jest.mock("@sentry/react-native", () => ({
   Severity: {},
 }));
 
+jest.mock("react-native-reanimated", () => {
+  const View = require("react-native").View;
+  return {
+    __esModule: true,
+    default: {
+      createAnimatedComponent: (component: unknown) => component,
+      View,
+      Text: View,
+      Image: View,
+      ScrollView: View,
+      FlatList: View,
+    },
+    useSharedValue: (v: unknown) => ({ value: v }),
+    useAnimatedStyle: (fn: () => unknown) => fn(),
+    withTiming: (v: unknown) => v,
+    withSpring: (v: unknown) => v,
+    withRepeat: (v: unknown) => v,
+    withSequence: (...args: unknown[]) => args[0],
+    withDelay: (_: unknown, v: unknown) => v,
+    Easing: { inOut: jest.fn(), in: jest.fn(), out: jest.fn(), bezier: jest.fn() },
+    FadeIn: { duration: jest.fn().mockReturnThis() },
+    FadeOut: { duration: jest.fn().mockReturnThis() },
+    SlideInDown: { duration: jest.fn().mockReturnThis() },
+    SlideOutDown: { duration: jest.fn().mockReturnThis() },
+    Layout: { duration: jest.fn().mockReturnThis() },
+    runOnJS: (fn: unknown) => fn,
+    runOnUI: (fn: unknown) => fn,
+    interpolate: jest.fn(),
+    Extrapolation: { CLAMP: "clamp" },
+    useAnimatedScrollHandler: jest.fn(),
+    useDerivedValue: (fn: () => unknown) => ({ value: fn() }),
+    createAnimatedComponent: (component: unknown) => component,
+  };
+});
+
 jest.mock("@expo/vector-icons/build/createIconSet", () => {
   const React = require("react");
   const { Text } = require("react-native");

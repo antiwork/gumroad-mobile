@@ -5,6 +5,8 @@ const config = getSentryExpoConfig(__dirname, {
   annotateReactComponents: true,
 });
 
+config.resolver.blockList = [...(config.resolver.blockList || []), /\.env\.build\.local$/];
+
 module.exports = withUniwindConfig(config, {
   cssEntryFile: "./app/global.css",
 });

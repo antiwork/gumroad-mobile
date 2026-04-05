@@ -4,19 +4,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Gumroad",
   slug: "gumroad",
-  version: "2026.03.22",
+  version: "2026.04.04",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "gumroadmobile",
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
   ios: {
     supportsTablet: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
-      UIBackgroundModes: ["audio"],
+      UIBackgroundModes: ["audio", "remote-notification", "fetch"],
       ITSAppUsesNonExemptEncryption: false,
       UIDesignRequiresCompatibility: true,
+      NSPhotoLibraryAddUsageDescription:
+        "Gumroad needs access to save files to your photo library when you choose to download content.",
     },
   },
   android: {
@@ -26,12 +27,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: process.env.ANDROID_BUNDLE_NAME,
-  },
-  androidNavigationBar: {
-    enforceContrast: false,
+    googleServicesFile: "./google-services.json",
   },
   web: {
     output: "static",
@@ -79,6 +77,42 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-web-browser",
     "expo-video",
+    "expo-image",
+    "expo-sharing",
+    [
+      "expo-widgets",
+      {
+        widgets: [
+          {
+            name: "RevenueWidget",
+            displayName: "Gumroad",
+            description: "Revenue totals",
+            contentMarginsDisabled: true,
+            supportedFamilies: ["systemSmall"],
+          },
+        ],
+      },
+    ],
+    [
+      "react-native-android-widget",
+      {
+        fonts: ["./assets/fonts/ABCFavorit-Regular-custom.ttf", "./assets/fonts/ABCFavorit-Bold-custom.ttf"],
+        widgets: [
+          {
+            name: "RevenueWidget",
+            label: "Gumroad",
+            description: "Revenue totals",
+            previewImage: "./assets/images/widget-preview.png",
+            minWidth: "110dp",
+            minHeight: "110dp",
+            targetCellWidth: 2,
+            targetCellHeight: 2,
+            resizeMode: "horizontal|vertical",
+            updatePeriodMillis: 1800000,
+          },
+        ],
+      },
+    ],
     [
       "@sentry/react-native/expo",
       {

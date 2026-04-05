@@ -1,6 +1,7 @@
 import { assertDefined } from "@/lib/assert";
+import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
-import { request } from "@/lib/request";
+import { request, UnauthorizedError } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
@@ -41,11 +42,21 @@ const fetchCreatorStatus = async (token: string): Promise<boolean> => {
     });
     return (response.products?.length ?? 0) > 0;
   } catch (e) {
-    Sentry.captureException(e);
-    console.error(e);
+    // UnauthorizedError (401) is expected here: we updated the required token
+    // scopes, so older tokens may lack access to this endpoint. This is a
+    // normal auth-refresh path, not a bug worth reporting to Sentry.
+    if (e instanceof UnauthorizedError) {
+      console.warn(e);
+    } else {
+      console.error(e);
+      Sentry.captureException(e);
+    }
     return false;
   }
 };
+
+const isKeychainUnavailableError = (error: unknown): boolean =>
+  error instanceof Error && error.message.includes("User interaction is not allowed");
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -79,8 +90,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsCreator(creatorStatus);
         }
       } catch (error) {
-        Sentry.captureException(error);
-        console.error("Failed to load stored auth:", error);
+        if (isKeychainUnavailableError(error)) {
+          console.warn("Keychain unavailable (device may be locked):", error);
+        } else {
+          console.error("Failed to load stored auth:", error);
+          Sentry.captureException(error);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -113,14 +128,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
         } catch (error) {
-          Sentry.captureException(error);
           console.error("Failed to exchange code for tokens:", error);
+          Sentry.captureException(error);
         } finally {
           setIsLoading(false);
         }
       } else if (response?.type === "error") {
-        Sentry.captureException(response.error);
-        console.error("Auth error:", response.error);
+        if (response.error?.code === "access_denied" || response.error?.code === "state_mismatch") {
+          console.warn("OAuth error:", response.error.code, response.error.message);
+        } else {
+          console.error("Auth error:", response.error);
+          Sentry.captureException(response.error);
+        }
         setIsLoading(false);
       }
     }
@@ -138,10 +157,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await SecureStore.deleteItemAsync(refreshTokenKey);
       setAccessToken(null);
       setIsCreator(false);
+      queryClient.clear();
       router.replace("/login");
     } catch (error) {
-      Sentry.captureException(error);
       console.error("Failed to logout:", error);
+      Sentry.captureException(error);
     } finally {
       setIsLoading(false);
     }
@@ -162,9 +182,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
     } catch (error) {
-      Sentry.captureException(error);
+      if (isKeychainUnavailableError(error)) {
+        console.warn("Keychain unavailable (device may be locked):", error);
+        return;
+      }
       console.error("Failed to refresh token:", error);
-      // If refresh fails, log the user out
+      Sentry.captureException(error);
       await logout();
     }
   }, [logout, storeTokens]);

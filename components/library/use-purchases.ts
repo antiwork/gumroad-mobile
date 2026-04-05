@@ -146,6 +146,35 @@ export const usePost = (urlRedirectToken: string, postExternalId: string): Post 
   );
 };
 
+interface InstallmentResponse {
+  success: boolean;
+  installment: Post;
+}
+
+export const useInstallment = (
+  installmentId: string,
+  params: { purchaseId?: string; subscriptionId?: string; followerId?: string },
+): Post | undefined => {
+  const { accessToken } = useAuth();
+
+  const queryParams = new URLSearchParams();
+  if (params.purchaseId) queryParams.set("purchase_id", params.purchaseId);
+  else if (params.subscriptionId) queryParams.set("subscription_id", params.subscriptionId);
+  else if (params.followerId) queryParams.set("follower_id", params.followerId);
+  const query = queryParams.toString();
+
+  const { data } = useQuery<InstallmentResponse>({
+    queryKey: ["installment", installmentId, query],
+    queryFn: () =>
+      requestAPI<InstallmentResponse>(`mobile/installments/${installmentId}${query ? `?${query}` : ""}`, {
+        accessToken: assertDefined(accessToken),
+      }),
+    enabled: !!accessToken && !!installmentId,
+  });
+
+  return data?.installment;
+};
+
 export const usePurchase = (url_redirect_external_id: string | undefined): Purchase | undefined => {
   const queryClient = useQueryClient();
   const { accessToken } = useAuth();

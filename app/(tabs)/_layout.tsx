@@ -89,7 +89,7 @@ const SettingsButton = () => {
   const { setSettingsOpen } = useSettingsSheet();
   return (
     <TouchableOpacity onPress={() => setSettingsOpen(true)}>
-      <SolidIcon name="cog" size={24} className="text-foreground" />
+      <SolidIcon name="cog" size={24} className="text-white" />
     </TouchableOpacity>
   );
 };
@@ -189,13 +189,8 @@ export default function TabsLayout() {
   const { isCreator } = useAuth();
   const [isSearchActive, setSearchActive] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
-  const [background, accent, muted, border] = useCSSVariable([
-    "--color-background",
-    "--color-accent",
-    "--color-muted",
-    "--color-border",
-  ]);
-  const headerTitleStyle = useResolveClassNames("font-sans text-foreground");
+  const [accent, muted, border] = useCSSVariable(["--color-accent", "--color-muted", "--color-border"]);
+  const headerTitleStyle = useResolveClassNames("font-sans text-white");
   const tabBarLabelStyle = useResolveClassNames("font-sans font-normal text-xs");
   return (
     <SearchContext.Provider value={{ isSearchActive, setSearchActive }}>
@@ -208,12 +203,12 @@ export default function TabsLayout() {
             </View>
           )}
           screenOptions={{
-            headerStyle: { backgroundColor: background as string },
+            headerStyle: { backgroundColor: "black" },
             headerShadowVisible: false,
             headerTintColor: accent as string,
             headerTitleStyle,
             tabBarStyle: {
-              backgroundColor: background as string,
+              backgroundColor: "black",
               borderTopColor: border as string,
             },
             tabBarActiveTintColor: accent as string,
