@@ -47,15 +47,22 @@ export const useRecentPurchases = () => {
     queryFn: async () => {
       const purchaseIds = await getStoredPurchaseIds();
       if (purchaseIds.length === 0) return [];
-      const response = await requestAPI<SearchResponse>(buildSearchPath(1, { purchase_ids: purchaseIds }), {
-        accessToken: assertDefined(accessToken),
-      });
+      const response = await requestAPI<SearchResponse>(
+        buildSearchPath(1, { purchase_ids: purchaseIds, archived: false }),
+        { accessToken: assertDefined(accessToken) },
+      );
       return [...response.purchases].sort(
-        (a, b) => purchaseIds.indexOf(a.purchase_id ?? "") - purchaseIds.indexOf(b.purchase_id ?? ""),
+        (a, b) =>
+          purchaseIds.indexOf(a.purchase_id ?? "") - purchaseIds.indexOf(b.purchase_id ?? ""),
       );
     },
     enabled: !!accessToken,
   });
 
-  return { purchases: query.data ?? [], refresh: query.refetch, refetch: query.refetch, isLoading: query.isLoading };
+  return {
+    purchases: query.data ?? [],
+    refresh: query.refetch,
+    refetch: query.refetch,
+    isLoading: query.isLoading,
+  };
 };
