@@ -237,6 +237,7 @@ export default function Index() {
                         },
                       })
                     }
+                    onLongPress={() => {}}
                     className={cn("flex-row items-center gap-4", isFilterLoading && "opacity-50")}
                   >
                     {item.thumbnail_url ? (
