@@ -6,7 +6,7 @@ import { Text } from "@/components/ui/text";
 import { useOTAUpdate } from "@/components/use-ota-update";
 import { type UpdateRequirement } from "@/components/use-minimum-version";
 import Constants from "expo-constants";
-import * as Linking from "expo-linking";
+import { safeOpenURL } from "@/lib/open-url";
 import { Platform, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { LoadingSpinner } from "./ui/loading-spinner";
@@ -22,7 +22,7 @@ const NativeUpdateContent = () => (
     <Button
       variant="accent"
       onPress={() => {
-        if (appStoreUrl) Linking.openURL(appStoreUrl);
+        if (appStoreUrl) safeOpenURL(appStoreUrl);
       }}
     >
       <Text>Update Now</Text>

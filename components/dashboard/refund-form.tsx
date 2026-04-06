@@ -6,7 +6,7 @@ import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Linking from "expo-linking";
+import { safeOpenURL } from "@/lib/open-url";
 import { useState } from "react";
 import { Keyboard, Alert as NativeAlert, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -138,7 +138,7 @@ export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefu
               Going forward, Gumroad does not return the payment processor fees when a payment is refunded.{" "}
               <Text
                 className="text-sm text-blue-700 underline dark:text-blue-300"
-                onPress={() => Linking.openURL(REFUND_FEE_HELP_URL)}
+                onPress={() => safeOpenURL(REFUND_FEE_HELP_URL)}
               >
                 Learn more
               </Text>

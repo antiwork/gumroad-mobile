@@ -8,13 +8,14 @@ import { useAddRecentPurchase } from "@/components/library/use-recent-products";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
+import { safeOpenURL } from "@/lib/open-url";
 import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
-import { Alert, Linking, View } from "react-native";
+import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
@@ -92,7 +93,7 @@ export default function DownloadScreen() {
         !/^https?:\/\//.test(request.url)
       )
         return true;
-      Linking.openURL(request.url);
+      safeOpenURL(request.url);
       return false;
     },
     [url],

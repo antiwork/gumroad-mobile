@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
+import { Alert } from "react-native";
 
 const authorizationEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/mobile_pre_authorization/new`;
 const tokenEndpoint = `${env.EXPO_PUBLIC_GUMROAD_URL}/oauth/token`;
@@ -147,7 +148,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [response, redirectUri, authRequest?.codeVerifier, storeTokens]);
 
   const login = useCallback(async () => {
-    if (authRequest) await promptAsync();
+    if (authRequest) {
+      try {
+        await promptAsync();
+      } catch (error) {
+        console.warn("Login browser error:", error);
+        Alert.alert("No browser found", "Please install a web browser to log in.");
+      }
+    }
   }, [authRequest, promptAsync]);
 
   const logout = useCallback(async () => {
