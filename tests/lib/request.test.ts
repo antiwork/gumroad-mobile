@@ -66,7 +66,7 @@ describe("request", () => {
 
     const error = await promise;
     expect(error).toBeInstanceOf(DOMException);
-    expect(error.name).toBe("AbortError");
+    expect((error as DOMException).name).toBe("AbortError");
   });
 
   it("respects an external abort signal", async () => {
