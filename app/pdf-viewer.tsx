@@ -48,7 +48,7 @@ export default function PdfViewerScreen() {
   const [showViewModeModal, setShowViewModeModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [pdfMounted, setPdfMounted] = useState(true);
-  const [pdfError, setPdfError] = useState(true);
+  const [pdfError, setPdfError] = useState(false);
   const [pdfKey, setPdfKey] = useState(0);
 
   const switchViewMode = (mode: "single" | "continuous") => {
