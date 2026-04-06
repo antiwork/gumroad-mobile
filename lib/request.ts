@@ -10,14 +10,7 @@ export class UnauthorizedError extends Error {
   }
 }
 
-const RETRY_COUNT = 2;
 const REQUEST_TIMEOUT_MS = 30_000;
-
-const isTransientNetworkError = (error: unknown): boolean =>
-  error instanceof TypeError &&
-  (error.message.includes("Network request timed out") || error.message.includes("Network request failed"));
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const request = async <T>(
   url: string,
@@ -25,51 +18,43 @@ export const request = async <T>(
 ): Promise<T> => {
   const body = options?.data ? JSON.stringify(options.data) : options?.body;
 
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
-    if (attempt > 0) await sleep(1000 * 2 ** (attempt - 1));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  if (options?.signal) options.signal.addEventListener("abort", () => controller.abort());
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    if (options?.signal) options.signal.addEventListener("abort", () => controller.abort());
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+      body,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...options?.headers,
-        },
-        body,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      const details = {
-        // Including the token in the logged URL makes Sentry exclude the whole string. We can remove this when we use the public API
-        url: url.replace(env.EXPO_PUBLIC_MOBILE_TOKEN, "[filtered]"),
-        method: options?.method ?? "GET",
-        status: response.status,
-      };
-      if (response.status === 401) {
-        console.info("HTTP request", details);
-        throw new UnauthorizedError("Unauthorized");
-      }
-      if (!response.ok) {
-        const error = response.status === 404 ? "Not found" : (await response.text()).slice(0, 10000);
-        console.info("HTTP request", { ...details, error });
-        throw new Error(`Request failed: ${response.status} ${error}`);
-      }
+    const details = {
+      // Including the token in the logged URL makes Sentry exclude the whole string. We can remove this when we use the public API
+      url: url.replace(env.EXPO_PUBLIC_MOBILE_TOKEN, "[filtered]"),
+      method: options?.method ?? "GET",
+      status: response.status,
+    };
+    if (response.status === 401) {
       console.info("HTTP request", details);
-      if (options?.skipResponseBody) return undefined as T;
-      return response.json();
-    } catch (error) {
-      clearTimeout(timeoutId);
-      lastError = error;
-      if (!isTransientNetworkError(error)) throw error;
+      throw new UnauthorizedError("Unauthorized");
     }
+    if (!response.ok) {
+      const error = response.status === 404 ? "Not found" : (await response.text()).slice(0, 10000);
+      console.info("HTTP request", { ...details, error });
+      throw new Error(`Request failed: ${response.status} ${error}`);
+    }
+    console.info("HTTP request", details);
+    if (options?.skipResponseBody) return undefined as T;
+    return response.json();
+  } finally {
+    clearTimeout(timeoutId);
   }
-  throw lastError;
 };
 
 export const buildApiUrl = (path: string) => {
