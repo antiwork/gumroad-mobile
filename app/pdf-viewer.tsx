@@ -28,15 +28,14 @@ const flattenToc = (items: TableContent[], depth = 0): FlattenedTocItem[] =>
   ]);
 
 export default function PdfViewerScreen() {
-  const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } =
-    useLocalSearchParams<{
-      uri: string;
-      title?: string;
-      urlRedirectId?: string;
-      productFileId?: string;
-      purchaseId?: string;
-      initialPage?: string;
-    }>();
+  const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } = useLocalSearchParams<{
+    uri: string;
+    title?: string;
+    urlRedirectId?: string;
+    productFileId?: string;
+    purchaseId?: string;
+    initialPage?: string;
+  }>();
   const { accessToken } = useAuth();
   const pdfRef = useRef<PdfRef>(null);
   const [currentPage, setCurrentPage] = useState(initialPage ? Number(initialPage) : 1);
@@ -177,10 +176,7 @@ export default function PdfViewerScreen() {
             keyExtractor={(item, index) => `${item.pageIdx}-${index}`}
             renderItem={({ item }) => (
               <TouchableOpacity onPress={() => handleTocItemPress(item.pageIdx)}>
-                <View
-                  className="border-b border-border py-3 pr-4"
-                  style={{ paddingLeft: 16 + item.depth * 16 }}
-                >
+                <View className="border-b border-border py-3 pr-4" style={{ paddingLeft: 16 + item.depth * 16 }}>
                   <Text className="text-base text-foreground" numberOfLines={2}>
                     {item.title}
                   </Text>
@@ -225,9 +221,7 @@ export default function PdfViewerScreen() {
               <LineIcon name="move-vertical" size={24} className="text-foreground" />
               <Text className="text-base text-foreground">Continuous</Text>
             </View>
-            {viewMode === "continuous" && (
-              <LineIcon name="check" size={24} className="text-accent" />
-            )}
+            {viewMode === "continuous" && <LineIcon name="check" size={24} className="text-accent" />}
           </TouchableOpacity>
         </SheetContent>
       </Sheet>
