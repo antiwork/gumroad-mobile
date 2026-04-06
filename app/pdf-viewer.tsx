@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dimensions, FlatList, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type FlattenedTocItem = {
   title: string;
@@ -27,14 +28,15 @@ const flattenToc = (items: TableContent[], depth = 0): FlattenedTocItem[] =>
   ]);
 
 export default function PdfViewerScreen() {
-  const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } = useLocalSearchParams<{
-    uri: string;
-    title?: string;
-    urlRedirectId?: string;
-    productFileId?: string;
-    purchaseId?: string;
-    initialPage?: string;
-  }>();
+  const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } =
+    useLocalSearchParams<{
+      uri: string;
+      title?: string;
+      urlRedirectId?: string;
+      productFileId?: string;
+      purchaseId?: string;
+      initialPage?: string;
+    }>();
   const { accessToken } = useAuth();
   const pdfRef = useRef<PdfRef>(null);
   const [currentPage, setCurrentPage] = useState(initialPage ? Number(initialPage) : 1);
@@ -46,7 +48,7 @@ export default function PdfViewerScreen() {
   const [showViewModeModal, setShowViewModeModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [pdfMounted, setPdfMounted] = useState(true);
-  const [pdfError, setPdfError] = useState(false);
+  const [pdfError, setPdfError] = useState(true);
   const [pdfKey, setPdfKey] = useState(0);
 
   const switchViewMode = (mode: "single" | "continuous") => {
@@ -95,7 +97,9 @@ export default function PdfViewerScreen() {
                   try {
                     const isAvailable = await Sharing.isAvailableAsync();
                     if (!isAvailable) return;
-                    const downloaded = await File.downloadFileAsync(uri, Paths.cache, { idempotent: true });
+                    const downloaded = await File.downloadFileAsync(uri, Paths.cache, {
+                      idempotent: true,
+                    });
                     await Sharing.shareAsync(downloaded.uri);
                   } finally {
                     setIsSharing(false);
@@ -130,15 +134,14 @@ export default function PdfViewerScreen() {
           <Text className="text-center text-lg text-foreground">
             Unable to load this PDF. The file may be temporarily unavailable.
           </Text>
-          <TouchableOpacity
+          <Button
             onPress={() => {
               setPdfError(false);
               setPdfKey((k) => k + 1);
             }}
-            className="rounded-lg bg-accent px-6 py-3"
           >
             <Text className="text-base font-semibold text-white">Try Again</Text>
-          </TouchableOpacity>
+          </Button>
         </View>
       ) : pdfMounted ? (
         <Pdf
@@ -174,7 +177,10 @@ export default function PdfViewerScreen() {
             keyExtractor={(item, index) => `${item.pageIdx}-${index}`}
             renderItem={({ item }) => (
               <TouchableOpacity onPress={() => handleTocItemPress(item.pageIdx)}>
-                <View className="border-b border-border py-3 pr-4" style={{ paddingLeft: 16 + item.depth * 16 }}>
+                <View
+                  className="border-b border-border py-3 pr-4"
+                  style={{ paddingLeft: 16 + item.depth * 16 }}
+                >
                   <Text className="text-base text-foreground" numberOfLines={2}>
                     {item.title}
                   </Text>
@@ -219,7 +225,9 @@ export default function PdfViewerScreen() {
               <LineIcon name="move-vertical" size={24} className="text-foreground" />
               <Text className="text-base text-foreground">Continuous</Text>
             </View>
-            {viewMode === "continuous" && <LineIcon name="check" size={24} className="text-accent" />}
+            {viewMode === "continuous" && (
+              <LineIcon name="check" size={24} className="text-accent" />
+            )}
           </TouchableOpacity>
         </SheetContent>
       </Sheet>
