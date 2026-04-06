@@ -29,12 +29,13 @@ const jsonResponse = (data: unknown, status = 200) =>
 
 /** Returns a fetch mock that blocks until the signal is aborted, then rejects like real fetch. */
 const hangingFetch = () =>
-  jest.fn((_url: string, init?: RequestInit) =>
-    new Promise((_resolve, reject) => {
-      init?.signal?.addEventListener("abort", () => {
-        reject(new DOMException("The operation was aborted.", "AbortError"));
-      });
-    }),
+  jest.fn(
+    (_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      }),
   );
 
 describe("request", () => {
