@@ -127,7 +127,9 @@ export default function PdfViewerScreen() {
       />
       {pdfError ? (
         <View className="flex-1 items-center justify-center gap-4 px-8">
-          <Text className="text-center text-lg text-foreground">Unable to load this PDF. The file may be temporarily unavailable.</Text>
+          <Text className="text-center text-lg text-foreground">
+            Unable to load this PDF. The file may be temporarily unavailable.
+          </Text>
           <TouchableOpacity
             onPress={() => {
               setPdfError(false);
