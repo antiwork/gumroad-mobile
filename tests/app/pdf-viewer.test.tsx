@@ -5,11 +5,6 @@ jest.mock("expo-router", () => ({
   Stack: { Screen: () => null },
 }));
 
-jest.mock("expo-navigation-bar", () => ({
-  setVisibilityAsync: jest.fn(),
-  setBehaviorAsync: jest.fn(),
-}));
-
 jest.mock("expo-sharing", () => ({
   isAvailableAsync: jest.fn(),
   shareAsync: jest.fn(),
