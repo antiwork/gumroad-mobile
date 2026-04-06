@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dimensions, FlatList, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type FlattenedTocItem = {
   title: string;
@@ -46,6 +47,8 @@ export default function PdfViewerScreen() {
   const [showViewModeModal, setShowViewModeModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [pdfMounted, setPdfMounted] = useState(true);
+  const [pdfError, setPdfError] = useState(false);
+  const [pdfKey, setPdfKey] = useState(0);
 
   const switchViewMode = (mode: "single" | "continuous") => {
     // Unmount the PDF component first to let the native rendering thread finish
@@ -93,7 +96,9 @@ export default function PdfViewerScreen() {
                   try {
                     const isAvailable = await Sharing.isAvailableAsync();
                     if (!isAvailable) return;
-                    const downloaded = await File.downloadFileAsync(uri, Paths.cache, { idempotent: true });
+                    const downloaded = await File.downloadFileAsync(uri, Paths.cache, {
+                      idempotent: true,
+                    });
                     await Sharing.shareAsync(downloaded.uri);
                   } finally {
                     setIsSharing(false);
@@ -123,9 +128,23 @@ export default function PdfViewerScreen() {
           ),
         }}
       />
-      {pdfMounted && (
+      {pdfError ? (
+        <View className="flex-1 items-center justify-center gap-4 px-8">
+          <Text className="text-center text-lg text-foreground">
+            Unable to load this PDF. The file may be temporarily unavailable.
+          </Text>
+          <Button
+            onPress={() => {
+              setPdfError(false);
+              setPdfKey((k) => k + 1);
+            }}
+          >
+            <Text className="text-base font-semibold text-white">Try Again</Text>
+          </Button>
+        </View>
+      ) : pdfMounted ? (
         <Pdf
-          key={viewMode}
+          key={`${viewMode}-${pdfKey}`}
           ref={pdfRef}
           source={{ uri }}
           style={styles.pdf}
@@ -140,11 +159,12 @@ export default function PdfViewerScreen() {
           }}
           onPageChanged={(page) => setCurrentPage(page)}
           onError={(error) => {
-            console.error("PDF Error:", error);
             Sentry.captureException(error);
+            console.error("PDF Error:", error);
+            setPdfError(true);
           }}
         />
-      )}
+      ) : null}
 
       <Sheet open={showTocModal} onOpenChange={setShowTocModal}>
         <SheetHeader onClose={() => setShowTocModal(false)}>
