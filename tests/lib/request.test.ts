@@ -51,6 +51,24 @@ describe("request", () => {
     await expect(request("https://api.example.com/test")).rejects.toThrow(UnauthorizedError);
   });
 
+  it("throws a clean error on 403 without leaking the response body", async () => {
+    const xmlBody = '<?xml version="1.0" encoding="UTF-8"?><Error><Code>AccessDenied</Code></Error>';
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(xmlBody),
+      }),
+    );
+    await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 403 Access denied");
+  });
+
+  it("throws a clean error on 404 without leaking the response body", async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse({}, 404));
+    await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 404 Not found");
+  });
+
   it("throws on non-ok responses", async () => {
     mockFetch.mockReturnValueOnce(jsonResponse({ error: "bad" }, 500));
     await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 500");
