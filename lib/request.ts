@@ -11,6 +11,7 @@ export class UnauthorizedError extends Error {
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_RESPONSE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 export const request = async <T>(
   url: string,
@@ -33,6 +34,14 @@ export const request = async <T>(
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
+
+    const contentLength = Number(response.headers.get("Content-Length"));
+    if (contentLength > MAX_RESPONSE_SIZE) {
+      controller.abort();
+      throw new Error(
+        `Response too large (${Math.round(contentLength / 1024 / 1024)} MB). Aborting to prevent out-of-memory crash.`,
+      );
+    }
 
     const details = {
       // Including the token in the logged URL makes Sentry exclude the whole string. We can remove this when we use the public API

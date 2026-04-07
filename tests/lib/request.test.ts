@@ -19,10 +19,11 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-const jsonResponse = (data: unknown, status = 200) =>
+const jsonResponse = (data: unknown, status = 200, headers?: Record<string, string>) =>
   Promise.resolve({
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers(headers),
     json: () => Promise.resolve(data),
     text: () => Promise.resolve(JSON.stringify(data)),
   });
@@ -68,6 +69,19 @@ describe("request", () => {
     const error = await promise;
     expect(error).toBeInstanceOf(DOMException);
     expect((error as DOMException).name).toBe("AbortError");
+  });
+
+  it("throws when Content-Length exceeds 50 MB", async () => {
+    const oversized = String(51 * 1024 * 1024);
+    mockFetch.mockReturnValueOnce(jsonResponse({ id: 1 }, 200, { "Content-Length": oversized }));
+    await expect(request("https://api.example.com/test")).rejects.toThrow("Response too large");
+  });
+
+  it("allows responses under 50 MB", async () => {
+    const small = String(1024);
+    mockFetch.mockReturnValueOnce(jsonResponse({ id: 1 }, 200, { "Content-Length": small }));
+    const result = await request("https://api.example.com/test");
+    expect(result).toEqual({ id: 1 });
   });
 
   it("respects an external abort signal", async () => {
