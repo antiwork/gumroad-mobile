@@ -10,6 +10,24 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class ServerError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ServerError";
+    this.status = status;
+  }
+}
+
+const extractErrorMessage = (body: string): string => {
+  const trimmed = body.trimStart();
+  if (trimmed.startsWith("<") || trimmed.startsWith("<?xml")) {
+    const titleMatch = trimmed.match(/<title[^>]*>([^<]+)<\/title>/i);
+    return titleMatch ? titleMatch[1].trim() : "Server returned an HTML error page";
+  }
+  return body.slice(0, 10000);
+};
+
 const REQUEST_TIMEOUT_MS = 30_000;
 
 export const request = async <T>(
@@ -45,8 +63,11 @@ export const request = async <T>(
       throw new UnauthorizedError("Unauthorized");
     }
     if (!response.ok) {
-      const error = response.status === 404 ? "Not found" : (await response.text()).slice(0, 10000);
+      const error = response.status === 404 ? "Not found" : extractErrorMessage(await response.text());
       console.info("HTTP request", { ...details, error });
+      if (response.status >= 500) {
+        throw new ServerError(response.status, `Request failed: ${response.status} ${error}`);
+      }
       throw new Error(`Request failed: ${response.status} ${error}`);
     }
     console.info("HTTP request", details);
