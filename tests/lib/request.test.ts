@@ -68,7 +68,7 @@ describe("request", () => {
   it("throws ServerError with clean message for 530 HTML response", async () => {
     const cloudflareHtml = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html><head><title>Maintenance | Gumroad</title></head><body><h1>Site under maintenance</h1>${"<p>lots of html</p>".repeat(500)}</body></html>`;
     mockFetch.mockReturnValueOnce(htmlResponse(cloudflareHtml, 530));
-    const error = await request("https://api.example.com/test").catch((e) => e) as ServerError;
+    const error = (await request("https://api.example.com/test").catch((e) => e)) as ServerError;
     expect(error).toBeInstanceOf(ServerError);
     expect(error.status).toBe(530);
     expect(error.message).toBe("Request failed: 530 Maintenance | Gumroad");
@@ -77,7 +77,7 @@ describe("request", () => {
 
   it("throws ServerError with JSON body for 503 non-HTML response", async () => {
     mockFetch.mockReturnValueOnce(jsonResponse({ error: "service unavailable" }, 503));
-    const error = await request("https://api.example.com/test").catch((e) => e) as ServerError;
+    const error = (await request("https://api.example.com/test").catch((e) => e)) as ServerError;
     expect(error).toBeInstanceOf(ServerError);
     expect(error.status).toBe(503);
     expect(error.message).toContain('{"error":"service unavailable"}');
