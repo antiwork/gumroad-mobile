@@ -16,7 +16,8 @@
     "e2e:ios:run": "maestro test -p ios -e APP_ID=$IOS_BUNDLE_NAME",
     "e2e:android": "dotenv-flow -- npm run e2e:android:run",
     "e2e:android:run": "maestro test -p android -e APP_ID=$ANDROID_BUNDLE_NAME",
-    "eas": "dotenv-flow eas --"
+    "eas": "dotenv-flow eas --",
+    "postinstall": "npx patch-package"
   },
   "jest": {
     "preset": "jest-expo",
