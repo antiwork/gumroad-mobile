@@ -140,7 +140,7 @@ export default function DownloadScreen() {
             urlRedirectId: purchase?.url_redirect_external_id,
             productFileId: message.payload.resourceId,
             purchaseId: purchase?.purchase_id,
-            initialPage: message.payload.resumeAt,
+            initialPage: fileData?.latest_media_location?.location ?? message.payload.resumeAt,
           },
         });
         return;
