@@ -3,9 +3,10 @@ import { renderHook, waitFor } from "@testing-library/react-native";
 import * as AuthSession from "expo-auth-session";
 import React from "react";
 
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { request } from "@/lib/request";
 import * as SecureStore from "expo-secure-store";
+import { Alert } from "react-native";
 
 jest.mock("expo-auth-session");
 jest.mock("expo-secure-store", () => ({
@@ -112,5 +113,32 @@ describe("fetchCreatorStatus Sentry reporting", () => {
     await waitFor(() => {
       expect(Sentry.captureException).toHaveBeenCalledWith(networkError);
     });
+  });
+});
+
+describe("login error handling", () => {
+  it("shows an alert instead of crashing when promptAsync throws", async () => {
+    const alertSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const mockPromptAsync = jest.fn().mockRejectedValue(new Error("SecurityException: Permission Denial"));
+
+    mockUseAuthRequest.mockReturnValue([{ codeVerifier: "test-verifier" }, null, mockPromptAsync]);
+    mockGetItemAsync.mockResolvedValue(null);
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }: { children: React.ReactNode }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await waitFor(() => {
+      expect(result.current.login).toBeDefined();
+    });
+
+    (Sentry.captureException as jest.Mock).mockClear();
+
+    await result.current.login();
+
+    expect(alertSpy).toHaveBeenCalledWith("No browser found", "Please install a web browser to log in.");
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+
+    alertSpy.mockRestore();
   });
 });

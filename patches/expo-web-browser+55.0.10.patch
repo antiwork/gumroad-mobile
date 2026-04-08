@@ -1,0 +1,55 @@
+diff --git a/node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/BrowserProxyActivity.kt b/node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/BrowserProxyActivity.kt
+index c30da17..10d0300 100644
+--- a/node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/BrowserProxyActivity.kt
++++ b/node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/BrowserProxyActivity.kt
+@@ -47,7 +47,17 @@ class BrowserProxyActivity : Activity() {
+     customTabsIntentData.extras?.let { customTabsIntent.intent.putExtras(it) }
+     customTabsIntentData.`package`?.let { customTabsIntent.intent.`package` = it }
+ 
+-    customTabsIntent.launchUrl(this, url.toUri())
++    try {
++      customTabsIntent.launchUrl(this, url.toUri())
++    } catch (e: SecurityException) {
++      try {
++        val fallbackIntent = Intent(Intent.ACTION_VIEW, url.toUri())
++        startActivity(fallbackIntent)
++      } catch (e2: Exception) {
++        finish()
++        return
++      }
++    }
+ 
+     instance = WeakReference(this)
+     hasLaunchedCustomTab = true
+diff --git a/node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/CustomTabsActivitiesHelper.kt b/node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/CustomTabsActivitiesHelper.kt
+index c1169b2..8be1610 100644
+--- a/node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/CustomTabsActivitiesHelper.kt
++++ b/node_modules/expo-web-browser/android/src/main/java/expo/modules/webbrowser/CustomTabsActivitiesHelper.kt
+@@ -63,7 +63,12 @@ internal class CustomTabsActivitiesHelper(
+     val url = tabsIntent.intent.data ?: throw NoUrlProvidedException()
+ 
+     if (!options.shouldCreateTask) {
+-      tabsIntent.launchUrl(currentActivity, url)
++      try {
++        tabsIntent.launchUrl(currentActivity, url)
++      } catch (e: SecurityException) {
++        val fallbackIntent = Intent(Intent.ACTION_VIEW, url)
++        currentActivity.startActivity(fallbackIntent)
++      }
+       return
+     }
+ 
+@@ -90,7 +95,12 @@ internal class CustomTabsActivitiesHelper(
+       tabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+     }
+ 
+-    tabsIntent.launchUrl(currentActivity, url)
++    try {
++      tabsIntent.launchUrl(currentActivity, url)
++    } catch (e: SecurityException) {
++      val fallbackIntent = Intent(Intent.ACTION_VIEW, url)
++      currentActivity.startActivity(fallbackIntent)
++    }
+   }
+ 
+ // endregion
