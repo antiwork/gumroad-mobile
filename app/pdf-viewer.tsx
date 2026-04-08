@@ -1,4 +1,5 @@
 import { LineIcon, SolidIcon } from "@/components/icon";
+import { PageIndicator } from "@/components/page-indicator";
 import { Screen } from "@/components/ui/screen";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
@@ -67,7 +68,6 @@ export default function PdfViewerScreen() {
         productFileId,
         purchaseId,
         // We deliberately use the latest value of the ref for the latest media location
-
         location: currentPageRef.current,
         accessToken,
       });
@@ -227,13 +227,11 @@ export default function PdfViewerScreen() {
       </Sheet>
 
       {totalPages > 0 && (
-        <View className="absolute right-0 bottom-8 left-0 items-center">
-          <View className="flex-row items-center gap-2 rounded bg-background/70 px-4 py-2">
-            <Text className="text-lg font-semibold tracking-wide text-foreground">
-              {currentPage} / {totalPages}
-            </Text>
-          </View>
-        </View>
+        <PageIndicator
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onJumpToPage={(page) => pdfRef.current?.setPage(page)}
+        />
       )}
     </Screen>
   );
