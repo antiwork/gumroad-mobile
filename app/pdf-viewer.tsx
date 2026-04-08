@@ -9,7 +9,7 @@ import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Dimensions, FlatList, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
@@ -49,6 +49,25 @@ export default function PdfViewerScreen() {
   const [pdfMounted, setPdfMounted] = useState(true);
   const [pdfError, setPdfError] = useState(false);
   const [pdfKey, setPdfKey] = useState(0);
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const scrollLockTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // In single-page mode, briefly disable scroll after each page change to prevent
+  // UIPageViewController's NSInternalInconsistencyException when rapid interactions
+  // trigger concurrent page animations.
+  const handlePageChanged = useCallback(
+    (page: number) => {
+      setCurrentPage(page);
+      if (viewMode === "single") {
+        setScrollLocked(true);
+        clearTimeout(scrollLockTimer.current);
+        scrollLockTimer.current = setTimeout(() => setScrollLocked(false), 350);
+      }
+    },
+    [viewMode],
+  );
+
+  useEffect(() => () => clearTimeout(scrollLockTimer.current), []);
 
   const switchViewMode = (mode: "single" | "continuous") => {
     // Unmount the PDF component first to let the native rendering thread finish
@@ -152,12 +171,13 @@ export default function PdfViewerScreen() {
           fitPolicy={0}
           enablePaging={viewMode === "single"}
           horizontal={viewMode === "single"}
+          scrollEnabled={!scrollLocked}
           page={initialPage ? Number(initialPage) : 1}
           onLoadComplete={(numberOfPages, _path, _size, toc) => {
             setTotalPages(numberOfPages);
             setTableOfContents(toc ?? []);
           }}
-          onPageChanged={(page) => setCurrentPage(page)}
+          onPageChanged={handlePageChanged}
           onError={(error) => {
             Sentry.captureException(error);
             console.error("PDF Error:", error);

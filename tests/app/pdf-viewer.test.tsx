@@ -24,6 +24,8 @@ jest.mock("@/lib/media-location", () => ({
 }));
 
 let mockOnError: ((e: unknown) => void) | null = null;
+let mockOnPageChanged: ((page: number) => void) | null = null;
+let lastPdfProps: Record<string, unknown> = {};
 
 jest.mock("react-native-pdf", () => {
   const { forwardRef } = require("react");
@@ -32,6 +34,8 @@ jest.mock("react-native-pdf", () => {
     __esModule: true,
     default: forwardRef((props: Record<string, unknown>, _ref: unknown) => {
       mockOnError = props.onError as any;
+      mockOnPageChanged = props.onPageChanged as any;
+      lastPdfProps = props;
       return <View testID="pdf-component" />;
     }),
   };
@@ -42,7 +46,14 @@ import { act } from "react";
 
 describe("PdfViewerScreen", () => {
   beforeEach(() => {
+    jest.useFakeTimers();
     mockOnError = null;
+    mockOnPageChanged = null;
+    lastPdfProps = {};
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("shows error view with Try Again button when PDF fails to load", () => {
@@ -71,5 +82,26 @@ describe("PdfViewerScreen", () => {
 
     expect(screen.getByTestId("pdf-component")).toBeTruthy();
     expect(screen.queryByText("Try Again")).toBeNull();
+  });
+
+  it("temporarily disables scroll after page change in single-page mode", () => {
+    render(<PdfViewerScreen />);
+
+    expect(lastPdfProps.scrollEnabled).toBe(true);
+    expect(lastPdfProps.enablePaging).toBe(true);
+
+    act(() => {
+      mockOnPageChanged!(2);
+    });
+
+    // Scroll should be locked immediately after page change
+    expect(lastPdfProps.scrollEnabled).toBe(false);
+
+    act(() => {
+      jest.advanceTimersByTime(350);
+    });
+
+    // Scroll should be re-enabled after the cooldown
+    expect(lastPdfProps.scrollEnabled).toBe(true);
   });
 });
