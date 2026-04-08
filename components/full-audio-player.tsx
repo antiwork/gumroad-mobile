@@ -119,6 +119,9 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     await setStoredLoopEnabled(newValue);
   };
 
+  const hasPrevious = queueLength > 1 && currentIndex > 0;
+  const hasNext = queueLength > 1 && currentIndex < queueLength - 1;
+
   const handlePreviousTrack = async () => {
     if (hasPrevious) await TrackPlayer.skipToPrevious();
     await updateQueueState();
@@ -128,9 +131,6 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     if (hasNext) await TrackPlayer.skipToNext();
     await updateQueueState();
   };
-
-  const hasPrevious = queueLength > 1 && currentIndex > 0;
-  const hasNext = queueLength > 1 && currentIndex < queueLength - 1;
 
   const handleSeek = async (locationX: number, width: number) => {
     const percentage = locationX / width;
