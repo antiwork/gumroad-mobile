@@ -3,45 +3,35 @@ import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
 import { withPlayerReady } from "@/components/use-audio-player-sync";
-import { useEffect, useState } from "react";
+import { player } from "@/lib/audio-player";
+import { useActiveTrack } from "@/lib/audio-player-hooks";
+import { useAudioPlayerStatus } from "expo-audio";
+import { useState } from "react";
 import { Pressable, TouchableOpacity, View } from "react-native";
-import TrackPlayer, { State, useActiveTrack, usePlaybackState, useProgress } from "react-native-track-player";
 
 const MiniAudioPlayerBase = () => {
-  const playbackState = usePlaybackState();
+  const status = useAudioPlayerStatus(player);
   const activeTrack = useActiveTrack();
-  const { position, duration } = useProgress();
-  const [isVisible, setIsVisible] = useState(false);
-
   const [isFullPlayerVisible, setFullPlayerVisible] = useState(false);
 
-  const isPlaying = playbackState.state === State.Playing;
-  const isBuffering = playbackState.state === State.Buffering || playbackState.state === State.Loading;
-  const progress = duration > 0 ? (position / duration) * 100 : 0;
+  const isPlaying = status.playing;
+  const isBuffering = status.isBuffering;
+  const progress = status.duration > 0 ? (status.currentTime / status.duration) * 100 : 0;
 
-  useEffect(() => {
-    const checkTrack = async () => {
-      const track = await TrackPlayer.getActiveTrack();
-      setIsVisible(track !== undefined);
-    };
-    checkTrack();
-  }, [activeTrack]);
-
-  const handlePlayPause = async () => {
+  const handlePlayPause = () => {
     if (isPlaying) {
-      await TrackPlayer.pause();
+      player.pause();
     } else {
-      await TrackPlayer.play();
+      player.play();
     }
   };
 
-  const handleSkipForward = async () => {
-    const { position, duration } = await TrackPlayer.getProgress();
-    const newPosition = Math.min(position + 30, duration);
-    await TrackPlayer.seekTo(newPosition);
+  const handleSkipForward = () => {
+    const newPosition = Math.min(player.currentTime + 30, player.duration);
+    player.seekTo(newPosition);
   };
 
-  if (!isVisible || !activeTrack) {
+  if (!activeTrack) {
     return null;
   }
 

@@ -2,16 +2,21 @@ import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
 import { safeOpenURL } from "@/lib/open-url";
+import {
+  player,
+  skipToNext,
+  skipToPrevious,
+  getQueue,
+  getActiveTrackIndex,
+  setLoopMode,
+  getLoopMode,
+  resetPlayer,
+} from "@/lib/audio-player";
+import { useActiveTrack } from "@/lib/audio-player-hooks";
+import { useAudioPlayerStatus } from "expo-audio";
 import { useCallback, useEffect, useState } from "react";
 import { Modal, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import TrackPlayer, {
-  RepeatMode,
-  State,
-  useActiveTrack,
-  usePlaybackState,
-  useProgress,
-} from "react-native-track-player";
 import * as SecureStore from "expo-secure-store";
 
 const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2, 0.5];
@@ -44,29 +49,27 @@ const formatTime = (seconds: number) => {
 };
 
 export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
-  const playbackState = usePlaybackState();
+  const status = useAudioPlayerStatus(player);
   const activeTrack = useActiveTrack();
-  const { position, duration } = useProgress();
   const { top, bottom } = useSafeAreaInsets();
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [loopEnabled, setLoopEnabled] = useState(true);
   const [queueLength, setQueueLength] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const updateQueueState = useCallback(async () => {
-    const queue = await TrackPlayer.getQueue();
+  const updateQueueState = useCallback(() => {
+    const queue = getQueue();
     setQueueLength(queue.length);
-    const index = await TrackPlayer.getActiveTrackIndex();
-    setCurrentIndex(index ?? 0);
+    setCurrentIndex(getActiveTrackIndex());
   }, []);
 
   useEffect(() => {
     if (visible) updateQueueState();
-  }, [visible, activeTrack?.url, updateQueueState]);
+  }, [visible, activeTrack?.resourceId, updateQueueState]);
 
   useEffect(() => {
     const loadSettings = async () => {
-      const speed = await TrackPlayer.getRate();
+      const speed = player.playbackRate;
       if (PLAYBACK_SPEEDS.includes(speed)) setPlaybackSpeed(speed);
       const loop = await getStoredLoopEnabled();
       setLoopEnabled(loop);
@@ -74,68 +77,68 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     if (visible) loadSettings();
   }, [visible]);
 
-  const isPlaying = playbackState.state === State.Playing;
-  const isBuffering = playbackState.state === State.Buffering || playbackState.state === State.Loading;
+  const isPlaying = status.playing;
+  const isBuffering = status.isBuffering;
+  const position = status.currentTime;
+  const duration = status.duration;
   const progress = duration > 0 ? (position / duration) * 100 : 0;
 
-  const handlePlayPause = async () => {
+  const handlePlayPause = () => {
     if (isPlaying) {
-      await TrackPlayer.pause();
+      player.pause();
     } else {
-      await TrackPlayer.play();
+      player.play();
     }
   };
 
-  const handleSkipBack = async () => {
-    const { position } = await TrackPlayer.getProgress();
-    const newPosition = Math.max(position - 15, 0);
-    await TrackPlayer.seekTo(newPosition);
+  const handleSkipBack = () => {
+    const newPosition = Math.max(player.currentTime - 15, 0);
+    player.seekTo(newPosition);
   };
 
-  const handleSkipForward = async () => {
-    const { position, duration } = await TrackPlayer.getProgress();
-    const newPosition = Math.min(position + 30, duration);
-    await TrackPlayer.seekTo(newPosition);
+  const handleSkipForward = () => {
+    const newPosition = Math.min(player.currentTime + 30, player.duration);
+    player.seekTo(newPosition);
   };
 
-  const handleClose = async () => {
-    await TrackPlayer.reset();
+  const handleClose = () => {
+    resetPlayer();
     onClose();
   };
 
   const handleCycleSpeed = async () => {
-    const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackSpeed);
-    const nextIndex = (currentIndex + 1) % PLAYBACK_SPEEDS.length;
-    const newSpeed = PLAYBACK_SPEEDS[nextIndex];
+    const currentIdx = PLAYBACK_SPEEDS.indexOf(playbackSpeed);
+    const nextIdx = (currentIdx + 1) % PLAYBACK_SPEEDS.length;
+    const newSpeed = PLAYBACK_SPEEDS[nextIdx];
     setPlaybackSpeed(newSpeed);
-    await TrackPlayer.setRate(newSpeed);
+    player.setPlaybackRate(newSpeed);
     await setStoredPlaybackSpeed(newSpeed);
   };
 
   const handleToggleLoop = async () => {
     const newValue = !loopEnabled;
     setLoopEnabled(newValue);
-    await TrackPlayer.setRepeatMode(newValue ? RepeatMode.Queue : RepeatMode.Off);
+    setLoopMode(newValue ? "queue" : "off");
     await setStoredLoopEnabled(newValue);
-  };
-
-  const handlePreviousTrack = async () => {
-    if (hasPrevious) await TrackPlayer.skipToPrevious();
-    await updateQueueState();
-  };
-
-  const handleNextTrack = async () => {
-    if (hasNext) await TrackPlayer.skipToNext();
-    await updateQueueState();
   };
 
   const hasPrevious = queueLength > 1 && currentIndex > 0;
   const hasNext = queueLength > 1 && currentIndex < queueLength - 1;
 
-  const handleSeek = async (locationX: number, width: number) => {
+  const handlePreviousTrack = () => {
+    if (hasPrevious) skipToPrevious();
+    updateQueueState();
+  };
+
+  const handleNextTrack = () => {
+    if (hasNext) skipToNext();
+    updateQueueState();
+  };
+
+  const handleSeek = (locationX: number, width: number) => {
     const percentage = locationX / width;
     const newPosition = percentage * duration;
-    await TrackPlayer.seekTo(newPosition);
+    player.seekTo(newPosition);
   };
 
   if (!activeTrack) {

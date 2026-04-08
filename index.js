@@ -1,8 +1,3 @@
-import TrackPlayer from "react-native-track-player";
-import { playbackService } from "./components/track-player-service";
-
-TrackPlayer.registerPlaybackService(() => playbackService);
-
 // Register Android widget task handler
 import "./components/revenue-widget-android-handler";
 

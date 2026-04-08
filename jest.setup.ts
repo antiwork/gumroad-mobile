@@ -55,6 +55,42 @@ jest.mock("react-native-reanimated", () => {
   };
 });
 
+jest.mock("expo-audio", () => ({
+  createAudioPlayer: jest.fn(() => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    seekTo: jest.fn().mockResolvedValue(undefined),
+    replace: jest.fn(),
+    remove: jest.fn(),
+    setPlaybackRate: jest.fn(),
+    setActiveForLockScreen: jest.fn(),
+    updateLockScreenMetadata: jest.fn(),
+    clearLockScreenControls: jest.fn(),
+    currentTime: 0,
+    duration: 0,
+    playing: false,
+    paused: true,
+    isBuffering: false,
+    isLoaded: false,
+    loop: false,
+    volume: 1,
+    muted: false,
+    playbackRate: 1,
+    id: "mock-player",
+  })),
+  useAudioPlayerStatus: jest.fn(() => ({
+    currentTime: 0,
+    duration: 0,
+    playing: false,
+    paused: true,
+    isBuffering: false,
+    isLoaded: false,
+    didJustFinish: false,
+    playbackRate: 1,
+  })),
+  setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@expo/vector-icons/build/createIconSet", () => {
   const React = require("react");
   const { Text } = require("react-native");

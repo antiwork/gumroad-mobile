@@ -80,6 +80,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-image",
     "expo-sharing",
     [
+      "expo-audio",
+      {
+        enableBackgroundPlayback: true,
+      },
+    ],
+    [
       "expo-widgets",
       {
         widgets: [
