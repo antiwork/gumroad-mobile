@@ -54,10 +54,13 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
 2. **Fastlane**: Required for iOS builds (EAS uses it for signing/archiving). Install with `arch -arm64 brew install fastlane` if missing.
 
 3. **JDK 17+**: Required for Android builds (Gradle 9 needs it). Install with `arch -arm64 brew install openjdk@17` and symlink:
+
    ```
    sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
    ```
+
    Set `JAVA_HOME` in the build command:
+
    ```
    export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
    ```
