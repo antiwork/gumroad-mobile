@@ -75,6 +75,89 @@ describe("request", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("retries on 502 and succeeds on retry", async () => {
+    mockFetch
+      .mockReturnValueOnce(jsonResponse("<html>Bad Gateway</html>", 502))
+      .mockReturnValueOnce(jsonResponse({ ok: true }));
+    const promise = request("https://api.example.com/test");
+    await jest.advanceTimersByTimeAsync(500);
+    const result = await promise;
+    expect(result).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries on 503 and succeeds on retry", async () => {
+    mockFetch
+      .mockReturnValueOnce(jsonResponse("Service Unavailable", 503))
+      .mockReturnValueOnce(jsonResponse({ ok: true }));
+    const promise = request("https://api.example.com/test");
+    await jest.advanceTimersByTimeAsync(500);
+    const result = await promise;
+    expect(result).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries on 504 and succeeds on retry", async () => {
+    mockFetch
+      .mockReturnValueOnce(jsonResponse("Gateway Timeout", 504))
+      .mockReturnValueOnce(jsonResponse({ ok: true }));
+    const promise = request("https://api.example.com/test");
+    await jest.advanceTimersByTimeAsync(500);
+    const result = await promise;
+    expect(result).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws after all retries are exhausted for 502", async () => {
+    mockFetch
+      .mockReturnValueOnce(jsonResponse("<html>Bad Gateway</html>", 502))
+      .mockReturnValueOnce(jsonResponse("<html>Bad Gateway</html>", 502))
+      .mockReturnValueOnce(jsonResponse("<html>Bad Gateway</html>", 502));
+    const promise = request("https://api.example.com/test").catch((e: Error) => e);
+    await jest.advanceTimersByTimeAsync(1500);
+    const error = await promise;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch("Request failed: 502");
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("uses exponential backoff between retries", async () => {
+    mockFetch
+      .mockReturnValueOnce(jsonResponse("", 502))
+      .mockReturnValueOnce(jsonResponse("", 502))
+      .mockReturnValueOnce(jsonResponse({ ok: true }));
+    const promise = request("https://api.example.com/test");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(499);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(999);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    const result = await promise;
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("does not retry 400 errors", async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "bad request" }, 400));
+    await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 400");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry 401 errors", async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse({}, 401));
+    await expect(request("https://api.example.com/test")).rejects.toThrow(UnauthorizedError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry 500 errors", async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "internal" }, 500));
+    await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 500");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it("aborts the request after 30s timeout", async () => {
     const mock = hangingFetch();
     mockFetch.mockImplementation(mock);
