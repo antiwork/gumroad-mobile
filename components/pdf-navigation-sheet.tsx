@@ -32,6 +32,7 @@ const PageThumbnail = memo(
     thumbnailWidth,
     thumbnailHeight,
     isCurrent,
+    failed,
     onPress,
   }: {
     page: number;
@@ -39,6 +40,7 @@ const PageThumbnail = memo(
     thumbnailWidth: number;
     thumbnailHeight: number;
     isCurrent: boolean;
+    failed: boolean;
     onPress: (page: number) => void;
   }) => (
     <TouchableOpacity onPress={() => onPress(page)} style={{ width: thumbnailWidth }}>
@@ -55,6 +57,10 @@ const PageThumbnail = memo(
             style={{ width: thumbnailWidth, height: thumbnailHeight }}
             contentFit="contain"
           />
+        ) : failed ? (
+          <View className="flex-1 items-center justify-center bg-muted">
+            <Text className="text-lg text-muted-foreground">{page}</Text>
+          </View>
         ) : (
           <View className="flex-1 items-center justify-center bg-muted">
             <ActivityIndicator size="small" />
@@ -72,6 +78,7 @@ const PageThumbnail = memo(
     </TouchableOpacity>
   ),
 );
+PageThumbnail.displayName = "PageThumbnail";
 
 export const PdfNavigationSheet = ({
   open,
@@ -96,6 +103,7 @@ export const PdfNavigationSheet = ({
   const [downloadError, setDownloadError] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [thumbnails, setThumbnails] = useState<Map<number, string>>(new Map());
+  const [failedPages, setFailedPages] = useState<Set<number>>(new Set());
   const thumbnailWidth = (containerWidth - THUMBNAIL_GAP * (THUMBNAIL_COLUMNS + 1)) / THUMBNAIL_COLUMNS;
   const thumbnailHeight = thumbnailWidth * 1.4;
 
@@ -127,6 +135,7 @@ export const PdfNavigationSheet = ({
     if (!cachedUri) return;
     let cancelled = false;
     const results = new Map<number, string>();
+    const failed = new Set<number>();
 
     const generateBatch = async (startPage: number) => {
       const batchEnd = Math.min(startPage + THUMBNAIL_BATCH_SIZE, totalPages);
@@ -134,15 +143,19 @@ export const PdfNavigationSheet = ({
       for (let i = startPage; i < batchEnd; i++) {
         promises.push(
           generateThumbnail(cachedUri, i, 60)
-            .then((result) => ({ page: i + 1, uri: result.uri }))
-            .catch(() => null),
+            .then((result) => ({ page: i + 1, uri: result.uri, ok: true as const }))
+            .catch(() => ({ page: i + 1, ok: false as const })),
         );
       }
       const batch = await Promise.all(promises);
       for (const result of batch) {
-        if (result) results.set(result.page, result.uri);
+        if (result.ok) results.set(result.page, result.uri);
+        else failed.add(result.page);
       }
-      if (!cancelled) setThumbnails(new Map(results));
+      if (!cancelled) {
+        setThumbnails(new Map(results));
+        setFailedPages(new Set(failed));
+      }
       if (batchEnd < totalPages && !cancelled) {
         await generateBatch(batchEnd);
       }
@@ -245,6 +258,7 @@ export const PdfNavigationSheet = ({
                 thumbnailWidth={thumbnailWidth}
                 thumbnailHeight={thumbnailHeight}
                 isCurrent={page === currentPage}
+                failed={failedPages.has(page)}
                 onPress={handlePagePress}
               />
             )}

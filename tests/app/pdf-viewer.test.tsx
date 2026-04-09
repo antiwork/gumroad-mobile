@@ -23,6 +23,10 @@ jest.mock("@/lib/media-location", () => ({
   updateMediaLocation: jest.fn(),
 }));
 
+jest.mock("@/modules/pdf-thumbnail", () => ({
+  generateThumbnail: jest.fn().mockResolvedValue({ uri: "file:///thumb.jpg", width: 300, height: 420 }),
+}));
+
 let mockOnError: ((e: unknown) => void) | null = null;
 
 jest.mock("react-native-pdf", () => {
