@@ -2,6 +2,7 @@ import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { Keyboard, Platform, TextInput, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export const PageIndicator = ({
   currentPage,
@@ -16,6 +17,7 @@ export const PageIndicator = ({
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<TextInput>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const { bottom: safeAreaBottom } = useSafeAreaInsets();
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -40,7 +42,7 @@ export const PageIndicator = ({
   return (
     <View
       className="absolute right-0 left-0 items-center"
-      style={{ bottom: keyboardHeight > 0 ? keyboardHeight + 8 : 32 }}
+      style={{ bottom: keyboardHeight > 0 ? keyboardHeight + safeAreaBottom + 8 : 32 }}
     >
       <TouchableOpacity
         activeOpacity={0.7}
