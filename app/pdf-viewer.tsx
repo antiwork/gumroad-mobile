@@ -48,6 +48,22 @@ export default function PdfViewerScreen() {
     requestAnimationFrame(() => setPdfMounted(true));
   };
 
+  useEffect(() => {
+    if (!urlRedirectId || !productFileId) return;
+
+    const timer = setTimeout(() => {
+      updateMediaLocation({
+        urlRedirectId,
+        productFileId,
+        purchaseId,
+        location: currentPage,
+        accessToken,
+      });
+    }, 10_000);
+
+    return () => clearTimeout(timer);
+  }, [urlRedirectId, productFileId, purchaseId, currentPage, accessToken]);
+
   useEffect(
     () => () => {
       if (!urlRedirectId || !productFileId) return;
