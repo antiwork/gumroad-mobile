@@ -13,24 +13,31 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
 ### 1. Fetch build credentials from 1Password
 
 1. Check if the `op` CLI is installed (`which op`). If not, install it:
+
    ```
    arch -arm64 brew install 1password-cli
    ```
+
    Then tell the user to enable the 1Password desktop app integration (Settings → Developer → CLI) and run `! op signin` to authenticate.
 
 2. Fetch the build credentials from 1Password:
+
    ```
    op item get "gumroad-mobile .env.build.local - build credentials for Expo mobile app" --format=json
    ```
+
    Parse the `notesPlain` field to extract the env var block (between the triple backticks).
 
 3. Write the env vars to `.env.build.local` in the project root (overwrite if it exists).
 
 4. Download the `google-services.json` attachment from the same 1Password item:
+
    ```
    op item get "gumroad-mobile .env.build.local - build credentials for Expo mobile app" --format=json
    ```
+
    Find the file attachment ID from the `files` array, then download it:
+
    ```
    op read "op://Engineering/<item-id>/<file-id>" > google-services.json
    ```

@@ -46,10 +46,13 @@ Upload the `.aab` to Google Play using `fastlane supply`.
 1. Check if `fastlane` is installed. If not, install it (`brew install fastlane`).
 2. Check if `gcloud` CLI is installed. If not, install it (`arch -arm64 brew install google-cloud-sdk`). Have the user sign in with `! gcloud auth login` if needed.
 3. Check if `play-store-key.json` exists in the project root. If not, set one up using `gcloud`:
+
    ```
    gcloud iam service-accounts list
    ```
+
    Find the email for "Play Console Service Account". If none exists, prompt the user to create it and give it publishing permission in Google Play Console (Setup → API access).
+
    ```
    gcloud iam service-accounts keys create play-store-key.json --iam-account=<SERVICE_ACCOUNT_EMAIL>
    ```
