@@ -202,7 +202,7 @@ export default function PostScreen() {
                     className="self-end"
                     variant="outline"
                     onPress={() => handleFileDownload(file.id)}
-                    disabled={downloadingFileId === file.id}
+                    disabled={!purchase || downloadingFileId === file.id}
                   >
                     {downloadingFileId === file.id ? <LoadingSpinner size="small" /> : <Text>Download</Text>}
                   </Button>
