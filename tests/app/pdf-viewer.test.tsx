@@ -11,7 +11,7 @@ jest.mock("expo-sharing", () => ({
 }));
 
 jest.mock("expo-file-system", () => ({
-  File: { downloadFileAsync: jest.fn() },
+  File: { downloadFileAsync: jest.fn().mockResolvedValue({ uri: "file:///cache/test.pdf" }) },
   Paths: { cache: "/cache" },
 }));
 

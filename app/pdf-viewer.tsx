@@ -1,4 +1,6 @@
 import { LineIcon, SolidIcon } from "@/components/icon";
+import { PageIndicator } from "@/components/page-indicator";
+import { PdfNavigationSheet } from "@/components/pdf-navigation-sheet";
 import { Screen } from "@/components/ui/screen";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
@@ -10,22 +12,10 @@ import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Dimensions, FlatList, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Dimensions, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-
-type FlattenedTocItem = {
-  title: string;
-  pageIdx: number;
-  depth: number;
-};
-
-const flattenToc = (items: TableContent[], depth = 0): FlattenedTocItem[] =>
-  items.flatMap((item) => [
-    { title: item.title, pageIdx: Number(item.pageIdx), depth },
-    ...flattenToc(item.children ?? [], depth + 1),
-  ]);
 
 export default function PdfViewerScreen() {
   const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } = useLocalSearchParams<{
@@ -67,7 +57,6 @@ export default function PdfViewerScreen() {
         productFileId,
         purchaseId,
         // We deliberately use the latest value of the ref for the latest media location
-
         location: currentPageRef.current,
         accessToken,
       });
@@ -75,12 +64,9 @@ export default function PdfViewerScreen() {
     [urlRedirectId, productFileId, purchaseId, currentPageRef, accessToken],
   );
 
-  const handleTocItemPress = (pageIdx: number) => {
-    pdfRef.current?.setPage(pageIdx + 1);
-    setShowTocModal(false);
+  const handlePageSelect = (page: number) => {
+    pdfRef.current?.setPage(page);
   };
-
-  const flattenedToc = flattenToc(tableOfContents);
 
   return (
     <Screen>
@@ -112,11 +98,9 @@ export default function PdfViewerScreen() {
                   className={cn("text-accent", Platform.OS === "ios" && "-rotate-90")}
                 />
               </TouchableOpacity>
-              {tableOfContents.length > 0 && (
-                <TouchableOpacity onPress={() => setShowTocModal(true)} className="p-2">
-                  <SolidIcon name="book-content" size={24} className="text-accent" />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity onPress={() => setShowTocModal(true)} className="p-2">
+                <SolidIcon name="book-content" size={24} className="text-accent" />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowViewModeModal(true)} className="p-2">
                 {viewMode === "continuous" ? (
                   <LineIcon name="move-vertical" size={24} className="text-accent" />
@@ -166,31 +150,15 @@ export default function PdfViewerScreen() {
         />
       ) : null}
 
-      <Sheet open={showTocModal} onOpenChange={setShowTocModal}>
-        <SheetHeader onClose={() => setShowTocModal(false)}>
-          <SheetTitle>Table of Contents</SheetTitle>
-        </SheetHeader>
-        <SheetContent>
-          <FlatList
-            data={flattenedToc}
-            keyExtractor={(item, index) => `${item.pageIdx}-${index}`}
-            renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => handleTocItemPress(item.pageIdx)}>
-                <View className="border-b border-border py-3 pr-4" style={{ paddingLeft: 16 + item.depth * 16 }}>
-                  <Text className="text-base text-foreground" numberOfLines={2}>
-                    {item.title}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={
-              <View className="items-center justify-center p-8">
-                <Text className="text-muted">No table of contents available</Text>
-              </View>
-            }
-          />
-        </SheetContent>
-      </Sheet>
+      <PdfNavigationSheet
+        open={showTocModal}
+        onOpenChange={setShowTocModal}
+        uri={uri}
+        tableOfContents={tableOfContents}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        onPageSelect={handlePageSelect}
+      />
 
       <Sheet open={showViewModeModal} onOpenChange={setShowViewModeModal}>
         <SheetHeader onClose={() => setShowViewModeModal(false)}>
@@ -227,13 +195,11 @@ export default function PdfViewerScreen() {
       </Sheet>
 
       {totalPages > 0 && (
-        <View className="absolute right-0 bottom-8 left-0 items-center">
-          <View className="flex-row items-center gap-2 rounded bg-background/70 px-4 py-2">
-            <Text className="text-lg font-semibold tracking-wide text-foreground">
-              {currentPage} / {totalPages}
-            </Text>
-          </View>
-        </View>
+        <PageIndicator
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onJumpToPage={(page) => pdfRef.current?.setPage(page)}
+        />
       )}
     </Screen>
   );

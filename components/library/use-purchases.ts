@@ -9,6 +9,7 @@ export interface PostFile {
   name: string;
   filegroup?: string;
   streaming_url?: string;
+  latest_media_location?: { location: number };
 }
 
 export interface Post {
