@@ -17,7 +17,8 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
 3. Read `.env.build.local` and extract the value of `EXPO_PUBLIC_GUMROAD_URL` — you'll need it later for verification.
 4. Check if `.env.build.local` contains `EXPO_APPLE_ID`. If not, prompt the user for their Apple ID email and add it to the file.
 5. Check if `.env.build.local` contains `EXPO_APPLE_PASSWORD`. If not, explain to the user how they can create an app-specific password for their Apple account and prompt them to enter it. Then add it to the file.
-6. Source the env file so all subsequent commands have access to its variables:
+6. Verify that the `gcloud` CLI is installed and logged in.
+7. Source the env file so all subsequent commands have access to its variables:
    ```
    set -a && source .env.build.local && set +a
    ```
@@ -43,7 +44,9 @@ rm -rf $TMPDIR/haste-map-* $TMPDIR/metro-cache
 
 ### 4. Build
 
-Determine which platforms to build based on the argument (default: both).
+First, run `npm run rebuild` to regenerate the native directories.
+
+Next, determine which platforms to build based on the argument (default: both).
 
 For each platform, run the build command (the env vars from `.env.build.local` are already set from step 1, and dotenv-flow won't override existing env vars):
 
@@ -106,12 +109,20 @@ First, upload to the internal test track:
 fastlane supply --aab <path-to-aab> --track internal --json_key play-store-key.json --package_name <ANDROID_BUNDLE_NAME> --skip_upload_metadata --skip_upload_changelogs --skip_upload_images --skip_upload_screenshots
 ```
 
-Then create a draft production release with the same AAB:
-
-```
-fastlane supply --aab <path-to-aab> --track production --release_status draft --json_key play-store-key.json --package_name <ANDROID_BUNDLE_NAME> --skip_upload_metadata --skip_upload_changelogs --skip_upload_images --skip_upload_screenshots
-```
-
 Use a generous timeout (5 minutes) for each command.
 
-Tell the user the internal test release is live and the production release is saved as a draft in Google Play Console, ready to be reviewed and published manually.
+Tell the user the internal test release is live and let them know how they can promote it to production in Google Play Console.
+
+### 7. Suggest release notes
+
+1. Find the most recent "Bump version" commit before the current one:
+   ```
+   git log --oneline --all --grep="Bump version" -n 2
+   ```
+   Use the second result (the previous version bump) as the starting point.
+2. Collect all commit subjects since that commit:
+   ```
+   git log --oneline <previous-bump-commit>..HEAD
+   ```
+3. Based on those commits, draft a single sentence for the release notes which highlights the one or two most impactful changes, e.g. "PDF viewer improvements and bug fixes."
+4. Print the suggested release notes for the user to copy into App Store Connect and/or Google Play Console.
