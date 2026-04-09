@@ -62,7 +62,7 @@ export const request = async <T>(
       if (!response.ok) {
         if (RETRYABLE_STATUS_CODES.includes(response.status) && attempt < MAX_RETRIES) {
           console.info("HTTP request (retrying)", { ...details, attempt: attempt + 1 });
-          await sleep(INITIAL_BACKOFF_MS * 2 ** attempt, options?.signal);
+          await sleep(INITIAL_BACKOFF_MS * 2 ** attempt, options?.signal ?? undefined);
           continue;
         }
 
