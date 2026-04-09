@@ -45,10 +45,7 @@ const PageThumbnail = memo(
   }) => (
     <TouchableOpacity onPress={() => onPress(page)} style={{ width: thumbnailWidth }}>
       <View
-        className={cn(
-          "overflow-hidden rounded-lg border-2",
-          isCurrent ? "border-accent" : "border-border",
-        )}
+        className={cn("overflow-hidden rounded-lg border-2", isCurrent ? "border-accent" : "border-border")}
         style={{ width: thumbnailWidth, height: thumbnailHeight }}
       >
         {thumbnailUri ? (
@@ -67,12 +64,7 @@ const PageThumbnail = memo(
           </View>
         )}
       </View>
-      <Text
-        className={cn(
-          "mt-1 text-center text-xs",
-          isCurrent ? "font-bold text-accent" : "text-muted-foreground",
-        )}
-      >
+      <Text className={cn("mt-1 text-center text-xs", isCurrent ? "font-bold text-accent" : "text-muted-foreground")}>
         {page}
       </Text>
     </TouchableOpacity>
