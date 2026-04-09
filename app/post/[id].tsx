@@ -137,8 +137,6 @@ export default function PostScreen() {
     );
   }
 
-  console.log("files", post.files_data);
-
   return (
     <Screen>
       <Stack.Screen options={{ title: "" }} />
