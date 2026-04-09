@@ -42,10 +42,12 @@ export default function PdfViewerScreen() {
 
   const switchViewMode = (mode: "single" | "continuous") => {
     // Unmount the PDF component first to let the native rendering thread finish
-    // before the document is closed, avoiding IllegalStateException: Already closed
+    // before the document is closed, avoiding IllegalStateException: Already closed.
+    // Use a 100ms delay before remounting to give the native view time to fully
+    // release resources, preventing "Get page pdf document null" RuntimeException.
     setPdfMounted(false);
     setViewMode(mode);
-    requestAnimationFrame(() => setPdfMounted(true));
+    setTimeout(() => setPdfMounted(true), 100);
   };
 
   useEffect(
@@ -101,7 +103,7 @@ export default function PdfViewerScreen() {
               <TouchableOpacity onPress={() => setShowTocModal(true)} className="p-2">
                 <SolidIcon name="book-content" size={24} className="text-accent" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowViewModeModal(true)} className="p-2">
+              <TouchableOpacity testID="view-mode-button" onPress={() => setShowViewModeModal(true)} className="p-2">
                 {viewMode === "continuous" ? (
                   <LineIcon name="move-vertical" size={24} className="text-accent" />
                 ) : (

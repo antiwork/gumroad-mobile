@@ -1,0 +1,116 @@
+diff --git a/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java b/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
+index e9a1d16..4ec1a94 100644
+--- a/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
++++ b/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
+@@ -65,6 +65,7 @@ import com.google.gson.Gson;
+ import org.wonday.pdf.events.TopChangeEvent;
+ 
+ public class PdfView extends PDFView implements OnPageChangeListener,OnLoadCompleteListener,OnErrorListener,OnTapListener,OnDrawListener,OnPageScrollListener, LinkHandler {
++    private boolean hasError = false;
+     private int page = 1;               // start from 1
+     private boolean horizontal = false;
+     private float scale = 1;
+@@ -150,25 +151,31 @@ public class PdfView extends PDFView implements OnPageChangeListener,OnLoadCompl
+ 
+     @Override
+     public void loadComplete(int numberOfPages) {
+-        SizeF pageSize = getPageSize(0);
+-        float width = pageSize.getWidth();
+-        float height = pageSize.getHeight();
++        try {
++            SizeF pageSize = getPageSize(0);
++            float width = pageSize.getWidth();
++            float height = pageSize.getHeight();
+ 
+-        this.zoomTo(this.scale);
+-        WritableMap event = Arguments.createMap();
++            this.zoomTo(this.scale);
++            WritableMap event = Arguments.createMap();
+ 
+-        //create a new json Object for the TableOfContents
+-        Gson gson = new Gson();
+-        event.putString("message", "loadComplete|"+numberOfPages+"|"+width+"|"+height+"|"+gson.toJson(this.getTableOfContents()));
++            //create a new json Object for the TableOfContents
++            Gson gson = new Gson();
++            event.putString("message", "loadComplete|"+numberOfPages+"|"+width+"|"+height+"|"+gson.toJson(this.getTableOfContents()));
+ 
+-        ThemedReactContext context = (ThemedReactContext) getContext();
+-        EventDispatcher dispatcher = UIManagerHelper.getEventDispatcherForReactTag(context, getId());
+-        int surfaceId = UIManagerHelper.getSurfaceId(this);
++            ThemedReactContext context = (ThemedReactContext) getContext();
++            EventDispatcher dispatcher = UIManagerHelper.getEventDispatcherForReactTag(context, getId());
++            int surfaceId = UIManagerHelper.getSurfaceId(this);
+ 
+-        TopChangeEvent tce = new TopChangeEvent(surfaceId, getId(), event);
++            TopChangeEvent tce = new TopChangeEvent(surfaceId, getId(), event);
+ 
+-        if (dispatcher != null) {
+-            dispatcher.dispatchEvent(tce);
++            if (dispatcher != null) {
++                dispatcher.dispatchEvent(tce);
++            }
++        } catch (Exception e) {
++            Log.e("PdfView", "Error in loadComplete", e);
++            onError(e);
++            return;
+         }
+         //        ReactContext reactContext = (ReactContext)this.getContext();
+ //        reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
+@@ -183,6 +190,7 @@ public class PdfView extends PDFView implements OnPageChangeListener,OnLoadCompl
+ 
+     @Override
+     public void onError(Throwable t){
++        this.hasError = true;
+         WritableMap event = Arguments.createMap();
+         if (t.getMessage().contains("Password required or incorrect password")) {
+             event.putString("message", "error|Password required or incorrect password.");
+@@ -285,8 +293,14 @@ public class PdfView extends PDFView implements OnPageChangeListener,OnLoadCompl
+     @Override
+     protected void onAttachedToWindow() {
+         super.onAttachedToWindow();
+-        if (this.isRecycled())
+-            this.drawPdf();
++        if (this.isRecycled()) {
++            try {
++                this.drawPdf();
++            } catch (Exception e) {
++                Log.e("PdfView", "Error re-drawing recycled PDF", e);
++                onError(e);
++            }
++        }
+     }
+ 
+     private int getPdfPageCount(File pdfFile) throws IOException {
+@@ -301,6 +315,7 @@ public class PdfView extends PDFView implements OnPageChangeListener,OnLoadCompl
+ 
+     public void drawPdf() {
+         showLog(format("drawPdf path:%s %s", this.path, this.page));
++        this.hasError = false;
+ 
+         if (this.path != null){
+ 
+@@ -370,6 +385,24 @@ public class PdfView extends PDFView implements OnPageChangeListener,OnLoadCompl
+                 configurator.onTap(this);
+             }
+ 
++            // Install an uncaught exception handler to catch RuntimeExceptions from the
++            // pdfium rendering thread (e.g., "Get page pdf document null" when the native
++            // document handle is null due to failed initialization or race conditions).
++            final Thread.UncaughtExceptionHandler previousHandler = Thread.getDefaultUncaughtExceptionHandler();
++            Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
++                if (throwable instanceof RuntimeException
++                        && throwable.getMessage() != null
++                        && throwable.getMessage().contains("pdf document null")) {
++                    Log.e("PdfView", "Caught null document crash on rendering thread", throwable);
++                    new Handler(Looper.getMainLooper()).post(() -> onError(throwable));
++                    return;
++                }
++                // Re-throw all other exceptions to the previous handler
++                if (previousHandler != null) {
++                    previousHandler.uncaughtException(thread, throwable);
++                }
++            });
++
+             configurator.load();
+         }
+     }
