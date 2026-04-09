@@ -1,0 +1,9 @@
+{
+  "platforms": ["ios", "android"],
+  "ios": {
+    "modules": ["PdfThumbnailModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.pdfthumbnail.PdfThumbnailModule"]
+  }
+}

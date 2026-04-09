@@ -2,14 +2,16 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, TouchableOpacity, View, ViewToken } from "react-native";
-import Pdf, { TableContent } from "react-native-pdf";
+import { Image } from "expo-image";
+import { memo, useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, TouchableOpacity, View } from "react-native";
+import { TableContent } from "react-native-pdf";
+import { generateThumbnail } from "@/modules/pdf-thumbnail";
 import { File, Paths } from "expo-file-system";
 
 const THUMBNAIL_COLUMNS = 3;
 const THUMBNAIL_GAP = 12;
-const VIEWPORT_BUFFER = 6;
+const THUMBNAIL_BATCH_SIZE = 9;
 
 type FlattenedTocItem = {
   title: string;
@@ -23,19 +25,17 @@ const flattenToc = (items: TableContent[], depth = 0): FlattenedTocItem[] =>
     ...flattenToc(item.children ?? [], depth + 1),
   ]);
 
-const PdfThumbnail = memo(
+const PageThumbnail = memo(
   ({
     page,
-    isNearViewport,
-    cachedUri,
+    thumbnailUri,
     thumbnailWidth,
     thumbnailHeight,
     isCurrent,
     onPress,
   }: {
     page: number;
-    isNearViewport: boolean;
-    cachedUri: string;
+    thumbnailUri: string | undefined;
     thumbnailWidth: number;
     thumbnailHeight: number;
     isCurrent: boolean;
@@ -48,17 +48,17 @@ const PdfThumbnail = memo(
           isCurrent ? "border-accent" : "border-border",
         )}
         style={{ width: thumbnailWidth, height: thumbnailHeight }}
-        pointerEvents="none"
       >
-        {isNearViewport ? (
-          <Pdf
-            source={{ uri: cachedUri }}
-            singlePage
-            page={page}
+        {thumbnailUri ? (
+          <Image
+            source={{ uri: thumbnailUri }}
             style={{ width: thumbnailWidth, height: thumbnailHeight }}
+            contentFit="contain"
           />
         ) : (
-          <View className="flex-1 items-center justify-center bg-muted" />
+          <View className="flex-1 items-center justify-center bg-muted">
+            <ActivityIndicator size="small" />
+          </View>
         )}
       </View>
       <Text
@@ -95,7 +95,7 @@ export const PdfNavigationSheet = ({
   const [cachedUri, setCachedUri] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set());
+  const [thumbnails, setThumbnails] = useState<Map<number, string>>(new Map());
   const thumbnailWidth = (containerWidth - THUMBNAIL_GAP * (THUMBNAIL_COLUMNS + 1)) / THUMBNAIL_COLUMNS;
   const thumbnailHeight = thumbnailWidth * 1.4;
 
@@ -123,18 +123,36 @@ export const PdfNavigationSheet = ({
 
   useEffect(downloadPdf, [downloadPdf]);
 
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 1 }).current;
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    const pageNumbers = viewableItems.map((item) => item.item as number);
-    if (pageNumbers.length === 0) return;
-    const min = Math.min(...pageNumbers);
-    const max = Math.max(...pageNumbers);
-    const buffered = new Set<number>();
-    for (let p = min - VIEWPORT_BUFFER; p <= max + VIEWPORT_BUFFER; p++) {
-      buffered.add(p);
-    }
-    setVisiblePages(buffered);
-  }).current;
+  useEffect(() => {
+    if (!cachedUri) return;
+    let cancelled = false;
+    const results = new Map<number, string>();
+
+    const generateBatch = async (startPage: number) => {
+      const batchEnd = Math.min(startPage + THUMBNAIL_BATCH_SIZE, totalPages);
+      const promises = [];
+      for (let i = startPage; i < batchEnd; i++) {
+        promises.push(
+          generateThumbnail(cachedUri, i, 60)
+            .then((result) => ({ page: i + 1, uri: result.uri }))
+            .catch(() => null),
+        );
+      }
+      const batch = await Promise.all(promises);
+      for (const result of batch) {
+        if (result) results.set(result.page, result.uri);
+      }
+      if (!cancelled) setThumbnails(new Map(results));
+      if (batchEnd < totalPages && !cancelled) {
+        await generateBatch(batchEnd);
+      }
+    };
+
+    generateBatch(0);
+    return () => {
+      cancelled = true;
+    };
+  }, [cachedUri, totalPages]);
 
   const handlePagePress = useCallback(
     (page: number) => {
@@ -213,21 +231,17 @@ export const PdfNavigationSheet = ({
             contentContainerStyle={{ padding: THUMBNAIL_GAP }}
             columnWrapperStyle={{ gap: THUMBNAIL_GAP, marginBottom: THUMBNAIL_GAP }}
             initialNumToRender={9}
-            maxToRenderPerBatch={6}
-            windowSize={3}
-            removeClippedSubviews
-            viewabilityConfig={viewabilityConfig}
-            onViewableItemsChanged={onViewableItemsChanged}
+            maxToRenderPerBatch={9}
+            windowSize={5}
             ListEmptyComponent={
               <View className="flex-1 items-center justify-center p-8">
                 <ActivityIndicator />
               </View>
             }
             renderItem={({ item: page }) => (
-              <PdfThumbnail
+              <PageThumbnail
                 page={page}
-                isNearViewport={visiblePages.has(page)}
-                cachedUri={cachedUri}
+                thumbnailUri={thumbnails.get(page)}
                 thumbnailWidth={thumbnailWidth}
                 thumbnailHeight={thumbnailHeight}
                 isCurrent={page === currentPage}
