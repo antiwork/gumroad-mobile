@@ -2,8 +2,10 @@ import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
 import { safeOpenURL } from "@/lib/open-url";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, TouchableOpacity, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { runOnJS } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TrackPlayer, {
   RepeatMode,
@@ -132,11 +134,57 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     await updateQueueState();
   };
 
-  const handleSeek = async (locationX: number, width: number) => {
-    const percentage = locationX / width;
-    const newPosition = percentage * duration;
-    await TrackPlayer.seekTo(newPosition);
-  };
+  const [seekProgress, setSeekProgress] = useState<number | null>(null);
+  const barWidthRef = useRef(0);
+
+  const positionToSeekProgress = (x: number) => Math.max(0, Math.min(100, (x / barWidthRef.current) * 100));
+
+  const updateSeeking = useCallback((x: number) => {
+    if (barWidthRef.current > 0 && duration > 0) {
+      setSeekProgress(positionToSeekProgress(x));
+    }
+  }, []);
+
+  const finishSeeking = useCallback(
+    (x: number) => {
+      if (barWidthRef.current > 0 && duration > 0) {
+        const pct = positionToSeekProgress(x);
+        setSeekProgress(pct);
+        TrackPlayer.seekTo((pct / 100) * duration);
+      }
+    },
+    [duration],
+  );
+
+  useEffect(() => {
+    // The player takes a second to catch up after seeking, so keeping seekProgress until the
+    // track position has caught up avoids an awkward UI flicker back to the old position
+    if (seekProgress != null && duration > 0) {
+      const target = (seekProgress / 100) * duration;
+      if (Math.abs(position - target) < 1) {
+        setSeekProgress(null);
+      }
+    }
+  }, [position, seekProgress, duration]);
+
+  const seekGesture = Gesture.Pan()
+    .hitSlop({ vertical: 16 })
+    .onBegin((e) => {
+      runOnJS(updateSeeking)(e.x);
+    })
+    .onUpdate((e) => {
+      runOnJS(updateSeeking)(e.x);
+    })
+    .onFinalize((e) => {
+      runOnJS(finishSeeking)(e.x);
+    });
+
+  const tapGesture = Gesture.Tap().onEnd((e) => {
+    runOnJS(finishSeeking)(e.x);
+  });
+
+  const seekBarGesture = Gesture.Exclusive(seekGesture, tapGesture);
+  const displayProgress = seekProgress ?? progress;
 
   if (!activeTrack) {
     return null;
@@ -184,25 +232,27 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
         </View>
 
         <View className="px-8 pb-8">
-          <TouchableOpacity
-            onPress={(e) => handleSeek(e.nativeEvent.locationX, e.nativeEvent.target ? 300 : 300)}
-            onLayout={() => {}}
-            className="mb-2"
-          >
+          <GestureDetector gesture={seekBarGesture}>
             <View
-              className="h-1 w-full rounded-full bg-muted"
-              onStartShouldSetResponder={() => true}
-              onResponderRelease={(e) => {
-                const width = e.nativeEvent.target ? 300 : 300;
-                handleSeek(e.nativeEvent.locationX, width);
+              className="mb-2 justify-center py-2"
+              onLayout={(e) => {
+                barWidthRef.current = e.nativeEvent.layout.width;
               }}
             >
-              <View className="h-1 rounded-full bg-primary" style={{ width: `${progress}%` }} />
+              <View className="h-1 w-full rounded-full bg-muted">
+                <View className="h-1 rounded-full bg-primary" style={{ width: `${displayProgress}%` }} />
+              </View>
+              <View
+                className="absolute size-4 rounded-full bg-primary"
+                style={{ left: `${displayProgress}%`, marginLeft: -8 }}
+              />
             </View>
-          </TouchableOpacity>
+          </GestureDetector>
 
           <View className="mb-8 flex-row justify-between">
-            <Text className="text-xs text-muted-foreground">{formatTime(position)}</Text>
+            <Text className="text-xs text-muted-foreground">
+              {formatTime(seekProgress != null ? (seekProgress / 100) * duration : position)}
+            </Text>
             <Text className="text-xs text-muted-foreground">{formatTime(duration)}</Text>
           </View>
 
