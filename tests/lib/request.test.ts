@@ -98,9 +98,7 @@ describe("request", () => {
   });
 
   it("retries on 504 and succeeds on retry", async () => {
-    mockFetch
-      .mockReturnValueOnce(jsonResponse("Gateway Timeout", 504))
-      .mockReturnValueOnce(jsonResponse({ ok: true }));
+    mockFetch.mockReturnValueOnce(jsonResponse("Gateway Timeout", 504)).mockReturnValueOnce(jsonResponse({ ok: true }));
     const promise = request("https://api.example.com/test");
     await jest.advanceTimersByTimeAsync(500);
     const result = await promise;
