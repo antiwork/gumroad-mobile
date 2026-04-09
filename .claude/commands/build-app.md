@@ -75,7 +75,7 @@ Next, determine which platforms to build based on the argument (default: both).
 For each platform, run the build command:
 
 ```
-npm run eas -- build --platform <platform> --profile production --local --non-interactive
+set -a && source .env.build.local && set +a && npx dotenv-flow -- npx eas build --platform <platform> --profile production --local --non-interactive
 ```
 
 where `<platform>` is `ios` or `android`.
@@ -84,7 +84,7 @@ IMPORTANT: This command may take a while. Run it with a generous timeout (10 min
 
 The build command outputs the path to the built artifact (`.ipa` for iOS, `.aab` for Android). Capture this path from the output.
 
-If building both platforms, build them sequentially (iOS first, then Android).
+If building both platforms, run them in parallel using a single background bash command that spawns both builds concurrently (using `&` and `wait`).
 
 ### 5. Verify iOS build (iOS only)
 
