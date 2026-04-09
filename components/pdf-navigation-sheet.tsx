@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, TouchableOpacity, View } from "react-native";
 import Pdf, { TableContent } from "react-native-pdf";
 import { File, Paths } from "expo-file-system";
@@ -42,6 +42,7 @@ export const PdfNavigationSheet = ({
   const hasToc = tableOfContents.length > 0;
   const [activeTab, setActiveTab] = useState<"contents" | "pages">("pages");
   const [cachedUri, setCachedUri] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const thumbnailWidth = (containerWidth - THUMBNAIL_GAP * (THUMBNAIL_COLUMNS + 1)) / THUMBNAIL_COLUMNS;
   const thumbnailHeight = thumbnailWidth * 1.4;
@@ -50,17 +51,25 @@ export const PdfNavigationSheet = ({
     if (hasToc) setActiveTab("contents");
   }, [hasToc]);
 
-  useEffect(() => {
+  const downloadPdf = useCallback(() => {
     let cancelled = false;
+    setDownloadError(false);
+    setCachedUri(null);
     File.downloadFileAsync(uri, Paths.cache, { idempotent: true })
       .then((result) => {
         if (!cancelled) setCachedUri(result.uri);
       })
-      .catch(() => {});
+      .catch((e) => {
+        console.error("Error downloading PDF", e);
+        if (!cancelled) setDownloadError(true);
+      });
+
     return () => {
       cancelled = true;
     };
   }, [uri]);
+
+  useEffect(downloadPdf, [downloadPdf]);
 
   const flattenedToc = flattenToc(tableOfContents);
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -114,6 +123,13 @@ export const PdfNavigationSheet = ({
               </TouchableOpacity>
             )}
           />
+        ) : downloadError ? (
+          <View className="flex-1 items-center justify-center gap-4 px-8">
+            <Text className="text-center text-base text-foreground">Unable to load page thumbnails.</Text>
+            <Button onPress={downloadPdf}>
+              <Text className="text-base font-semibold text-white">Try Again</Text>
+            </Button>
+          </View>
         ) : cachedUri && containerWidth > 0 ? (
           <FlatList
             key="pages"
@@ -126,6 +142,11 @@ export const PdfNavigationSheet = ({
             initialNumToRender={9}
             maxToRenderPerBatch={6}
             windowSize={3}
+            ListEmptyComponent={
+              <View className="flex-1 items-center justify-center p-8">
+                <ActivityIndicator />
+              </View>
+            }
             renderItem={({ item: page }) => (
               <TouchableOpacity
                 onPress={() => {
