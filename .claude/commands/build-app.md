@@ -47,6 +47,26 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
    set -a && source .env.build.local && set +a
    ```
 
+### 1b. Check build tool prerequisites
+
+1. **EAS CLI**: Must be installed globally (`npm install -g eas-cli`) and logged in. If not logged in, have the user run `! eas login --sso`. The Expo project is under the `anti-work` org — the user must be a member.
+
+2. **Fastlane**: Required for iOS builds (EAS uses it for signing/archiving). Install with `arch -arm64 brew install fastlane` if missing.
+
+3. **JDK 17+**: Required for Android builds (Gradle 9 needs it). Install with `arch -arm64 brew install openjdk@17` and symlink:
+   ```
+   sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
+   ```
+   Set `JAVA_HOME` in the build command:
+   ```
+   export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+   ```
+
+4. **Android SDK**: Required for local Android builds. Install Android Studio (`arch -arm64 brew install --cask android-studio`), open it once to complete the setup wizard, then set:
+   ```
+   export ANDROID_HOME=~/Library/Android/sdk
+   ```
+
 ### 2. Update version
 
 Update the `version` field in `app.config.ts` to today's date in `YYYY.MM.DD` format (e.g., `2026.03.26`). If the version already matches today's date, skip this step. Otherwise:
@@ -72,10 +92,14 @@ First, run `npm install` then `npm run rebuild` to regenerate the native directo
 
 Next, determine which platforms to build based on the argument (default: both).
 
-For each platform, run the build command:
+For each platform, run the build command with env vars and JDK set:
 
 ```
-set -a && source .env.build.local && set +a && npx dotenv-flow -- npx eas build --platform <platform> --profile production --local --non-interactive
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+export PATH="$JAVA_HOME/bin:$PATH"
+export ANDROID_HOME=~/Library/Android/sdk
+set -a && source .env.build.local && set +a
+npx dotenv-flow -- eas build --platform <platform> --profile production --local --non-interactive
 ```
 
 where `<platform>` is `ios` or `android`.
@@ -84,7 +108,7 @@ IMPORTANT: This command may take a while. Run it with a generous timeout (10 min
 
 The build command outputs the path to the built artifact (`.ipa` for iOS, `.aab` for Android). Capture this path from the output.
 
-If building both platforms, run them in parallel using a single background bash command that spawns both builds concurrently (using `&` and `wait`).
+If building both platforms, run them in parallel using a single background bash command that spawns both builds concurrently (using `&` and `wait`). Note: parallel builds are memory-intensive — if an Android build fails with `OutOfMemoryError: Metaspace`, the Gradle JVM args in `android/gradle.properties` may need increasing (e.g., `-Xmx4096m -XX:MaxMetaspaceSize=1024m`).
 
 ### 5. Verify iOS build (iOS only)
 
