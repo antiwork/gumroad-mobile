@@ -12,7 +12,8 @@ import * as Sentry from "@sentry/react-native";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useCallback, useRef, useState } from "react";
+import { Asset } from "expo-asset";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView } from "react-native-webview";
@@ -32,6 +33,21 @@ const downloadFile = (urlRedirectToken: string, productFileId: string) =>
     },
   );
 
+const fontDataPromise = Promise.all(
+  [
+    { module: require("@/assets/fonts/ABCFavorit-Regular-custom.ttf"), weight: 400, style: "normal" },
+    { module: require("@/assets/fonts/ABCFavorit-Bold-custom.ttf"), weight: 700, style: "normal" },
+    { module: require("@/assets/fonts/ABCFavorit-RegularItalic-custom.ttf"), weight: 400, style: "italic" },
+    { module: require("@/assets/fonts/ABCFavorit-BoldItalic-custom.ttf"), weight: 700, style: "italic" },
+  ].map(async ({ module, weight, style }) => {
+    const asset = Asset.fromModule(module);
+    await asset.downloadAsync();
+    if (!asset.localUri) throw new Error("Failed to load font asset");
+    const file = new File(asset.localUri);
+    return { weight, style, base64: await file.base64() };
+  }),
+);
+
 export default function PostScreen() {
   const { id, purchaseId, subscriptionId, followerId } = useLocalSearchParams<{
     id: string;
@@ -45,14 +61,31 @@ export default function PostScreen() {
   const { width } = useWindowDimensions();
   const [bodyHeight, setBodyHeight] = useState(0);
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+  const [fontFaces, setFontFaces] = useState("");
   const webViewRef = useRef<BaseWebView>(null);
 
   const [foreground, bodyBg, fontFamily] = useCSSVariable(["--color-foreground", "--color-body-bg", "--font-sans"]);
+
+  useEffect(() => {
+    fontDataPromise
+      .then((fonts) =>
+        setFontFaces(
+          fonts
+            .map(
+              (f) =>
+                `@font-face { font-family: '${fontFamily}'; src: url(data:font/ttf;base64,${f.base64}) format('truetype'); font-weight: ${f.weight}; font-style: ${f.style}; }`,
+            )
+            .join("\n"),
+        ),
+      )
+      .catch(Sentry.captureException);
+  }, [fontFamily]);
 
   const htmlContent = post?.message
     ? `<!DOCTYPE html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <style>
+  ${fontFaces}
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: '${fontFamily}', system-ui, sans-serif; font-size: 16px; line-height: 1.6; color: ${foreground}; background: ${bodyBg}; padding: 0; overflow-wrap: break-word; word-wrap: break-word; }
   img { max-width: 100%; height: auto; }
@@ -103,6 +136,8 @@ export default function PostScreen() {
       </Screen>
     );
   }
+
+  console.log("files", post.files_data);
 
   return (
     <Screen>
@@ -156,7 +191,7 @@ export default function PostScreen() {
               const [fileName, extension] = file.name.split(/\.(?=[^.]+$)/);
               return (
                 <View key={file.id} className={`gap-4 p-4 ${index > 0 ? "border-t border-border" : ""}`}>
-                  <View className="flex-1 flex-row items-center gap-3">
+                  <View className="flex-row items-center gap-3">
                     <LineIcon name="file" size={20} className="text-foreground" />
                     <View className="flex-1">
                       <Text numberOfLines={1}>{fileName}</Text>
