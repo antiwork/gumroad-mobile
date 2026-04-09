@@ -3,14 +3,12 @@ import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, TouchableOpacity, View } from "react-native";
 import Pdf, { TableContent } from "react-native-pdf";
 import { File, Paths } from "expo-file-system";
 
 const THUMBNAIL_COLUMNS = 3;
 const THUMBNAIL_GAP = 12;
-const THUMBNAIL_WIDTH = (Dimensions.get("window").width - THUMBNAIL_GAP * (THUMBNAIL_COLUMNS + 1)) / THUMBNAIL_COLUMNS;
-const THUMBNAIL_HEIGHT = THUMBNAIL_WIDTH * 1.4;
 
 type FlattenedTocItem = {
   title: string;
@@ -44,6 +42,9 @@ export const PdfNavigationSheet = ({
   const hasToc = tableOfContents.length > 0;
   const [activeTab, setActiveTab] = useState<"contents" | "pages">("pages");
   const [cachedUri, setCachedUri] = useState<string | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const thumbnailWidth = (containerWidth - THUMBNAIL_GAP * (THUMBNAIL_COLUMNS + 1)) / THUMBNAIL_COLUMNS;
+  const thumbnailHeight = thumbnailWidth * 1.4;
 
   useEffect(() => {
     if (hasToc) setActiveTab("contents");
@@ -113,12 +114,13 @@ export const PdfNavigationSheet = ({
               </TouchableOpacity>
             )}
           />
-        ) : cachedUri ? (
+        ) : cachedUri && containerWidth > 0 ? (
           <FlatList
             key="pages"
             data={pages}
             numColumns={THUMBNAIL_COLUMNS}
             keyExtractor={(item) => String(item)}
+            onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
             contentContainerStyle={{ padding: THUMBNAIL_GAP }}
             columnWrapperStyle={{ gap: THUMBNAIL_GAP, marginBottom: THUMBNAIL_GAP }}
             initialNumToRender={9}
@@ -130,21 +132,21 @@ export const PdfNavigationSheet = ({
                   onPageSelect(page);
                   handleClose();
                 }}
-                style={{ width: THUMBNAIL_WIDTH }}
+                style={{ width: thumbnailWidth }}
               >
                 <View
                   className={cn(
                     "overflow-hidden rounded-lg border-2",
                     page === currentPage ? "border-accent" : "border-border",
                   )}
-                  style={{ width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT }}
+                  style={{ width: thumbnailWidth, height: thumbnailHeight }}
                   pointerEvents="none"
                 >
                   <Pdf
                     source={{ uri: cachedUri }}
                     singlePage
                     page={page}
-                    style={{ width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT }}
+                    style={{ width: thumbnailWidth, height: thumbnailHeight }}
                   />
                 </View>
                 <Text
@@ -159,7 +161,10 @@ export const PdfNavigationSheet = ({
             )}
           />
         ) : (
-          <View className="flex-1 items-center justify-center">
+          <View
+            className="flex-1 items-center justify-center"
+            onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+          >
             <ActivityIndicator />
           </View>
         )}
