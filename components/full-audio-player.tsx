@@ -140,7 +140,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   const positionToSeekProgress = (x: number) => Math.max(0, Math.min(100, (x / barWidthRef.current) * 100));
 
   const updateSeeking = useCallback((x: number) => {
-    if (barWidthRef.current > 0 && duration > 0) {
+    if (barWidthRef.current > 0) {
       setSeekProgress(positionToSeekProgress(x));
     }
   }, []);
