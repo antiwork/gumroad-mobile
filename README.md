@@ -81,8 +81,7 @@ Use the Claude Code slash commands `/build-app` and `/submit-app` to build and s
 ### Prerequisites
 
 - **1Password CLI**: Credentials are fetched automatically from 1Password. Install with `arch -arm64 brew install 1password-cli`, enable the desktop app integration (Settings → Developer → CLI), and sign in with `op signin`.
-- **EAS CLI**: Install globally with `npm install -g eas-cli` and log in with `eas login --sso`. You must be a member of the `anti-work` Expo org.
-- **Fastlane**: Required for iOS code signing. Install with `arch -arm64 brew install fastlane`.
+- 1. **Xcode**: Required for iOS builds. The user must be signed into an Apple Developer account in Xcode (Settings → Accounts) with access to the correct team.
 - **JDK 17+**: Required for Android builds (Gradle 9). Install with `arch -arm64 brew install openjdk@17`, then symlink:
   ```bash
   sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
