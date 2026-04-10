@@ -7,7 +7,11 @@ export const navigationIntegration = Sentry.reactNavigationIntegration({
 });
 
 const mobileReplay = Sentry.mobileReplayIntegration({
-  excludedViewClasses: ["ExpoVideo.VideoView"],
+  excludedViewClasses: [
+    "ExpoVideo.VideoView",
+    "AVPlayerView",
+    "WKWebView",
+  ],
 });
 
 Sentry.init({
