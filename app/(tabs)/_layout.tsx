@@ -10,8 +10,6 @@ import { useUser } from "@/components/use-user";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
-import { flushReplayBuffer } from "@/lib/sentry";
-import { showFeedbackWidget } from "@sentry/react-native";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
@@ -110,8 +108,7 @@ const SettingsSheet = () => {
 
   const handleSendFeedback = () => {
     setSettingsOpen(false);
-    flushReplayBuffer();
-    showFeedbackWidget();
+    safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/help?new_ticket=1`);
   };
 
   return (
