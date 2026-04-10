@@ -46,12 +46,14 @@ Upload the `.aab` to Google Play using the Publishing API directly.
 `gcloud` and `play-store-key.json` should already be set up from `/build-app`. If not, follow the Google Play API access setup in `/build-app` step 4.3.
 
 1. Get an OAuth2 access token from the service account:
+
    ```
    gcloud auth activate-service-account --key-file=play-store-key.json
    ACCESS_TOKEN=$(gcloud auth print-access-token --scopes=https://www.googleapis.com/auth/androidpublisher)
    ```
 
 2. Create an edit:
+
    ```
    EDIT_ID=$(curl -s -X POST \
      "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits" \
@@ -61,6 +63,7 @@ Upload the `.aab` to Google Play using the Publishing API directly.
    ```
 
 3. Upload the `.aab`:
+
    ```
    curl -X POST \
      "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits/$EDIT_ID/bundles?uploadType=media" \
@@ -70,6 +73,7 @@ Upload the `.aab` to Google Play using the Publishing API directly.
    ```
 
 4. Assign the upload to the internal track:
+
    ```
    VERSION_CODE=$(curl -s \
      "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits/$EDIT_ID/bundles" \
