@@ -75,8 +75,7 @@ export default function VideoPlayerScreen() {
 
         location: currentPositionRef.current,
         accessToken,
-      });
-      void queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] });
+      }).then(() => queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] }));
     },
     [urlRedirectId, productFileId, purchaseId, currentPositionRef, accessToken, queryClient],
   );

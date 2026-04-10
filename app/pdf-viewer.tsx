@@ -77,8 +77,7 @@ export default function PdfViewerScreen() {
         // We deliberately use the latest value of the ref for the latest media location
         location: currentPageRef.current,
         accessToken,
-      });
-      void queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] });
+      }).then(() => queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] }));
     },
     [urlRedirectId, productFileId, purchaseId, currentPageRef, accessToken, queryClient],
   );
