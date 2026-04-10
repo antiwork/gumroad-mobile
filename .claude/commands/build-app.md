@@ -53,7 +53,7 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
 
 2. **Fastlane**: Required for iOS builds (EAS uses it for signing/archiving). Install with `arch -arm64 brew install fastlane` if missing.
 
-3. **JDK 17+**: Required for Android builds (Gradle 9 needs it). Install with `arch -arm64 brew install openjdk@17` and symlink:
+3. **JDK 17+**: Required for Android builds (Gradle 9 needs it). If `$JAVA_HOME` is not already pointing to a JDK 17 install, install it with `arch -arm64 brew install openjdk@17` and symlink:
 
    ```
    sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
@@ -111,7 +111,7 @@ IMPORTANT: This command may take a while. Run it with a generous timeout (10 min
 
 The build command outputs the path to the built artifact (`.ipa` for iOS, `.aab` for Android). Capture this path from the output.
 
-If building both platforms, run them in parallel using a single background bash command that spawns both builds concurrently (using `&` and `wait`). Note: parallel builds are memory-intensive — if an Android build fails with `OutOfMemoryError: Metaspace`, the Gradle JVM args in `android/gradle.properties` may need increasing (e.g., `-Xmx4096m -XX:MaxMetaspaceSize=1024m`).
+If building both platforms, run them in parallel using a single background bash command that spawns both builds concurrently (using `&` and `wait`). Note: parallel builds are memory-intensive — the memory limit is already increased by the `gradle-memory` plugin but if an Android build fails with `OutOfMemoryError: Metaspace` you may need to increase it further.
 
 ### 5. Verify iOS build (iOS only)
 
