@@ -24,10 +24,7 @@ Sentry.init({
     }
     return event;
   },
-  integrations: [
-    navigationIntegration,
-    mobileReplay,
-  ],
+  integrations: [navigationIntegration, mobileReplay],
 });
 
 export { Sentry };
