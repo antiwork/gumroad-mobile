@@ -77,7 +77,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-updates",
     "expo-secure-store",
     "expo-web-browser",
-    "expo-video",
+    [
+      "expo-video",
+      {
+        supportsPictureInPicture: true,
+      },
+    ],
     "expo-image",
     "expo-sharing",
     [
