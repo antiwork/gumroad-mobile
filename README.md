@@ -74,6 +74,21 @@ You should now be able to load `https://gumroad.dev` in your browser. Once that 
 
 The app will run without any custom credentials, but can be configured using environment variables. You can override any of the default values in `.env` with a `.env.local` file.
 
+## Building for production
+
+Use the Claude Code slash commands `/build-app` and `/submit-app` to build and submit to app stores.
+
+### Prerequisites
+
+- **1Password CLI**: Credentials are fetched automatically from 1Password. Install with `arch -arm64 brew install 1password-cli`, enable the desktop app integration (Settings → Developer → CLI), and sign in with `op signin`.
+- **EAS CLI**: Install globally with `npm install -g eas-cli` and log in with `eas login --sso`. You must be a member of the `anti-work` Expo org.
+- **Fastlane**: Required for iOS code signing. Install with `arch -arm64 brew install fastlane`.
+- **JDK 17+**: Required for Android builds (Gradle 9). Install with `arch -arm64 brew install openjdk@17`, then symlink:
+  ```bash
+  sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
+  ```
+- **Android SDK**: Required for local Android builds. Install Android Studio and complete the setup wizard to download the SDK.
+
 ## Testing
 
 ### E2E tests
