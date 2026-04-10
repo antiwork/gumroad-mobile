@@ -36,6 +36,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
+    "./plugins/gradle-memory",
     "expo-router",
     [
       "expo-font",

@@ -1,78 +1,33 @@
 ---
-description: Build and submit to app stores (iOS, Android, or both)
-allowed-tools: Bash, Read, Glob, Grep
+description: Submit built app artifacts to app stores (iOS, Android, or both)
+allowed-tools: Bash, Read, Glob, Grep, Edit, Write
 user-facing: true
 ---
 
-Build the app for production and submit to app stores.
+Submit previously built app artifacts to app stores. Run `/build-app` first if you haven't built yet.
 
 Argument: platform — one of "ios", "android", or "both" (default: "both")
 
 ## Steps
 
-### 1. Check prerequisites
+### 1. Locate build artifacts
 
-1. Verify `.env.build.local` exists in the project root. If it doesn't, stop and tell the user they need to create it with production env vars (EXPO_PUBLIC_GUMROAD_URL, EXPO_PUBLIC_GUMROAD_API_URL, EXPO_PUBLIC_GUMROAD_CLIENT_ID, EXPO_PUBLIC_MOBILE_TOKEN, and any other required vars).
-2. Verify `google-services.json` exists in the project root. If it doesn't, stop and tell the user they need to add it (required for Android builds).
-3. Read `.env.build.local` and extract the value of `EXPO_PUBLIC_GUMROAD_URL` — you'll need it later for verification.
-4. Check if `.env.build.local` contains `EXPO_APPLE_ID`. If not, prompt the user for their Apple ID email and add it to the file.
-5. Check if `.env.build.local` contains `EXPO_APPLE_PASSWORD`. If not, explain to the user how they can create an app-specific password for their Apple account and prompt them to enter it. Then add it to the file.
-6. Verify that the `gcloud` CLI is installed and logged in.
-7. Source the env file so all subsequent commands have access to its variables:
+Look for the most recent `.ipa` (iOS) and `.aab` (Android) files in the project root or `build/` directory. If not found, tell the user to run `/build-app` first.
+
+### 2. Load env vars
+
+1. Check if `.env.build.local` exists. If not, fetch it from 1Password (see step 1 in `/build-app`).
+2. Source the env file:
    ```
    set -a && source .env.build.local && set +a
    ```
 
-### 2. Update version
+### 3. Check Apple credentials (iOS only)
 
-Update the `version` field in `app.config.ts` to today's date in `YYYY.MM.DD` format (e.g., `2026.03.26`). If the version already matches today's date, skip this step. Otherwise:
+1. Check if `.env.build.local` contains `EXPO_APPLE_ID`. If not, prompt the user for their Apple ID email and add it to the file.
+2. Check if `.env.build.local` contains `EXPO_APPLE_PASSWORD`. If not, explain how to create an app-specific password at appleid.apple.com → Sign-In and Security → App-Specific Passwords → Generate. Prompt the user to enter it, then add it to the file.
 
-1. If the current branch is NOT `main`, inform the user and ask whether they want to continue building from this branch.
-2. Edit the `version` field in `app.config.ts` to the current date.
-3. Check if the current branch is `main`. If so:
-   - Stage `app.config.ts`
-   - Commit with message `Bump version`
-   - Push to origin
-
-### 3. Clear build cache
-
-Run these commands:
-
-```
-rm -rf $TMPDIR/haste-map-* $TMPDIR/metro-cache
-```
-
-### 4. Build
-
-First, run `npm run rebuild` to regenerate the native directories.
-
-Next, determine which platforms to build based on the argument (default: both).
-
-For each platform, run the build command (the env vars from `.env.build.local` are already set from step 1, and dotenv-flow won't override existing env vars):
-
-```
-npm run eas -- build --platform <platform> --profile production --local --non-interactive
-```
-
-where `<platform>` is `ios` or `android`.
-
-IMPORTANT: This command may take a while. Run it with a generous timeout (10 minutes).
-
-The build command outputs the path to the built artifact (`.ipa` for iOS, `.aab` for Android). Capture this path from the output.
-
-If building both platforms, build them sequentially (iOS first, then Android).
-
-### 5. Verify iOS build (iOS only)
-
-After building the iOS `.ipa`:
-
-1. Create a temporary directory
-2. Unzip the `.ipa` into it
-3. Run: `strings <temp-dir>/Payload/*.app/main.jsbundle | grep -o -i "<EXPO_PUBLIC_GUMROAD_URL value from .env.build.local>"`
-4. If the grep finds the URL, the env vars were applied correctly. If not, stop and warn the user that the build may not have the correct env vars.
-5. Clean up the temporary directory
-
-### 6. Submit to app stores
+### 4. Submit to app stores
 
 #### iOS
 
@@ -88,32 +43,30 @@ Use a generous timeout (5 minutes).
 
 Upload the `.aab` to Google Play using `fastlane supply`.
 
-First, check if `fastlane` is installed. If not, install it (`brew install fastlane` or `gem install fastlane`).
+1. Check if `fastlane` is installed. If not, install it (`brew install fastlane`).
+2. Check if `gcloud` CLI is installed. If not, install it (`arch -arm64 brew install google-cloud-sdk`). Have the user sign in with `! gcloud auth login` if needed.
+3. Check if `play-store-key.json` exists in the project root. If not, set one up using `gcloud`:
 
-Next, check if a Google Play service account key JSON file exists at `play-store-key.json` in the project root. If not, set one up using `gcloud`:
-
-1. Find the email for "Play Console Service Account". If no such service account exists, prompt the user to create it and give it publishing permission in the Google Play Console (Setup → API access).
    ```
    gcloud iam service-accounts list
    ```
-2. Create and download a key file:
+
+   Find the email for "Play Console Service Account". If none exists, prompt the user to create it and give it publishing permission in Google Play Console (Setup → API access).
+
    ```
    gcloud iam service-accounts keys create play-store-key.json --iam-account=<SERVICE_ACCOUNT_EMAIL>
    ```
 
-Then run:
-
-First, upload to the internal test track:
-
-```
-fastlane supply --aab <path-to-aab> --track internal --json_key play-store-key.json --package_name <ANDROID_BUNDLE_NAME> --skip_upload_metadata --skip_upload_changelogs --skip_upload_images --skip_upload_screenshots
-```
+4. Upload to the internal test track:
+   ```
+   fastlane supply --aab <path-to-aab> --track internal --json_key play-store-key.json --package_name $ANDROID_BUNDLE_NAME --skip_upload_metadata --skip_upload_changelogs --skip_upload_images --skip_upload_screenshots
+   ```
 
 Use a generous timeout (5 minutes) for each command.
 
-Tell the user the internal test release is live and let them know how they can promote it to production in Google Play Console.
+Tell the user the internal test release is live and how to promote it to production in Google Play Console.
 
-### 7. Suggest release notes
+### 5. Suggest release notes
 
 1. Find the most recent "Bump version" commit before the current one:
    ```
@@ -124,5 +77,5 @@ Tell the user the internal test release is live and let them know how they can p
    ```
    git log --oneline <previous-bump-commit>..HEAD
    ```
-3. Based on those commits, draft a single sentence for the release notes which highlights the one or two most impactful changes, e.g. "PDF viewer improvements and bug fixes."
+3. Draft a single sentence for the release notes highlighting the one or two most impactful changes, e.g. "PDF viewer improvements and bug fixes."
 4. Print the suggested release notes for the user to copy into App Store Connect and/or Google Play Console.
