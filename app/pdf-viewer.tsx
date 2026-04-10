@@ -10,6 +10,7 @@ import { updateMediaLocation } from "@/lib/media-location";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Dimensions, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -27,6 +28,7 @@ export default function PdfViewerScreen() {
     initialPage?: string;
   }>();
   const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
   const pdfRef = useRef<PdfRef>(null);
   const [currentPage, setCurrentPage] = useState(initialPage ? Number(initialPage) : 1);
   const currentPageRef = useRefToLatest(currentPage);
@@ -76,8 +78,9 @@ export default function PdfViewerScreen() {
         location: currentPageRef.current,
         accessToken,
       });
+      void queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] });
     },
-    [urlRedirectId, productFileId, purchaseId, currentPageRef, accessToken],
+    [urlRedirectId, productFileId, purchaseId, currentPageRef, accessToken, queryClient],
   );
 
   const handlePageSelect = (page: number) => {
