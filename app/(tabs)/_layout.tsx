@@ -16,7 +16,6 @@ import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
 import { Tabs } from "expo-router";
-import * as Updates from "expo-updates";
 import { createContext, useContext, useRef, useState } from "react";
 import { Alert, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
@@ -53,7 +52,7 @@ const LogoIcon = () => {
 
       Alert.alert(
         "Gumroad",
-        `Version ${Constants.expoConfig?.version ?? "unknown"} (${Application.nativeBuildVersion ?? "dev"})${Updates.updateId ? `\nUpdate ${Updates.updateId}` : ""}`,
+        `Version ${Constants.expoConfig?.version ?? "unknown"} (${Application.nativeBuildVersion ?? "dev"})`,
       );
     }
   };

@@ -26,11 +26,11 @@ const RevenueWidgetUpdater = () => {
 };
 
 const ForceUpdateGuard = () => {
-  const { updateRequirement } = useMinimumVersion();
-  if (!updateRequirement) return null;
+  const { needsUpdate } = useMinimumVersion();
+  if (!needsUpdate) return null;
   return (
     <View style={StyleSheet.absoluteFill} className="z-50">
-      <ForceUpdateScreen requirement={updateRequirement} />
+      <ForceUpdateScreen />
     </View>
   );
 };
