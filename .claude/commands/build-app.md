@@ -49,11 +49,9 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
 
 ### 1b. Check build tool prerequisites
 
-1. **EAS CLI**: Must be installed globally (`npm install -g eas-cli`) and logged in. If not logged in, have the user run `! eas login --sso`. The Expo project is under the `anti-work` org — the user must be a member.
+1. **Xcode**: Required for iOS builds. Verify with `xcodebuild -version`. The user must be signed into an Apple Developer account in Xcode (Settings → Accounts) with access to the team matching `$APPLE_TEAM_ID`.
 
-2. **Fastlane**: Required for iOS builds (EAS uses it for signing/archiving). Install with `arch -arm64 brew install fastlane` if missing.
-
-3. **JDK 17+**: Required for Android builds (Gradle 9 needs it). If `$JAVA_HOME` is not already pointing to a JDK 17 install, install it with `arch -arm64 brew install openjdk@17` and symlink:
+2. **JDK 17+**: Required for Android builds (Gradle 9 needs it). If `$JAVA_HOME` is not already pointing to a JDK 17 install, install it with `arch -arm64 brew install openjdk@17` and symlink:
 
    ```
    sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
@@ -65,7 +63,7 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
    export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
    ```
 
-4. **Android SDK**: Required for local Android builds. Install Android Studio (`arch -arm64 brew install --cask android-studio`), open it once to complete the setup wizard, then set:
+3. **Android SDK**: Required for local Android builds. Install Android Studio (`arch -arm64 brew install --cask android-studio`), open it once to complete the setup wizard, then set:
    ```
    export ANDROID_HOME=~/Library/Android/sdk
    ```
@@ -91,25 +89,85 @@ rm -rf $TMPDIR/haste-map-* $TMPDIR/metro-cache
 
 ### 4. Build
 
-First, run `npm install` then `npm run rebuild` to regenerate the native directories.
+First, source the env file and run `npm install` then `npm run rebuild` to regenerate the native directories:
+
+```
+set -a && source .env.build.local && set +a
+npm install
+npm run rebuild
+```
 
 Next, determine which platforms to build based on the argument (default: both).
 
-For each platform, run the build command with env vars and JDK set:
+#### iOS
+
+1. Generate an `ExportOptions.plist` for the archive export, replacing `$APPLE_TEAM_ID` with the value in `.env.build.local`:
+
+   ```
+   cat > /tmp/ExportOptions.plist << EOF
+   <?xml version="1.0" encoding="UTF-8"?>
+   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+   <plist version="1.0">
+   <dict>
+       <key>method</key>
+       <string>app-store</string>
+       <key>teamID</key>
+       <string>$APPLE_TEAM_ID</string>
+       <key>signingStyle</key>
+       <string>automatic</string>
+       <key>destination</key>
+       <string>export</string>
+       <key>uploadSymbols</key>
+       <true/>
+   </dict>
+   </plist>
+   EOF
+   ```
+
+2. Archive the app:
+
+   ```
+   set -a && source .env.build.local && set +a
+   xcodebuild -workspace ios/Gumroad.xcworkspace \
+     -scheme Gumroad \
+     -configuration Release \
+     -archivePath ios/build/Gumroad.xcarchive \
+     archive \
+     DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+     -allowProvisioningUpdates
+   ```
+
+3. Export the archive to an `.ipa`:
+
+   ```
+   xcodebuild -exportArchive \
+     -archivePath ios/build/Gumroad.xcarchive \
+     -exportOptionsPlist /tmp/ExportOptions.plist \
+     -exportPath ios/build/export \
+     -allowProvisioningUpdates
+   ```
+
+   The `.ipa` will be at `ios/build/export/Gumroad.ipa`.
+
+IMPORTANT: The archive step may take a while. Run it with a generous timeout (10 minutes).
+
+#### Android
+
+Build a release `.aab` (Android App Bundle):
 
 ```
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 export PATH="$JAVA_HOME/bin:$PATH"
 export ANDROID_HOME=~/Library/Android/sdk
 set -a && source .env.build.local && set +a
-npx dotenv-flow -- eas build --platform <platform> --profile production --local --non-interactive
+cd android && ./gradlew bundleRelease && cd ..
 ```
 
-where `<platform>` is `ios` or `android`.
+The `.aab` will be at `android/app/build/outputs/bundle/release/app-release.aab`.
 
 IMPORTANT: This command may take a while. Run it with a generous timeout (10 minutes).
 
-The build command outputs the path to the built artifact (`.ipa` for iOS, `.aab` for Android). Capture this path from the output.
+#### Parallel builds
 
 If building both platforms, run them in parallel using a single background bash command that spawns both builds concurrently (using `&` and `wait`). Note: parallel builds are memory-intensive — the memory limit is already increased by the `gradle-memory` plugin but if an Android build fails with `OutOfMemoryError: Metaspace` you may need to increase it further.
 
