@@ -30,16 +30,14 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
 
 3. Write the env vars to `.env.build.local` in the project root (overwrite if it exists).
 
-4. Download the `google-services.json` attachment from the same 1Password item:
+4. Download file attachments from the same 1Password item. Find each file's attachment ID from the `files` array, then download them. Skip any file that already exists in the project root.
 
-   ```
-   op item get "gumroad-mobile .env.build.local - build credentials for Expo mobile app" --format=json
-   ```
-
-   Find the file attachment ID from the `files` array, then download it:
+   - `google-services.json`
+   - `upload-keystore.jks`
 
    ```
    op read "op://Engineering/<item-id>/<file-id>" > google-services.json
+   op read "op://Engineering/<item-id>/<file-id>" > upload-keystore.jks
    ```
 
 5. Source the env file:
@@ -49,7 +47,7 @@ Argument: platform — one of "ios", "android", or "both" (default: "both")
 
 ### 1b. Check build tool prerequisites
 
-1. **Xcode**: Required for iOS builds. Verify with `xcodebuild -version`. The user must be signed into an Apple Developer account in Xcode (Settings → Accounts) with access to the team matching `$APPLE_TEAM_ID`.
+1. **Xcode**: Required for iOS builds. Verify with `xcodebuild -version`. The user must be signed into an Apple Developer account in Xcode (Settings → Accounts) with access to the team matching `$EXPO_APPLE_TEAM_ID`.
 
 2. **JDK 17+**: Required for Android builds (Gradle 9 needs it). If `$JAVA_HOME` is not already pointing to a JDK 17 install, install it with `arch -arm64 brew install openjdk@17` and symlink:
 
@@ -101,7 +99,7 @@ Next, determine which platforms to build based on the argument (default: both).
 
 #### iOS
 
-1. Generate an `ExportOptions.plist` for the archive export, replacing `$APPLE_TEAM_ID` with the value in `.env.build.local`:
+1. Generate an `ExportOptions.plist` for the archive export, replacing `$EXPO_APPLE_TEAM_ID` with the value in `.env.build.local`:
 
    ```
    cat > /tmp/ExportOptions.plist << EOF
@@ -112,7 +110,7 @@ Next, determine which platforms to build based on the argument (default: both).
        <key>method</key>
        <string>app-store</string>
        <key>teamID</key>
-       <string>$APPLE_TEAM_ID</string>
+       <string>$EXPO_APPLE_TEAM_ID</string>
        <key>signingStyle</key>
        <string>automatic</string>
        <key>destination</key>
@@ -133,7 +131,7 @@ Next, determine which platforms to build based on the argument (default: both).
      -configuration Release \
      -archivePath ios/build/Gumroad.xcarchive \
      archive \
-     DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+     DEVELOPMENT_TEAM="$EXPO_APPLE_TEAM_ID" \
      -allowProvisioningUpdates
    ```
 
@@ -153,15 +151,77 @@ IMPORTANT: The archive step may take a while. Run it with a generous timeout (10
 
 #### Android
 
-Build a release `.aab` (Android App Bundle):
+Since `npm run rebuild` regenerates the `android/` directory, the following steps must be done after the rebuild above.
 
-```
-export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
-export PATH="$JAVA_HOME/bin:$PATH"
-export ANDROID_HOME=~/Library/Android/sdk
-set -a && source .env.build.local && set +a
-cd android && ./gradlew bundleRelease && cd ..
-```
+1. Copy the keystore into the Android project:
+
+   ```
+   cp upload-keystore.jks android/app/upload-keystore.jks
+   ```
+
+2. Edit `android/app/build.gradle` to configure release signing. Add a `release` block inside `signingConfigs`:
+
+   ```groovy
+   release {
+       storeFile file('upload-keystore.jks')
+       storePassword System.env.ANDROID_KEYSTORE_PASSWORD
+       keyAlias System.env.ANDROID_KEY_ALIAS
+       keyPassword System.env.ANDROID_KEY_PASSWORD
+   }
+   ```
+
+   Then change the `release` build type's `signingConfig` from `signingConfigs.debug` to `signingConfigs.release`.
+
+3. Increment the `versionCode` in `android/app/build.gradle`. The rebuild always resets it to `1`, but Google Play rejects duplicate version codes.
+
+   Set up Google Play API access (if not already done):
+
+   a. Check if `gcloud` CLI is installed. If not: `arch -arm64 brew install google-cloud-sdk`. Have the user sign in with `! gcloud auth login` if needed.
+
+   b. Check if `play-store-key.json` exists in the project root. If not, set one up:
+
+      ```
+      gcloud iam service-accounts list
+      ```
+
+      Find the email for "Play Console Service Account". If none exists, prompt the user to create it and give it publishing permission in Google Play Console (Setup → API access).
+
+      ```
+      gcloud iam service-accounts keys create play-store-key.json --iam-account=<SERVICE_ACCOUNT_EMAIL>
+      ```
+
+   Then query the Google Play Publishing API for the highest existing version code:
+
+   ```
+   gcloud auth activate-service-account --key-file=play-store-key.json
+   ACCESS_TOKEN=$(gcloud auth print-access-token --scopes=https://www.googleapis.com/auth/androidpublisher)
+
+   EDIT_ID=$(curl -s -X POST \
+     "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits" \
+     -H "Authorization: Bearer $ACCESS_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{}' | jq -r '.id')
+
+   MAX_VERSION_CODE=$(curl -s \
+     "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits/$EDIT_ID/bundles" \
+     -H "Authorization: Bearer $ACCESS_TOKEN" | jq '[.bundles[].versionCode] | max')
+
+   curl -s -X DELETE \
+     "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits/$EDIT_ID" \
+     -H "Authorization: Bearer $ACCESS_TOKEN"
+   ```
+
+   Edit `android/app/build.gradle` to set `versionCode` to `MAX_VERSION_CODE + 1`.
+
+4. Build a release `.aab` (Android App Bundle):
+
+   ```
+   export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+   export PATH="$JAVA_HOME/bin:$PATH"
+   export ANDROID_HOME=~/Library/Android/sdk
+   set -a && source .env.build.local && set +a
+   cd android && ./gradlew bundleRelease && cd ..
+   ```
 
 The `.aab` will be at `android/app/build/outputs/bundle/release/app-release.aab`.
 

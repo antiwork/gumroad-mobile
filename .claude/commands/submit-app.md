@@ -41,28 +41,55 @@ Use a generous timeout (5 minutes).
 
 #### Android
 
-Upload the `.aab` to Google Play using `fastlane supply`.
+Upload the `.aab` to Google Play using the Publishing API directly.
 
-1. Check if `fastlane` is installed. If not, install it (`brew install fastlane`).
-2. Check if `gcloud` CLI is installed. If not, install it (`arch -arm64 brew install google-cloud-sdk`). Have the user sign in with `! gcloud auth login` if needed.
-3. Check if `play-store-key.json` exists in the project root. If not, set one up using `gcloud`:
+`gcloud` and `play-store-key.json` should already be set up from `/build-app`. If not, follow the Google Play API access setup in `/build-app` step 4.3.
 
+1. Get an OAuth2 access token from the service account:
    ```
-   gcloud iam service-accounts list
-   ```
-
-   Find the email for "Play Console Service Account". If none exists, prompt the user to create it and give it publishing permission in Google Play Console (Setup → API access).
-
-   ```
-   gcloud iam service-accounts keys create play-store-key.json --iam-account=<SERVICE_ACCOUNT_EMAIL>
+   gcloud auth activate-service-account --key-file=play-store-key.json
+   ACCESS_TOKEN=$(gcloud auth print-access-token --scopes=https://www.googleapis.com/auth/androidpublisher)
    ```
 
-4. Upload to the internal test track:
+2. Create an edit:
    ```
-   fastlane supply --aab <path-to-aab> --track internal --json_key play-store-key.json --package_name $ANDROID_BUNDLE_NAME --skip_upload_metadata --skip_upload_changelogs --skip_upload_images --skip_upload_screenshots
+   EDIT_ID=$(curl -s -X POST \
+     "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits" \
+     -H "Authorization: Bearer $ACCESS_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{}' | jq -r '.id')
    ```
 
-Use a generous timeout (5 minutes) for each command.
+3. Upload the `.aab`:
+   ```
+   curl -X POST \
+     "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits/$EDIT_ID/bundles?uploadType=media" \
+     -H "Authorization: Bearer $ACCESS_TOKEN" \
+     -H "Content-Type: application/octet-stream" \
+     --data-binary @<path-to-aab>
+   ```
+
+4. Assign the upload to the internal track:
+   ```
+   VERSION_CODE=$(curl -s \
+     "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits/$EDIT_ID/bundles" \
+     -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.bundles[-1].versionCode')
+
+   curl -X PUT \
+     "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$ANDROID_BUNDLE_NAME/edits/$EDIT_ID/tracks/internal" \
+     -H "Authorization: Bearer $ACCESS_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d "{\"track\":\"internal\",\"releases\":[{\"versionCodes\":[\"$VERSION_CODE\"],\"status\":\"completed\"}]}"
+   ```
+
+5. Commit the edit:
+   ```
+   curl -X POST \
+     "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${ANDROID_BUNDLE_NAME}/edits/${EDIT_ID}:commit" \
+     -H "Authorization: Bearer $ACCESS_TOKEN"
+   ```
+
+Use a generous timeout (5 minutes) for the upload step. Check each API response for errors before proceeding to the next step.
 
 Tell the user the internal test release is live and how to promote it to production in Google Play Console.
 
