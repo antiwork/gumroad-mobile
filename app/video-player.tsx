@@ -3,6 +3,7 @@ import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
+import { useQueryClient } from "@tanstack/react-query";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -24,6 +25,7 @@ export default function VideoPlayerScreen() {
     initialPosition?: string;
   }>();
 
+  const queryClient = useQueryClient();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPosition, setCurrentPosition] = useState(initialPosition ? Number(initialPosition) : 0);
@@ -73,9 +75,9 @@ export default function VideoPlayerScreen() {
 
         location: currentPositionRef.current,
         accessToken,
-      });
+      }).then(() => queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] }));
     },
-    [urlRedirectId, productFileId, purchaseId, currentPositionRef, accessToken],
+    [urlRedirectId, productFileId, purchaseId, currentPositionRef, accessToken, queryClient],
   );
 
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, screen } from "@testing-library/react-native";
+import { renderWithQueryClient } from "../render-with-query-client";
 
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ uri: "https://example.com/test.pdf", title: "Test PDF" }),
@@ -44,13 +45,15 @@ jest.mock("react-native-pdf", () => {
 import PdfViewerScreen from "@/app/pdf-viewer";
 import { act } from "react";
 
+const renderWithProviders = () => renderWithQueryClient(<PdfViewerScreen />);
+
 describe("PdfViewerScreen", () => {
   beforeEach(() => {
     mockOnError = null;
   });
 
   it("shows error view with Try Again button when PDF fails to load", () => {
-    render(<PdfViewerScreen />);
+    renderWithProviders();
 
     expect(screen.getByTestId("pdf-component")).toBeTruthy();
     expect(screen.queryByText("Try Again")).toBeNull();
@@ -65,7 +68,7 @@ describe("PdfViewerScreen", () => {
   });
 
   it("re-mounts PDF component when Try Again is pressed", () => {
-    render(<PdfViewerScreen />);
+    renderWithProviders();
 
     act(() => {
       mockOnError!(new Error("ENOENT"));

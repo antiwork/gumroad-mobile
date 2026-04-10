@@ -1,7 +1,7 @@
 import { RefundForm } from "@/components/dashboard/refund-form";
 import { SaleDetail } from "@/components/dashboard/use-sales-analytics";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, screen } from "@testing-library/react-native";
+import { renderWithQueryClient } from "../../render-with-query-client";
 import { act } from "react";
 import { Alert as NativeAlert } from "react-native";
 
@@ -44,14 +44,8 @@ const makeSale = (overrides: Partial<SaleDetail> = {}): SaleDetail => ({
   ...overrides,
 });
 
-const renderWithProviders = (sale: SaleDetail, onRefundSuccess?: () => void) => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <RefundForm sale={sale} onRefundSuccess={onRefundSuccess} />
-    </QueryClientProvider>,
-  );
-};
+const renderWithProviders = (sale: SaleDetail, onRefundSuccess?: () => void) =>
+  renderWithQueryClient(<RefundForm sale={sale} onRefundSuccess={onRefundSuccess} />);
 
 const pressRefundAndConfirm = () => {
   const alertSpy = jest.spyOn(NativeAlert, "alert");
