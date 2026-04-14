@@ -87,7 +87,7 @@ const ProductsSearchButton = () => {
   const { isProductSearchActive, setProductSearchActive } = useProductsSearch();
   return (
     <TouchableOpacity onPress={() => setProductSearchActive(!isProductSearchActive)}>
-      <LineIcon name="search" size={24} className={isProductSearchActive ? "text-accent" : "text-foreground"} />
+      <LineIcon name="search" size={24} className="text-foreground" />
     </TouchableOpacity>
   );
 };

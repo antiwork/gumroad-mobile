@@ -62,8 +62,8 @@ const ProductCard = ({
             {product.thumbnail_url ? (
               <Image source={{ uri: product.thumbnail_url }} className="size-16 rounded-lg bg-muted" resizeMode="cover" />
             ) : (
-              <View className="size-16 items-center justify-center rounded-lg bg-accent/20">
-                <LineIcon name="package" size={20} className="text-accent" />
+              <View className="size-16 items-center justify-center rounded-lg bg-muted">
+                <LineIcon name="package" size={20} className="text-muted" />
             </View>
             )}
             <View className="flex-1 gap-1.5">
@@ -118,8 +118,14 @@ export default function Products() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const mutedColor = useCSSVariable("--color-muted") as string;
-  const publishedCount = products.filter((product) => product.published).length;
-  const draftCount = products.length - publishedCount;
+  const totalSalesCount = products.reduce((sum, product) => sum + (product.sales_count ?? 0), 0);
+  const revenueCurrency = (products[0]?.currency || "USD").toUpperCase();
+  const totalSalesRevenueCents = products.reduce((sum, product) => sum + (product.price || 0) * (product.sales_count ?? 0), 0);
+  const formattedSalesRevenue = new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: revenueCurrency,
+    maximumFractionDigits: 2,
+  }).format(totalSalesRevenueCents / 100);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery.trim().toLowerCase()), 300);
 
@@ -280,25 +286,21 @@ export default function Products() {
                     onPress={() => setStatusFilter(filter.id as "all" | "published" | "draft")}
                     variant={isActive ? "outline" : "ghost"}
                     size="sm"
-                    className={`rounded-full ${isActive ? "border-accent bg-accent/10" : ""}`}
+                    className="rounded-full"
                   >
-                    <Text className={isActive ? "text-accent" : "text-muted"}>{filter.label}</Text>
+                    <Text className={isActive ? "text-foreground" : "text-muted"}>{filter.label}</Text>
                   </Button>
                 );
               })}
             </View>
             <View className="flex-row gap-2">
               <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
-                <Text className="text-xs text-muted">Total</Text>
-                <Text className="text-lg font-bold">{products.length}</Text>
+                <Text className="text-xs text-muted">Sales Revenue</Text>
+                <Text className="text-lg font-bold">{formattedSalesRevenue}</Text>
               </View>
               <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
-                <Text className="text-xs text-muted">Published</Text>
-                <Text className="text-lg font-bold">{publishedCount}</Text>
-              </View>
-              <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
-                <Text className="text-xs text-muted">Drafts</Text>
-                <Text className="text-lg font-bold">{draftCount}</Text>
+                <Text className="text-xs text-muted">Sales</Text>
+                <Text className="text-lg font-bold">{totalSalesCount.toLocaleString()}</Text>
               </View>
             </View>
           </View>

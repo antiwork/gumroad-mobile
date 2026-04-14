@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { LineIcon } from "@/components/icon";
+import { StyledImage } from "@/components/styled";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
@@ -13,6 +14,13 @@ import { useState } from "react";
 import { Pressable, ScrollView, TextInput, View } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import { useCSSVariable } from "uniwind";
+import bundleThumbnail from "@/assets/images/native-types/bundle.svg";
+import callThumbnail from "@/assets/images/native-types/call.svg";
+import coffeeThumbnail from "@/assets/images/native-types/coffee.svg";
+import courseThumbnail from "@/assets/images/native-types/course.svg";
+import digitalThumbnail from "@/assets/images/native-types/digital.svg";
+import ebookThumbnail from "@/assets/images/native-types/ebook.svg";
+import membershipThumbnail from "@/assets/images/native-types/membership.svg";
 
 type CreateProductResponse = {
   success: boolean;
@@ -29,16 +37,17 @@ type NativeProductKind = "digital" | "membership" | "bundle" | "coffee" | "commi
 const PRODUCT_KIND_OPTIONS: {
   id: ProductKindId;
   nativeType: NativeProductKind;
+  thumbnail: React.ComponentProps<typeof StyledImage>["source"];
   title: string;
   description: string;
 }[] = [
-  { id: "digital", nativeType: "digital", title: "Digital product", description: "Any set of files to download or stream." },
-  { id: "course", nativeType: "digital", title: "Course or tutorial", description: "Sell a lesson or a full learning experience." },
-  { id: "ebook", nativeType: "digital", title: "E-book", description: "Offer books and comics in downloadable formats." },
-  { id: "membership", nativeType: "membership", title: "Membership", description: "Start a recurring membership around your audience." },
-  { id: "bundle", nativeType: "bundle", title: "Bundle", description: "Sell multiple existing products as one offer." },
-  { id: "call", nativeType: "commission", title: "Call", description: "Offer scheduled calls with your customers." },
-  { id: "coffee", nativeType: "coffee", title: "Coffee", description: "Accept support and tips from your audience." },
+  { id: "digital", nativeType: "digital", thumbnail: digitalThumbnail, title: "Digital product", description: "Any set of files to download or stream." },
+  { id: "course", nativeType: "digital", thumbnail: courseThumbnail, title: "Course or tutorial", description: "Sell a lesson or a full learning experience." },
+  { id: "ebook", nativeType: "digital", thumbnail: ebookThumbnail, title: "E-book", description: "Offer books and comics in downloadable formats." },
+  { id: "membership", nativeType: "membership", thumbnail: membershipThumbnail, title: "Membership", description: "Start a recurring membership around your audience." },
+  { id: "bundle", nativeType: "bundle", thumbnail: bundleThumbnail, title: "Bundle", description: "Sell multiple existing products as one offer." },
+  { id: "call", nativeType: "commission", thumbnail: callThumbnail, title: "Call", description: "Offer scheduled calls with your customers." },
+  { id: "coffee", nativeType: "coffee", thumbnail: coffeeThumbnail, title: "Coffee", description: "Accept support and tips from your audience." },
 ];
 
 export default function ProductNew() {
@@ -122,89 +131,98 @@ export default function ProductNew() {
     <Screen>
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-4 py-6 pb-10"
+        contentContainerClassName="pb-8"
         keyboardShouldPersistTaps="handled"
       >
-        <View className="gap-1">
+        <View className="border-b border-border px-4 py-4">
           <Text className="text-2xl font-bold">What are you creating?</Text>
-          <Text className="text-sm text-muted">
-            Turn your idea into a live product in minutes. Start simple, then customize details in the editor.
+          <Text className="mt-2 text-sm text-muted">
+            Turn your idea into a live product in minutes. No fuss, just a few quick selections.
           </Text>
-          <Pressable onPress={() => void safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/help`)}>
+          <Pressable onPress={() => void safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/help`)} className="mt-3">
             <Text className="text-sm text-accent">Need help adding a product?</Text>
           </Pressable>
         </View>
 
-        {error ? (
-          <View className="rounded-lg border border-destructive/50 bg-card px-3 py-3">
-            <Text className="text-sm text-muted">{error}</Text>
+        <View className="gap-4 px-4 py-4">
+          {error ? (
+            <View className="rounded-lg border border-destructive/50 bg-card px-3 py-3">
+              <Text className="text-sm text-muted">{error}</Text>
+            </View>
+          ) : null}
+
+          <View className="gap-2">
+            <Text className="text-xs uppercase tracking-wide text-muted">Products</Text>
+            <Card className="rounded-lg">
+              <CardContent className="gap-2 p-3">
+                {PRODUCT_KIND_OPTIONS.map((option) => {
+                  const isActive = selectedKind === option.id;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      onPress={() => setSelectedKind(option.id)}
+                      className={`rounded-lg border px-3 py-3 ${isActive ? "border-foreground bg-muted/20" : "border-border bg-background"}`}
+                    >
+                      <View className="flex-row items-start gap-3">
+                        <View className="overflow-hidden rounded-md border border-border">
+                          <StyledImage source={option.thumbnail} className="size-11" contentFit="cover" />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="font-medium text-foreground">{option.title}</Text>
+                          <Text className="mt-1 text-xs text-muted">{option.description}</Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </CardContent>
+            </Card>
           </View>
-        ) : null}
 
-        <Card className="rounded-xl">
-          <CardHeader>
-            <CardTitle>Products</CardTitle>
-          </CardHeader>
-          <CardContent className="gap-2">
-            {PRODUCT_KIND_OPTIONS.map((option) => {
-              const isActive = selectedKind === option.id;
-              return (
-                <Pressable
-                  key={option.id}
-                  onPress={() => setSelectedKind(option.id)}
-                  className={`rounded-lg border px-3 py-3 ${isActive ? "border-accent bg-accent/10" : "border-border bg-background"}`}
-                >
-                  <Text className={`font-medium ${isActive ? "text-accent" : "text-foreground"}`}>{option.title}</Text>
-                  <Text className="mt-1 text-xs text-muted">{option.description}</Text>
-                </Pressable>
-              );
-            })}
-          </CardContent>
-        </Card>
+          <View className="gap-2">
+            <Text className="text-xs uppercase tracking-wide text-muted">Product details</Text>
+            <Card className="rounded-lg">
+              <CardContent className="gap-4 p-3">
+                <View className="gap-2">
+                  <Text className="text-sm">Name</Text>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Name of product"
+                    placeholderTextColor={mutedColor}
+                    autoCapitalize="sentences"
+                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                  />
+                </View>
 
-        <Card className="rounded-xl">
-          <CardHeader>
-            <CardTitle>Product details</CardTitle>
-          </CardHeader>
-          <CardContent className="gap-4">
-            <View className="gap-2">
-              <Text className="text-sm">Name</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="Name of product"
-                placeholderTextColor={mutedColor}
-                autoCapitalize="sentences"
-                className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-              />
-            </View>
+                <View className="gap-2">
+                  <Text className="text-sm">Price</Text>
+                  <TextInput
+                    value={price}
+                    onChangeText={(value) => {
+                      const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+                      setPrice(normalized);
+                    }}
+                    placeholder="0.00"
+                    placeholderTextColor={mutedColor}
+                    keyboardType="decimal-pad"
+                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                  />
+                </View>
+              </CardContent>
+            </Card>
+          </View>
 
-            <View className="gap-2">
-              <Text className="text-sm">Price</Text>
-              <TextInput
-                value={price}
-                onChangeText={(value) => {
-                  const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
-                  setPrice(normalized);
-                }}
-                placeholder="0.00"
-                placeholderTextColor={mutedColor}
-                keyboardType="decimal-pad"
-                className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-              />
-            </View>
-          </CardContent>
-        </Card>
+          <View className="gap-2 pt-1">
+            <Button variant="accent" onPress={() => void createProduct()} disabled={isSubmitting}>
+              <Text>{isSubmitting ? "Creating..." : "Next: Customize"}</Text>
+              <LineIcon name="arrow-right-stroke" size={18} className="text-primary-foreground" />
+            </Button>
 
-        <View className="gap-2">
-          <Button variant="accent" onPress={() => void createProduct()} disabled={isSubmitting}>
-            <Text>{isSubmitting ? "Creating..." : "Next: Customize"}</Text>
-            <LineIcon name="arrow-right-stroke" size={18} className="text-primary-foreground" />
-          </Button>
-
-          <Button variant="outline" onPress={() => router.back()} disabled={isSubmitting}>
-            <Text>Cancel</Text>
-          </Button>
+            <Button variant="outline" onPress={() => router.back()} disabled={isSubmitting}>
+              <Text>Cancel</Text>
+            </Button>
+          </View>
         </View>
       </ScrollView>
     </Screen>
