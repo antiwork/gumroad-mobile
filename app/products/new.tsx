@@ -5,10 +5,12 @@ import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { LineIcon } from "@/components/icon";
 import { useAuth } from "@/lib/auth-context";
+import { env } from "@/lib/env";
+import { safeOpenURL } from "@/lib/open-url";
 import { requestAPI } from "@/lib/request";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { TextInput, View } from "react-native";
+import { Pressable, ScrollView, TextInput, View } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import { useCSSVariable } from "uniwind";
 
@@ -21,11 +23,30 @@ type CreateProductResponse = {
   };
 };
 
+type ProductKindId = "digital" | "course" | "ebook" | "membership" | "bundle" | "call" | "coffee";
+type NativeProductKind = "digital" | "membership" | "bundle" | "coffee" | "commission";
+
+const PRODUCT_KIND_OPTIONS: {
+  id: ProductKindId;
+  nativeType: NativeProductKind;
+  title: string;
+  description: string;
+}[] = [
+  { id: "digital", nativeType: "digital", title: "Digital product", description: "Any set of files to download or stream." },
+  { id: "course", nativeType: "digital", title: "Course or tutorial", description: "Sell a lesson or a full learning experience." },
+  { id: "ebook", nativeType: "digital", title: "E-book", description: "Offer books and comics in downloadable formats." },
+  { id: "membership", nativeType: "membership", title: "Membership", description: "Start a recurring membership around your audience." },
+  { id: "bundle", nativeType: "bundle", title: "Bundle", description: "Sell multiple existing products as one offer." },
+  { id: "call", nativeType: "commission", title: "Call", description: "Offer scheduled calls with your customers." },
+  { id: "coffee", nativeType: "coffee", title: "Coffee", description: "Accept support and tips from your audience." },
+];
+
 export default function ProductNew() {
   const { isLoading: isAuthLoading, accessToken } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [selectedKind, setSelectedKind] = useState<ProductKindId>("digital");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mutedColor = useCSSVariable("--color-muted") as string;
@@ -53,6 +74,9 @@ export default function ProductNew() {
       return;
     }
 
+    const selectedOption = PRODUCT_KIND_OPTIONS.find((option) => option.id === selectedKind);
+    const nativeType = selectedOption?.nativeType ?? "digital";
+
     setError(null);
     setIsSubmitting(true);
     try {
@@ -62,7 +86,7 @@ export default function ProductNew() {
         data: {
           name: trimmedName,
           price: Math.round(parsedPrice * 100),
-          native_type: "digital",
+          native_type: nativeType,
         },
       });
 
@@ -96,15 +120,19 @@ export default function ProductNew() {
 
   return (
     <Screen>
-      <View className="flex-1 gap-4 px-4 py-6">
-        <View className="flex-row items-center gap-2">
-          <View className="rounded-lg bg-accent/20 p-2">
-            <LineIcon name="package" size={18} className="text-accent" />
-          </View>
-          <View>
-            <Text className="text-xl font-bold">Create product</Text>
-            <Text className="text-xs text-muted">Start with basics, then continue editing.</Text>
-          </View>
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="gap-4 px-4 py-6 pb-10"
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="gap-1">
+          <Text className="text-2xl font-bold">What are you creating?</Text>
+          <Text className="text-sm text-muted">
+            Turn your idea into a live product in minutes. Start simple, then customize details in the editor.
+          </Text>
+          <Pressable onPress={() => void safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/help`)}>
+            <Text className="text-sm text-accent">Need help adding a product?</Text>
+          </Pressable>
         </View>
 
         {error ? (
@@ -112,6 +140,27 @@ export default function ProductNew() {
             <Text className="text-sm text-muted">{error}</Text>
           </View>
         ) : null}
+
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle>Products</CardTitle>
+          </CardHeader>
+          <CardContent className="gap-2">
+            {PRODUCT_KIND_OPTIONS.map((option) => {
+              const isActive = selectedKind === option.id;
+              return (
+                <Pressable
+                  key={option.id}
+                  onPress={() => setSelectedKind(option.id)}
+                  className={`rounded-lg border px-3 py-3 ${isActive ? "border-accent bg-accent/10" : "border-border bg-background"}`}
+                >
+                  <Text className={`font-medium ${isActive ? "text-accent" : "text-foreground"}`}>{option.title}</Text>
+                  <Text className="mt-1 text-xs text-muted">{option.description}</Text>
+                </Pressable>
+              );
+            })}
+          </CardContent>
+        </Card>
 
         <Card className="rounded-xl">
           <CardHeader>
@@ -148,7 +197,7 @@ export default function ProductNew() {
         </Card>
 
         <View className="gap-2">
-          <Button onPress={() => void createProduct()} disabled={isSubmitting}>
+          <Button variant="accent" onPress={() => void createProduct()} disabled={isSubmitting}>
             <Text>{isSubmitting ? "Creating..." : "Next: Customize"}</Text>
             <LineIcon name="arrow-right-stroke" size={18} className="text-primary-foreground" />
           </Button>
@@ -157,7 +206,7 @@ export default function ProductNew() {
             <Text>Cancel</Text>
           </Button>
         </View>
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

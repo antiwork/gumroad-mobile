@@ -5,11 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
+import { useProductsSearch } from "@/app/(tabs)/_layout";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Image, Pressable, RefreshControl, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
@@ -106,7 +107,9 @@ const ProductCard = ({
 
 export default function Products() {
   const { isLoading: isAuthLoading, accessToken } = useAuth();
+  const { isProductSearchActive, setProductSearchActive } = useProductsSearch();
   const router = useRouter();
+  const inputRef = useRef<TextInput>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -118,22 +121,30 @@ export default function Products() {
   const publishedCount = products.filter((product) => product.published).length;
   const draftCount = products.length - publishedCount;
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery.trim().toLowerCase());
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery.trim().toLowerCase()), 300);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+  useEffect(() => {
+    if (isProductSearchActive) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } else {
+      setSearchQuery("");
+    }
+  }, [isProductSearchActive]);
+
+  const filteredProducts = useMemo(
+    () =>
+      products.filter((product) => {
       if (statusFilter === "published" && !product.published) return false;
       if (statusFilter === "draft" && product.published) return false;
       if (!debouncedSearchQuery) return true;
       const searchText = `${product.name} ${product.custom_summary ?? ""} ${product.description ?? ""}`.toLowerCase();
       return searchText.includes(debouncedSearchQuery);
-    });
-  }, [debouncedSearchQuery, products, statusFilter]);
+      }),
+    [debouncedSearchQuery, products, statusFilter],
+  );
 
   const fetchProducts = useCallback(async (isRefresh = false) => {
     if (!accessToken) {
@@ -223,6 +234,32 @@ export default function Products() {
 
   return (
     <Screen>
+      {isProductSearchActive ? (
+        <View className="flex-row items-center border-b border-border/70 px-4 py-3">
+          <View className="flex-1 flex-row items-center rounded-lg border border-border bg-card px-3 py-2">
+            <LineIcon name="search" size={18} className="text-muted" />
+            <TextInput
+              ref={inputRef}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search products"
+              placeholderTextColor={mutedColor}
+              autoCapitalize="none"
+              autoCorrect={false}
+              className="ml-2 flex-1 text-foreground"
+            />
+            {searchQuery.length > 0 ? (
+              <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+                <LineIcon name="x" size={18} className="text-muted" />
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => setProductSearchActive(false)} hitSlop={8}>
+                <LineIcon name="x" size={18} className="text-muted" />
+              </Pressable>
+            )}
+          </View>
+        </View>
+      ) : null}
       <FlatList
         data={filteredProducts}
         keyExtractor={(item) => item.id}
@@ -230,23 +267,6 @@ export default function Products() {
         ListHeaderComponent={
           <View className="gap-3 border-b border-border/70 px-4 py-4">
             {error ? <Text className="text-xs text-muted">{error}</Text> : null}
-            <View className="flex-row items-center rounded-lg border border-border bg-card px-3 py-2">
-              <LineIcon name="search" size={18} className="text-muted" />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search products"
-                placeholderTextColor={mutedColor}
-                autoCapitalize="none"
-                autoCorrect={false}
-                className="ml-2 flex-1 text-foreground"
-              />
-              {searchQuery.length > 0 ? (
-                <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
-                  <LineIcon name="x" size={18} className="text-muted" />
-                </Pressable>
-              ) : null}
-            </View>
             <View className="flex-row gap-2">
               {[
                 { id: "all", label: "All" },

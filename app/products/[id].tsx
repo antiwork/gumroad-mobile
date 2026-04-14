@@ -108,15 +108,14 @@ export default function ProductEdit() {
           custom_summary: customSummary.trim() || null,
         },
       });
-      setSaveNotice("Changes saved.");
-      await fetchProduct();
+      router.replace("/(tabs)/products");
     } catch (requestError) {
       Sentry.captureException(requestError);
       setError(requestError instanceof Error ? requestError.message : "Could not save product.");
     } finally {
       setIsSaving(false);
     }
-  }, [accessToken, customSummary, description, fetchProduct, name, price, productId]);
+  }, [accessToken, customSummary, description, name, price, productId, router]);
 
   const handleTogglePublishPress = useCallback(async () => {
     if (!productId || !accessToken || isSaving || isLoading) return;
@@ -128,15 +127,14 @@ export default function ProductEdit() {
         accessToken,
         method: "PUT",
       });
-      setSaveNotice(published ? "Product moved to draft." : "Product published.");
-      await fetchProduct();
+      router.replace("/(tabs)/products");
     } catch (requestError) {
       Sentry.captureException(requestError);
       setError(requestError instanceof Error ? requestError.message : "Could not change publish status.");
     } finally {
       setIsSaving(false);
     }
-  }, [accessToken, fetchProduct, isLoading, isSaving, productId, published]);
+  }, [accessToken, isLoading, isSaving, productId, published, router]);
 
   const handleDeletePress = useCallback(() => {
     if (!productId || !accessToken || isSaving || isLoading) return;
@@ -191,9 +189,14 @@ export default function ProductEdit() {
       <Stack.Screen
         options={{
           title: "Edit product",
+          headerLeft: () => (
+            <Button size="sm" variant="ghost" onPress={() => router.back()} disabled={isSaving}>
+              <Text>Back</Text>
+            </Button>
+          ),
           headerRight: () => (
             <View>
-              <Button size="sm" onPress={() => void handleSavePress()} disabled={isSaving || isLoading}>
+              <Button size="sm" variant="accent" onPress={() => void handleSavePress()} disabled={isSaving || isLoading}>
                 <Text>Save</Text>
               </Button>
             </View>
@@ -294,7 +297,7 @@ export default function ProductEdit() {
             </Card>
 
             <View className="flex-row gap-2">
-              <Button onPress={() => void handleSavePress()} disabled={isSaving}>
+              <Button variant="accent" onPress={() => void handleSavePress()} disabled={isSaving}>
                 <Text>{isSaving ? "Saving..." : "Save changes"}</Text>
                 <LineIcon name="check" size={18} className="text-primary-foreground" />
               </Button>
@@ -302,16 +305,8 @@ export default function ProductEdit() {
                 <Text>{published ? "Unpublish" : "Publish"}</Text>
               </Button>
             </View>
-            <View className="flex-row gap-2">
-              <Button variant="outline" onPress={() => void fetchProduct()} disabled={isSaving}>
-                <Text>Reload</Text>
-              </Button>
-              <Button variant="ghost" onPress={handleDeletePress} disabled={isSaving}>
-                <Text className="text-destructive">Delete</Text>
-              </Button>
-            </View>
-            <Button variant="outline" onPress={() => router.back()} disabled={isSaving}>
-              <Text>Back</Text>
+            <Button variant="ghost" onPress={handleDeletePress} disabled={isSaving}>
+              <Text className="text-destructive">Delete product</Text>
             </Button>
           </>
         ) : null}

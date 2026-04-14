@@ -30,6 +30,18 @@ const SearchContext = createContext<SearchContextValue>({
 
 export const useDashboardSearch = () => useContext(SearchContext);
 
+interface ProductSearchContextValue {
+  isProductSearchActive: boolean;
+  setProductSearchActive: (active: boolean) => void;
+}
+
+const ProductSearchContext = createContext<ProductSearchContextValue>({
+  isProductSearchActive: false,
+  setProductSearchActive: () => {},
+});
+
+export const useProductsSearch = () => useContext(ProductSearchContext);
+
 // Tap the logo 5 times <1.5 seconds apart to show the version and build number
 const TAP_COUNT_THRESHOLD = 5;
 const TAP_TIMEOUT_MS = 1500;
@@ -67,6 +79,15 @@ const SearchButton = () => {
   return (
     <TouchableOpacity onPress={() => setSearchActive(!isSearchActive)}>
       <LineIcon name="search" size={24} className={isSearchActive ? "text-accent" : "text-foreground"} />
+    </TouchableOpacity>
+  );
+};
+
+const ProductsSearchButton = () => {
+  const { isProductSearchActive, setProductSearchActive } = useProductsSearch();
+  return (
+    <TouchableOpacity onPress={() => setProductSearchActive(!isProductSearchActive)}>
+      <LineIcon name="search" size={24} className={isProductSearchActive ? "text-accent" : "text-foreground"} />
     </TouchableOpacity>
   );
 };
@@ -186,6 +207,7 @@ const ProductsHeaderRight = () => {
   const router = useRouter();
   return (
     <View className="mr-3 flex-row items-center gap-3">
+      <ProductsSearchButton />
       <TouchableOpacity onPress={() => router.push("/products/new")}>
         <SolidIcon name="plus" size={24} className="text-white" />
       </TouchableOpacity>
@@ -197,76 +219,79 @@ const ProductsHeaderRight = () => {
 export default function TabsLayout() {
   const { isCreator } = useAuth();
   const [isSearchActive, setSearchActive] = useState(false);
+  const [isProductSearchActive, setProductSearchActive] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [accent, muted, border] = useCSSVariable(["--color-accent", "--color-muted", "--color-border"]);
   const headerTitleStyle = useResolveClassNames("font-sans text-white");
   const tabBarLabelStyle = useResolveClassNames("font-sans font-normal text-xs");
   return (
     <SearchContext.Provider value={{ isSearchActive, setSearchActive }}>
-      <SettingsSheetContext.Provider value={{ isSettingsOpen, setSettingsOpen }}>
-        <Tabs
-          tabBar={(props) => (
-            <View>
-              <MiniAudioPlayer />
-              <BottomTabBar {...props} />
-            </View>
-          )}
-          screenOptions={{
-            headerStyle: { backgroundColor: "black" },
-            headerShadowVisible: false,
-            headerTintColor: accent as string,
-            headerTitleStyle,
-            tabBarStyle: {
-              backgroundColor: "black",
-              borderTopColor: border as string,
-            },
-            tabBarActiveTintColor: accent as string,
-            tabBarInactiveTintColor: muted as string,
-            tabBarLabelStyle,
-          }}
-        >
-          <Tabs.Screen
-            name="dashboard"
-            options={{
-              title: "Dashboard",
-              headerLeft: () => <LogoIcon />,
-              headerRight: () => <DashboardHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={color} />,
-              href: isCreator ? undefined : null,
+      <ProductSearchContext.Provider value={{ isProductSearchActive, setProductSearchActive }}>
+        <SettingsSheetContext.Provider value={{ isSettingsOpen, setSettingsOpen }}>
+          <Tabs
+            tabBar={(props) => (
+              <View>
+                <MiniAudioPlayer />
+                <BottomTabBar {...props} />
+              </View>
+            )}
+            screenOptions={{
+              headerStyle: { backgroundColor: "black" },
+              headerShadowVisible: false,
+              headerTintColor: accent as string,
+              headerTitleStyle,
+              tabBarStyle: {
+                backgroundColor: "black",
+                borderTopColor: border as string,
+              },
+              tabBarActiveTintColor: accent as string,
+              tabBarInactiveTintColor: muted as string,
+              tabBarLabelStyle,
             }}
-          />
-          <Tabs.Screen
-            name="analytics"
-            options={{
-              title: "Analytics",
-              headerLeft: () => <LogoIcon />,
-              headerRight: () => <LibraryHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-big" size={size} color={color} />,
-              href: isCreator ? undefined : null,
-            }}
-          />
-          <Tabs.Screen
-            name="products"
-            options={{
-              title: "Products",
-              headerLeft: () => <LogoIcon />,
-              headerRight: () => <ProductsHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="inbox" size={size} color={color} />,
-              href: isCreator ? undefined : null,
-            }}
-          />
-          <Tabs.Screen
-            name="library"
-            options={{
-              title: "Library",
-              headerLeft: () => <LogoIcon />,
-              headerRight: () => <LibraryHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="bookmark-heart" size={size} color={color} />,
-            }}
-          />
-        </Tabs>
-        <SettingsSheet />
-      </SettingsSheetContext.Provider>
+          >
+            <Tabs.Screen
+              name="dashboard"
+              options={{
+                title: "Dashboard",
+                headerLeft: () => <LogoIcon />,
+                headerRight: () => <DashboardHeaderRight />,
+                tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={color} />,
+                href: isCreator ? undefined : null,
+              }}
+            />
+            <Tabs.Screen
+              name="analytics"
+              options={{
+                title: "Analytics",
+                headerLeft: () => <LogoIcon />,
+                headerRight: () => <LibraryHeaderRight />,
+                tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-big" size={size} color={color} />,
+                href: isCreator ? undefined : null,
+              }}
+            />
+            <Tabs.Screen
+              name="products"
+              options={{
+                title: "Products",
+                headerLeft: () => <LogoIcon />,
+                headerRight: () => <ProductsHeaderRight />,
+                tabBarIcon: ({ color, size }) => <SolidIcon name="inbox" size={size} color={color} />,
+                href: isCreator ? undefined : null,
+              }}
+            />
+            <Tabs.Screen
+              name="library"
+              options={{
+                title: "Library",
+                headerLeft: () => <LogoIcon />,
+                headerRight: () => <LibraryHeaderRight />,
+                tabBarIcon: ({ color, size }) => <SolidIcon name="bookmark-heart" size={size} color={color} />,
+              }}
+            />
+          </Tabs>
+          <SettingsSheet />
+        </SettingsSheetContext.Provider>
+      </ProductSearchContext.Provider>
     </SearchContext.Provider>
   );
 }
