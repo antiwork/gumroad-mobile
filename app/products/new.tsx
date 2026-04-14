@@ -32,21 +32,30 @@ type CreateProductResponse = {
 };
 
 type ProductKindId = "digital" | "course" | "ebook" | "membership" | "bundle" | "call" | "coffee";
-type NativeProductKind = "digital" | "membership" | "bundle" | "coffee" | "commission";
+type NativeProductKind = "digital" | "course" | "ebook" | "membership" | "bundle" | "call" | "coffee";
+type SubscriptionDuration = "monthly";
 
 const PRODUCT_KIND_OPTIONS: {
   id: ProductKindId;
   nativeType: NativeProductKind;
+  subscriptionDuration?: SubscriptionDuration;
   thumbnail: React.ComponentProps<typeof StyledImage>["source"];
   title: string;
   description: string;
 }[] = [
   { id: "digital", nativeType: "digital", thumbnail: digitalThumbnail, title: "Digital product", description: "Any set of files to download or stream." },
-  { id: "course", nativeType: "digital", thumbnail: courseThumbnail, title: "Course or tutorial", description: "Sell a lesson or a full learning experience." },
-  { id: "ebook", nativeType: "digital", thumbnail: ebookThumbnail, title: "E-book", description: "Offer books and comics in downloadable formats." },
-  { id: "membership", nativeType: "membership", thumbnail: membershipThumbnail, title: "Membership", description: "Start a recurring membership around your audience." },
+  { id: "course", nativeType: "course", thumbnail: courseThumbnail, title: "Course or tutorial", description: "Sell a lesson or a full learning experience." },
+  { id: "ebook", nativeType: "ebook", thumbnail: ebookThumbnail, title: "E-book", description: "Offer books and comics in downloadable formats." },
+  {
+    id: "membership",
+    nativeType: "membership",
+    subscriptionDuration: "monthly",
+    thumbnail: membershipThumbnail,
+    title: "Membership",
+    description: "Start a recurring membership around your audience.",
+  },
   { id: "bundle", nativeType: "bundle", thumbnail: bundleThumbnail, title: "Bundle", description: "Sell multiple existing products as one offer." },
-  { id: "call", nativeType: "commission", thumbnail: callThumbnail, title: "Call", description: "Offer scheduled calls with your customers." },
+  { id: "call", nativeType: "call", thumbnail: callThumbnail, title: "Call", description: "Offer scheduled calls with your customers." },
   { id: "coffee", nativeType: "coffee", thumbnail: coffeeThumbnail, title: "Coffee", description: "Accept support and tips from your audience." },
 ];
 
@@ -85,6 +94,7 @@ export default function ProductNew() {
 
     const selectedOption = PRODUCT_KIND_OPTIONS.find((option) => option.id === selectedKind);
     const nativeType = selectedOption?.nativeType ?? "digital";
+    const subscriptionDuration = selectedOption?.subscriptionDuration;
 
     setError(null);
     setIsSubmitting(true);
@@ -96,6 +106,7 @@ export default function ProductNew() {
           name: trimmedName,
           price: Math.round(parsedPrice * 100),
           native_type: nativeType,
+          ...(subscriptionDuration ? { subscription_duration: subscriptionDuration } : {}),
         },
       });
 

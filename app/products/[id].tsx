@@ -6,25 +6,17 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import { normalizeProduct, RawProduct } from "@/lib/product-api";
 import { requestAPI } from "@/lib/request";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, TextInput, View } from "react-native";
+import { Alert, ScrollView, TextInput, View } from "react-native";
 import * as Sentry from "@sentry/react-native";
 import { useCSSVariable } from "uniwind";
 
 type ProductDetailsResponse = {
   success: boolean;
-  product: {
-    id: string;
-    name: string;
-    description?: string;
-    custom_summary?: string;
-    price: number;
-    formatted_price: string;
-    published: boolean;
-    unique_permalink?: string | null;
-  };
+  product: RawProduct;
 };
 
 export default function ProductEdit() {
@@ -42,6 +34,8 @@ export default function ProductEdit() {
   const [customSummary, setCustomSummary] = useState("");
   const [published, setPublished] = useState(false);
   const [formattedPrice, setFormattedPrice] = useState<string | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
   const mutedColor = useCSSVariable("--color-muted") as string;
 
   const fetchProduct = useCallback(async () => {
@@ -62,12 +56,16 @@ export default function ProductEdit() {
       const response = await requestAPI<ProductDetailsResponse>(`/v2/products/${encodeURIComponent(productId)}`, {
         accessToken,
       });
-      setName(response.product.name ?? "");
-      setDescription(response.product.description ?? "");
-      setCustomSummary(response.product.custom_summary ?? "");
-      setPrice((response.product.price / 100).toFixed(2));
-      setPublished(!!response.product.published);
-      setFormattedPrice(response.product.formatted_price ?? null);
+      const normalizedProduct = normalizeProduct(response.product);
+      if (!normalizedProduct) throw new Error("Invalid product response.");
+      setName(normalizedProduct.name);
+      setDescription(normalizedProduct.description);
+      setCustomSummary(normalizedProduct.customSummary);
+      setPrice((normalizedProduct.price / 100).toFixed(2));
+      setPublished(normalizedProduct.published);
+      setFormattedPrice(normalizedProduct.formattedPrice);
+      setTags(normalizedProduct.tags);
+      setShortUrl(normalizedProduct.shortUrl);
     } catch (requestError) {
       Sentry.captureException(requestError);
       setError(requestError instanceof Error ? requestError.message : "Could not load product.");
@@ -203,7 +201,11 @@ export default function ProductEdit() {
           ),
         }}
       />
-      <View className="flex-1 gap-4 px-4 py-6">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="gap-4 px-4 py-6 pb-10"
+        keyboardShouldPersistTaps="handled"
+      >
         {isLoading ? (
           <View className="flex-1 items-center justify-center">
             <LoadingSpinner size="large" />
@@ -295,6 +297,21 @@ export default function ProductEdit() {
                 </Badge>
               </CardContent>
             </Card>
+            {shortUrl ? (
+              <Card className="rounded-xl">
+                <CardContent className="gap-1 p-3">
+                  <Text className="text-xs text-muted">Public link</Text>
+                  <Text className="text-sm text-foreground" numberOfLines={1}>
+                    {shortUrl}
+                  </Text>
+                  {tags.length > 0 ? (
+                    <Text className="text-xs text-muted" numberOfLines={1}>
+                      Tags: {tags.join(", ")}
+                    </Text>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : null}
 
             <View className="flex-row gap-2">
               <Button variant="accent" onPress={() => void handleSavePress()} disabled={isSaving}>
@@ -310,7 +327,7 @@ export default function ProductEdit() {
             </Button>
           </>
         ) : null}
-      </View>
+      </ScrollView>
     </Screen>
   );
 }

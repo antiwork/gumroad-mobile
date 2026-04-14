@@ -7,6 +7,7 @@ import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useProductsSearch } from "@/app/(tabs)/_layout";
 import { useAuth } from "@/lib/auth-context";
+import { normalizeProducts, ProductModel, RawProduct } from "@/lib/product-api";
 import { requestAPI } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -14,41 +15,39 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Image, Pressable, RefreshControl, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-interface Product {
-  id: string;
-  name: string;
-  url?: string | null;
-  description?: string;
-  price: number;
-  currency: string;
-  formatted_price: string;
-  thumbnail_url?: string;
-  published: boolean;
-  tags?: string[];
-  custom_summary?: string;
-  deleted: boolean;
-  sales_count?: number;
-  short_url?: string;
-  customizable_price?: boolean;
-}
-
 interface ProductsResponse {
   success: boolean;
-  products: Product[];
+  products: RawProduct[];
   next_page_key?: string;
   next_page_url?: string;
 }
+
+const formatRevenue = (amountCents: number, currencyCode: string) => {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currencyCode,
+      maximumFractionDigits: 2,
+    }).format(amountCents / 100);
+  } catch {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+    }).format(amountCents / 100);
+  }
+};
 
 const ProductCard = ({
   product,
   onPress,
   isFirst,
 }: {
-  product: Product;
+  product: ProductModel;
   onPress: () => void;
   isFirst: boolean;
 }) => {
-  const subtitle = product.custom_summary || product.description;
+  const subtitle = product.customSummary || product.description;
 
   return (
     <Pressable
@@ -59,8 +58,8 @@ const ProductCard = ({
       <Card className="rounded-xl">
         <CardContent className="p-3">
           <View className="flex-row gap-3">
-            {product.thumbnail_url ? (
-              <Image source={{ uri: product.thumbnail_url }} className="size-16 rounded-lg bg-muted" resizeMode="cover" />
+            {product.thumbnailUrl ? (
+              <Image source={{ uri: product.thumbnailUrl }} className="size-16 rounded-lg bg-muted" resizeMode="cover" />
             ) : (
               <View className="size-16 items-center justify-center rounded-lg bg-muted">
                 <LineIcon name="package" size={20} className="text-muted" />
@@ -75,9 +74,9 @@ const ProductCard = ({
                   <Text>{product.published ? "Published" : "Draft"}</Text>
                 </Badge>
               </View>
-              {product.short_url ? (
+              {product.shortUrl ? (
                 <Text className="text-xs text-muted" numberOfLines={1}>
-                  {product.short_url}
+                  {product.shortUrl}
                 </Text>
               ) : null}
               {subtitle ? (
@@ -85,15 +84,20 @@ const ProductCard = ({
                   {subtitle}
                 </Text>
               ) : null}
+              {product.tags.length > 0 ? (
+                <Text className="text-[11px] text-muted" numberOfLines={1}>
+                  {product.tags.slice(0, 2).join(" • ")}
+                </Text>
+              ) : null}
               <View className="mt-1 flex-row items-center justify-between">
-                <Text className="text-xs text-muted">{product.sales_count ?? 0} sales</Text>
+                <Text className="text-xs text-muted">{product.salesCount} sales</Text>
                 <View className="flex-row items-center gap-2">
-                  {product.customizable_price ? (
+                  {product.customizablePrice ? (
                     <Badge variant="outline">
                       <Text>PWYW</Text>
                     </Badge>
                   ) : null}
-                  <Text className="text-sm font-bold">{product.formatted_price}</Text>
+                  <Text className="text-sm font-bold">{product.formattedPrice}</Text>
                   <LineIcon name="chevron-right" size={16} className="text-muted" />
                 </View>
               </View>
@@ -110,7 +114,7 @@ export default function Products() {
   const { isProductSearchActive, setProductSearchActive } = useProductsSearch();
   const router = useRouter();
   const inputRef = useRef<TextInput>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductModel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,14 +122,10 @@ export default function Products() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const mutedColor = useCSSVariable("--color-muted") as string;
-  const totalSalesCount = products.reduce((sum, product) => sum + (product.sales_count ?? 0), 0);
+  const totalSalesCount = products.reduce((sum, product) => sum + product.salesCount, 0);
   const revenueCurrency = (products[0]?.currency || "USD").toUpperCase();
-  const totalSalesRevenueCents = products.reduce((sum, product) => sum + (product.price || 0) * (product.sales_count ?? 0), 0);
-  const formattedSalesRevenue = new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: revenueCurrency,
-    maximumFractionDigits: 2,
-  }).format(totalSalesRevenueCents / 100);
+  const totalSalesRevenueCents = products.reduce((sum, product) => sum + product.price * product.salesCount, 0);
+  const formattedSalesRevenue = formatRevenue(totalSalesRevenueCents, revenueCurrency);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery.trim().toLowerCase()), 300);
 
@@ -146,7 +146,7 @@ export default function Products() {
       if (statusFilter === "published" && !product.published) return false;
       if (statusFilter === "draft" && product.published) return false;
       if (!debouncedSearchQuery) return true;
-      const searchText = `${product.name} ${product.custom_summary ?? ""} ${product.description ?? ""}`.toLowerCase();
+      const searchText = `${product.name} ${product.customSummary} ${product.description}`.toLowerCase();
       return searchText.includes(debouncedSearchQuery);
       }),
     [debouncedSearchQuery, products, statusFilter],
@@ -170,7 +170,7 @@ export default function Products() {
       const response = await requestAPI<ProductsResponse>("/v2/products", { accessToken });
       if (!response.success) throw new Error("Unable to load products");
 
-      setProducts((response.products ?? []).filter((product) => !product.deleted));
+      setProducts(normalizeProducts(response.products));
     } catch (error) {
       Sentry.captureException(error);
       setError(error instanceof Error ? error.message : "Failed to load products");
@@ -186,12 +186,11 @@ export default function Products() {
     }, [fetchProducts]),
   );
 
-  const handleProductPress = (product: Product) => {
+  const handleProductPress = (product: ProductModel) => {
     const editIdentifier = product.id?.trim() || null;
     console.info("[Products] Open editor attempt", {
       productId: product.id,
-      shortUrl: product.short_url,
-      url: product.url,
+      shortUrl: product.shortUrl,
       resolvedEditIdentifier: editIdentifier,
     });
     if (!editIdentifier) {
@@ -200,8 +199,7 @@ export default function Products() {
         level: "warning",
         extra: {
           productId: product.id,
-          shortUrl: product.short_url,
-          url: product.url,
+          shortUrl: product.shortUrl,
         },
       });
       return;
@@ -210,7 +208,7 @@ export default function Products() {
       pathname: "/products/[id]",
       params: {
         id: editIdentifier,
-        shortUrl: product.short_url ?? "",
+        shortUrl: product.shortUrl ?? "",
       },
     });
   };
@@ -295,7 +293,7 @@ export default function Products() {
             </View>
             <View className="flex-row gap-2">
               <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
-                <Text className="text-xs text-muted">Sales Revenue</Text>
+                <Text className="text-xs text-muted">Revenue</Text>
                 <Text className="text-lg font-bold">{formattedSalesRevenue}</Text>
               </View>
               <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
