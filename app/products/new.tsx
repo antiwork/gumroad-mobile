@@ -1,51 +1,86 @@
-import { StyledWebView } from "@/components/styled";
+import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
-import { env } from "@/lib/env";
-import { useCallback, useRef, useState } from "react";
-import { View } from "react-native";
-import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
+import { requestAPI } from "@/lib/request";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { TextInput, View } from "react-native";
 import * as Sentry from "@sentry/react-native";
+
+type CreateProductResponse = {
+  success: boolean;
+  product: {
+    id: string;
+    unique_permalink?: string | null;
+    custom_permalink?: string | null;
+  };
+};
 
 export default function ProductNew() {
   const { isLoading: isAuthLoading, accessToken } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [webError, setWebError] = useState<string | null>(null);
-  const webViewRef = useRef<BaseWebView>(null);
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const url = accessToken
-    ? `${env.EXPO_PUBLIC_GUMROAD_URL}/products/new?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`
-    : `${env.EXPO_PUBLIC_GUMROAD_URL}/products/new?display=mobile_app&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
-
-  const handleShouldStartLoadWithRequest = useCallback(
-    (request: { url: string; navigationType: string; mainDocumentURL?: string }) => {
-      if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
-      if (
-        request.url === url ||
-        request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL) ||
-        request.url.startsWith("https://challenges.cloudflare.com/") ||
-        request.url.startsWith("https://connect-js.stripe.com/") ||
-        request.url.startsWith("https://gumroad.com/") ||
-        request.url.startsWith("https://www.gumroad.com/") ||
-        !/^https?:\/\//.test(request.url)
-      )
-        return true;
-      return false;
-    },
-    [url],
-  );
-
-  const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    const data = event.nativeEvent.data;
-    try {
-      const message = JSON.parse(data);
-      console.info("WebView message received:", message);
-    } catch (error) {
-      Sentry.captureException(error);
+  const createProduct = async () => {
+    if (!accessToken) {
+      setError("You must be signed in to create a product.");
+      return;
     }
-  }, []);
+
+    const trimmedName = name.trim();
+    const normalizedPrice = price.trim();
+    if (!trimmedName) {
+      setError("Product name is required.");
+      return;
+    }
+    if (!normalizedPrice) {
+      setError("Price is required.");
+      return;
+    }
+
+    const parsedPrice = Number(normalizedPrice);
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      setError("Price must be a valid number.");
+      return;
+    }
+
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const response = await requestAPI<CreateProductResponse>("/v2/products", {
+        accessToken,
+        method: "POST",
+        data: {
+          name: trimmedName,
+          price: Math.round(parsedPrice * 100),
+          native_type: "digital",
+        },
+      });
+
+      const editIdentifier = response.product.id?.trim();
+      if (!editIdentifier) {
+        setError("Product created, but we could not open the editor yet.");
+        return;
+      }
+
+      router.replace({
+        pathname: "/products/[id]",
+        params: {
+          id: editIdentifier,
+        },
+      });
+    } catch (requestError) {
+      Sentry.captureException(requestError);
+      setError(requestError instanceof Error ? requestError.message : "Failed to create product.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (isAuthLoading) {
     return (
@@ -57,37 +92,48 @@ export default function ProductNew() {
 
   return (
     <Screen>
-      {isLoading && (
-        <View className="absolute inset-0 items-center justify-center bg-body-bg z-10">
-          <LoadingSpinner size="large" />
+      <View className="flex-1 gap-4 px-4 py-6">
+        <Text className="text-xl font-bold">Create product</Text>
+
+        {error ? (
+          <View className="rounded border border-border bg-background px-3 py-3">
+            <Text className="text-sm text-muted">{error}</Text>
+          </View>
+        ) : null}
+
+        <View className="gap-2">
+          <Text className="text-sm">Name</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Name of product"
+            autoCapitalize="sentences"
+            className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+          />
         </View>
-      )}
-      <StyledWebView
-        ref={webViewRef}
-        source={{ uri: url }}
-        className="flex-1 bg-transparent"
-        webviewDebuggingEnabled
-        pullToRefreshEnabled
-        incognito
-        mediaPlaybackRequiresUserAction={false}
-        originWhitelist={["*"]}
-        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-        onMessage={handleMessage}
-        onError={(event) => {
-          const description = event.nativeEvent.description || "Failed to load create product page";
-          setWebError(description);
-          Sentry.captureMessage("Product new WebView failed", {
-            level: "error",
-            extra: { description, failingUrl: event.nativeEvent.url },
-          });
-        }}
-        onLoadEnd={() => setIsLoading(false)}
-      />
-      {webError ? (
-        <View className="absolute bottom-4 left-4 right-4 rounded border border-border bg-background px-3 py-2">
-          <Text className="text-xs text-muted">{webError}</Text>
+
+        <View className="gap-2">
+          <Text className="text-sm">Price</Text>
+          <TextInput
+            value={price}
+            onChangeText={(value) => {
+              const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+              setPrice(normalized);
+            }}
+            placeholder="0.00"
+            keyboardType="decimal-pad"
+            className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+          />
         </View>
-      ) : null}
+
+        <Button onPress={() => void createProduct()} disabled={isSubmitting}>
+          <Text>{isSubmitting ? "Creating..." : "Next: Customize"}</Text>
+        </Button>
+
+        <Button variant="outline" onPress={() => router.back()} disabled={isSubmitting}>
+          <Text>Cancel</Text>
+        </Button>
+      </View>
     </Screen>
   );
 }

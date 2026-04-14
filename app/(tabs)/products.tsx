@@ -3,11 +3,13 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import { env } from "@/lib/env";
+import { safeOpenURL } from "@/lib/open-url";
 import { requestAPI } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
-import { FlatList, Image, Pressable, RefreshControl, View } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { FlatList, Image, Pressable, RefreshControl, TextInput, View } from "react-native";
 
 interface Product {
   id: string;
@@ -103,14 +105,20 @@ export default function Products() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const publishedCount = products.filter((product) => product.published).length;
   const draftCount = products.length - publishedCount;
-
-  const getProductEditIdentifier = (product: Product) => {
-    const fromShortUrl = product.short_url?.match(/\/l\/([^/?#]+)/)?.[1];
-    const fromUrl = product.url?.match(/\/l\/([^/?#]+)/)?.[1];
-    return fromShortUrl || fromUrl || null;
-  };
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return products.filter((product) => {
+      if (statusFilter === "published" && !product.published) return false;
+      if (statusFilter === "draft" && product.published) return false;
+      if (!normalizedQuery) return true;
+      const searchText = `${product.name} ${product.custom_summary ?? ""} ${product.description ?? ""}`.toLowerCase();
+      return searchText.includes(normalizedQuery);
+    });
+  }, [products, searchQuery, statusFilter]);
 
   const fetchProducts = useCallback(async (isRefresh = false) => {
     if (!accessToken) {
@@ -147,17 +155,32 @@ export default function Products() {
   );
 
   const handleProductPress = (product: Product) => {
-    const editIdentifier = getProductEditIdentifier(product);
+    const editIdentifier = product.id?.trim() || null;
+    console.info("[Products] Open editor attempt", {
+      productId: product.id,
+      shortUrl: product.short_url,
+      url: product.url,
+      resolvedEditIdentifier: editIdentifier,
+    });
     if (!editIdentifier) {
       setError("Unable to open this product right now.");
       Sentry.captureMessage("Missing product edit identifier", {
         level: "warning",
-        extra: { productId: product.id, shortUrl: product.short_url, url: product.url },
+        extra: {
+          productId: product.id,
+          shortUrl: product.short_url,
+          url: product.url,
+        },
       });
       return;
     }
-
-    router.push(`/products/${encodeURIComponent(editIdentifier)}`);
+    router.push({
+      pathname: "/products/[id]",
+      params: {
+        id: editIdentifier,
+        shortUrl: product.short_url ?? "",
+      },
+    });
   };
 
   if (isAuthLoading) {
@@ -186,13 +209,55 @@ export default function Products() {
   return (
     <Screen>
       <FlatList
-        data={products}
+        data={filteredProducts}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 16 }}
         ListHeaderComponent={
           <View className="gap-3 border-b border-border px-4 py-4">
             <Text className="text-xl font-bold">Products</Text>
             {error ? <Text className="text-xs text-muted">{error}</Text> : null}
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search products"
+              autoCapitalize="none"
+              autoCorrect={false}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+            />
+            <View className="flex-row gap-2">
+              {[
+                { id: "all", label: "All" },
+                { id: "published", label: "Published" },
+                { id: "draft", label: "Drafts" },
+              ].map((filter) => {
+                const isActive = statusFilter === filter.id;
+                return (
+                  <Pressable
+                    key={filter.id}
+                    onPress={() => setStatusFilter(filter.id as "all" | "published" | "draft")}
+                    className={`rounded-full border px-3 py-1 ${isActive ? "border-primary bg-primary" : "border-border bg-background"}`}
+                  >
+                    <Text className={`text-xs ${isActive ? "text-primary-foreground" : "text-muted"}`}>{filter.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => void safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/affiliates`)}
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-2"
+              >
+                <Text className="text-xs text-muted">Affiliates</Text>
+                <Text className="mt-1 text-sm font-medium">Manage partners</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/collaborators`)}
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-2"
+              >
+                <Text className="text-xs text-muted">Collabs</Text>
+                <Text className="mt-1 text-sm font-medium">Manage collaborators</Text>
+              </Pressable>
+            </View>
             <View className="flex-row gap-2">
               <View className="flex-1 rounded-lg border border-border bg-background px-3 py-2">
                 <Text className="text-xs text-muted">Total</Text>
@@ -228,16 +293,24 @@ export default function Products() {
               <View className="mb-4 rounded-full border border-border p-3">
                 <LineIcon name="package" size={24} className="text-muted" />
               </View>
-              <Text className="text-lg text-muted text-center mb-2">No products yet</Text>
-              <Text className="mb-4 text-sm text-muted text-center">Create your first product to start selling from mobile.</Text>
-              <Pressable onPress={() => router.push("/products/new")} className="rounded bg-primary px-4 py-2">
-                <Text className="text-primary-foreground">Create your first product</Text>
-              </Pressable>
+              <Text className="text-lg text-muted text-center mb-2">
+                {products.length > 0 ? "No products match your filters" : "No products yet"}
+              </Text>
+              {products.length > 0 ? (
+                <Text className="mb-4 text-sm text-muted text-center">Try changing your search or status filter.</Text>
+              ) : (
+                <>
+                  <Text className="mb-4 text-sm text-muted text-center">Create your first product to start selling from mobile.</Text>
+                  <Pressable onPress={() => router.push("/products/new")} className="rounded bg-primary px-4 py-2">
+                    <Text className="text-primary-foreground">Create your first product</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           ) : null
         }
         ListFooterComponent={
-          isLoading && products.length > 0 ? (
+          isLoading && filteredProducts.length > 0 ? (
             <View className="w-full items-center py-4">
               <LoadingSpinner size="small" />
             </View>
