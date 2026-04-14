@@ -13,7 +13,7 @@ import { safeOpenURL } from "@/lib/open-url";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { createContext, useContext, useRef, useState } from "react";
 import { Alert, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
@@ -182,6 +182,18 @@ const LibraryHeaderRight = () => (
   </View>
 );
 
+const ProductsHeaderRight = () => {
+  const router = useRouter();
+  return (
+    <View className="mr-3 flex-row items-center gap-3">
+      <TouchableOpacity onPress={() => router.push("/products/new")}>
+        <SolidIcon name="plus" size={24} className="text-white" />
+      </TouchableOpacity>
+      <SettingsButton />
+    </View>
+  );
+};
+
 export default function TabsLayout() {
   const { isCreator } = useAuth();
   const [isSearchActive, setSearchActive] = useState(false);
@@ -230,6 +242,16 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <LibraryHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-big" size={size} color={color} />,
+              href: isCreator ? undefined : null,
+            }}
+          />
+          <Tabs.Screen
+            name="products"
+            options={{
+              title: "Products",
+              headerLeft: () => <LogoIcon />,
+              headerRight: () => <ProductsHeaderRight />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="inbox" size={size} color={color} />,
               href: isCreator ? undefined : null,
             }}
           />
