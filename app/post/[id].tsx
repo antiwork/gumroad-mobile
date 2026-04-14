@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
+import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { safeOpenURL } from "@/lib/open-url";
 import { buildApiUrl } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
@@ -24,14 +25,13 @@ const formatDate = (dateString: string) => {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 };
 
+const downloadUrl = (urlRedirectToken: string, productFileId: string) =>
+  buildApiUrl(`/mobile/url_redirects/download/${urlRedirectToken}/${productFileId}`);
+
 const downloadFile = (urlRedirectToken: string, productFileId: string) =>
-  File.downloadFileAsync(
-    buildApiUrl(`/mobile/url_redirects/download/${urlRedirectToken}/${productFileId}`),
-    Paths.cache,
-    {
-      idempotent: true,
-    },
-  );
+  File.downloadFileAsync(downloadUrl(urlRedirectToken, productFileId), Paths.cache, {
+    idempotent: true,
+  });
 
 const fontDataPromise = Promise.all(
   [
@@ -57,12 +57,14 @@ export default function PostScreen() {
   }>();
   const post = useInstallment(id, { purchaseId, subscriptionId, followerId });
   const purchase = usePurchase(post?.url_redirect_external_id);
+  const webViewRef = useRef<BaseWebView>(null);
+  const { playAudio, pauseAudio } = useAudioPlayerSync(webViewRef);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const { bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [bodyHeight, setBodyHeight] = useState(0);
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [fontFaces, setFontFaces] = useState("");
-  const webViewRef = useRef<BaseWebView>(null);
 
   const [foreground, bodyBg, fontFamily] = useCSSVariable(["--color-foreground", "--color-body-bg", "--font-sans"]);
 
@@ -115,6 +117,37 @@ export default function PostScreen() {
       Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
     } finally {
       setDownloadingFileId(null);
+    }
+  };
+
+  const handleAudioPress = async (fileId: string) => {
+    try {
+      if (playingAudioId === fileId) {
+        await pauseAudio();
+        setPlayingAudioId(null);
+        return;
+      }
+      if (!post?.url_redirect_external_id || !purchase?.url_redirect_token) return;
+      const allAudioFiles = post.files_data?.filter((f) => f.filegroup === "audio") ?? [];
+      const tracks = allAudioFiles.map((f) => ({
+        uri: downloadUrl(purchase.url_redirect_token, f.id),
+        resourceId: f.id,
+        title: f.name ?? post.name,
+        urlRedirectId: post.url_redirect_external_id,
+        purchaseId: purchase.purchase_id,
+      }));
+      const file = allAudioFiles.find((f) => f.id === fileId);
+      await playAudio({
+        resourceId: fileId,
+        resumeAt: file?.latest_media_location?.location,
+        artist: post.creator_name,
+        artistUrl: post.creator_profile_url,
+        artwork: purchase.thumbnail_url,
+        tracks,
+      });
+      setPlayingAudioId(fileId);
+    } catch (error) {
+      Sentry.captureException(error);
     }
   };
 
@@ -187,23 +220,30 @@ export default function PostScreen() {
           <View className="mx-4 rounded border border-border bg-background">
             {post.files_data.map((file, index) => {
               const [fileName, extension] = file.name.split(/\.(?=[^.]+$)/);
+              const isAudio = file.filegroup === "audio";
               return (
                 <View key={file.id} className={`gap-4 p-4 ${index > 0 ? "border-t border-border" : ""}`}>
                   <View className="flex-row items-center gap-3">
-                    <LineIcon name="file" size={20} className="text-foreground" />
+                    <LineIcon name={isAudio ? "music" : "file"} size={20} className="text-foreground" />
                     <View className="flex-1">
                       <Text numberOfLines={1}>{fileName}</Text>
                       {extension ? <Text>{extension.toUpperCase()}</Text> : null}
                     </View>
                   </View>
-                  <Button
-                    className="self-end"
-                    variant="outline"
-                    onPress={() => handleFileDownload(file.id)}
-                    disabled={!purchase || downloadingFileId === file.id}
-                  >
-                    {downloadingFileId === file.id ? <LoadingSpinner size="small" /> : <Text>Download</Text>}
-                  </Button>
+                  <View className="flex-row gap-2 self-end">
+                    {isAudio && (
+                      <Button variant="outline" onPress={() => handleAudioPress(file.id)} disabled={!purchase}>
+                        <Text>{playingAudioId === file.id ? "Pause" : "Play"}</Text>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      onPress={() => handleFileDownload(file.id)}
+                      disabled={!purchase || downloadingFileId === file.id}
+                    >
+                      {downloadingFileId === file.id ? <LoadingSpinner size="small" /> : <Text>Download</Text>}
+                    </Button>
+                  </View>
                 </View>
               );
             })}
