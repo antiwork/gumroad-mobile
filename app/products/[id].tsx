@@ -1,4 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LineIcon } from "@/components/icon";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
@@ -8,6 +11,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, TextInput, View } from "react-native";
 import * as Sentry from "@sentry/react-native";
+import { useCSSVariable } from "uniwind";
 
 type ProductDetailsResponse = {
   success: boolean;
@@ -38,6 +42,7 @@ export default function ProductEdit() {
   const [customSummary, setCustomSummary] = useState("");
   const [published, setPublished] = useState(false);
   const [formattedPrice, setFormattedPrice] = useState<string | null>(null);
+  const mutedColor = useCSSVariable("--color-muted") as string;
 
   const fetchProduct = useCallback(async () => {
     if (!productId) {
@@ -205,73 +210,93 @@ export default function ProductEdit() {
         {!isLoading ? (
           <>
             {error ? (
-              <View className="rounded border border-border bg-background px-3 py-3">
+              <View className="rounded-lg border border-destructive/50 bg-card px-3 py-3">
                 <Text className="text-sm text-muted">{error}</Text>
               </View>
             ) : null}
             {saveNotice ? (
-              <View className="rounded border border-border bg-background px-3 py-3">
+              <View className="rounded-lg border border-accent/50 bg-card px-3 py-3">
                 <Text className="text-sm text-muted">{saveNotice}</Text>
               </View>
             ) : null}
 
-            <View className="gap-2">
-              <Text className="text-sm">Name</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="Product name"
-                autoCapitalize="sentences"
-                className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-              />
-            </View>
+            <Card className="rounded-xl">
+              <CardHeader>
+                <CardTitle>Product details</CardTitle>
+              </CardHeader>
+              <CardContent className="gap-4">
+                <View className="gap-2">
+                  <Text className="text-sm">Name</Text>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Product name"
+                    placeholderTextColor={mutedColor}
+                    autoCapitalize="sentences"
+                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                  />
+                </View>
 
-            <View className="gap-2">
-              <Text className="text-sm">Summary</Text>
-              <TextInput
-                value={customSummary}
-                onChangeText={setCustomSummary}
-                placeholder="Short product summary"
-                autoCapitalize="sentences"
-                className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-              />
-            </View>
+                <View className="gap-2">
+                  <Text className="text-sm">Summary</Text>
+                  <TextInput
+                    value={customSummary}
+                    onChangeText={setCustomSummary}
+                    placeholder="Short product summary"
+                    placeholderTextColor={mutedColor}
+                    autoCapitalize="sentences"
+                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                  />
+                </View>
 
-            <View className="gap-2">
-              <Text className="text-sm">Description</Text>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Describe your product"
-                multiline
-                textAlignVertical="top"
-                autoCapitalize="sentences"
-                className="min-h-28 rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-              />
-            </View>
+                <View className="gap-2">
+                  <Text className="text-sm">Description</Text>
+                  <TextInput
+                    value={description}
+                    onChangeText={setDescription}
+                    placeholder="Describe your product"
+                    placeholderTextColor={mutedColor}
+                    multiline
+                    textAlignVertical="top"
+                    autoCapitalize="sentences"
+                    className="min-h-28 rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                  />
+                </View>
 
-            <View className="gap-2">
-              <Text className="text-sm">Price</Text>
-              <TextInput
-                value={price}
-                onChangeText={(value) => {
-                  const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
-                  setPrice(normalized);
-                }}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-                className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-              />
-              {formattedPrice ? <Text className="text-xs text-muted">Current: {formattedPrice}</Text> : null}
-            </View>
+                <View className="gap-2">
+                  <Text className="text-sm">Price</Text>
+                  <TextInput
+                    value={price}
+                    onChangeText={(value) => {
+                      const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+                      setPrice(normalized);
+                    }}
+                    placeholder="0.00"
+                    placeholderTextColor={mutedColor}
+                    keyboardType="decimal-pad"
+                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                  />
+                  {formattedPrice ? <Text className="text-xs text-muted">Current: {formattedPrice}</Text> : null}
+                </View>
+              </CardContent>
+            </Card>
 
-            <View className="rounded border border-border bg-background px-3 py-3">
-              <Text className="text-sm text-muted">Status: {published ? "Published" : "Draft"}</Text>
-            </View>
+            <Card className="rounded-xl">
+              <CardContent className="flex-row items-center justify-between p-3">
+                <View className="flex-row items-center gap-2">
+                  <LineIcon name="package" size={16} className="text-accent" />
+                  <Text className="text-sm text-muted">Status</Text>
+                </View>
+                <Badge variant={published ? "default" : "secondary"}>
+                  <Text>{published ? "Published" : "Draft"}</Text>
+                </Badge>
+              </CardContent>
+            </Card>
 
             <View className="flex-row gap-2">
               <Button onPress={() => void handleSavePress()} disabled={isSaving}>
                 <Text>{isSaving ? "Saving..." : "Save changes"}</Text>
+                <LineIcon name="check" size={18} className="text-primary-foreground" />
               </Button>
               <Button variant="outline" onPress={() => void handleTogglePublishPress()} disabled={isSaving}>
                 <Text>{published ? "Unpublish" : "Publish"}</Text>

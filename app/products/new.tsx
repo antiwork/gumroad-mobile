@@ -1,13 +1,16 @@
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
+import { LineIcon } from "@/components/icon";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI } from "@/lib/request";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { TextInput, View } from "react-native";
 import * as Sentry from "@sentry/react-native";
+import { useCSSVariable } from "uniwind";
 
 type CreateProductResponse = {
   success: boolean;
@@ -25,6 +28,7 @@ export default function ProductNew() {
   const [price, setPrice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mutedColor = useCSSVariable("--color-muted") as string;
 
   const createProduct = async () => {
     if (!accessToken) {
@@ -93,46 +97,66 @@ export default function ProductNew() {
   return (
     <Screen>
       <View className="flex-1 gap-4 px-4 py-6">
-        <Text className="text-xl font-bold">Create product</Text>
+        <View className="flex-row items-center gap-2">
+          <View className="rounded-lg bg-accent/20 p-2">
+            <LineIcon name="package" size={18} className="text-accent" />
+          </View>
+          <View>
+            <Text className="text-xl font-bold">Create product</Text>
+            <Text className="text-xs text-muted">Start with basics, then continue editing.</Text>
+          </View>
+        </View>
 
         {error ? (
-          <View className="rounded border border-border bg-background px-3 py-3">
+          <View className="rounded-lg border border-destructive/50 bg-card px-3 py-3">
             <Text className="text-sm text-muted">{error}</Text>
           </View>
         ) : null}
 
-        <View className="gap-2">
-          <Text className="text-sm">Name</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Name of product"
-            autoCapitalize="sentences"
-            className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-          />
-        </View>
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle>Product details</CardTitle>
+          </CardHeader>
+          <CardContent className="gap-4">
+            <View className="gap-2">
+              <Text className="text-sm">Name</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Name of product"
+                placeholderTextColor={mutedColor}
+                autoCapitalize="sentences"
+                className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+              />
+            </View>
+
+            <View className="gap-2">
+              <Text className="text-sm">Price</Text>
+              <TextInput
+                value={price}
+                onChangeText={(value) => {
+                  const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+                  setPrice(normalized);
+                }}
+                placeholder="0.00"
+                placeholderTextColor={mutedColor}
+                keyboardType="decimal-pad"
+                className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+              />
+            </View>
+          </CardContent>
+        </Card>
 
         <View className="gap-2">
-          <Text className="text-sm">Price</Text>
-          <TextInput
-            value={price}
-            onChangeText={(value) => {
-              const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
-              setPrice(normalized);
-            }}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-            className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-          />
+          <Button onPress={() => void createProduct()} disabled={isSubmitting}>
+            <Text>{isSubmitting ? "Creating..." : "Next: Customize"}</Text>
+            <LineIcon name="arrow-right-stroke" size={18} className="text-primary-foreground" />
+          </Button>
+
+          <Button variant="outline" onPress={() => router.back()} disabled={isSubmitting}>
+            <Text>Cancel</Text>
+          </Button>
         </View>
-
-        <Button onPress={() => void createProduct()} disabled={isSubmitting}>
-          <Text>{isSubmitting ? "Creating..." : "Next: Customize"}</Text>
-        </Button>
-
-        <Button variant="outline" onPress={() => router.back()} disabled={isSubmitting}>
-          <Text>Cancel</Text>
-        </Button>
       </View>
     </Screen>
   );

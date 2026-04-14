@@ -1,15 +1,17 @@
 import { LineIcon } from "@/components/icon";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
-import { env } from "@/lib/env";
-import { safeOpenURL } from "@/lib/open-url";
 import { requestAPI } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, Image, Pressable, RefreshControl, TextInput, View } from "react-native";
+import { useCSSVariable } from "uniwind";
 
 interface Product {
   id: string;
@@ -51,49 +53,53 @@ const ProductCard = ({
     <Pressable
       onPress={onPress}
       style={isFirst ? { marginTop: 12 } : undefined}
-      className="mx-4 mb-3 rounded-xl border border-border bg-background p-3"
+      className="mx-4 mb-3"
     >
-      <View className="flex-row gap-3">
-        {product.thumbnail_url ? (
-          <Image source={{ uri: product.thumbnail_url }} className="size-16 rounded bg-muted" resizeMode="cover" />
-        ) : (
-          <View className="size-16 items-center justify-center rounded bg-muted">
-            <LineIcon name="package" size={20} className="text-muted" />
-          </View>
-        )}
-        <View className="flex-1 gap-1">
-          <View className="flex-row items-start justify-between gap-2">
-            <Text className="flex-1 text-base font-bold" numberOfLines={1}>
-              {product.name}
-            </Text>
-            <View className="rounded-full bg-muted px-2 py-1">
-              <Text className="text-xs font-medium text-foreground">{product.published ? "Published" : "Draft"}</Text>
+      <Card className="rounded-xl">
+        <CardContent className="p-3">
+          <View className="flex-row gap-3">
+            {product.thumbnail_url ? (
+              <Image source={{ uri: product.thumbnail_url }} className="size-16 rounded-lg bg-muted" resizeMode="cover" />
+            ) : (
+              <View className="size-16 items-center justify-center rounded-lg bg-accent/20">
+                <LineIcon name="package" size={20} className="text-accent" />
             </View>
-          </View>
-          {product.short_url ? (
-            <Text className="text-xs text-muted" numberOfLines={1}>
-              {product.short_url}
-            </Text>
-          ) : null}
-          {subtitle ? (
-            <Text className="text-xs text-muted" numberOfLines={2}>
-              {subtitle}
-            </Text>
-          ) : null}
-          <View className="mt-1 flex-row items-center justify-between">
-            <Text className="text-xs text-muted">{product.sales_count ?? 0} sales</Text>
-            <View className="flex-row items-center gap-2">
-              {product.customizable_price ? (
-                <View className="rounded-full border border-border px-2 py-0.5">
-                  <Text className="text-[10px] text-muted">PWYW</Text>
-                </View>
+            )}
+            <View className="flex-1 gap-1.5">
+              <View className="flex-row items-start justify-between gap-2">
+                <Text className="flex-1 text-base font-bold" numberOfLines={1}>
+                  {product.name}
+                </Text>
+                <Badge variant={product.published ? "default" : "secondary"}>
+                  <Text>{product.published ? "Published" : "Draft"}</Text>
+                </Badge>
+              </View>
+              {product.short_url ? (
+                <Text className="text-xs text-muted" numberOfLines={1}>
+                  {product.short_url}
+                </Text>
               ) : null}
-              <Text className="text-sm font-bold">{product.formatted_price}</Text>
-              <LineIcon name="chevron-right" size={16} className="text-muted" />
+              {subtitle ? (
+                <Text className="text-xs text-muted" numberOfLines={2}>
+                  {subtitle}
+                </Text>
+              ) : null}
+              <View className="mt-1 flex-row items-center justify-between">
+                <Text className="text-xs text-muted">{product.sales_count ?? 0} sales</Text>
+                <View className="flex-row items-center gap-2">
+                  {product.customizable_price ? (
+                    <Badge variant="outline">
+                      <Text>PWYW</Text>
+                    </Badge>
+                  ) : null}
+                  <Text className="text-sm font-bold">{product.formatted_price}</Text>
+                  <LineIcon name="chevron-right" size={16} className="text-muted" />
+                </View>
+              </View>
             </View>
           </View>
-        </View>
-      </View>
+        </CardContent>
+      </Card>
     </Pressable>
   );
 };
@@ -107,6 +113,7 @@ export default function Products() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
+  const mutedColor = useCSSVariable("--color-muted") as string;
   const publishedCount = products.filter((product) => product.published).length;
   const draftCount = products.length - publishedCount;
   const filteredProducts = useMemo(() => {
@@ -213,17 +220,25 @@ export default function Products() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 16 }}
         ListHeaderComponent={
-          <View className="gap-3 border-b border-border px-4 py-4">
-            <Text className="text-xl font-bold">Products</Text>
+          <View className="gap-3 border-b border-border/70 px-4 py-4">
             {error ? <Text className="text-xs text-muted">{error}</Text> : null}
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search products"
-              autoCapitalize="none"
-              autoCorrect={false}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-foreground"
-            />
+            <View className="flex-row items-center rounded-lg border border-border bg-card px-3 py-2">
+              <LineIcon name="search" size={18} className="text-muted" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search products"
+                placeholderTextColor={mutedColor}
+                autoCapitalize="none"
+                autoCorrect={false}
+                className="ml-2 flex-1 text-foreground"
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+                  <LineIcon name="x" size={18} className="text-muted" />
+                </Pressable>
+              ) : null}
+            </View>
             <View className="flex-row gap-2">
               {[
                 { id: "all", label: "All" },
@@ -232,42 +247,28 @@ export default function Products() {
               ].map((filter) => {
                 const isActive = statusFilter === filter.id;
                 return (
-                  <Pressable
+                  <Button
                     key={filter.id}
                     onPress={() => setStatusFilter(filter.id as "all" | "published" | "draft")}
-                    className={`rounded-full border px-3 py-1 ${isActive ? "border-primary bg-primary" : "border-border bg-background"}`}
+                    variant={isActive ? "outline" : "ghost"}
+                    size="sm"
+                    className={`rounded-full ${isActive ? "border-accent bg-accent/10" : ""}`}
                   >
-                    <Text className={`text-xs ${isActive ? "text-primary-foreground" : "text-muted"}`}>{filter.label}</Text>
-                  </Pressable>
+                    <Text className={isActive ? "text-accent" : "text-muted"}>{filter.label}</Text>
+                  </Button>
                 );
               })}
             </View>
             <View className="flex-row gap-2">
-              <Pressable
-                onPress={() => void safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/affiliates`)}
-                className="flex-1 rounded-lg border border-border bg-background px-3 py-2"
-              >
-                <Text className="text-xs text-muted">Affiliates</Text>
-                <Text className="mt-1 text-sm font-medium">Manage partners</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/collaborators`)}
-                className="flex-1 rounded-lg border border-border bg-background px-3 py-2"
-              >
-                <Text className="text-xs text-muted">Collabs</Text>
-                <Text className="mt-1 text-sm font-medium">Manage collaborators</Text>
-              </Pressable>
-            </View>
-            <View className="flex-row gap-2">
-              <View className="flex-1 rounded-lg border border-border bg-background px-3 py-2">
+              <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
                 <Text className="text-xs text-muted">Total</Text>
                 <Text className="text-lg font-bold">{products.length}</Text>
               </View>
-              <View className="flex-1 rounded-lg border border-border bg-background px-3 py-2">
+              <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
                 <Text className="text-xs text-muted">Published</Text>
                 <Text className="text-lg font-bold">{publishedCount}</Text>
               </View>
-              <View className="flex-1 rounded-lg border border-border bg-background px-3 py-2">
+              <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
                 <Text className="text-xs text-muted">Drafts</Text>
                 <Text className="text-lg font-bold">{draftCount}</Text>
               </View>
