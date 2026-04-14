@@ -14,11 +14,7 @@ config.resolver.blockList = [...(config.resolver.blockList || []), /\.env\.build
 // "TypeError: attempted to use private field on non-instance" on Hermes.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === "@tanstack/query-core") {
-    return context.resolveRequest(
-      { ...context, unstable_conditionNames: ["require"] },
-      moduleName,
-      platform,
-    );
+    return context.resolveRequest({ ...context, unstable_conditionNames: ["require"] }, moduleName, platform);
   }
   return context.resolveRequest(context, moduleName, platform);
 };
