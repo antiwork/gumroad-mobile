@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { requestAPI } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Image, Pressable, RefreshControl, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
@@ -112,20 +112,28 @@ export default function Products() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const mutedColor = useCSSVariable("--color-muted") as string;
   const publishedCount = products.filter((product) => product.published).length;
   const draftCount = products.length - publishedCount;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim().toLowerCase());
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const filteredProducts = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
     return products.filter((product) => {
       if (statusFilter === "published" && !product.published) return false;
       if (statusFilter === "draft" && product.published) return false;
-      if (!normalizedQuery) return true;
+      if (!debouncedSearchQuery) return true;
       const searchText = `${product.name} ${product.custom_summary ?? ""} ${product.description ?? ""}`.toLowerCase();
-      return searchText.includes(normalizedQuery);
+      return searchText.includes(debouncedSearchQuery);
     });
-  }, [products, searchQuery, statusFilter]);
+  }, [debouncedSearchQuery, products, statusFilter]);
 
   const fetchProducts = useCallback(async (isRefresh = false) => {
     if (!accessToken) {
