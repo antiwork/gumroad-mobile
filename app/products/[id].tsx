@@ -1,6 +1,7 @@
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
+import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { useLocalSearchParams } from "expo-router";
@@ -10,14 +11,26 @@ import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webvie
 import * as Sentry from "@sentry/react-native";
 
 export default function ProductEdit() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const productId = Array.isArray(id) ? id[0] : id;
   const { isLoading: isAuthLoading, accessToken } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [webError, setWebError] = useState<string | null>(null);
   const webViewRef = useRef<BaseWebView>(null);
 
+  if (!productId) {
+    return (
+      <Screen>
+        <View className="flex-1 items-center justify-center px-4">
+          <Text className="text-center text-muted">Unable to load product editor.</Text>
+        </View>
+      </Screen>
+    );
+  }
+
   const url = accessToken
-    ? `${env.EXPO_PUBLIC_GUMROAD_URL}/products/${id}/edit?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`
-    : `${env.EXPO_PUBLIC_GUMROAD_URL}/products/${id}/edit?display=mobile_app&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
+    ? `${env.EXPO_PUBLIC_GUMROAD_URL}/products/${productId}/edit?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`
+    : `${env.EXPO_PUBLIC_GUMROAD_URL}/products/${productId}/edit?display=mobile_app&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; navigationType: string; mainDocumentURL?: string }) => {
@@ -73,8 +86,21 @@ export default function ProductEdit() {
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onMessage={handleMessage}
+        onError={(event) => {
+          const description = event.nativeEvent.description || "Failed to load product editor";
+          setWebError(description);
+          Sentry.captureMessage("Product edit WebView failed", {
+            level: "error",
+            extra: { description, failingUrl: event.nativeEvent.url, productId },
+          });
+        }}
         onLoadEnd={() => setIsLoading(false)}
       />
+      {webError ? (
+        <View className="absolute bottom-4 left-4 right-4 rounded border border-border bg-background px-3 py-2">
+          <Text className="text-xs text-muted">{webError}</Text>
+        </View>
+      ) : null}
     </Screen>
   );
 }

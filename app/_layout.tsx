@@ -73,6 +73,8 @@ const RootLayout = () => {
             <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: "none" }} />
             <Stack.Screen name="purchase/[token]" options={{ title: "" }} />
             <Stack.Screen name="post/[id]" options={{ title: "" }} />
+            <Stack.Screen name="products/new" options={{ title: "New product", presentation: "modal" }} />
+            <Stack.Screen name="products/[id]" options={{ title: "Edit product", presentation: "modal" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
             <Stack.Screen name="+not-found" options={{ title: "Not Found" }} />
           </Stack>

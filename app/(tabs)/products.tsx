@@ -12,6 +12,7 @@ import { FlatList, Image, Pressable, RefreshControl, View } from "react-native";
 interface Product {
   id: string;
   name: string;
+  url?: string | null;
   description?: string;
   price: number;
   currency: string;
@@ -105,6 +106,12 @@ export default function Products() {
   const publishedCount = products.filter((product) => product.published).length;
   const draftCount = products.length - publishedCount;
 
+  const getProductEditIdentifier = (product: Product) => {
+    const fromShortUrl = product.short_url?.match(/\/l\/([^/?#]+)/)?.[1];
+    const fromUrl = product.url?.match(/\/l\/([^/?#]+)/)?.[1];
+    return fromShortUrl || fromUrl || null;
+  };
+
   const fetchProducts = useCallback(async (isRefresh = false) => {
     if (!accessToken) {
       setError("Not authenticated");
@@ -140,10 +147,17 @@ export default function Products() {
   );
 
   const handleProductPress = (product: Product) => {
-    router.push({
-      pathname: "/products/[id]",
-      params: { id: product.id },
-    });
+    const editIdentifier = getProductEditIdentifier(product);
+    if (!editIdentifier) {
+      setError("Unable to open this product right now.");
+      Sentry.captureMessage("Missing product edit identifier", {
+        level: "warning",
+        extra: { productId: product.id, shortUrl: product.short_url, url: product.url },
+      });
+      return;
+    }
+
+    router.push(`/products/${encodeURIComponent(editIdentifier)}`);
   };
 
   if (isAuthLoading) {
@@ -178,6 +192,7 @@ export default function Products() {
         ListHeaderComponent={
           <View className="gap-3 border-b border-border px-4 py-4">
             <Text className="text-xl font-bold">Products</Text>
+            {error ? <Text className="text-xs text-muted">{error}</Text> : null}
             <View className="flex-row gap-2">
               <View className="flex-1 rounded-lg border border-border bg-background px-3 py-2">
                 <Text className="text-xs text-muted">Total</Text>

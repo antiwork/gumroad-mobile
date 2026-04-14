@@ -1,6 +1,7 @@
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
+import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { useCallback, useRef, useState } from "react";
@@ -11,6 +12,7 @@ import * as Sentry from "@sentry/react-native";
 export default function ProductNew() {
   const { isLoading: isAuthLoading, accessToken } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [webError, setWebError] = useState<string | null>(null);
   const webViewRef = useRef<BaseWebView>(null);
 
   const url = accessToken
@@ -71,8 +73,21 @@ export default function ProductNew() {
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onMessage={handleMessage}
+        onError={(event) => {
+          const description = event.nativeEvent.description || "Failed to load create product page";
+          setWebError(description);
+          Sentry.captureMessage("Product new WebView failed", {
+            level: "error",
+            extra: { description, failingUrl: event.nativeEvent.url },
+          });
+        }}
         onLoadEnd={() => setIsLoading(false)}
       />
+      {webError ? (
+        <View className="absolute bottom-4 left-4 right-4 rounded border border-border bg-background px-3 py-2">
+          <Text className="text-xs text-muted">{webError}</Text>
+        </View>
+      ) : null}
     </Screen>
   );
 }
