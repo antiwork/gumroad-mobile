@@ -296,30 +296,13 @@ export default function PostScreen() {
               const [fileName, extension] = file.name.split(/\.(?=[^.]+$)/);
               const mediaType = getMediaType(file);
               return (
-                <View key={file.id} className={`gap-4 p-4 ${index > 0 ? "border-t border-border" : ""}`}>
-                  <View className="flex-row items-center gap-3">
-                    <LineIcon name={fileIconName(mediaType)} size={20} className="text-foreground" />
-                    <View className="flex-1">
-                      <Text numberOfLines={1}>{fileName}</Text>
-                      {extension ? <Text>{extension.toUpperCase()}</Text> : null}
-                    </View>
+                <View key={file.id} className={`flex-row items-center gap-3 p-4 ${index > 0 ? "border-t border-border" : ""}`}>
+                  <LineIcon name={fileIconName(mediaType)} size={20} className="text-foreground" />
+                  <View className="flex-1">
+                    <Text numberOfLines={1}>{fileName}</Text>
+                    {extension ? <Text>{extension.toUpperCase()}</Text> : null}
                   </View>
-                  <View className="flex-row gap-2 self-end">
-                    {mediaType === "audio" && (
-                      <Button variant="outline" onPress={() => handleAudioPress(file.id)} disabled={!purchase}>
-                        <Text>{activeResourceId === file.id && isPlaying ? "Pause" : "Play"}</Text>
-                      </Button>
-                    )}
-                    {mediaType === "video" && (
-                      <Button variant="outline" onPress={() => handleVideoPress(file.id)} disabled={!purchase}>
-                        <Text>Play</Text>
-                      </Button>
-                    )}
-                    {mediaType === "pdf" && (
-                      <Button variant="outline" onPress={() => handlePdfPress(file.id)} disabled={!purchase}>
-                        <Text>View</Text>
-                      </Button>
-                    )}
+                  <View className="flex-row gap-2">
                     <Button
                       variant="outline"
                       onPress={() => handleFileDownload(file.id)}
@@ -327,6 +310,21 @@ export default function PostScreen() {
                     >
                       {downloadingFileId === file.id ? <LoadingSpinner size="small" /> : <Text>Download</Text>}
                     </Button>
+                    {mediaType === "audio" && (
+                      <Button onPress={() => handleAudioPress(file.id)} disabled={!purchase}>
+                        <Text>{activeResourceId === file.id && isPlaying ? "Pause" : "Play"}</Text>
+                      </Button>
+                    )}
+                    {mediaType === "video" && (
+                      <Button onPress={() => handleVideoPress(file.id)} disabled={!purchase}>
+                        <Text>Watch</Text>
+                      </Button>
+                    )}
+                    {mediaType === "pdf" && (
+                      <Button onPress={() => handlePdfPress(file.id)} disabled={!purchase}>
+                        <Text>Read</Text>
+                      </Button>
+                    )}
                   </View>
                 </View>
               );
