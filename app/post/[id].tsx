@@ -58,8 +58,7 @@ export default function PostScreen() {
   const post = useInstallment(id, { purchaseId, subscriptionId, followerId });
   const purchase = usePurchase(post?.url_redirect_external_id);
   const webViewRef = useRef<BaseWebView>(null);
-  const { playAudio, pauseAudio } = useAudioPlayerSync(webViewRef);
-  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const { playAudio, pauseAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [bodyHeight, setBodyHeight] = useState(0);
@@ -122,9 +121,8 @@ export default function PostScreen() {
 
   const handleAudioPress = async (fileId: string) => {
     try {
-      if (playingAudioId === fileId) {
+      if (activeResourceId === fileId && isPlaying) {
         await pauseAudio();
-        setPlayingAudioId(null);
         return;
       }
       if (!post?.url_redirect_external_id || !purchase?.url_redirect_token) return;
@@ -145,7 +143,6 @@ export default function PostScreen() {
         artwork: purchase.thumbnail_url,
         tracks,
       });
-      setPlayingAudioId(fileId);
     } catch (error) {
       Sentry.captureException(error);
     }
@@ -233,7 +230,7 @@ export default function PostScreen() {
                   <View className="flex-row gap-2 self-end">
                     {isAudio && (
                       <Button variant="outline" onPress={() => handleAudioPress(file.id)} disabled={!purchase}>
-                        <Text>{playingAudioId === file.id ? "Pause" : "Play"}</Text>
+                        <Text>{activeResourceId === file.id && isPlaying ? "Pause" : "Play"}</Text>
                       </Button>
                     )}
                     <Button
