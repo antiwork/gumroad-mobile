@@ -32,11 +32,14 @@ export default function ProductEdit() {
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [customSummary, setCustomSummary] = useState("");
+  const [customPermalink, setCustomPermalink] = useState("");
   const [published, setPublished] = useState(false);
   const [formattedPrice, setFormattedPrice] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [nativeType, setNativeType] = useState("digital");
   const mutedColor = useCSSVariable("--color-muted") as string;
+  const shortUrlPrefix = shortUrl ? shortUrl.replace(/\/[^/]+$/, "/") : "";
 
   const fetchProduct = useCallback(async () => {
     if (!productId) {
@@ -61,11 +64,13 @@ export default function ProductEdit() {
       setName(normalizedProduct.name);
       setDescription(normalizedProduct.description);
       setCustomSummary(normalizedProduct.customSummary);
+      setCustomPermalink(normalizedProduct.customPermalink || "");
       setPrice((normalizedProduct.price / 100).toFixed(2));
       setPublished(normalizedProduct.published);
       setFormattedPrice(normalizedProduct.formattedPrice);
       setTags(normalizedProduct.tags);
       setShortUrl(normalizedProduct.shortUrl);
+      setNativeType(normalizedProduct.nativeType);
     } catch (requestError) {
       Sentry.captureException(requestError);
       setError(requestError instanceof Error ? requestError.message : "Could not load product.");
@@ -104,6 +109,7 @@ export default function ProductEdit() {
           price: Math.round(parsedPrice * 100),
           description: description.trim(),
           custom_summary: customSummary.trim() || null,
+          custom_permalink: customPermalink.trim() || null,
         },
       });
       router.replace("/(tabs)/products");
@@ -113,7 +119,7 @@ export default function ProductEdit() {
     } finally {
       setIsSaving(false);
     }
-  }, [accessToken, customSummary, description, name, price, productId, router]);
+  }, [accessToken, customPermalink, customSummary, description, name, price, productId, router]);
 
   const handleTogglePublishPress = useCallback(async () => {
     if (!productId || !accessToken || isSaving || isLoading) return;
@@ -227,6 +233,25 @@ export default function ProductEdit() {
 
             <Card className="rounded-xl">
               <CardHeader>
+                <CardTitle>Thumbnail</CardTitle>
+              </CardHeader>
+              <CardContent className="gap-3">
+                <View className="flex-row gap-3">
+                  <View className="relative size-28 overflow-hidden rounded-lg border border-border bg-muted">
+                    <View className="size-full items-center justify-center gap-2">
+                      <LineIcon name="image" size={22} className="text-muted" />
+                      <Text className="text-xs text-muted">Mock only</Text>
+                    </View>
+                  </View>
+                  <Text className="flex-1 text-xs text-muted">
+                    Image upload is mocked for now. We will wire this to the real upload flow in a later pass.
+                  </Text>
+                </View>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-xl">
+              <CardHeader>
                 <CardTitle>Product details</CardTitle>
               </CardHeader>
               <CardContent className="gap-4">
@@ -253,6 +278,28 @@ export default function ProductEdit() {
                     className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
                   />
                 </View>
+
+                {nativeType !== "coffee" ? (
+                  <View className="gap-2">
+                    <Text className="text-sm">Public link slug</Text>
+                    <View className="flex-row items-center rounded-lg border border-border bg-background px-3 py-3">
+                      {shortUrlPrefix ? (
+                        <Text className="mr-1 text-xs text-muted" numberOfLines={1}>
+                          {shortUrlPrefix}
+                        </Text>
+                      ) : null}
+                      <TextInput
+                        value={customPermalink}
+                        onChangeText={(value) => setCustomPermalink(value.replace(/\s/g, "").replace(/[^a-zA-Z0-9_-]/g, ""))}
+                        placeholder="custom-link"
+                        placeholderTextColor={mutedColor}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        className="flex-1 text-foreground"
+                      />
+                    </View>
+                  </View>
+                ) : null}
 
                 <View className="gap-2">
                   <Text className="text-sm">Description</Text>
@@ -304,6 +351,9 @@ export default function ProductEdit() {
                   <Text className="text-sm text-foreground" numberOfLines={1}>
                     {shortUrl}
                   </Text>
+                  {nativeType === "coffee" ? (
+                    <Text className="text-xs text-muted">Public link is read-only for coffee products.</Text>
+                  ) : null}
                   {tags.length > 0 ? (
                     <Text className="text-xs text-muted" numberOfLines={1}>
                       Tags: {tags.join(", ")}

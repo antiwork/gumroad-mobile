@@ -4,6 +4,8 @@ export type RawProduct = {
   description?: string | null;
   price?: number | string | null;
   currency?: string | null;
+  native_type?: string | null;
+  subscription_duration?: string | null;
   formatted_price?: string | null;
   thumbnail_url?: string | null;
   published?: boolean | null;
@@ -11,6 +13,7 @@ export type RawProduct = {
   custom_summary?: string | null;
   deleted?: boolean | null;
   sales_count?: number | string | null;
+  sales_usd_cents?: number | string | null;
   short_url?: string | null;
   customizable_price?: boolean | null;
   unique_permalink?: string | null;
@@ -23,6 +26,8 @@ export type ProductModel = {
   description: string;
   price: number;
   currency: string;
+  nativeType: string;
+  subscriptionDuration: string | null;
   formattedPrice: string;
   thumbnailUrl: string | null;
   published: boolean;
@@ -30,6 +35,7 @@ export type ProductModel = {
   customSummary: string;
   deleted: boolean;
   salesCount: number;
+  salesUsdCents: number;
   shortUrl: string | null;
   customizablePrice: boolean;
   uniquePermalink: string | null;
@@ -64,6 +70,8 @@ export const normalizeProduct = (raw: RawProduct): ProductModel | null => {
     description: raw.description || "",
     price,
     currency,
+    nativeType: raw.native_type || "digital",
+    subscriptionDuration: raw.subscription_duration || null,
     formattedPrice,
     thumbnailUrl: raw.thumbnail_url || null,
     published: !!raw.published,
@@ -71,6 +79,7 @@ export const normalizeProduct = (raw: RawProduct): ProductModel | null => {
     customSummary: raw.custom_summary || "",
     deleted: !!raw.deleted,
     salesCount: toNumber(raw.sales_count),
+    salesUsdCents: toNumber(raw.sales_usd_cents),
     shortUrl: raw.short_url || null,
     customizablePrice: !!raw.customizable_price,
     uniquePermalink: raw.unique_permalink || null,

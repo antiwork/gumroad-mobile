@@ -38,6 +38,13 @@ const formatRevenue = (amountCents: number, currencyCode: string) => {
   }
 };
 
+const formatUsdRevenue = (amountCents: number) =>
+  new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(amountCents / 100);
+
 const ProductCard = ({
   product,
   onPress,
@@ -62,8 +69,8 @@ const ProductCard = ({
               <Image source={{ uri: product.thumbnailUrl }} className="size-16 rounded-lg bg-muted" resizeMode="cover" />
             ) : (
               <View className="size-16 items-center justify-center rounded-lg bg-muted">
-                <LineIcon name="package" size={20} className="text-muted" />
-            </View>
+                <LineIcon name="image" size={20} className="text-muted" />
+              </View>
             )}
             <View className="flex-1 gap-1.5">
               <View className="flex-row items-start justify-between gap-2">
@@ -125,7 +132,11 @@ export default function Products() {
   const totalSalesCount = products.reduce((sum, product) => sum + product.salesCount, 0);
   const revenueCurrency = (products[0]?.currency || "USD").toUpperCase();
   const totalSalesRevenueCents = products.reduce((sum, product) => sum + product.price * product.salesCount, 0);
-  const formattedSalesRevenue = formatRevenue(totalSalesRevenueCents, revenueCurrency);
+  const totalSalesUsdCents = products.reduce((sum, product) => sum + product.salesUsdCents, 0);
+  const hasUsdRevenue = totalSalesUsdCents > 0;
+  const formattedSalesRevenue = hasUsdRevenue
+    ? formatUsdRevenue(totalSalesUsdCents)
+    : formatRevenue(totalSalesRevenueCents, revenueCurrency);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery.trim().toLowerCase()), 300);
 
