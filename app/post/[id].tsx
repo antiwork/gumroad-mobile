@@ -296,7 +296,10 @@ export default function PostScreen() {
               const [fileName, extension] = file.name.split(/\.(?=[^.]+$)/);
               const mediaType = getMediaType(file);
               return (
-                <View key={file.id} className={`flex-row items-center gap-3 p-4 ${index > 0 ? "border-t border-border" : ""}`}>
+                <View
+                  key={file.id}
+                  className={`flex-row items-center gap-3 p-4 ${index > 0 ? "border-t border-border" : ""}`}
+                >
                   <LineIcon name={fileIconName(mediaType)} size={20} className="text-foreground" />
                   <View className="flex-1">
                     <Text numberOfLines={1}>{fileName}</Text>
