@@ -1,5 +1,5 @@
-import { useAuth } from "@/lib/auth-context";
 import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
+import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
@@ -79,6 +79,8 @@ export const setupPlayer = async () => {
 
 export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) => {
   const { accessToken } = useAuth();
+  const [activeResourceId, setActiveResourceId] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     setAudioAccessToken(accessToken);
@@ -90,6 +92,43 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     purchaseId?: string;
     contentLength?: number;
   } | null>(null);
+
+  const allTracksRef = useRef<AudioTrackInfo[]>([]);
+
+  useEffect(() => {
+    const initFromPlayer = async () => {
+      if (!isPlayerSetup) return;
+      const activeTrack = await TrackPlayer.getActiveTrack();
+      const { state } = await TrackPlayer.getPlaybackState();
+      if (activeTrack?.id && (state === State.Playing || state === State.Buffering)) {
+        setActiveResourceId(activeTrack.id);
+        setIsPlaying(true);
+      } else if (activeTrack?.id && state === State.Paused) {
+        setActiveResourceId(activeTrack.id);
+        setIsPlaying(false);
+      } else {
+        setActiveResourceId(null);
+        setIsPlaying(false);
+      }
+
+      const queue = await TrackPlayer.getQueue();
+      if (queue.length > 0) {
+        allTracksRef.current = queue.map((t) => ({
+          uri: t.url?.toString() ?? "",
+          resourceId: t.id ?? "",
+          title: t.title,
+        }));
+      }
+      if (activeTrack?.id) {
+        const track = allTracksRef.current.find((t) => t.resourceId === activeTrack.id);
+        if (track) {
+          currentAudioRef.current = { ...track, contentLength: activeTrack.duration };
+          setAudioContext(currentAudioRef.current);
+        }
+      }
+    };
+    initFromPlayer();
+  }, []);
 
   const syncMediaLocation = useCallback(
     async (position: number, isEnd = false) => {
@@ -152,14 +191,21 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     }, 5000);
 
     const stateSubscription = TrackPlayer.addEventListener(Event.PlaybackState, async ({ state }) => {
-      if (state === State.Paused || state === State.Stopped) {
+      if (state === State.Playing || state === State.Buffering) {
+        setIsPlaying(true);
+      } else if (state === State.Paused || state === State.Stopped) {
+        setIsPlaying(false);
         await sendAudioPlayerInfo({ isPlaying: false });
       } else if (state === State.Ended) {
+        setIsPlaying(false);
+        setActiveResourceId(null);
         await sendAudioPlayerInfo({ isPlaying: false, isEnd: true });
       }
     });
 
     const endSubscription = TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
+      setIsPlaying(false);
+      setActiveResourceId(null);
       await sendAudioPlayerInfo({ isPlaying: false, isEnd: true });
     });
 
@@ -180,8 +226,6 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     await sendAudioPlayerInfo({ isPlaying: false });
   }, [sendAudioPlayerInfo]);
 
-  const allTracksRef = useRef<AudioTrackInfo[]>([]);
-
   const updateCurrentAudioRef = useCallback((resourceId: string, duration?: number) => {
     const track = allTracksRef.current.find((t) => t.resourceId === resourceId);
     if (track) {
@@ -194,6 +238,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
   useEffect(() => {
     const subscription = TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async (event) => {
       if (event.track?.id) {
+        setActiveResourceId(event.track.id);
         const previousContext = currentAudioRef.current;
         if (previousContext && previousContext.resourceId !== event.track.id) {
           const position = event.lastPosition ?? 0;
@@ -284,5 +329,5 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     [sendAudioPlayerInfo, syncMediaLocation],
   );
 
-  return { pauseAudio, playAudio };
+  return { pauseAudio, playAudio, activeResourceId, isPlaying };
 };

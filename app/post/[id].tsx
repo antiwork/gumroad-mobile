@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
+import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { safeOpenURL } from "@/lib/open-url";
 import { buildApiUrl } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { File, Paths } from "expo-file-system";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { Asset } from "expo-asset";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -24,14 +25,56 @@ const formatDate = (dateString: string) => {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 };
 
+const audioExtensions = ["mp3", "m4a", "aac", "wav", "ogg", "flac"];
+const videoExtensions = ["mp4", "m4v"];
+const pdfExtensions = ["pdf"];
+
+const getFileExtension = (name: string) => name.split(/\.(?=[^.]+$)/)[1]?.toLowerCase();
+
+const isAudioFile = (file: { name: string; filegroup?: string }) => {
+  const ext = getFileExtension(file.name);
+  return file.filegroup === "audio" || (ext != null && audioExtensions.includes(ext));
+};
+
+const isVideoFile = (file: { name: string; filegroup?: string; streaming_url?: string }) => {
+  const ext = getFileExtension(file.name);
+  return file.filegroup === "video" || (ext != null && videoExtensions.includes(ext)) || !!file.streaming_url;
+};
+
+const isPdfFile = (file: { name: string }) => {
+  const ext = getFileExtension(file.name);
+  return ext != null && pdfExtensions.includes(ext);
+};
+
+type FileMediaType = "audio" | "video" | "pdf" | "other";
+
+const getMediaType = (file: { name: string; filegroup?: string; streaming_url?: string }): FileMediaType => {
+  if (isAudioFile(file)) return "audio";
+  if (isVideoFile(file)) return "video";
+  if (isPdfFile(file)) return "pdf";
+  return "other";
+};
+
+const fileIconName = (mediaType: FileMediaType) => {
+  switch (mediaType) {
+    case "audio":
+      return "music";
+    case "video":
+      return "play";
+    case "pdf":
+      return "file";
+    default:
+      return "file";
+  }
+};
+
+const downloadUrl = (urlRedirectToken: string, productFileId: string) =>
+  buildApiUrl(`/mobile/url_redirects/download/${urlRedirectToken}/${productFileId}`);
+
 const downloadFile = (urlRedirectToken: string, productFileId: string) =>
-  File.downloadFileAsync(
-    buildApiUrl(`/mobile/url_redirects/download/${urlRedirectToken}/${productFileId}`),
-    Paths.cache,
-    {
-      idempotent: true,
-    },
-  );
+  File.downloadFileAsync(downloadUrl(urlRedirectToken, productFileId), Paths.cache, {
+    idempotent: true,
+  });
 
 const fontDataPromise = Promise.all(
   [
@@ -55,14 +98,16 @@ export default function PostScreen() {
     subscriptionId?: string;
     followerId?: string;
   }>();
+  const router = useRouter();
   const post = useInstallment(id, { purchaseId, subscriptionId, followerId });
   const purchase = usePurchase(post?.url_redirect_external_id);
+  const webViewRef = useRef<BaseWebView>(null);
+  const { playAudio, pauseAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [bodyHeight, setBodyHeight] = useState(0);
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [fontFaces, setFontFaces] = useState("");
-  const webViewRef = useRef<BaseWebView>(null);
 
   const [foreground, bodyBg, fontFamily] = useCSSVariable(["--color-foreground", "--color-body-bg", "--font-sans"]);
 
@@ -116,6 +161,68 @@ export default function PostScreen() {
     } finally {
       setDownloadingFileId(null);
     }
+  };
+
+  const handleAudioPress = async (fileId: string) => {
+    try {
+      if (activeResourceId === fileId && isPlaying) {
+        await pauseAudio();
+        return;
+      }
+      if (!post?.url_redirect_external_id || !purchase?.url_redirect_token) return;
+      const allAudioFiles = post.files_data?.filter(isAudioFile) ?? [];
+      const tracks = allAudioFiles.map((f) => ({
+        uri: downloadUrl(purchase.url_redirect_token, f.id),
+        resourceId: f.id,
+        title: f.name ?? post.name,
+        urlRedirectId: post.url_redirect_external_id,
+        purchaseId: purchase.purchase_id,
+      }));
+      const file = allAudioFiles.find((f) => f.id === fileId);
+      await playAudio({
+        resourceId: fileId,
+        resumeAt: file?.latest_media_location?.location,
+        artist: post.creator_name,
+        artistUrl: post.creator_profile_url,
+        artwork: purchase.thumbnail_url,
+        tracks,
+      });
+    } catch (error) {
+      Sentry.captureException(error);
+    }
+  };
+
+  const handleVideoPress = (fileId: string) => {
+    if (!post?.url_redirect_external_id || !purchase?.url_redirect_token) return;
+    const file = post.files_data?.find((f) => f.id === fileId);
+    router.push({
+      pathname: "/video-player",
+      params: {
+        uri: downloadUrl(purchase.url_redirect_token, fileId),
+        streamingUrl: file?.streaming_url,
+        title: post.name,
+        urlRedirectId: post.url_redirect_external_id,
+        productFileId: fileId,
+        purchaseId: purchase.purchase_id,
+        initialPosition: file?.latest_media_location?.location ?? undefined,
+      },
+    });
+  };
+
+  const handlePdfPress = (fileId: string) => {
+    if (!post?.url_redirect_external_id || !purchase?.url_redirect_token) return;
+    const file = post.files_data?.find((f) => f.id === fileId);
+    router.push({
+      pathname: "/pdf-viewer",
+      params: {
+        uri: downloadUrl(purchase.url_redirect_token, fileId),
+        title: post.name,
+        urlRedirectId: post.url_redirect_external_id,
+        productFileId: fileId,
+        purchaseId: purchase.purchase_id,
+        initialPage: file?.latest_media_location?.location ?? undefined,
+      },
+    });
   };
 
   const handleCreatorPress = () => {
@@ -187,23 +294,40 @@ export default function PostScreen() {
           <View className="mx-4 rounded border border-border bg-background">
             {post.files_data.map((file, index) => {
               const [fileName, extension] = file.name.split(/\.(?=[^.]+$)/);
+              const mediaType = getMediaType(file);
               return (
-                <View key={file.id} className={`gap-4 p-4 ${index > 0 ? "border-t border-border" : ""}`}>
+                <View key={file.id} className={`gap-3 p-4 ${index > 0 ? "border-t border-border" : ""}`}>
                   <View className="flex-row items-center gap-3">
-                    <LineIcon name="file" size={20} className="text-foreground" />
+                    <LineIcon name={fileIconName(mediaType)} size={20} className="text-foreground" />
                     <View className="flex-1">
                       <Text numberOfLines={1}>{fileName}</Text>
                       {extension ? <Text>{extension.toUpperCase()}</Text> : null}
                     </View>
                   </View>
-                  <Button
-                    className="self-end"
-                    variant="outline"
-                    onPress={() => handleFileDownload(file.id)}
-                    disabled={!purchase || downloadingFileId === file.id}
-                  >
-                    {downloadingFileId === file.id ? <LoadingSpinner size="small" /> : <Text>Download</Text>}
-                  </Button>
+                  <View className="flex-row gap-2 self-end">
+                    <Button
+                      variant="outline"
+                      onPress={() => handleFileDownload(file.id)}
+                      disabled={!purchase || downloadingFileId === file.id}
+                    >
+                      {downloadingFileId === file.id ? <LoadingSpinner size="small" /> : <Text>Download</Text>}
+                    </Button>
+                    {mediaType === "audio" && (
+                      <Button onPress={() => handleAudioPress(file.id)} disabled={!purchase}>
+                        <Text>{activeResourceId === file.id && isPlaying ? "Pause" : "Play"}</Text>
+                      </Button>
+                    )}
+                    {mediaType === "video" && (
+                      <Button onPress={() => handleVideoPress(file.id)} disabled={!purchase}>
+                        <Text>Watch</Text>
+                      </Button>
+                    )}
+                    {mediaType === "pdf" && (
+                      <Button onPress={() => handlePdfPress(file.id)} disabled={!purchase}>
+                        <Text>Read</Text>
+                      </Button>
+                    )}
+                  </View>
                 </View>
               );
             })}
