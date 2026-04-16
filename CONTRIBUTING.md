@@ -80,3 +80,15 @@ A great bug report includes:
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE.md).
+
+## Before Pushing
+
+Always run linting, formatting, and type checking before pushing commits:
+
+```bash
+npx expo lint         # lint
+npm run format        # format with prettier
+npm run typecheck     # tsc --noEmit
+```
+
+Fix any issues before committing. CI does not auto-fix.
