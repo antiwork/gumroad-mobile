@@ -1,16 +1,12 @@
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt
-index 60b6871..4960ede 100644
+index 60b6871..92baf02 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt
-@@ -63,8 +63,16 @@ class MusicService : MediaLibraryService() {
+@@ -63,8 +63,12 @@ class MusicService : MediaLibraryService() {
                  return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
              }
          }
 +        // FIX: Use unique session ID to prevent "Session ID must be unique" crash
-+        // This crash occurs when app is force-killed (no onDestroy called) and reopened.
-+        // The previous MediaSession remains as a "zombie" in Android's static session map.
-+        // Using a unique ID per app launch avoids the conflict.
-+        // See: https://github.com/doublesymmetry/react-native-track-player/issues/2485
 +        val uniqueSessionId = "rntp_session_${System.currentTimeMillis()}"
 +
          mediaLibrarySession = MediaLibrarySession.Builder(this, player.exoPlayer, callback)
@@ -21,24 +17,74 @@ index 60b6871..4960ede 100644
      }
  
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
-index b495b5a..b66d239 100644
+index b495b5a..15739da 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
-@@ -104,9 +104,17 @@ class MusicService : HeadlessJsMediaService() {
-             data = Uri.parse("trackplayer://notification.click")
-             action = Intent.ACTION_VIEW
-         }
-+        // FIX: Use unique session ID to prevent "Session ID must be unique" crash
-+        // This crash occurs when app is force-killed (no onDestroy called) and reopened.
-+        // The previous MediaSession remains as a "zombie" in Android's static session map.
-+        // Using a unique ID per app launch avoids the conflict.
-+        // See: https://github.com/doublesymmetry/react-native-track-player/issues/2485
-+        val uniqueSessionId = "rntp_session_${System.currentTimeMillis()}"
-+
+@@ -53,6 +53,7 @@ import kotlinx.coroutines.*
+ import kotlinx.coroutines.flow.flow
+ import timber.log.Timber
+ import java.util.concurrent.TimeUnit
++import java.util.UUID
+ import kotlin.system.exitProcess
+ 
+ @OptIn(UnstableApi::class)
+@@ -97,6 +98,20 @@ class MusicService : HeadlessJsMediaService() {
+                 return "RNTP-${element.className}:${element.methodName}"
+             }
+         })
++        if (::mediaSession.isInitialized) {
++            try {
++                mediaSession.release()
++            } catch (e: Exception) {
++                Timber.w(e, "Failed to release previous MediaSession")
++            }
++        }
++        if (::fakePlayer.isInitialized) {
++            try {
++                fakePlayer.release()
++            } catch (e: Exception) {
++                Timber.w(e, "Failed to release previous fakePlayer")
++            }
++        }
+         fakePlayer = ExoPlayer.Builder(this).build()
+         val openAppIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+@@ -107,6 +122,7 @@ class MusicService : HeadlessJsMediaService() {
          mediaSession = MediaLibrarySession.Builder(this, fakePlayer,
              InnerMediaSessionCallback()
          )
-+            .setId(uniqueSessionId)
++            .setId(UUID.randomUUID().toString())
              .setBitmapLoader(CacheBitmapLoader(CoilBitmapLoader(this)))
              // https://github.com/androidx/media/issues/1218
              .setSessionActivity(
+diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/utils/CoilBitmapLoader.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/utils/CoilBitmapLoader.kt
+index d85e2c7..3195f7b 100644
+--- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/utils/CoilBitmapLoader.kt
++++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/utils/CoilBitmapLoader.kt
+@@ -10,6 +10,7 @@ import androidx.media3.common.util.BitmapLoader
+ import androidx.media3.common.util.Util.isBitmapFactorySupportedMimeType
+ import androidx.media3.common.util.UnstableApi
+ import coil.ImageLoader
++import coil.memory.MemoryCache
+ import coil.request.ImageRequest
+ import com.google.common.util.concurrent.ListenableFuture
+ import jp.wasabeef.transformers.coil.CropSquareTransformation
+@@ -27,7 +28,17 @@ class CoilBitmapLoader @Inject constructor(
+ ) : BitmapLoader {
+ 
+     private val scope = MainScope()
+-    private val imageLoader = ImageLoader(context)
++    // Disable the weak reference memory cache to prevent background ANR
++    // in RealWeakMemoryCache.cleanUp which can block for 5+ seconds.
++    // The disk cache and strong memory cache still provide adequate caching
++    // for notification artwork.
++    private val imageLoader = ImageLoader.Builder(context)
++        .memoryCache {
++            MemoryCache.Builder(context)
++                .weakReferencesEnabled(false)
++                .build()
++        }
++        .build()
+ 
+     override fun supportsMimeType(mimeType: String): Boolean {
+         return isBitmapFactorySupportedMimeType(mimeType)
