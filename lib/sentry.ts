@@ -5,15 +5,15 @@ export const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: true,
 });
 
-const mobileReplay = Sentry.mobileReplayIntegration({
-  excludedViewClasses: ["ExpoVideo.VideoView"],
-});
-
 Sentry.init({
   dsn: env.EXPO_PUBLIC_SENTRY_DSN,
   tracesSampleRate: __DEV__ ? 1 : 0.1,
-  replaysSessionSampleRate: __DEV__ ? 1 : 0,
-  replaysOnErrorSampleRate: __DEV__ ? 1 : 0.1,
+  // Session replay disabled: the native SentrySessionReplay.createAndCaptureInBackground
+  // method blocks the main thread for 2000ms+, causing app hangs on iOS.
+  // See: https://github.com/getsentry/sentry-react-native/issues/4838
+  // Re-enable once the upstream fix lands in @sentry/react-native.
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
   beforeSend(event) {
     const message = event.exception?.values?.[0]?.value ?? event.exception?.values?.[0]?.type;
     if (message === "Network request failed" || message === "TypeError: Network request failed") {
@@ -24,7 +24,7 @@ Sentry.init({
     }
     return event;
   },
-  integrations: [navigationIntegration, mobileReplay],
+  integrations: [navigationIntegration],
 });
 
 export { Sentry };
