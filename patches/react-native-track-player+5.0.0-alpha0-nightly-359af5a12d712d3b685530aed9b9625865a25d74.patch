@@ -2,12 +2,28 @@ diff --git a/node_modules/react-native-track-player/android/src/main/java/com/do
 index 60b6871..92baf02 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt
-@@ -63,8 +63,12 @@ class MusicService : MediaLibraryService() {
+@@ -1,6 +1,7 @@
+ @file: OptIn(UnstableApi::class) package com.doublesymmetry.kotlinaudio.service
+ 
+ import android.content.Intent
++import java.util.UUID
+ import android.os.Binder
+ import android.os.Bundle
+ import android.os.IBinder
+@@ -63,8 +64,19 @@ class MusicService : MediaLibraryService() {
                  return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
              }
          }
-+        // FIX: Use unique session ID to prevent "Session ID must be unique" crash
-+        val uniqueSessionId = "rntp_session_${System.currentTimeMillis()}"
++        // FIX: Release previous mediaLibrarySession before recreation to prevent resource leaks
++        mediaLibrarySession?.let { session ->
++            try {
++                session.release()
++            } catch (e: Exception) {
++                // Log but don't crash on cleanup failure
++            }
++        }
++        // FIX: Use UUID-based session ID to prevent "Session ID must be unique" crash
++        val uniqueSessionId = "rntp_session_${UUID.randomUUID()}"
 +
          mediaLibrarySession = MediaLibrarySession.Builder(this, player.exoPlayer, callback)
 -        .setCustomLayout(customCommandButtons)
