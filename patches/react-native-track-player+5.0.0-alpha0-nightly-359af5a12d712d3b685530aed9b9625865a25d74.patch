@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt
-index 60b6871..92baf02 100644
+index 60b6871..1b89d31 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/kotlinaudio/service/MusicService.kt
 @@ -1,6 +1,7 @@
@@ -10,7 +10,7 @@ index 60b6871..92baf02 100644
  import android.os.Binder
  import android.os.Bundle
  import android.os.IBinder
-@@ -63,8 +64,19 @@ class MusicService : MediaLibraryService() {
+@@ -63,8 +64,20 @@ class MusicService : MediaLibraryService() {
                  return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
              }
          }
