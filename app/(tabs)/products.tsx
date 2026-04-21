@@ -107,6 +107,8 @@ export default function Products() {
   const [products, setProducts] = useState<ProductModel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [nextPageKey, setNextPageKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -115,9 +117,9 @@ export default function Products() {
   const totalSalesCount = products.reduce((sum, product) => sum + product.salesCount, 0);
   const totalSalesUsdCents = products.reduce((sum, product) => sum + product.salesUsdCents, 0);
   const formattedSalesRevenue = formatUsdRevenue(totalSalesUsdCents);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery.trim().toLowerCase()), 300);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -132,11 +134,11 @@ export default function Products() {
   const filteredProducts = useMemo(
     () =>
       products.filter((product) => {
-      if (statusFilter === "published" && !product.published) return false;
-      if (statusFilter === "draft" && product.published) return false;
-      if (!debouncedSearchQuery) return true;
-      const searchText = `${product.name} ${product.customSummary} ${product.description}`.toLowerCase();
-      return searchText.includes(debouncedSearchQuery);
+        if (statusFilter === "published" && !product.published) return false;
+        if (statusFilter === "draft" && product.published) return false;
+        if (!debouncedSearchQuery) return true;
+        const searchText = `${product.name} ${product.customSummary} ${product.description}`.toLowerCase();
+        return searchText.includes(debouncedSearchQuery);
       }),
     [debouncedSearchQuery, products, statusFilter],
   );
@@ -160,18 +162,39 @@ export default function Products() {
       if (!response.success) throw new Error("Unable to load products");
 
       setProducts(normalizeProducts(response.products));
-    } catch (error) {
-      Sentry.captureException(error);
-      setError(error instanceof Error ? error.message : "Failed to load products");
+      setNextPageKey(response.next_page_key ?? null);
+    } catch (err) {
+      Sentry.captureException(err);
+      setError(err instanceof Error ? err.message : "Failed to load products");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, [accessToken]);
 
+  const fetchMoreProducts = useCallback(async () => {
+    if (!nextPageKey || !accessToken || isLoadingMore || isLoading) return;
+
+    setIsLoadingMore(true);
+    try {
+      const response = await requestAPI<ProductsResponse>(
+        `/v2/products?page_key=${encodeURIComponent(nextPageKey)}`,
+        { accessToken },
+      );
+      if (!response.success) throw new Error("Unable to load more products");
+
+      setProducts((prev) => [...prev, ...normalizeProducts(response.products)]);
+      setNextPageKey(response.next_page_key ?? null);
+    } catch (err) {
+      Sentry.captureException(err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [accessToken, isLoading, isLoadingMore, nextPageKey]);
+
   useFocusEffect(
     useCallback(() => {
-      fetchProducts();
+      void fetchProducts();
     }, [fetchProducts]),
   );
 
@@ -212,7 +235,7 @@ export default function Products() {
       <Screen>
         <View className="flex-1 items-center justify-center px-4">
           <Text className="text-center text-muted mb-4">{error}</Text>
-          <Pressable onPress={() => fetchProducts()} className="rounded bg-primary px-4 py-2">
+          <Pressable onPress={() => void fetchProducts()} className="rounded bg-primary px-4 py-2">
             <Text className="text-primary-foreground">Retry</Text>
           </Pressable>
         </View>
@@ -252,9 +275,13 @@ export default function Products() {
         data={filteredProducts}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 16 }}
+        onEndReached={() => {
+          if (nextPageKey && !isLoadingMore && !isLoading) void fetchMoreProducts();
+        }}
+        onEndReachedThreshold={0.5}
         ListHeaderComponent={
           <View className="gap-3 border-b border-border/70 px-4 py-4">
-            {error ? <Text className="text-xs text-muted">{error}</Text> : null}
+            {error ? <Text className="text-xs text-destructive">{error}</Text> : null}
             <View className="flex-row gap-2">
               {[
                 { id: "all", label: "All" },
@@ -290,7 +317,7 @@ export default function Products() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => fetchProducts(true)}
+            onRefresh={() => void fetchProducts(true)}
           />
         }
         renderItem={({ item, index }) => (
@@ -323,7 +350,7 @@ export default function Products() {
           ) : null
         }
         ListFooterComponent={
-          isLoading && filteredProducts.length > 0 ? (
+          isLoading || isLoadingMore ? (
             <View className="w-full items-center py-4">
               <LoadingSpinner size="small" />
             </View>
