@@ -1,0 +1,64 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/launch.yaml
+# Log in as a creator account
+- tapOn: Sign in with Gumroad
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+- runFlow:
+    when:
+      visible: Logout
+    commands:
+      - tapOn: Logout
+- scrollUntilVisible:
+    element: Login
+- tapOn: Email
+- inputText: ${CREATOR_EMAIL}
+- pressKey: enter
+- inputText: ${CREATOR_PASSWORD}
+- pressKey: enter
+- runFlow:
+    when:
+      visible: Not Now
+    commands:
+      - tapOn: Not Now
+- runFlow:
+    when:
+      visible: Authentication Token
+    commands:
+      - tapOn: Login
+- assertVisible: Authorize
+- tapOn: Authorize
+- assertVisible: Library
+# Navigate to Products tab
+- tapOn: Products
+- assertVisible: Products
+# Open the new product screen via the + button in the header
+- tapOn:
+    id: ".*plus.*"
+    optional: true
+# Fallback: if no + button matched, tap the CTA in the empty state
+- runFlow:
+    when:
+      visible: Create your first product
+    commands:
+      - tapOn: Create your first product
+- assertVisible: "What are you creating?"
+# Select a product type
+- tapOn: Digital product
+# Fill in product name
+- tapOn:
+    id: "product-name-input"
+- inputText: "E2E Test Product"
+# Fill in price
+- tapOn:
+    id: "product-price-input"
+- inputText: "9.99"
+# Submit
+- tapOn: "Next: Customize"
+# Should navigate to the edit screen
+- assertVisible: "Edit product"

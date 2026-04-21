@@ -4,6 +4,14 @@ process.env.EXPO_PUBLIC_GUMROAD_CLIENT_ID = "test-client-id";
 process.env.EXPO_PUBLIC_MOBILE_TOKEN = "test-mobile-token";
 process.env.EXPO_PUBLIC_SENTRY_DSN = "https://test@sentry.io/123";
 
+jest.mock("react-native-webview", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  return {
+    WebView: (props: Record<string, unknown>) => React.createElement(View, props),
+  };
+});
+
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,

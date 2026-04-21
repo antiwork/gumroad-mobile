@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { FormField } from "@/components/ui/form-field";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { PriceInput } from "@/components/ui/price-input";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { LineIcon } from "@/components/icon";
@@ -156,11 +159,7 @@ export default function ProductNew() {
         </View>
 
         <View className="gap-4 px-4 py-4">
-          {error ? (
-            <View className="rounded-lg border border-destructive/50 bg-card px-3 py-3">
-              <Text className="text-sm text-destructive">{error}</Text>
-            </View>
-          ) : null}
+          {error ? <ErrorBanner error={error} /> : null}
 
           <View className="gap-2">
             <Text className="text-xs uppercase tracking-wide text-muted">Products</Text>
@@ -172,6 +171,7 @@ export default function ProductNew() {
                     <Pressable
                       key={option.id}
                       onPress={() => setSelectedKind(option.id)}
+                      testID={`product-kind-${option.id}`}
                       className={`rounded-lg border px-3 py-3 ${isActive ? "border-foreground bg-muted/20" : "border-border bg-background"}`}
                     >
                       <View className="flex-row items-start gap-3">
@@ -194,8 +194,7 @@ export default function ProductNew() {
             <Text className="text-xs uppercase tracking-wide text-muted">Product details</Text>
             <Card className="rounded-lg">
               <CardContent className="gap-4 p-3">
-                <View className="gap-2">
-                  <Text className="text-sm">Name</Text>
+                <FormField label="Name">
                   <TextInput
                     value={name}
                     onChangeText={setName}
@@ -203,29 +202,19 @@ export default function ProductNew() {
                     placeholderTextColor={mutedColor}
                     autoCapitalize="sentences"
                     className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                    testID="product-name-input"
                   />
-                </View>
+                </FormField>
 
-                <View className="gap-2">
-                  <Text className="text-sm">Price</Text>
-                  <TextInput
-                    value={price}
-                    onChangeText={(value) => {
-                      const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
-                      setPrice(normalized);
-                    }}
-                    placeholder="0.00"
-                    placeholderTextColor={mutedColor}
-                    keyboardType="decimal-pad"
-                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-                  />
-                </View>
+                <FormField label="Price">
+                  <PriceInput value={price} onChangeText={setPrice} testID="product-price-input" />
+                </FormField>
               </CardContent>
             </Card>
           </View>
 
           <View className="gap-2 pt-1">
-            <Button variant="accent" onPress={() => void createProduct()} disabled={isSubmitting}>
+            <Button variant="accent" onPress={() => void createProduct()} disabled={isSubmitting} testID="create-product-button">
               <Text>{isSubmitting ? "Creating..." : "Next: Customize"}</Text>
               <LineIcon name="arrow-right-stroke" size={18} className="text-primary-foreground" />
             </Button>

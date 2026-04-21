@@ -1,7 +1,8 @@
 import { LineIcon } from "@/components/icon";
-import { Badge } from "@/components/ui/badge";
+import { ProductCard } from "@/components/products/product-card";
+import { StatCard } from "@/components/products/stat-card";
+import { StatusFilter, StatusFilterBar } from "@/components/products/status-filter-bar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
@@ -12,7 +13,7 @@ import { requestAPI } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Image, Pressable, RefreshControl, TextInput, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 interface ProductsResponse {
@@ -29,76 +30,6 @@ const formatUsdRevenue = (amountCents: number) =>
     maximumFractionDigits: 2,
   }).format(amountCents / 100);
 
-const ProductCard = ({
-  product,
-  onPress,
-  isFirst,
-}: {
-  product: ProductModel;
-  onPress: () => void;
-  isFirst: boolean;
-}) => {
-  const subtitle = product.customSummary || product.description;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`mx-4 mb-3${isFirst ? " mt-3" : ""}`}
-    >
-      <Card className="rounded-xl">
-        <CardContent className="p-3">
-          <View className="flex-row gap-3">
-            {product.thumbnailUrl ? (
-              <Image source={{ uri: product.thumbnailUrl }} className="size-16 rounded-lg bg-muted" resizeMode="cover" />
-            ) : (
-              <View className="size-16 items-center justify-center rounded-lg bg-muted">
-                <LineIcon name="image" size={20} className="text-muted" />
-              </View>
-            )}
-            <View className="flex-1 gap-1.5">
-              <View className="flex-row items-start justify-between gap-2">
-                <Text className="flex-1 text-base font-bold" numberOfLines={1}>
-                  {product.name}
-                </Text>
-                <Badge variant={product.published ? "default" : "secondary"}>
-                  <Text>{product.published ? "Published" : "Draft"}</Text>
-                </Badge>
-              </View>
-              {product.shortUrl ? (
-                <Text className="text-xs text-muted" numberOfLines={1}>
-                  {product.shortUrl}
-                </Text>
-              ) : null}
-              {subtitle ? (
-                <Text className="text-xs text-muted" numberOfLines={2}>
-                  {subtitle}
-                </Text>
-              ) : null}
-              {product.tags.length > 0 ? (
-                <Text className="text-[11px] text-muted" numberOfLines={1}>
-                  {product.tags.slice(0, 2).join(" • ")}
-                </Text>
-              ) : null}
-              <View className="mt-1 flex-row items-center justify-between">
-                <Text className="text-xs text-muted">{product.salesCount} sales</Text>
-                <View className="flex-row items-center gap-2">
-                  {product.customizablePrice ? (
-                    <Badge variant="outline">
-                      <Text>PWYW</Text>
-                    </Badge>
-                  ) : null}
-                  <Text className="text-sm font-bold">{product.formattedPrice}</Text>
-                  <LineIcon name="chevron-right" size={16} className="text-muted" />
-                </View>
-              </View>
-            </View>
-          </View>
-        </CardContent>
-      </Card>
-    </Pressable>
-  );
-};
-
 export default function Products() {
   const { isLoading: isAuthLoading, accessToken } = useAuth();
   const { isProductSearchActive, setProductSearchActive } = useProductsSearch();
@@ -112,7 +43,7 @@ export default function Products() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const mutedColor = useCSSVariable("--color-muted") as string;
   const totalSalesCount = products.reduce((sum, product) => sum + product.salesCount, 0);
   const totalSalesUsdCents = products.reduce((sum, product) => sum + product.salesUsdCents, 0);
@@ -258,6 +189,7 @@ export default function Products() {
               autoCapitalize="none"
               autoCorrect={false}
               className="ml-2 flex-1 text-foreground"
+              testID="product-search-input"
             />
             {searchQuery.length > 0 ? (
               <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
@@ -279,38 +211,14 @@ export default function Products() {
           if (nextPageKey && !isLoadingMore && !isLoading) void fetchMoreProducts();
         }}
         onEndReachedThreshold={0.5}
+        testID="products-list"
         ListHeaderComponent={
           <View className="gap-3 border-b border-border/70 px-4 py-4">
             {error ? <Text className="text-xs text-destructive">{error}</Text> : null}
+            <StatusFilterBar value={statusFilter} onChange={setStatusFilter} />
             <View className="flex-row gap-2">
-              {[
-                { id: "all", label: "All" },
-                { id: "published", label: "Published" },
-                { id: "draft", label: "Drafts" },
-              ].map((filter) => {
-                const isActive = statusFilter === filter.id;
-                return (
-                  <Button
-                    key={filter.id}
-                    onPress={() => setStatusFilter(filter.id as "all" | "published" | "draft")}
-                    variant={isActive ? "outline" : "ghost"}
-                    size="sm"
-                    className="rounded-full"
-                  >
-                    <Text className={isActive ? "text-foreground" : "text-muted"}>{filter.label}</Text>
-                  </Button>
-                );
-              })}
-            </View>
-            <View className="flex-row gap-2">
-              <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
-                <Text className="text-xs text-muted">Revenue</Text>
-                <Text className="text-lg font-bold">{formattedSalesRevenue}</Text>
-              </View>
-              <View className="flex-1 rounded-xl border border-border bg-card px-3 py-2">
-                <Text className="text-xs text-muted">Sales</Text>
-                <Text className="text-lg font-bold">{totalSalesCount.toLocaleString()}</Text>
-              </View>
+              <StatCard label="Revenue" value={formattedSalesRevenue} testID="revenue-stat" />
+              <StatCard label="Sales" value={totalSalesCount.toLocaleString()} testID="sales-stat" />
             </View>
           </View>
         }
@@ -329,7 +237,7 @@ export default function Products() {
         )}
         ListEmptyComponent={
           !isLoading ? (
-            <View className="items-center justify-center py-20 px-4">
+            <View className="items-center justify-center py-20 px-4" testID="empty-state">
               <View className="mb-4 rounded-full border border-border p-3">
                 <LineIcon name="package" size={24} className="text-muted" />
               </View>

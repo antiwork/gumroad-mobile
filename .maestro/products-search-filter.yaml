@@ -1,0 +1,62 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/launch.yaml
+# Log in as a creator account
+- tapOn: Sign in with Gumroad
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+- runFlow:
+    when:
+      visible: Logout
+    commands:
+      - tapOn: Logout
+- scrollUntilVisible:
+    element: Login
+- tapOn: Email
+- inputText: ${CREATOR_EMAIL}
+- pressKey: enter
+- inputText: ${CREATOR_PASSWORD}
+- pressKey: enter
+- runFlow:
+    when:
+      visible: Not Now
+    commands:
+      - tapOn: Not Now
+- runFlow:
+    when:
+      visible: Authentication Token
+    commands:
+      - tapOn: Login
+- assertVisible: Authorize
+- tapOn: Authorize
+- assertVisible: Library
+# Navigate to Products
+- tapOn: Products
+- assertVisible: Products
+# Search for a product using the search icon
+- tapOn:
+    id: ".*search.*"
+    optional: true
+- assertVisible: "Search products"
+- tapOn:
+    id: "product-search-input"
+- inputText: "test"
+# Filtered results should appear; filter bar still visible
+- assertVisible: All
+# Clear the search with the X button
+- tapOn:
+    id: ".*x.*"
+    optional: true
+# Filter by Published
+- tapOn: Published
+- assertVisible: Published
+# Filter by Drafts
+- tapOn: Drafts
+- assertVisible: Drafts
+# Return to All
+- tapOn: All
+- assertVisible: All

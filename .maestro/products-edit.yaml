@@ -1,0 +1,56 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/launch.yaml
+# Log in as a creator account
+- tapOn: Sign in with Gumroad
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+- runFlow:
+    when:
+      visible: Logout
+    commands:
+      - tapOn: Logout
+- scrollUntilVisible:
+    element: Login
+- tapOn: Email
+- inputText: ${CREATOR_EMAIL}
+- pressKey: enter
+- inputText: ${CREATOR_PASSWORD}
+- pressKey: enter
+- runFlow:
+    when:
+      visible: Not Now
+    commands:
+      - tapOn: Not Now
+- runFlow:
+    when:
+      visible: Authentication Token
+    commands:
+      - tapOn: Login
+- assertVisible: Authorize
+- tapOn: Authorize
+- assertVisible: Library
+# Navigate to Products tab
+- tapOn: Products
+- assertVisible: Products
+# Tap the first product card
+- tapOn:
+    index: 0
+    childOf:
+      id: "products-list"
+# Should be on edit screen
+- assertVisible: "Edit product"
+- assertVisible: "Product details"
+# Edit the product name
+- tapOn:
+    id: "product-name-input"
+- clearText
+- inputText: "Updated Product Name"
+# Save changes
+- tapOn: "Save changes"
+# Should navigate back to products list
+- assertVisible: Products

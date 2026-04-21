@@ -1,0 +1,46 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/launch.yaml
+# Log in as a creator account
+- tapOn: Sign in with Gumroad
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+- runFlow:
+    when:
+      visible: Logout
+    commands:
+      - tapOn: Logout
+- scrollUntilVisible:
+    element: Login
+- tapOn: Email
+- inputText: ${CREATOR_EMAIL}
+- pressKey: enter
+- inputText: ${CREATOR_PASSWORD}
+- pressKey: enter
+- runFlow:
+    when:
+      visible: Not Now
+    commands:
+      - tapOn: Not Now
+- runFlow:
+    when:
+      visible: Authentication Token
+    commands:
+      - tapOn: Login
+- assertVisible: Authorize
+- tapOn: Authorize
+# Should land on Library tab; navigate to Products
+- assertVisible: Library
+- tapOn: Products
+- assertVisible: Products
+# Verify the filter bar is present
+- assertVisible: All
+- assertVisible: Published
+- assertVisible: Drafts
+# Verify stat cards are present
+- assertVisible: Revenue
+- assertVisible: Sales

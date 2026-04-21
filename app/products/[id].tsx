@@ -1,8 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { FormField } from "@/components/ui/form-field";
 import { LineIcon } from "@/components/icon";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { PriceInput } from "@/components/ui/price-input";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
@@ -196,7 +199,7 @@ export default function ProductEdit() {
           ),
           headerRight: () => (
             <View>
-              <Button size="sm" variant="accent" onPress={() => void handleSavePress()} disabled={isSaving || isLoading}>
+              <Button size="sm" variant="accent" onPress={() => void handleSavePress()} disabled={isSaving || isLoading} testID="save-button">
                 <Text>Save</Text>
               </Button>
             </View>
@@ -216,11 +219,7 @@ export default function ProductEdit() {
 
         {!isLoading ? (
           <>
-            {error ? (
-              <View className="rounded-lg border border-destructive/50 bg-card px-3 py-3">
-                <Text className="text-sm text-destructive">{error}</Text>
-              </View>
-            ) : null}
+            {error ? <ErrorBanner error={error} /> : null}
 
             <Card className="rounded-xl">
               <CardHeader>
@@ -246,8 +245,7 @@ export default function ProductEdit() {
                 <CardTitle>Product details</CardTitle>
               </CardHeader>
               <CardContent className="gap-4">
-                <View className="gap-2">
-                  <Text className="text-sm">Name</Text>
+                <FormField label="Name">
                   <TextInput
                     value={name}
                     onChangeText={setName}
@@ -255,11 +253,11 @@ export default function ProductEdit() {
                     placeholderTextColor={mutedColor}
                     autoCapitalize="sentences"
                     className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                    testID="product-name-input"
                   />
-                </View>
+                </FormField>
 
-                <View className="gap-2">
-                  <Text className="text-sm">Summary</Text>
+                <FormField label="Summary">
                   <TextInput
                     value={customSummary}
                     onChangeText={setCustomSummary}
@@ -267,12 +265,12 @@ export default function ProductEdit() {
                     placeholderTextColor={mutedColor}
                     autoCapitalize="sentences"
                     className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                    testID="product-summary-input"
                   />
-                </View>
+                </FormField>
 
                 {nativeType !== "coffee" ? (
-                  <View className="gap-2">
-                    <Text className="text-sm">Public link slug</Text>
+                  <FormField label="Public link slug">
                     <View className="flex-row items-center rounded-lg border border-border bg-background px-3 py-3">
                       {shortUrlPrefix ? (
                         <Text className="mr-1 text-xs text-muted" numberOfLines={1}>
@@ -287,13 +285,13 @@ export default function ProductEdit() {
                         autoCapitalize="none"
                         autoCorrect={false}
                         className="flex-1 text-foreground"
+                        testID="product-permalink-input"
                       />
                     </View>
-                  </View>
+                  </FormField>
                 ) : null}
 
-                <View className="gap-2">
-                  <Text className="text-sm">Description</Text>
+                <FormField label="Description">
                   <TextInput
                     value={description}
                     onChangeText={setDescription}
@@ -303,24 +301,14 @@ export default function ProductEdit() {
                     textAlignVertical="top"
                     autoCapitalize="sentences"
                     className="min-h-28 rounded-lg border border-border bg-background px-3 py-3 text-foreground"
+                    testID="product-description-input"
                   />
-                </View>
+                </FormField>
 
-                <View className="gap-2">
-                  <Text className="text-sm">Price</Text>
-                  <TextInput
-                    value={price}
-                    onChangeText={(value) => {
-                      const normalized = value.replace(/,/g, ".").replace(/[^0-9.]/g, "");
-                      setPrice(normalized);
-                    }}
-                    placeholder="0.00"
-                    placeholderTextColor={mutedColor}
-                    keyboardType="decimal-pad"
-                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-                  />
+                <FormField label="Price">
+                  <PriceInput value={price} onChangeText={setPrice} testID="product-price-input" />
                   {formattedPrice ? <Text className="text-xs text-muted">Current: {formattedPrice}</Text> : null}
-                </View>
+                </FormField>
               </CardContent>
             </Card>
 
@@ -355,15 +343,15 @@ export default function ProductEdit() {
             ) : null}
 
             <View className="flex-row gap-2">
-              <Button variant="accent" onPress={() => void handleSavePress()} disabled={isSaving}>
+              <Button variant="accent" onPress={() => void handleSavePress()} disabled={isSaving} testID="save-changes-button">
                 <Text>{isSaving ? "Saving..." : "Save changes"}</Text>
                 <LineIcon name="check" size={18} className="text-primary-foreground" />
               </Button>
-              <Button variant="outline" onPress={() => void handleTogglePublishPress()} disabled={isSaving}>
+              <Button variant="outline" onPress={() => void handleTogglePublishPress()} disabled={isSaving} testID="toggle-publish-button">
                 <Text>{published ? "Unpublish" : "Publish"}</Text>
               </Button>
             </View>
-            <Button variant="ghost" onPress={handleDeletePress} disabled={isSaving}>
+            <Button variant="ghost" onPress={handleDeletePress} disabled={isSaving} testID="delete-button">
               <Text className="text-destructive">Delete product</Text>
             </Button>
           </>
