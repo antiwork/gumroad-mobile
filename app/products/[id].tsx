@@ -1,175 +1,112 @@
+import { StyledWebView } from "@/components/styled";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ErrorBanner } from "@/components/ui/error-banner";
-import { FormField } from "@/components/ui/form-field";
-import { LineIcon } from "@/components/icon";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { PriceInput } from "@/components/ui/price-input";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
-import { normalizeProduct, RawProduct } from "@/lib/product-api";
-import { requestAPI } from "@/lib/request";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, TextInput, View } from "react-native";
+import { env } from "@/lib/env";
+import { safeOpenURL } from "@/lib/open-url";
 import * as Sentry from "@sentry/react-native";
-import { useCSSVariable } from "uniwind";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useRef, useState } from "react";
+import { Alert, View } from "react-native";
+import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 
-type ProductDetailsResponse = {
-  success: boolean;
-  product: RawProduct;
-};
+type WebMessage =
+  | { type: "productSaveSuccess"; payload: Record<string, never> }
+  | { type: "productSaveError"; payload: { message: string } }
+  | { type: "productSaveWarning"; payload: { message: string } }
+  | { type: "productPublishSuccess"; payload: Record<string, never> }
+  | { type: "productUnpublishSuccess"; payload: Record<string, never> }
+  | { type: "productTabChange"; payload: { tab: string } };
 
 export default function ProductEdit() {
-  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const { id, uniquePermalink, published: publishedParam } = useLocalSearchParams<{
+    id: string | string[];
+    uniquePermalink: string | string[];
+    published: string;
+  }>();
   const productId = Array.isArray(id) ? id[0] : id;
+  const permalink = Array.isArray(uniquePermalink) ? uniquePermalink[0] : uniquePermalink;
   const { isLoading: isAuthLoading, accessToken } = useAuth();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const webViewRef = useRef<BaseWebView>(null);
+  const [isPublished, setIsPublished] = useState(publishedParam === "true");
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [description, setDescription] = useState("");
-  const [customSummary, setCustomSummary] = useState("");
-  const [customPermalink, setCustomPermalink] = useState("");
-  const [published, setPublished] = useState(false);
-  const [formattedPrice, setFormattedPrice] = useState<string | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [shortUrl, setShortUrl] = useState<string | null>(null);
-  const [nativeType, setNativeType] = useState("digital");
-  const mutedColor = useCSSVariable("--color-muted") as string;
-  const shortUrlPrefix = shortUrl ? shortUrl.replace(/\/[^/]+$/, "/") : "";
+  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProduct = useCallback(async () => {
-    if (!productId) {
-      setError("Missing product identifier.");
-      setIsLoading(false);
-      return;
-    }
-    if (!accessToken) {
-      setError("You must be signed in to edit products.");
-      setIsLoading(false);
-      return;
-    }
+  const editPathPrefix = permalink ? `/products/${encodeURIComponent(permalink)}/edit` : null;
+  const url =
+    editPathPrefix && accessToken
+      ? `${env.EXPO_PUBLIC_GUMROAD_URL}${editPathPrefix}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`
+      : null;
 
-    setError(null);
-    setIsLoading(true);
-    try {
-      const response = await requestAPI<ProductDetailsResponse>(`/v2/products/${encodeURIComponent(productId)}`, {
-        accessToken,
-      });
-      const normalizedProduct = normalizeProduct(response.product);
-      if (!normalizedProduct) throw new Error("Invalid product response.");
-      setName(normalizedProduct.name);
-      setDescription(normalizedProduct.description);
-      setCustomSummary(normalizedProduct.customSummary);
-      setCustomPermalink(normalizedProduct.customPermalink || "");
-      setPrice((normalizedProduct.price / 100).toFixed(2));
-      setPublished(normalizedProduct.published);
-      setFormattedPrice(normalizedProduct.formattedPrice);
-      setTags(normalizedProduct.tags);
-      setShortUrl(normalizedProduct.shortUrl);
-      setNativeType(normalizedProduct.nativeType);
-    } catch (requestError) {
-      Sentry.captureException(requestError);
-      setError(requestError instanceof Error ? requestError.message : "Could not load product.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [accessToken, productId]);
+  const handleShouldStartLoadWithRequest = useCallback(
+    (request: { url: string; navigationType: string; mainDocumentURL?: string }) => {
+      if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
+      if (
+        !url ||
+        !editPathPrefix ||
+        request.url === url ||
+        request.url.startsWith("https://challenges.cloudflare.com/") ||
+        request.url.startsWith("https://connect-js.stripe.com/") ||
+        !/^https?:\/\//.test(request.url)
+      )
+        return true;
+      if (request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL)) {
+        const path = request.url.slice(env.EXPO_PUBLIC_GUMROAD_URL.length).split("?")[0] ?? "";
+        if (path.startsWith(editPathPrefix)) return true;
+      }
+      safeOpenURL(request.url);
+      return false;
+    },
+    [url, editPathPrefix],
+  );
 
-  useEffect(() => {
-    void fetchProduct();
-  }, [fetchProduct]);
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      try {
+        const message = JSON.parse(event.nativeEvent.data) as WebMessage;
+        if (message.type === "productSaveSuccess") {
+          setIsSaving(false);
+        } else if (message.type === "productSaveError") {
+          setIsSaving(false);
+          Alert.alert("Save Failed", message.payload.message || "Could not save product.");
+        } else if (message.type === "productSaveWarning") {
+          setIsSaving(false);
+          Alert.alert("Saved with warnings", message.payload.message);
+        } else if (message.type === "productPublishSuccess") {
+          setIsPublished(true);
+          setIsSaving(false);
+        } else if (message.type === "productUnpublishSuccess") {
+          setIsPublished(false);
+          setIsSaving(false);
+        } else if (message.type === "productTabChange") {
+          // TODO(#60): Reflect the active editor tab in a native tab bar instead of keeping it inside the webview.
+        }
+      } catch (error) {
+        Sentry.captureException(error);
+      }
+    },
+    [],
+  );
 
-  const handleSavePress = useCallback(async () => {
-    if (!productId || !accessToken) return;
-    const trimmedName = name.trim();
-    const normalizedPrice = price.trim();
-    if (!trimmedName) {
-      setError("Product name is required.");
-      return;
-    }
-    const parsedPrice = Number(normalizedPrice);
-    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
-      setError("Price must be a valid number.");
-      return;
-    }
-
-    setError(null);
+  const handleSavePress = useCallback(() => {
     setIsSaving(true);
-    try {
-      await requestAPI(`/v2/products/${encodeURIComponent(productId)}`, {
-        accessToken,
-        method: "PUT",
-        data: {
-          name: trimmedName,
-          price: Math.round(parsedPrice * 100),
-          description: description.trim(),
-          custom_summary: customSummary.trim() || null,
-          custom_permalink: customPermalink.trim() || null,
-        },
-      });
-      router.replace("/(tabs)/products");
-    } catch (requestError) {
-      Sentry.captureException(requestError);
-      setError(requestError instanceof Error ? requestError.message : "Could not save product.");
-    } finally {
-      setIsSaving(false);
-    }
-  }, [accessToken, customPermalink, customSummary, description, name, price, productId, router]);
+    webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppProductSave", payload: {} }));
+  }, []);
 
-  const handleTogglePublishPress = useCallback(async () => {
-    if (!productId || !accessToken || isSaving || isLoading) return;
-    setError(null);
+  const handlePublishPress = useCallback(() => {
     setIsSaving(true);
-    try {
-      await requestAPI(`/v2/products/${encodeURIComponent(productId)}/${published ? "disable" : "enable"}`, {
-        accessToken,
-        method: "PUT",
-      });
-      router.replace("/(tabs)/products");
-    } catch (requestError) {
-      Sentry.captureException(requestError);
-      setError(requestError instanceof Error ? requestError.message : "Could not change publish status.");
-    } finally {
-      setIsSaving(false);
-    }
-  }, [accessToken, isLoading, isSaving, productId, published, router]);
+    webViewRef.current?.postMessage(
+      JSON.stringify({
+        type: isPublished ? "mobileAppProductUnpublish" : "mobileAppProductPublish",
+        payload: {},
+      }),
+    );
+  }, [isPublished]);
 
-  const handleDeletePress = useCallback(() => {
-    if (!productId || !accessToken || isSaving || isLoading) return;
-    Alert.alert("Delete product?", "This action cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-              setError(null);
-              setIsSaving(true);
-            try {
-              await requestAPI(`/v2/products/${encodeURIComponent(productId)}`, {
-                accessToken,
-                method: "DELETE",
-              });
-              router.replace("/(tabs)/products");
-            } catch (requestError) {
-              Sentry.captureException(requestError);
-              setError(requestError instanceof Error ? requestError.message : "Could not delete product.");
-            } finally {
-              setIsSaving(false);
-            }
-          })();
-        },
-      },
-    ]);
-  }, [accessToken, isLoading, isSaving, productId, router]);
-
-  if (!productId) {
+  if (!productId || !permalink) {
     return (
       <Screen>
         <View className="flex-1 items-center justify-center px-4">
@@ -179,7 +116,7 @@ export default function ProductEdit() {
     );
   }
 
-  if (isAuthLoading) {
+  if (isAuthLoading || !url) {
     return (
       <View className="flex-1 items-center justify-center bg-body-bg">
         <LoadingSpinner size="large" />
@@ -198,165 +135,48 @@ export default function ProductEdit() {
             </Button>
           ),
           headerRight: () => (
-            <View>
-              <Button size="sm" variant="accent" onPress={() => void handleSavePress()} disabled={isSaving || isLoading} testID="save-button">
+            <View className="flex-row gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={handlePublishPress}
+                disabled={isSaving}
+                testID="toggle-publish-button"
+              >
+                <Text>{isPublished ? "Unpublish" : "Publish"}</Text>
+              </Button>
+              <Button
+                size="sm"
+                variant="accent"
+                onPress={handleSavePress}
+                disabled={isSaving}
+                testID="save-button"
+              >
                 <Text>Save</Text>
               </Button>
             </View>
           ),
         }}
       />
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="gap-4 px-4 py-6 pb-10"
-        keyboardShouldPersistTaps="handled"
-      >
-        {isLoading ? (
-          <View className="flex-1 items-center justify-center">
-            <LoadingSpinner size="large" />
-          </View>
-        ) : null}
-
-        {!isLoading ? (
-          <>
-            {error ? <ErrorBanner error={error} /> : null}
-
-            <Card className="rounded-xl">
-              <CardHeader>
-                <CardTitle>Thumbnail</CardTitle>
-              </CardHeader>
-              <CardContent className="gap-3">
-                <View className="flex-row gap-3">
-                  <View className="relative size-28 overflow-hidden rounded-lg border border-border bg-muted">
-                    <View className="size-full items-center justify-center gap-2">
-                      <LineIcon name="image" size={22} className="text-muted" />
-                      <Text className="text-xs text-muted">Mock only</Text>
-                    </View>
-                  </View>
-                  <Text className="flex-1 text-xs text-muted">
-                    Image upload is mocked for now. We will wire this to the real upload flow in a later pass.
-                  </Text>
-                </View>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-xl">
-              <CardHeader>
-                <CardTitle>Product details</CardTitle>
-              </CardHeader>
-              <CardContent className="gap-4">
-                <FormField label="Name">
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Product name"
-                    placeholderTextColor={mutedColor}
-                    autoCapitalize="sentences"
-                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-                    testID="product-name-input"
-                  />
-                </FormField>
-
-                <FormField label="Summary">
-                  <TextInput
-                    value={customSummary}
-                    onChangeText={setCustomSummary}
-                    placeholder="Short product summary"
-                    placeholderTextColor={mutedColor}
-                    autoCapitalize="sentences"
-                    className="rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-                    testID="product-summary-input"
-                  />
-                </FormField>
-
-                {nativeType !== "coffee" ? (
-                  <FormField label="Public link slug">
-                    <View className="flex-row items-center rounded-lg border border-border bg-background px-3 py-3">
-                      {shortUrlPrefix ? (
-                        <Text className="mr-1 text-xs text-muted" numberOfLines={1}>
-                          {shortUrlPrefix}
-                        </Text>
-                      ) : null}
-                      <TextInput
-                        value={customPermalink}
-                        onChangeText={(value) => setCustomPermalink(value.replace(/\s/g, "").replace(/[^a-zA-Z0-9_-]/g, ""))}
-                        placeholder="custom-link"
-                        placeholderTextColor={mutedColor}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        className="flex-1 text-foreground"
-                        testID="product-permalink-input"
-                      />
-                    </View>
-                  </FormField>
-                ) : null}
-
-                <FormField label="Description">
-                  <TextInput
-                    value={description}
-                    onChangeText={setDescription}
-                    placeholder="Describe your product"
-                    placeholderTextColor={mutedColor}
-                    multiline
-                    textAlignVertical="top"
-                    autoCapitalize="sentences"
-                    className="min-h-28 rounded-lg border border-border bg-background px-3 py-3 text-foreground"
-                    testID="product-description-input"
-                  />
-                </FormField>
-
-                <FormField label="Price">
-                  <PriceInput value={price} onChangeText={setPrice} testID="product-price-input" />
-                  {formattedPrice ? <Text className="text-xs text-muted">Current: {formattedPrice}</Text> : null}
-                </FormField>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-xl">
-              <CardContent className="flex-row items-center justify-between p-3">
-                <View className="flex-row items-center gap-2">
-                  <LineIcon name="package" size={16} className="text-accent" />
-                  <Text className="text-sm text-muted">Status</Text>
-                </View>
-                <Badge variant={published ? "default" : "secondary"}>
-                  <Text>{published ? "Published" : "Draft"}</Text>
-                </Badge>
-              </CardContent>
-            </Card>
-            {shortUrl ? (
-              <Card className="rounded-xl">
-                <CardContent className="gap-1 p-3">
-                  <Text className="text-xs text-muted">Public link</Text>
-                  <Text className="text-sm text-foreground" numberOfLines={1}>
-                    {shortUrl}
-                  </Text>
-                  {nativeType === "coffee" ? (
-                    <Text className="text-xs text-muted">Public link is read-only for coffee products.</Text>
-                  ) : null}
-                  {tags.length > 0 ? (
-                    <Text className="text-xs text-muted" numberOfLines={1}>
-                      Tags: {tags.join(", ")}
-                    </Text>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ) : null}
-
-            <View className="flex-row gap-2">
-              <Button variant="accent" onPress={() => void handleSavePress()} disabled={isSaving} testID="save-changes-button">
-                <Text>{isSaving ? "Saving..." : "Save changes"}</Text>
-                <LineIcon name="check" size={18} className="text-primary-foreground" />
-              </Button>
-              <Button variant="outline" onPress={() => void handleTogglePublishPress()} disabled={isSaving} testID="toggle-publish-button">
-                <Text>{published ? "Unpublish" : "Publish"}</Text>
-              </Button>
-            </View>
-            <Button variant="ghost" onPress={handleDeletePress} disabled={isSaving} testID="delete-button">
-              <Text className="text-destructive">Delete product</Text>
-            </Button>
-          </>
-        ) : null}
-      </ScrollView>
+      <StyledWebView
+        ref={webViewRef}
+        source={{ uri: url }}
+        className="flex-1 bg-transparent"
+        webviewDebuggingEnabled
+        pullToRefreshEnabled
+        incognito
+        originWhitelist={["*"]}
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onMessage={handleMessage}
+        onLoadStart={() => setIsLoading(true)}
+        onLoadEnd={() => setIsLoading(false)}
+        testID="product-edit-webview"
+      />
+      {isLoading || isSaving ? (
+        <View className="absolute inset-0 items-center justify-center bg-black/50">
+          <LoadingSpinner size="large" />
+        </View>
+      ) : null}
     </Screen>
   );
 }

@@ -146,6 +146,8 @@ export default function Products() {
       pathname: "/products/[id]",
       params: {
         id: editIdentifier,
+        uniquePermalink: product.uniquePermalink ?? "",
+        published: product.published ? "true" : "false",
         shortUrl: product.shortUrl ?? "",
       },
     });

@@ -2,251 +2,331 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 import ProductEdit from "@/app/products/[id]";
 import { Alert } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 
-const mockReplace = jest.fn();
 const mockBack = jest.fn();
+const mockPostMessage = jest.fn();
+const mockSafeOpenURL = jest.fn();
+
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockReplace, back: mockBack }),
-  useLocalSearchParams: () => ({ id: "prod-abc" }),
-  Stack: { Screen: jest.fn(() => null) },
+  useRouter: () => ({ back: mockBack }),
+  useLocalSearchParams: jest.fn(() => ({
+    id: "prod-abc",
+    uniquePermalink: "my-product",
+    published: "false",
+  })),
+  Stack: {
+    Screen: jest.fn(({ options }: { options?: { headerLeft?: () => unknown; headerRight?: () => unknown } }) => {
+      const React = require("react");
+      const { View } = require("react-native");
+      const left = options?.headerLeft ? options.headerLeft() : null;
+      const right = options?.headerRight ? options.headerRight() : null;
+      return React.createElement(View, { testID: "screen-header" },
+        left ? React.cloneElement(left as React.ReactElement, { key: "left" }) : null,
+        right ? React.cloneElement(right as React.ReactElement, { key: "right" }) : null,
+      );
+    }),
+  },
 }));
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ isLoading: false, accessToken: "test-token" }),
 }));
 
-const mockRequestAPI = jest.fn();
-jest.mock("@/lib/request", () => ({
-  requestAPI: (...args: unknown[]) => mockRequestAPI(...args),
+jest.mock("@/lib/open-url", () => ({
+  safeOpenURL: (...args: unknown[]) => mockSafeOpenURL(...args),
 }));
 
 jest.mock("@sentry/react-native", () => ({
   captureException: jest.fn(),
 }));
 
-const makeProductResponse = (overrides = {}) => ({
-  success: true,
-  product: {
-    id: "prod-abc",
-    name: "Edit Me",
-    description: "Description text",
-    price: 1500,
-    currency: "usd",
-    native_type: "digital",
-    subscription_duration: null,
-    formatted_price: "$15.00",
-    thumbnail_url: null,
-    published: true,
-    tags: ["design"],
-    custom_summary: "A summary",
-    deleted: false,
-    sales_count: 7,
-    sales_usd_cents: 10500,
-    short_url: "https://example.gumroad.com/l/edit-me",
-    customizable_price: false,
-    unique_permalink: "edit-me",
-    custom_permalink: "edit-me-custom",
-    ...overrides,
-  },
+jest.mock("react-native-webview", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  const MockWebView = React.forwardRef(
+    (props: Record<string, unknown>, ref: React.Ref<{ postMessage: jest.Mock }>) => {
+      React.useImperativeHandle(ref, () => ({ postMessage: mockPostMessage }));
+      return React.createElement(View, { ...props, testID: props.testID ?? "product-edit-webview" });
+    },
+  );
+  MockWebView.displayName = "MockWebView";
+  return { WebView: MockWebView };
 });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (useLocalSearchParams as jest.Mock).mockReturnValue({
+    id: "prod-abc",
+    uniquePermalink: "my-product",
+    published: "false",
+  });
 });
 
-describe("ProductEdit screen", () => {
-  it("shows loading state while fetching product", () => {
-    mockRequestAPI.mockReturnValueOnce(new Promise(() => {}));
+describe("ProductEdit screen (WebView)", () => {
+  it("renders the WebView with the correct URL", () => {
     renderWithQueryClient(<ProductEdit />);
-    expect(screen.queryByTestId("product-name-input")).toBeNull();
+    const webview = screen.getByTestId("product-edit-webview");
+    expect(webview.props.source.uri).toBe(
+      "https://example.com/products/my-product/edit?display=mobile_app&access_token=test-token&mobile_token=test-mobile-token",
+    );
   });
 
-  it("populates form fields after fetch", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse());
-
+  it("shows error state when productId is missing", () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      id: "",
+      uniquePermalink: "my-product",
+      published: "false",
+    });
     renderWithQueryClient(<ProductEdit />);
+    expect(screen.getByText("Unable to load product editor.")).toBeTruthy();
+    expect(screen.queryByTestId("product-edit-webview")).toBeNull();
+  });
+
+  it("shows error state when uniquePermalink is missing", () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      id: "prod-abc",
+      uniquePermalink: "",
+      published: "false",
+    });
+    renderWithQueryClient(<ProductEdit />);
+    expect(screen.getByText("Unable to load product editor.")).toBeTruthy();
+    expect(screen.queryByTestId("product-edit-webview")).toBeNull();
+  });
+
+  it("shows Publish button label for unpublished product", () => {
+    renderWithQueryClient(<ProductEdit />);
+    const publishButton = screen.getByTestId("toggle-publish-button");
+    expect(publishButton).toBeTruthy();
+  });
+
+  it("shows Unpublish button label for published product", () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      id: "prod-abc",
+      uniquePermalink: "my-product",
+      published: "true",
+    });
+    renderWithQueryClient(<ProductEdit />);
+    expect(screen.getByTestId("toggle-publish-button")).toBeTruthy();
+  });
+
+  it("renders Save button in header", () => {
+    renderWithQueryClient(<ProductEdit />);
+    expect(screen.getByTestId("save-button")).toBeTruthy();
+  });
+
+  it("posts mobileAppProductSave message when Save is pressed", () => {
+    renderWithQueryClient(<ProductEdit />);
+    fireEvent.press(screen.getByTestId("save-button"));
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      JSON.stringify({ type: "mobileAppProductSave", payload: {} }),
+    );
+  });
+
+  it("posts mobileAppProductPublish message for unpublished product", () => {
+    renderWithQueryClient(<ProductEdit />);
+    fireEvent.press(screen.getByTestId("toggle-publish-button"));
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      JSON.stringify({ type: "mobileAppProductPublish", payload: {} }),
+    );
+  });
+
+  it("posts mobileAppProductUnpublish message for published product", () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      id: "prod-abc",
+      uniquePermalink: "my-product",
+      published: "true",
+    });
+    renderWithQueryClient(<ProductEdit />);
+    fireEvent.press(screen.getByTestId("toggle-publish-button"));
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      JSON.stringify({ type: "mobileAppProductUnpublish", payload: {} }),
+    );
+  });
+
+  it("disables buttons while saving", async () => {
+    renderWithQueryClient(<ProductEdit />);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("save-button"));
+    });
+    expect(screen.getByTestId("save-button")).toBeDisabled();
+    expect(screen.getByTestId("toggle-publish-button")).toBeDisabled();
+  });
+
+  it("clears saving state on productSaveSuccess message", async () => {
+    renderWithQueryClient(<ProductEdit />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("save-button"));
+    });
+    expect(screen.getByTestId("save-button")).toBeDisabled();
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productSaveSuccess", payload: {} }) },
+      });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("save-button")).not.toBeDisabled());
+  });
+
+  it("shows alert and clears saving on productSaveError message", async () => {
+    const alertSpy = jest.spyOn(Alert, "alert");
+    renderWithQueryClient(<ProductEdit />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("save-button"));
+    });
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productSaveError", payload: { message: "Something broke" } }) },
+      });
+    });
 
     await waitFor(() => {
-      expect(screen.getByTestId("product-name-input").props.value).toBe("Edit Me");
+      expect(alertSpy).toHaveBeenCalledWith("Save Failed", "Something broke");
+      expect(screen.getByTestId("save-button")).not.toBeDisabled();
     });
-    expect(screen.getByTestId("product-summary-input").props.value).toBe("A summary");
-    expect(screen.getByTestId("product-price-input").props.value).toBe("15.00");
-    expect(screen.getByTestId("product-description-input").props.value).toBe("Description text");
   });
 
-  it("shows Published badge for a published product", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse({ published: true }));
+  it("clears saving state on productPublishSuccess and updates published state", async () => {
     renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => expect(screen.getByText("Published")).toBeTruthy());
-  });
-
-  it("shows Draft badge for an unpublished product", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse({ published: false }));
-    renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => expect(screen.getByText("Draft")).toBeTruthy());
-  });
-
-  it("shows error banner on fetch failure", async () => {
-    mockRequestAPI.mockRejectedValueOnce(new Error("Not found"));
-    renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => expect(screen.getByText("Not found")).toBeTruthy());
-  });
-
-  it("shows validation error when saving with empty name", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse());
-    renderWithQueryClient(<ProductEdit />);
-
-    await waitFor(() => screen.getByTestId("product-name-input"));
-
-    fireEvent.changeText(screen.getByTestId("product-name-input"), "");
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("save-changes-button"));
-    });
-
-    expect(screen.getByText("Product name is required.")).toBeTruthy();
-  });
-
-  it("shows validation error for invalid price", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse());
-    renderWithQueryClient(<ProductEdit />);
-
-    await waitFor(() => screen.getByTestId("product-price-input"));
-
-    fireEvent.changeText(screen.getByTestId("product-price-input"), ".");
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("save-changes-button"));
-    });
-
-    expect(screen.getByText("Price must be a valid number.")).toBeTruthy();
-  });
-
-  it("saves product and navigates back on success", async () => {
-    mockRequestAPI
-      .mockResolvedValueOnce(makeProductResponse())
-      .mockResolvedValueOnce({});
-
-    renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByTestId("product-name-input"));
-
-    fireEvent.changeText(screen.getByTestId("product-name-input"), "Updated Name");
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("save-changes-button"));
-    });
-
-    expect(mockRequestAPI).toHaveBeenCalledWith(
-      "/v2/products/prod-abc",
-      expect.objectContaining({ method: "PUT", data: expect.objectContaining({ name: "Updated Name" }) }),
-    );
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/products");
-  });
-
-  it("shows error banner when save fails", async () => {
-    mockRequestAPI
-      .mockResolvedValueOnce(makeProductResponse())
-      .mockRejectedValueOnce(new Error("Save failed"));
-
-    renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByTestId("save-changes-button"));
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("save-changes-button"));
-    });
-
-    await waitFor(() => expect(screen.getByText("Save failed")).toBeTruthy());
-  });
-
-  it("shows delete confirmation alert when delete is pressed", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse());
-    const alertSpy = jest.spyOn(Alert, "alert");
-
-    renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByTestId("delete-button"));
-
-    fireEvent.press(screen.getByTestId("delete-button"));
-
-    expect(alertSpy).toHaveBeenCalledWith("Delete product?", "This action cannot be undone.", expect.any(Array));
-  });
-
-  it("deletes product and navigates back after confirming", async () => {
-    mockRequestAPI
-      .mockResolvedValueOnce(makeProductResponse())
-      .mockResolvedValueOnce({});
-
-    const alertSpy = jest.spyOn(Alert, "alert");
-    renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByTestId("delete-button"));
-
-    fireEvent.press(screen.getByTestId("delete-button"));
-
-    const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
-    await act(async () => {
-      buttons.find((b) => b.text === "Delete")?.onPress?.();
-      await Promise.resolve();
-    });
-
-    expect(mockRequestAPI).toHaveBeenCalledWith(
-      "/v2/products/prod-abc",
-      expect.objectContaining({ method: "DELETE" }),
-    );
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/products");
-  });
-
-  it("calls enable endpoint when publishing a draft product", async () => {
-    mockRequestAPI
-      .mockResolvedValueOnce(makeProductResponse({ published: false }))
-      .mockResolvedValueOnce({});
-
-    renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByTestId("toggle-publish-button"));
 
     await act(async () => {
       fireEvent.press(screen.getByTestId("toggle-publish-button"));
     });
 
-    expect(mockRequestAPI).toHaveBeenCalledWith(
-      "/v2/products/prod-abc/enable",
-      expect.objectContaining({ method: "PUT" }),
-    );
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productPublishSuccess", payload: {} }) },
+      });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("toggle-publish-button")).not.toBeDisabled());
   });
 
-  it("calls disable endpoint when unpublishing a published product", async () => {
-    mockRequestAPI
-      .mockResolvedValueOnce(makeProductResponse({ published: true }))
-      .mockResolvedValueOnce({});
-
+  it("clears saving state on productUnpublishSuccess and updates published state", async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      id: "prod-abc",
+      uniquePermalink: "my-product",
+      published: "true",
+    });
     renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByTestId("toggle-publish-button"));
 
     await act(async () => {
       fireEvent.press(screen.getByTestId("toggle-publish-button"));
     });
 
-    expect(mockRequestAPI).toHaveBeenCalledWith(
-      "/v2/products/prod-abc/disable",
-      expect.objectContaining({ method: "PUT" }),
-    );
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productUnpublishSuccess", payload: {} }) },
+      });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("toggle-publish-button")).not.toBeDisabled());
   });
 
-  it("hides permalink field for coffee products", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse({ native_type: "coffee" }));
+  it("opens external links in system browser", () => {
     renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByTestId("product-name-input"));
-    expect(screen.queryByTestId("product-permalink-input")).toBeNull();
+
+    const webview = screen.getByTestId("product-edit-webview");
+    const result = webview.props.onShouldStartLoadWithRequest({
+      url: "https://external-site.com/page",
+      navigationType: "click",
+      mainDocumentURL: "https://external-site.com/page",
+    });
+
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external-site.com/page");
+    expect(result).toBe(false);
   });
 
-  it("shows permalink field for non-coffee products", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse({ native_type: "digital" }));
+  it("allows internal Gumroad navigation", () => {
     renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByTestId("product-permalink-input"));
-    expect(screen.getByTestId("product-permalink-input")).toBeTruthy();
+
+    const webview = screen.getByTestId("product-edit-webview");
+    const result = webview.props.onShouldStartLoadWithRequest({
+      url: "https://example.com/products/my-product/edit/content",
+      navigationType: "click",
+      mainDocumentURL: "https://example.com/products/my-product/edit/content",
+    });
+
+    expect(result).toBe(true);
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
   });
 
-  it("shows tags when present", async () => {
-    mockRequestAPI.mockResolvedValueOnce(makeProductResponse({ tags: ["art", "ebook"] }));
+  it("allows iframe loads (url differs from mainDocumentURL)", () => {
     renderWithQueryClient(<ProductEdit />);
-    await waitFor(() => screen.getByText("Tags: art, ebook"));
+
+    const webview = screen.getByTestId("product-edit-webview");
+    const result = webview.props.onShouldStartLoadWithRequest({
+      url: "https://external-video.com/embed/123",
+      navigationType: "iframe-load",
+      mainDocumentURL: "https://example.com/products/my-product/edit",
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it("includes access_token and mobile_token in WebView URL", () => {
+    renderWithQueryClient(<ProductEdit />);
+    const webview = screen.getByTestId("product-edit-webview");
+    expect(webview.props.source.uri).toContain("access_token=test-token");
+    expect(webview.props.source.uri).toContain("mobile_token=test-mobile-token");
+    expect(webview.props.source.uri).toContain("display=mobile_app");
+  });
+
+  it("shows alert and clears saving on productSaveWarning message", async () => {
+    const alertSpy = jest.spyOn(Alert, "alert");
+    renderWithQueryClient(<ProductEdit />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("save-button"));
+    });
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: {
+          data: JSON.stringify({ type: "productSaveWarning", payload: { message: "Missing cover image" } }),
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith("Saved with warnings", "Missing cover image");
+      expect(screen.getByTestId("save-button")).not.toBeDisabled();
+    });
+  });
+
+  it("opens Gumroad URLs outside the edit path in the system browser", () => {
+    renderWithQueryClient(<ProductEdit />);
+
+    const webview = screen.getByTestId("product-edit-webview");
+    const result = webview.props.onShouldStartLoadWithRequest({
+      url: "https://example.com/dashboard",
+      navigationType: "click",
+      mainDocumentURL: "https://example.com/dashboard",
+    });
+
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://example.com/dashboard");
+    expect(result).toBe(false);
+  });
+
+  it("ignores unhandled productTabChange messages without error", async () => {
+    renderWithQueryClient(<ProductEdit />);
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productTabChange", payload: { tab: "content" } }) },
+      });
+    });
+
+    expect(screen.getByTestId("save-button")).not.toBeDisabled();
   });
 });

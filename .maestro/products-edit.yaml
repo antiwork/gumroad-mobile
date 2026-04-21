@@ -42,15 +42,22 @@ appId: ${APP_ID}
     index: 0
     childOf:
       id: "products-list"
-# Should be on edit screen
+# Should be on edit screen with native header
 - assertVisible: "Edit product"
-- assertVisible: "Product details"
-# Edit the product name
-- tapOn:
-    id: "product-name-input"
-- clearText
-- inputText: "Updated Product Name"
-# Save changes
-- tapOn: "Save changes"
-# Should navigate back to products list
+- assertVisible: "Save"
+# Native Publish/Unpublish button is visible in header
+- assertVisible:
+    anyOf:
+      - text: "Publish"
+      - text: "Unpublish"
+# Tap Save — sends mobileAppProductSave message to WebView
+- tapOn: "Save"
+# Loading overlay should appear then disappear
+- assertNotVisible: "Save"
+  optional: true
+- waitForAnimationToEnd
+# After save completes, Save button is re-enabled
+- assertVisible: "Save"
+# Go back to products list
+- tapOn: "Back"
 - assertVisible: Products
