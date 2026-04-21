@@ -158,7 +158,7 @@ export default function ProductNew() {
         <View className="gap-4 px-4 py-4">
           {error ? (
             <View className="rounded-lg border border-destructive/50 bg-card px-3 py-3">
-              <Text className="text-sm text-muted">{error}</Text>
+              <Text className="text-sm text-destructive">{error}</Text>
             </View>
           ) : null}
 

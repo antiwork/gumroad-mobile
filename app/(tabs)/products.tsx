@@ -22,22 +22,6 @@ interface ProductsResponse {
   next_page_url?: string;
 }
 
-const formatRevenue = (amountCents: number, currencyCode: string) => {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currencyCode,
-      maximumFractionDigits: 2,
-    }).format(amountCents / 100);
-  } catch {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 2,
-    }).format(amountCents / 100);
-  }
-};
-
 const formatUsdRevenue = (amountCents: number) =>
   new Intl.NumberFormat(undefined, {
     style: "currency",
@@ -59,8 +43,7 @@ const ProductCard = ({
   return (
     <Pressable
       onPress={onPress}
-      style={isFirst ? { marginTop: 12 } : undefined}
-      className="mx-4 mb-3"
+      className={`mx-4 mb-3${isFirst ? " mt-3" : ""}`}
     >
       <Card className="rounded-xl">
         <CardContent className="p-3">
@@ -130,13 +113,8 @@ export default function Products() {
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const mutedColor = useCSSVariable("--color-muted") as string;
   const totalSalesCount = products.reduce((sum, product) => sum + product.salesCount, 0);
-  const revenueCurrency = (products[0]?.currency || "USD").toUpperCase();
-  const totalSalesRevenueCents = products.reduce((sum, product) => sum + product.price * product.salesCount, 0);
   const totalSalesUsdCents = products.reduce((sum, product) => sum + product.salesUsdCents, 0);
-  const hasUsdRevenue = totalSalesUsdCents > 0;
-  const formattedSalesRevenue = hasUsdRevenue
-    ? formatUsdRevenue(totalSalesUsdCents)
-    : formatRevenue(totalSalesRevenueCents, revenueCurrency);
+  const formattedSalesRevenue = formatUsdRevenue(totalSalesUsdCents);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery.trim().toLowerCase()), 300);
 
@@ -199,11 +177,6 @@ export default function Products() {
 
   const handleProductPress = (product: ProductModel) => {
     const editIdentifier = product.id?.trim() || null;
-    console.info("[Products] Open editor attempt", {
-      productId: product.id,
-      shortUrl: product.shortUrl,
-      resolvedEditIdentifier: editIdentifier,
-    });
     if (!editIdentifier) {
       setError("Unable to open this product right now.");
       Sentry.captureMessage("Missing product edit identifier", {

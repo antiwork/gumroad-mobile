@@ -27,7 +27,6 @@ export default function ProductEdit() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
@@ -98,7 +97,6 @@ export default function ProductEdit() {
     }
 
     setError(null);
-    setSaveNotice(null);
     setIsSaving(true);
     try {
       await requestAPI(`/v2/products/${encodeURIComponent(productId)}`, {
@@ -124,7 +122,6 @@ export default function ProductEdit() {
   const handleTogglePublishPress = useCallback(async () => {
     if (!productId || !accessToken || isSaving || isLoading) return;
     setError(null);
-    setSaveNotice(null);
     setIsSaving(true);
     try {
       await requestAPI(`/v2/products/${encodeURIComponent(productId)}/${published ? "disable" : "enable"}`, {
@@ -149,9 +146,8 @@ export default function ProductEdit() {
         style: "destructive",
         onPress: () => {
           void (async () => {
-            setError(null);
-            setSaveNotice(null);
-            setIsSaving(true);
+              setError(null);
+              setIsSaving(true);
             try {
               await requestAPI(`/v2/products/${encodeURIComponent(productId)}`, {
                 accessToken,
@@ -222,12 +218,7 @@ export default function ProductEdit() {
           <>
             {error ? (
               <View className="rounded-lg border border-destructive/50 bg-card px-3 py-3">
-                <Text className="text-sm text-muted">{error}</Text>
-              </View>
-            ) : null}
-            {saveNotice ? (
-              <View className="rounded-lg border border-accent/50 bg-card px-3 py-3">
-                <Text className="text-sm text-muted">{saveNotice}</Text>
+                <Text className="text-sm text-destructive">{error}</Text>
               </View>
             ) : null}
 
