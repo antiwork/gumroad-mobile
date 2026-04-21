@@ -13,6 +13,7 @@ import { buildApiUrl } from "@/lib/request";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
+import { useDeferredMount } from "@/hooks/use-deferred-mount";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
 import { Alert, View } from "react-native";
@@ -72,6 +73,7 @@ export default function DownloadScreen() {
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
+  const webViewReady = useDeferredMount();
 
   useEffect(() => {
     if (purchase) addRecentPurchase(purchase);
@@ -207,7 +209,12 @@ export default function DownloadScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: purchase?.name ?? "" }} />
-      <StyledWebView
+      {!webViewReady ? (
+        <View className="flex-1 items-center justify-center bg-body-bg">
+          <LoadingSpinner size="large" />
+        </View>
+      ) : null}
+      {webViewReady ? <StyledWebView
         ref={webViewRef}
         source={{ uri: url }}
         className="flex-1 bg-transparent"
@@ -218,7 +225,7 @@ export default function DownloadScreen() {
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onMessage={handleMessage}
-      />
+      /> : null}
       {isDownloading && (
         <View className="absolute inset-0 items-center justify-center bg-black/50">
           <LoadingSpinner size="large" />

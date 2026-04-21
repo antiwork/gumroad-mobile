@@ -14,6 +14,7 @@ import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { Asset } from "expo-asset";
+import { useDeferredMount } from "@/hooks/use-deferred-mount";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -109,6 +110,7 @@ export default function PostScreen() {
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [fontFaces, setFontFaces] = useState("");
 
+  const webViewReady = useDeferredMount();
   const [foreground, bodyBg, fontFamily] = useCSSVariable(["--color-foreground", "--color-body-bg", "--font-sans"]);
 
   useEffect(() => {
@@ -263,7 +265,7 @@ export default function PostScreen() {
             </View>
           </Pressable>
 
-          {htmlContent && (
+          {htmlContent && webViewReady && (
             <View style={{ height: bodyHeight, marginTop: 16 }}>
               <BaseWebView
                 ref={webViewRef}
