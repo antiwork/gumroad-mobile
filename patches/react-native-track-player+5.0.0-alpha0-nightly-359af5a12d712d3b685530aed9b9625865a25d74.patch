@@ -32,6 +32,26 @@ index 60b6871..1b89d31 100644
              .build()
      }
  
+diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
+index 13a6c60..42a8fc8 100644
+--- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
++++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
+@@ -75,7 +75,14 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
+         launchInScope {
+             // If a binder already exists, don't get a new one
+             if (!::musicService.isInitialized) {
+-                val binder: MusicService.MusicBinder = service as MusicService.MusicBinder
++                // FIX: Guard against cross-process BinderProxy which cannot be cast to MusicBinder.
++                // This can happen during service recreation or process death and causes a
++                // ClassCastException crash. Log and return early instead of crashing.
++                if (service !is MusicService.MusicBinder) {
++                    Timber.w("onServiceConnected received unexpected binder type: ${service.javaClass.name}")
++                    return@launchInScope
++                }
++                val binder: MusicService.MusicBinder = service
+                 musicService = binder.service
+                 musicService.setupPlayer(playerOptions)
+                 playerSetUpPromise?.resolve(null)
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
 index b495b5a..15739da 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
