@@ -2,7 +2,9 @@
 
 Please see the main [Antiwork Contributing Guidelines](https://github.com/antiwork/.github/blob/main/CONTRIBUTING.md) for development guidelines.
 
-Generally: Include an AI disclosure, self-review (comment) on your code, break up big 1k+ line PRs into smaller PRs (100 loc), and include video of before/after with light/dark mode represented. And include e2e tests!
+Generally: Include an AI disclosure, self-review (comment) on your code, break up big 1k+ line PRs into smaller PRs (100 loc), and include e2e tests!
+
+**Videos are required for every PR.** For user-facing changes, show before/after with light/dark mode represented. For non-user-facing changes, record a short walkthrough of the relevant existing functionality to demonstrate understanding and confirm nothing broke.
 
 ## Testing Guidelines
 
@@ -16,7 +18,7 @@ Generally: Include an AI disclosure, self-review (comment) on your code, break u
 
 1. Update documentation if you're changing behavior
 2. Add or update tests for your changes
-3. Provide before & after screenshots/videos for UI changes
+3. Provide before & after videos for all changes (see video requirement above)
 4. Include screenshots of your test suite passing locally
 5. Don't comment on the parent issue when opening a PR; instead, link to the issue in your PR description.
 6. Use native-sounding English in all communication with no excessive capitalization (e.g HOW IS THIS GOING), multiple question marks (how's this going???), grammatical errors (how's dis going), or typos (thnx fr update).
