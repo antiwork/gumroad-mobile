@@ -9,7 +9,7 @@ const mockPostMessage = jest.fn();
 const mockSafeOpenURL = jest.fn();
 
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, canGoBack: () => true }),
   useLocalSearchParams: jest.fn(() => ({
     id: "prod-abc",
     uniquePermalink: "my-product",
@@ -328,5 +328,79 @@ describe("ProductEdit screen (WebView)", () => {
     });
 
     expect(screen.getByTestId("save-button")).not.toBeDisabled();
+  });
+
+  it("dismisses the screen on productSaveSuccess", async () => {
+    renderWithQueryClient(<ProductEdit />);
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productSaveSuccess", payload: {} }) },
+      });
+    });
+
+    await waitFor(() => expect(mockBack).toHaveBeenCalledTimes(1));
+  });
+
+  it("dismisses the screen on productUnpublishSuccess", async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      id: "prod-abc",
+      uniquePermalink: "my-product",
+      published: "true",
+    });
+    renderWithQueryClient(<ProductEdit />);
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productUnpublishSuccess", payload: {} }) },
+      });
+    });
+
+    await waitFor(() => expect(mockBack).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not dismiss the screen on productPublishSuccess", async () => {
+    renderWithQueryClient(<ProductEdit />);
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productPublishSuccess", payload: {} }) },
+      });
+    });
+
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it("does not dismiss the screen on productSaveWarning", async () => {
+    jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+    renderWithQueryClient(<ProductEdit />);
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: {
+          data: JSON.stringify({ type: "productSaveWarning", payload: { message: "Missing cover image" } }),
+        },
+      });
+    });
+
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it("does not dismiss the screen on productSaveError", async () => {
+    jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+    renderWithQueryClient(<ProductEdit />);
+
+    const webview = screen.getByTestId("product-edit-webview");
+    await act(async () => {
+      webview.props.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "productSaveError", payload: { message: "boom" } }) },
+      });
+    });
+
+    expect(mockBack).not.toHaveBeenCalled();
   });
 });

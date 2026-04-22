@@ -69,6 +69,7 @@ export default function ProductEdit() {
         const message = JSON.parse(event.nativeEvent.data) as WebMessage;
         if (message.type === "productSaveSuccess") {
           setIsSaving(false);
+          if (router.canGoBack()) router.back();
         } else if (message.type === "productSaveError") {
           setIsSaving(false);
           Alert.alert("Save Failed", message.payload.message || "Could not save product.");
@@ -81,6 +82,7 @@ export default function ProductEdit() {
         } else if (message.type === "productUnpublishSuccess") {
           setIsPublished(false);
           setIsSaving(false);
+          if (router.canGoBack()) router.back();
         } else if (message.type === "productTabChange") {
           // TODO(#60): Reflect the active editor tab in a native tab bar instead of keeping it inside the webview.
         }
@@ -88,7 +90,7 @@ export default function ProductEdit() {
         Sentry.captureException(error);
       }
     },
-    [],
+    [router],
   );
 
   const handleSavePress = useCallback(() => {
