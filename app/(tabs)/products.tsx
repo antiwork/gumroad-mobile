@@ -149,6 +149,7 @@ export default function Products() {
         uniquePermalink: product.uniquePermalink ?? "",
         published: product.published ? "true" : "false",
         shortUrl: product.shortUrl ?? "",
+        name: product.name ?? "",
       },
     });
   };
