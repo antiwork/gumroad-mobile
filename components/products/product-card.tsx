@@ -8,18 +8,16 @@ import { Image, Pressable, View } from "react-native";
 export const ProductCard = ({
   product,
   onPress,
-  isFirst,
 }: {
   product: ProductModel;
   onPress: () => void;
-  isFirst: boolean;
 }) => {
   const subtitle = product.customSummary || product.description;
 
   return (
     <Pressable
       onPress={onPress}
-      className={`mx-4 mb-3${isFirst ? " mt-3" : ""}`}
+      className="mx-4 my-2"
       testID={`product-card-${product.id}`}
     >
       <Card className="rounded-xl">

@@ -29,68 +29,68 @@ const makeProduct = (overrides: Partial<ProductModel> = {}): ProductModel => ({
 
 describe("ProductCard", () => {
   it("renders product name", () => {
-    render(<ProductCard product={makeProduct()} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct()} onPress={jest.fn()} />);
     expect(screen.getByText("My Product")).toBeTruthy();
   });
 
   it("shows Published badge when product is published", () => {
-    render(<ProductCard product={makeProduct({ published: true })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ published: true })} onPress={jest.fn()} />);
     expect(screen.getByText("Published")).toBeTruthy();
   });
 
   it("shows Draft badge when product is unpublished", () => {
-    render(<ProductCard product={makeProduct({ published: false })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ published: false })} onPress={jest.fn()} />);
     expect(screen.getByText("Draft")).toBeTruthy();
   });
 
   it("shows PWYW badge for customizable price products", () => {
-    render(<ProductCard product={makeProduct({ customizablePrice: true })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ customizablePrice: true })} onPress={jest.fn()} />);
     expect(screen.getByText("PWYW")).toBeTruthy();
   });
 
   it("does not show PWYW badge for fixed price products", () => {
-    render(<ProductCard product={makeProduct({ customizablePrice: false })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ customizablePrice: false })} onPress={jest.fn()} />);
     expect(screen.queryByText("PWYW")).toBeNull();
   });
 
   it("shows sales count", () => {
-    render(<ProductCard product={makeProduct({ salesCount: 42 })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ salesCount: 42 })} onPress={jest.fn()} />);
     expect(screen.getByText("42 sales")).toBeTruthy();
   });
 
   it("shows formatted price", () => {
-    render(<ProductCard product={makeProduct({ formattedPrice: "€25.00" })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ formattedPrice: "€25.00" })} onPress={jest.fn()} />);
     expect(screen.getByText("€25.00")).toBeTruthy();
   });
 
   it("shows short URL when present", () => {
-    render(<ProductCard product={makeProduct()} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct()} onPress={jest.fn()} />);
     expect(screen.getByText("https://example.gumroad.com/l/prod-1")).toBeTruthy();
   });
 
   it("does not show short URL when absent", () => {
-    render(<ProductCard product={makeProduct({ shortUrl: null })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ shortUrl: null })} onPress={jest.fn()} />);
     expect(screen.queryByText(/gumroad\.com/)).toBeNull();
   });
 
   it("shows custom summary when present", () => {
-    render(<ProductCard product={makeProduct({ customSummary: "Great summary" })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ customSummary: "Great summary" })} onPress={jest.fn()} />);
     expect(screen.getByText("Great summary")).toBeTruthy();
   });
 
   it("falls back to description when no custom summary", () => {
-    render(<ProductCard product={makeProduct({ customSummary: "", description: "A description" })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ customSummary: "", description: "A description" })} onPress={jest.fn()} />);
     expect(screen.getByText("A description")).toBeTruthy();
   });
 
   it("shows up to 2 tags joined by bullet", () => {
-    render(<ProductCard product={makeProduct({ tags: ["design", "tools", "extra"] })} onPress={jest.fn()} isFirst={false} />);
+    render(<ProductCard product={makeProduct({ tags: ["design", "tools", "extra"] })} onPress={jest.fn()} />);
     expect(screen.getByText("design • tools")).toBeTruthy();
   });
 
   it("calls onPress when tapped", () => {
     const onPress = jest.fn();
-    render(<ProductCard product={makeProduct()} onPress={onPress} isFirst={false} />);
+    render(<ProductCard product={makeProduct()} onPress={onPress} />);
     fireEvent.press(screen.getByTestId("product-card-prod-1"));
     expect(onPress).toHaveBeenCalledTimes(1);
   });

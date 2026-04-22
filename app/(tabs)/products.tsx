@@ -231,10 +231,9 @@ export default function Products() {
             onRefresh={() => void fetchProducts(true)}
           />
         }
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <ProductCard
             product={item}
-            isFirst={index === 0}
             onPress={() => handleProductPress(item)}
           />
         )}
