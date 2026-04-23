@@ -19,7 +19,7 @@ index 60b6871..1b89d31 100644
 +            try {
 +                session.release()
 +            } catch (e: Exception) {
-+                // Log but don't crash on cleanup failure
++                Timber.w(e, "Failed to release media session during cleanup")
 +            }
 +        }
 +        // FIX: Use UUID-based session ID to prevent "Session ID must be unique" crash
@@ -46,6 +46,7 @@ index 13a6c60..42a8fc8 100644
 +                // ClassCastException crash. Log and return early instead of crashing.
 +                if (service !is MusicService.MusicBinder) {
 +                    Timber.w("onServiceConnected received unexpected binder type: ${service.javaClass.name}")
++                    playerSetUpPromise?.reject("service_error", "Unexpected binder type", null)
 +                    return@launchInScope
 +                }
 +                val binder: MusicService.MusicBinder = service
