@@ -8,6 +8,11 @@ export const navigationIntegration = Sentry.reactNavigationIntegration({
 Sentry.init({
   dsn: env.EXPO_PUBLIC_SENTRY_DSN,
   tracesSampleRate: __DEV__ ? 1 : 0.1,
+  // Reduce from default 100 to 30 to prevent main-thread hangs.
+  // SentryCrashScopeObserver serializes all breadcrumbs to JSON on the main
+  // thread via addEscapedString, which blocks for 2000ms+ with 100 breadcrumbs.
+  // See: https://gumroad-to.sentry.io/issues/7435371854/
+  maxBreadcrumbs: 30,
   // Session replay disabled: the native SentrySessionReplay.createAndCaptureInBackground
   // method blocks the main thread for 2000ms+, causing app hangs on iOS.
   // See: https://github.com/getsentry/sentry-react-native/issues/4838
