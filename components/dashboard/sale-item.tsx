@@ -1,6 +1,7 @@
 import { SalePurchase } from "@/components/dashboard/use-sales-analytics";
 import { Text } from "@/components/ui/text";
-import { Image, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
+import { TouchableOpacity, View } from "react-native";
 import { Badge } from "../ui/badge";
 
 interface SaleItemProps {
@@ -11,7 +12,7 @@ interface SaleItemProps {
 export const SaleItem = ({ sale, onPress }: SaleItemProps) => (
   <TouchableOpacity onPress={onPress} className="flex-row items-center gap-3 border-b border-border bg-background pr-4">
     {sale.product_thumbnail_url ? (
-      <Image source={{ uri: sale.product_thumbnail_url }} className="size-16 bg-body-bg" resizeMode="cover" />
+      <Image source={{ uri: sale.product_thumbnail_url }} className="size-16 bg-body-bg" contentFit="cover" />
     ) : (
       <View className="size-16 items-center justify-center bg-body-bg">
         <Text className="text-lg">📦</Text>
