@@ -72,7 +72,7 @@ You should now be able to load `https://gumroad.dev` in your browser. Once that 
 
 ### Configuring
 
-The app will run without any custom credentials, but can be configured using environment variables. You can override any of the default values in `.env` with a `.env.local` file.
+The app will run without any custom credentials, but can be configured using environment variables. Copy `.env.example` to `.env` (gitignored) and edit the values — for example, swap the URLs and client ID to point at production.
 
 ## Building for production
 
