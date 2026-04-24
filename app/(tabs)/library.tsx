@@ -13,12 +13,12 @@ import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
 import {
   Alert,
   FlatList,
-  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -32,7 +32,7 @@ import * as Sentry from "@sentry/react-native";
 const CarouselItem = ({ item, onPress }: { item: Purchase; onPress: () => void }) => (
   <TouchableOpacity onPress={onPress} className="size-50 overflow-hidden rounded">
     {item.thumbnail_url ? (
-      <Image source={{ uri: item.thumbnail_url }} className="absolute inset-0" resizeMode="cover" />
+      <Image source={{ uri: item.thumbnail_url }} className="absolute inset-0" contentFit="cover" />
     ) : (
       <View className="absolute inset-0 items-center justify-center bg-muted">
         <Text className="text-4xl">📦</Text>
@@ -241,7 +241,7 @@ export default function Index() {
                     className={cn("flex-row items-center gap-4", isFilterLoading && "opacity-50")}
                   >
                     {item.thumbnail_url ? (
-                      <Image source={{ uri: item.thumbnail_url }} className="size-17 bg-muted" resizeMode="cover" />
+                      <Image source={{ uri: item.thumbnail_url }} className="size-17 bg-muted" contentFit="cover" />
                     ) : (
                       <View className="size-17 items-center justify-center bg-muted">
                         <Text className="text-2xl">📦</Text>
