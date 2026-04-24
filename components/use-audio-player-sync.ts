@@ -2,6 +2,7 @@ import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
 import type { WebView } from "react-native-webview";
 import { getStoredLoopEnabled, getStoredPlaybackSpeed } from "./full-audio-player";
@@ -184,6 +185,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
         console.warn("Audio polling called before player setup");
         return;
       }
+      if (AppState.currentState !== "active") return;
       const { state } = await TrackPlayer.getPlaybackState();
       if (state === State.Playing) {
         await sendAudioPlayerInfo({ isPlaying: true });

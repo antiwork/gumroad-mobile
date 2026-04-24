@@ -8,7 +8,7 @@ import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { AppState, StyleSheet, View } from "react-native";
 
 const fetchStreamingPlaylistUrl = async (streamingUrl: string, accessToken: string): Promise<string> =>
   (await requestAPI<{ playlist_url: string }>(streamingUrl, { accessToken })).playlist_url;
@@ -84,6 +84,7 @@ export default function VideoPlayerScreen() {
     if (!player || !urlRedirectId || !productFileId) return;
 
     const interval = setInterval(() => {
+      if (AppState.currentState !== "active") return;
       const position = player.currentTime;
       setCurrentPosition(position);
 
