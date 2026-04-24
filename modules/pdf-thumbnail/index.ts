@@ -6,9 +6,23 @@ type ThumbnailResult = {
   height: number;
 };
 
-const PdfThumbnailModule = requireNativeModule<{
+type PdfThumbnailNative = {
   generate(filePath: string, page: number, quality: number): Promise<ThumbnailResult>;
-}>("PdfThumbnail");
+};
 
-export const generateThumbnail = (filePath: string, page: number, quality = 80): Promise<ThumbnailResult> =>
-  PdfThumbnailModule.generate(filePath, page, Math.min(Math.max(quality, 0), 100));
+let cached: PdfThumbnailNative | null | undefined;
+const getModule = (): PdfThumbnailNative | null => {
+  if (cached !== undefined) return cached;
+  try {
+    cached = requireNativeModule<PdfThumbnailNative>("PdfThumbnail");
+  } catch {
+    cached = null;
+  }
+  return cached;
+};
+
+export const generateThumbnail = (filePath: string, page: number, quality = 80): Promise<ThumbnailResult> => {
+  const mod = getModule();
+  if (!mod) return Promise.reject(new Error("PdfThumbnail native module is not available"));
+  return mod.generate(filePath, page, Math.min(Math.max(quality, 0), 100));
+};
