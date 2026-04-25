@@ -26,23 +26,15 @@ type WidgetData = {
   hasError: boolean;
 };
 
-let iosWidgetPromise: Promise<typeof import("@/components/revenue-widget")> | null = null;
-
-const getIOSWidget = () => {
-  if (!iosWidgetPromise) {
-    iosWidgetPromise = import("@/components/revenue-widget");
-  }
-  return iosWidgetPromise;
-};
-
-const updateIOSWidget = async (data: WidgetData) => {
-  const { default: RevenueWidget } = await getIOSWidget();
-  RevenueWidget.updateSnapshot(data);
+const updateIOSWidget = (data: WidgetData) => {
+  const RevenueWidget =
+    require("@/components/revenue-widget") as typeof import("@/components/revenue-widget");
+  RevenueWidget.default.updateSnapshot(data);
 };
 
 const updateAndroidWidget = async (data: WidgetData) => {
-  const { requestWidgetUpdate } = await import("react-native-android-widget");
-  const { RevenueWidgetAndroid } = await import("@/components/revenue-widget-android");
+  const { requestWidgetUpdate } = require("react-native-android-widget") as typeof import("react-native-android-widget");
+  const { RevenueWidgetAndroid } = require("@/components/revenue-widget-android") as typeof import("@/components/revenue-widget-android");
   await requestWidgetUpdate({
     widgetName: "RevenueWidget",
     renderWidget: () => (
@@ -93,13 +85,17 @@ const fetchRevenueTotals = async (accessToken: string) => {
 };
 
 TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
-  const accessToken = await SecureStore.getItemAsync("gumroad_access_token");
-  if (!accessToken) {
-    updateWidgetLoggedOut();
+  if (Platform.OS !== "ios") {
     return BackgroundFetch.BackgroundFetchResult.NoData;
   }
 
   try {
+    const accessToken = await SecureStore.getItemAsync("gumroad_access_token");
+    if (!accessToken) {
+      updateWidgetLoggedOut();
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+
     const data = await fetchRevenueTotals(accessToken);
     updateWidgetWithData(data);
     return BackgroundFetch.BackgroundFetchResult.NewData;
@@ -147,7 +143,6 @@ export const useRevenueWidget = () => {
   }, [data, error, accessToken, isAuthLoading]);
 
   useEffect(() => {
-    if (Platform.OS === "ios") getIOSWidget();
     registerBackgroundFetch();
   }, []);
 };
