@@ -1,0 +1,85 @@
+diff --git a/node_modules/expo-image/ios/ImageView.swift b/node_modules/expo-image/ios/ImageView.swift
+index adcf377..74ddee0 100644
+--- a/node_modules/expo-image/ios/ImageView.swift
++++ b/node_modules/expo-image/ios/ImageView.swift
+@@ -189,25 +189,25 @@ public final class ImageView: ExpoView {
+     context[ImageView.contentFitKey] = contentFit
+ 
+     // Do it here so we don't waste resources trying to fetch from a remote URL
+-    if maybeRenderLocalAsset(from: source) {
+-      return
+-    }
++    maybeRenderLocalAsset(from: source) { [weak self] in
++      guard let self else { return }
+ 
+-    // Render SF Symbols directly without going through SDWebImage to preserve symbol properties
+-    if source.isSFSymbol {
+-      renderSFSymbol(from: source)
+-      return
+-    }
++      // Render SF Symbols directly without going through SDWebImage to preserve symbol properties
++      if source.isSFSymbol {
++        self.renderSFSymbol(from: source)
++        return
++      }
+ 
+-    onLoadStart([:])
++      self.onLoadStart([:])
+ 
+-    pendingOperation = imageManager.loadImage(
+-      with: source.uri,
+-      options: loadingOptions,
+-      context: context,
+-      progress: imageLoadProgress(_:_:_:),
+-      completed: imageLoadCompleted(_:_:_:_:_:_:)
+-    )
++      self.pendingOperation = self.imageManager.loadImage(
++        with: source.uri,
++        options: self.loadingOptions,
++        context: context,
++        progress: self.imageLoadProgress(_:_:_:),
++        completed: self.imageLoadCompleted(_:_:_:_:_:_:)
++      )
++    }
+   }
+ 
+   // MARK: - Loading
+@@ -346,23 +346,30 @@ public final class ImageView: ExpoView {
+     onDisplay()
+   }
+ 
+-  private func maybeRenderLocalAsset(from source: ImageSource) -> Bool {
++  private func maybeRenderLocalAsset(from source: ImageSource, fallback: @escaping () -> Void) {
+     let path: String? = {
+-      // .path() on iOS 16 would remove the leading slash, but it doesn't on tvOS 16 🙃
+-      // It also crashes with EXC_BREAKPOINT when parsing data:image uris
+-      // manually drop the leading slash below iOS 16
+       if let path = source.uri?.path {
+         return String(path.dropFirst())
+       }
+       return nil
+     }()
+ 
+-    if let path, !path.isEmpty, let local = UIImage(named: path) {
+-      renderSourceImage(local)
+-      return true
++    guard let path, !path.isEmpty else {
++      fallback()
++      return
+     }
+ 
+-    return false
++    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
++      let local = UIImage(named: path)
++      DispatchQueue.main.async {
++        guard let self else { return }
++        if let local {
++          self.renderSourceImage(local)
++        } else {
++          fallback()
++        }
++      }
++    }
+   }
+ 
+   // MARK: - Placeholder
