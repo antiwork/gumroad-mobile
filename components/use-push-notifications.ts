@@ -50,6 +50,12 @@ const getExpoPushToken = async () => {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
     });
+    await Notifications.setNotificationChannelAsync("Purchases", {
+      name: "Purchases",
+      importance: Notifications.AndroidImportance.MAX,
+      sound: "chaching.wav",
+      vibrationPattern: [0, 250, 250, 250],
+    });
   }
 
   const tokenData = await Notifications.getDevicePushTokenAsync();

@@ -77,6 +77,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-web-browser",
     [
+      "expo-notifications",
+      {
+        sounds: ["./assets/sounds/chaching.wav"],
+      },
+    ],
+    [
       "expo-video",
       {
         supportsPictureInPicture: true,
