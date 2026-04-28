@@ -1,0 +1,15 @@
+diff --git a/node_modules/expo-image/ios/ImageView.swift b/node_modules/expo-image/ios/ImageView.swift
+index adcf377..9bc3480 100644
+--- a/node_modules/expo-image/ios/ImageView.swift
++++ b/node_modules/expo-image/ios/ImageView.swift
+@@ -122,6 +122,10 @@ public final class ImageView: ExpoView {
+     sdImageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+     sdImageView.layer.masksToBounds = false
+ 
++    // Disable progressive animated image loading to prevent main-thread hangs
++    // in -[SDAnimatedImageView progressiveAnimatedCoderForImage:]
++    sdImageView.shouldIncrementalLoad = false
++
+     // Apply trilinear filtering to smooth out mis-sized images.
+     sdImageView.layer.magnificationFilter = .trilinear
+     sdImageView.layer.minificationFilter = .trilinear
