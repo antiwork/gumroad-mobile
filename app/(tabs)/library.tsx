@@ -13,7 +13,7 @@ import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
-import { Image } from "expo-image";
+import { StyledImage as Image } from "@/components/styled";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
 import {
