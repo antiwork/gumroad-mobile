@@ -23,35 +23,44 @@ class PdfThumbnailModule : Module() {
       }
 
       val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-      val renderer = PdfRenderer(descriptor)
+      try {
+        val renderer = PdfRenderer(descriptor)
+        try {
+          if (page < 0 || page >= renderer.pageCount) {
+            throw CodedException("ERR_PDF_PAGE", "Page $page not found in PDF", null)
+          }
 
-      if (page < 0 || page >= renderer.pageCount) {
-        renderer.close()
+          val pdfPage = renderer.openPage(page)
+          try {
+            val width = pdfPage.width
+            val height = pdfPage.height
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            try {
+              bitmap.eraseColor(Color.WHITE)
+              pdfPage.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+              val outputFile = File(context.cacheDir, "pdf_thumb_${UUID.randomUUID()}.jpg")
+              FileOutputStream(outputFile).use { stream ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+              }
+
+              mapOf(
+                "uri" to Uri.fromFile(outputFile).toString(),
+                "width" to width,
+                "height" to height
+              )
+            } finally {
+              bitmap.recycle()
+            }
+          } finally {
+            pdfPage.close()
+          }
+        } finally {
+          renderer.close()
+        }
+      } finally {
         descriptor.close()
-        throw CodedException("ERR_PDF_PAGE", "Page $page not found in PDF", null)
       }
-
-      val pdfPage = renderer.openPage(page)
-      val width = pdfPage.width
-      val height = pdfPage.height
-      val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-      bitmap.eraseColor(Color.WHITE)
-      pdfPage.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-      pdfPage.close()
-      renderer.close()
-      descriptor.close()
-
-      val outputFile = File(context.cacheDir, "pdf_thumb_${UUID.randomUUID()}.jpg")
-      FileOutputStream(outputFile).use { stream ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
-      }
-      bitmap.recycle()
-
-      mapOf(
-        "uri" to Uri.fromFile(outputFile).toString(),
-        "width" to width,
-        "height" to height
-      )
     }
   }
 
