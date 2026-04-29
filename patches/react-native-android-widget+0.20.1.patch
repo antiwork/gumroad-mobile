@@ -1,15 +1,18 @@
 diff --git a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
-index 1234567..abcdefg 100644
+index 6b487ca..8e0903b 100644
 --- a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
 +++ b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
-@@ -76,8 +76,9 @@ public class RNWidgetImageProvider extends ContentProvider {
+@@ -76,9 +76,11 @@ public class RNWidgetImageProvider extends ContentProvider {
  
      private static void deleteImages(Context context, String prefix) {
          File folder = getFolderWithImages(context);
 -        File[] files = folder.listFiles(pathname -> pathname.getName().startsWith(prefix));
 +        if (!folder.exists()) return;
  
+-        for (File f : Objects.requireNonNull(files)) {
 +        File[] files = folder.listFiles(pathname -> pathname.getName().startsWith(prefix));
-         for (File f : Objects.requireNonNull(files)) {
++        if (files == null) return;
++        for (File f : files) {
              f.delete();
          }
+     }
