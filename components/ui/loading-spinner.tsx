@@ -2,7 +2,14 @@ import rainbowSvg from "@/assets/images/loading-rainbow.svg";
 import { Image } from "expo-image";
 import { useEffect } from "react";
 import { View, ViewProps } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -15,6 +22,9 @@ export const LoadingSpinner = ({ size = "large", ...props }: LoadingSpinnerProps
 
   useEffect(() => {
     rotation.value = withRepeat(withTiming(360, { duration: 1000, easing: Easing.linear }), -1, false);
+    return () => {
+      cancelAnimation(rotation);
+    };
   }, [rotation]);
 
   const animatedStyle = useAnimatedStyle(() => ({
