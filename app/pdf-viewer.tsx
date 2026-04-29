@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dimensions, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
+import { safeOpenURL } from "@/lib/open-url";
 import { Button } from "@/components/ui/button";
 
 export default function PdfViewerScreen() {
@@ -153,6 +154,7 @@ export default function PdfViewerScreen() {
           trustAllCerts={false}
           fitPolicy={0}
           enablePaging={viewMode === "single"}
+          enableAnnotationRendering
           horizontal={viewMode === "single"}
           page={initialPage ? Number(initialPage) : 1}
           onLoadComplete={(numberOfPages, _path, _size, toc) => {
@@ -160,6 +162,7 @@ export default function PdfViewerScreen() {
             setTableOfContents(toc ?? []);
           }}
           onPageChanged={(page) => setCurrentPage(page)}
+          onPressLink={(url) => safeOpenURL(url)}
           onError={(error) => {
             Sentry.captureException(error);
             console.error("PDF Error:", error);

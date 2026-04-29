@@ -44,6 +44,7 @@ export const PageIndicator = ({
 
   return (
     <View
+      pointerEvents="box-none"
       className="absolute right-0 left-0 items-center"
       style={{
         bottom:
