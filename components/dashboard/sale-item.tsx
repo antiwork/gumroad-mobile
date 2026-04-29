@@ -1,6 +1,6 @@
 import { SalePurchase } from "@/components/dashboard/use-sales-analytics";
 import { Text } from "@/components/ui/text";
-import { Image } from "expo-image";
+import { StyledImage as Image } from "@/components/styled";
 import { TouchableOpacity, View } from "react-native";
 import { Badge } from "../ui/badge";
 
