@@ -1,0 +1,11 @@
+{
+  "name": "pdf-thumbnail",
+  "version": "1.0.0",
+  "description": "Generates PDF page thumbnails for the Gumroad mobile app.",
+  "main": "index.ts",
+  "sideEffects": false,
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import PDFKit
+import UIKit
 
 public class PdfThumbnailModule: Module {
   public func definition() -> ModuleDefinition {
