@@ -1,0 +1,105 @@
+diff --git a/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm b/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
+index de46c98..ddc97f2 100644
+--- a/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
++++ b/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
+@@ -390,7 +390,11 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+                     return;
+                 }
+ 
+-                _pdfView.document = _pdfDocument;
++                @try {
++                    _pdfView.document = _pdfDocument;
++                } @catch (NSException *exception) {
++                    NSLog(@"[RNPDFPdfView] Exception setting PDF document: %@", exception);
++                }
+             } else {
+ 
+                 [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"error|Load pdf failed. path=%s",_path.UTF8String]]];
+@@ -540,13 +544,17 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+             PDFPage *pdfPage = [_pdfDocument pageAtIndex:_page-1];
+             if (pdfPage && _page == 1) {
+                 dispatch_async(dispatch_get_main_queue(), ^{
+-                    [self->_pdfView goToFirstPage:nil];
+-                    for (UIView *subview in self->_pdfView.subviews) {
+-                        if ([subview isKindOfClass:[UIScrollView class]]) {
+-                            UIScrollView *scrollView = (UIScrollView *)subview;
+-                            [scrollView setContentOffset:CGPointMake(0, 0) animated:NO];
+-                            break;
++                    @try {
++                        [self->_pdfView goToFirstPage:nil];
++                        for (UIView *subview in self->_pdfView.subviews) {
++                            if ([subview isKindOfClass:[UIScrollView class]]) {
++                                UIScrollView *scrollView = (UIScrollView *)subview;
++                                [scrollView setContentOffset:CGPointMake(0, 0) animated:NO];
++                                break;
++                            }
+                         }
++                    } @catch (NSException *exception) {
++                        NSLog(@"[RNPDFPdfView] Exception navigating to first page: %@", exception);
+                     }
+                 });
+             } else if (pdfPage) {
+@@ -559,8 +567,12 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+ 
+                 CGPoint pointLeftTop = CGPointMake(0, pdfPageRect.size.height);
+                 PDFDestination *pdfDest = [[PDFDestination alloc] initWithPage:pdfPage atPoint:pointLeftTop];
+-                [_pdfView goToDestination:pdfDest];
+-                _pdfView.scaleFactor = _fixScaleFactor*_scale;
++                @try {
++                    [_pdfView goToDestination:pdfDest];
++                    _pdfView.scaleFactor = _fixScaleFactor*_scale;
++                } @catch (NSException *exception) {
++                    NSLog(@"[RNPDFPdfView] Exception navigating to page: %@", exception);
++                }
+             }
+         }
+ 
+@@ -620,15 +632,19 @@ - (void)dealloc{
+ - (void)onDocumentChanged:(NSNotification *)noti
+ {
+ 
+-    if (_pdfDocument) {
++    @try {
++        if (_pdfDocument) {
+ 
+-        unsigned long numberOfPages = _pdfDocument.pageCount;
+-        PDFPage *page = [_pdfDocument pageAtIndex:_pdfDocument.pageCount-1];
+-        CGSize pageSize = [_pdfView rowSizeForPage:page];
+-        NSString *jsonString = [self getTableContents];
++            unsigned long numberOfPages = _pdfDocument.pageCount;
++            PDFPage *page = [_pdfDocument pageAtIndex:_pdfDocument.pageCount-1];
++            CGSize pageSize = [_pdfView rowSizeForPage:page];
++            NSString *jsonString = [self getTableContents];
+ 
+-        [self notifyOnChangeWithMessage:
+-         [[NSString alloc] initWithString:[NSString stringWithFormat:@"loadComplete|%lu|%f|%f|%@", numberOfPages, pageSize.width, pageSize.height,jsonString]]];
++            [self notifyOnChangeWithMessage:
++             [[NSString alloc] initWithString:[NSString stringWithFormat:@"loadComplete|%lu|%f|%f|%@", numberOfPages, pageSize.width, pageSize.height,jsonString]]];
++        }
++    } @catch (NSException *exception) {
++        NSLog(@"[RNPDFPdfView] Exception in onDocumentChanged: %@", exception);
+     }
+ 
+ }
+@@ -722,12 +738,16 @@ -(NSString *) getTableContents
+ - (void)onPageChanged:(NSNotification *)noti
+ {
+ 
+-    if (_pdfDocument) {
+-        PDFPage *currentPage = _pdfView.currentPage;
+-        unsigned long page = [_pdfDocument indexForPage:currentPage];
+-        unsigned long numberOfPages = _pdfDocument.pageCount;
++    @try {
++        if (_pdfDocument) {
++            PDFPage *currentPage = _pdfView.currentPage;
++            unsigned long page = [_pdfDocument indexForPage:currentPage];
++            unsigned long numberOfPages = _pdfDocument.pageCount;
+ 
+-        [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"pageChanged|%lu|%lu", page+1, numberOfPages]]];
++            [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"pageChanged|%lu|%lu", page+1, numberOfPages]]];
++        }
++    } @catch (NSException *exception) {
++        NSLog(@"[RNPDFPdfView] Exception in onPageChanged: %@", exception);
+     }
+ 
+ }
