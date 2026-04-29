@@ -46,4 +46,6 @@ app-example
 /ios
 /android
 /modules/*/ios
+!/modules/pdf-thumbnail/ios
 /modules/*/android
+!/modules/pdf-thumbnail/android
