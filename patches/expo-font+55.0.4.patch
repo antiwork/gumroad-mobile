@@ -1,0 +1,27 @@
+diff --git a/node_modules/expo-font/ios/FontUtils.swift b/node_modules/expo-font/ios/FontUtils.swift
+index cc376af..99b5c4e 100644
+--- a/node_modules/expo-font/ios/FontUtils.swift
++++ b/node_modules/expo-font/ios/FontUtils.swift
+@@ -1,4 +1,5 @@
+ import CoreGraphics
++import ExpoModulesCore
+ 
+ /**
+  * Queries custom native font names from the Info.plist `UIAppFonts`.
+@@ -51,8 +52,15 @@ internal func loadFont(fromUrl url: CFURL, alias: String) throws -> CGFont {
+  */
+ internal func registerFont(fontUrl: CFURL, fontFamilyAlias: String) throws {
+   var error: Unmanaged<CFError>?
++  var didRegister = true
+ 
+-  if !CTFontManagerRegisterFontsForURL(fontUrl, .process, &error), let error = error?.takeRetainedValue() {
++  // CTFontManager can throw NSInvalidArgumentException on corrupted font metadata,
++  // and Swift's try/catch cannot catch ObjC exceptions.
++  try EXUtilities.catchException {
++    didRegister = CTFontManagerRegisterFontsForURL(fontUrl, .process, &error)
++  }
++
++  if !didRegister, let error = error?.takeRetainedValue() {
+     let fontError = CTFontManagerError(rawValue: CFErrorGetCode(error))
+ 
+     switch fontError {
