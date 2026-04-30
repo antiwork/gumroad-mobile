@@ -43,7 +43,7 @@ export const updateMediaLocation = async ({
     console.warn("Failed to update media location:", error);
     // AbortError is expected when requests timeout (e.g. poor connectivity)
     // during periodic background sync - no need to report to Sentry
-    if (!(error instanceof DOMException && error.name === "AbortError")) {
+    if (!(error instanceof Error && error.name === "AbortError")) {
       Sentry.captureException(error);
     }
   }
