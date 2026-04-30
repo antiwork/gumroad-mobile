@@ -7,8 +7,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { AppState, type AppStateStatus, StyleSheet, View } from "react-native";
 
 const fetchStreamingPlaylistUrl = async (streamingUrl: string, accessToken: string): Promise<string> =>
   (await requestAPI<{ playlist_url: string }>(streamingUrl, { accessToken })).playlist_url;
@@ -57,11 +57,34 @@ export default function VideoPlayerScreen() {
 
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
+    player.staysActiveInBackground = false;
     if (initialPosition) {
       player.currentTime = Number(initialPosition);
     }
     player.play();
   });
+
+  const wasPlayingBeforeBackgroundRef = useRef(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if (nextState === "background" || nextState === "inactive") {
+        wasPlayingBeforeBackgroundRef.current = player.playing;
+        player.pause();
+      } else if (nextState === "active" && wasPlayingBeforeBackgroundRef.current) {
+        player.play();
+        wasPlayingBeforeBackgroundRef.current = false;
+      }
+    });
+
+    return () => subscription.remove();
+  }, [player]);
+
+  useEffect(() => {
+    return () => {
+      player.pause();
+    };
+  }, [player]);
 
   useEffect(
     () => () => {
