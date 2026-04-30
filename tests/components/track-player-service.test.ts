@@ -1,4 +1,3 @@
-// Capture event handlers registered by playbackService
 const eventHandlers: Record<string, (event: unknown) => Promise<void>> = {};
 
 jest.mock("react-native-track-player", () => ({
@@ -54,40 +53,45 @@ const mockTrackPlayer = TrackPlayer as jest.Mocked<typeof TrackPlayer>;
 
 describe("playbackService", () => {
   beforeEach(async () => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
     Object.keys(eventHandlers).forEach((key) => delete eventHandlers[key]);
     (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValue({ position: 60, duration: 300 });
     await playbackService();
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("handles RemoteJumpForward with a normal event payload", async () => {
     await eventHandlers["remote-jump-forward"]({ interval: 30 });
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90); // 60 + 30
+    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90);
   });
 
   it("handles RemoteJumpForward when event is null", async () => {
     await eventHandlers["remote-jump-forward"](null);
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90); // 60 + 30 (default)
+    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90);
   });
 
   it("handles RemoteJumpForward when event is undefined", async () => {
     await eventHandlers["remote-jump-forward"](undefined);
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90); // 60 + 30 (default)
+    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90);
   });
 
   it("handles RemoteJumpBackward with a normal event payload", async () => {
     await eventHandlers["remote-jump-backward"]({ interval: 15 });
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(45); // 60 - 15
+    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(45);
   });
 
   it("handles RemoteJumpBackward when event is null", async () => {
     await eventHandlers["remote-jump-backward"](null);
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(45); // 60 - 15 (default)
+    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(45);
   });
 
   it("clamps RemoteJumpBackward to zero", async () => {
     (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValueOnce({ position: 5, duration: 300 });
     await eventHandlers["remote-jump-backward"]({ interval: 15 });
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(0); // max(0, 5 - 15)
+    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(0);
   });
 });
