@@ -50,7 +50,8 @@ const jsonResponse = (status = 200) =>
 
 describe("updateMediaLocation", () => {
   it("does not report AbortError to Sentry", async () => {
-    const abortError = new DOMException("Aborted", "AbortError");
+    const abortError = new Error("Aborted");
+    abortError.name = "AbortError";
     mockFetch.mockRejectedValueOnce(abortError);
 
     await updateMediaLocation(defaultParams);
