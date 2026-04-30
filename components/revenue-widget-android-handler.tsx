@@ -12,6 +12,12 @@ interface RevenueTotalsResponse {
   year: { formatted_revenue: string };
 }
 
+// Android widget updates run as headless tasks triggered by broadcast intents.
+// The system enforces a ~5 s background ANR timeout, so network requests must
+// complete well within that window to avoid "Background ANR" crashes.
+// See: https://gumroad-to.sentry.io/issues/7450709376/
+const WIDGET_REQUEST_TIMEOUT_MS = 4_000;
+
 const renderRevenueWidget = async () => {
   const accessToken = await SecureStore.getItemAsync("gumroad_access_token");
 
@@ -21,9 +27,13 @@ const renderRevenueWidget = async () => {
 
   try {
     const url = buildApiUrl("mobile/analytics/revenue_totals.json");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), WIDGET_REQUEST_TIMEOUT_MS);
     const data = await request<RevenueTotalsResponse>(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     return (
       <RevenueWidgetAndroid
