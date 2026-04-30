@@ -1,0 +1,26 @@
+diff --git a/node_modules/react-native/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/node_modules/react-native/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
+index 6e9c384..43647b6 100644
+--- a/node_modules/react-native/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
++++ b/node_modules/react-native/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
+@@ -363,7 +363,7 @@ - (void)_updatePlaceholder
+ 
+ - (CGRect)caretRectForPosition:(UITextPosition *)position
+ {
+-  if (_caretHidden) {
++  if (_caretHidden || !position) {
+     return CGRectZero;
+   }
+ 
+diff --git a/node_modules/react-native/Libraries/Text/TextInput/Singleline/RCTUITextField.mm b/node_modules/react-native/Libraries/Text/TextInput/Singleline/RCTUITextField.mm
+index 377f41e..78ee103 100644
+--- a/node_modules/react-native/Libraries/Text/TextInput/Singleline/RCTUITextField.mm
++++ b/node_modules/react-native/Libraries/Text/TextInput/Singleline/RCTUITextField.mm
+@@ -213,7 +213,7 @@ - (void)removeDictationResultPlaceholder:(id)placeholder willInsertResult:(BOOL)
+ 
+ - (CGRect)caretRectForPosition:(UITextPosition *)position
+ {
+-  if (_caretHidden) {
++  if (_caretHidden || !position) {
+     return CGRectZero;
+   }
+ 
