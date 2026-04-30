@@ -74,7 +74,7 @@ index b495b5a..15739da 100644
              // https://github.com/androidx/media/issues/1218
              .setSessionActivity(
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/utils/CoilBitmapLoader.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/utils/CoilBitmapLoader.kt
-index d85e2c7..3195f7b 100644
+index d85e2c7..7c0f99f 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/utils/CoilBitmapLoader.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/utils/CoilBitmapLoader.kt
 @@ -10,6 +10,7 @@ import androidx.media3.common.util.BitmapLoader
@@ -85,21 +85,25 @@ index d85e2c7..3195f7b 100644
  import coil.request.ImageRequest
  import com.google.common.util.concurrent.ListenableFuture
  import jp.wasabeef.transformers.coil.CropSquareTransformation
-@@ -27,7 +28,17 @@ class CoilBitmapLoader @Inject constructor(
+@@ -27,7 +28,21 @@ class CoilBitmapLoader @Inject constructor(
  ) : BitmapLoader {
  
      private val scope = MainScope()
 -    private val imageLoader = ImageLoader(context)
 +    // Disable the weak reference memory cache to prevent background ANR
 +    // in RealWeakMemoryCache.cleanUp which can block for 5+ seconds.
-+    // The disk cache and strong memory cache still provide adequate caching
-+    // for notification artwork.
++    // Disable disk cache to prevent background ANR when onTrimMemory
++    // triggers lazy disk cache initialization on the main thread
++    // (RealImageLoader.onTrimMemory -> SynchronizedLazyImpl.getValue).
++    // The strong memory cache still provides adequate caching for
++    // notification artwork.
 +    private val imageLoader = ImageLoader.Builder(context)
 +        .memoryCache {
 +            MemoryCache.Builder(context)
 +                .weakReferencesEnabled(false)
 +                .build()
 +        }
++        .diskCache(null)
 +        .build()
  
      override fun supportsMimeType(mimeType: String): Boolean {
