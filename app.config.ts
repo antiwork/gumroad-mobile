@@ -37,6 +37,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     "./plugins/gradle-memory",
+    "./plugins/android-large-heap",
     "expo-router",
     [
       "expo-font",

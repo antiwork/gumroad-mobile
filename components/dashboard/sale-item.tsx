@@ -12,7 +12,7 @@ interface SaleItemProps {
 export const SaleItem = ({ sale, onPress }: SaleItemProps) => (
   <TouchableOpacity onPress={onPress} className="flex-row items-center gap-3 border-b border-border bg-background pr-4">
     {sale.product_thumbnail_url ? (
-      <Image source={{ uri: sale.product_thumbnail_url }} className="size-16 bg-body-bg" contentFit="cover" />
+      <Image source={{ uri: sale.product_thumbnail_url }} className="size-16 bg-body-bg" contentFit="cover" autoplay={false} />
     ) : (
       <View className="size-16 items-center justify-center bg-body-bg">
         <Text className="text-lg">📦</Text>
