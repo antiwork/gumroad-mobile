@@ -32,7 +32,7 @@ import * as Sentry from "@sentry/react-native";
 const CarouselItem = ({ item, onPress }: { item: Purchase; onPress: () => void }) => (
   <TouchableOpacity onPress={onPress} className="size-50 overflow-hidden rounded">
     {item.thumbnail_url ? (
-      <Image source={{ uri: item.thumbnail_url }} className="absolute inset-0" contentFit="cover" />
+      <Image source={{ uri: item.thumbnail_url }} className="absolute inset-0" contentFit="cover" autoplay={false} />
     ) : (
       <View className="absolute inset-0 items-center justify-center bg-muted">
         <Text className="text-4xl">📦</Text>
@@ -44,7 +44,7 @@ const CarouselItem = ({ item, onPress }: { item: Purchase; onPress: () => void }
         {item.name}
       </Text>
       <View className="mt-1 flex-row items-center gap-1.5">
-        <Image source={{ uri: item.creator_profile_picture_url }} className="size-5 rounded-full border border-white" />
+        <Image source={{ uri: item.creator_profile_picture_url }} className="size-5 rounded-full border border-white" autoplay={false} />
         <Text className="font-sans text-xs text-white" numberOfLines={1}>
           {item.creator_name}
         </Text>
@@ -241,7 +241,7 @@ export default function Index() {
                     className={cn("flex-row items-center gap-4", isFilterLoading && "opacity-50")}
                   >
                     {item.thumbnail_url ? (
-                      <Image source={{ uri: item.thumbnail_url }} className="size-17 bg-muted" contentFit="cover" />
+                      <Image source={{ uri: item.thumbnail_url }} className="size-17 bg-muted" contentFit="cover" autoplay={false} />
                     ) : (
                       <View className="size-17 items-center justify-center bg-muted">
                         <Text className="text-2xl">📦</Text>
@@ -252,7 +252,7 @@ export default function Index() {
                         {item.name}
                       </Text>
                       <View className="flex-row items-center gap-1.5">
-                        <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" />
+                        <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" autoplay={false} />
                         <Text className="text-sm text-muted" numberOfLines={1}>
                           {item.creator_name}
                         </Text>
