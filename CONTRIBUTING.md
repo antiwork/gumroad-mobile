@@ -35,6 +35,17 @@ Use the latest and greatest state-of-the-art models from American AI companies l
 
 ## Development guidelines
 
+### Branch hygiene
+
+Rebase your branch onto `main` when starting work and before every commit:
+
+```bash
+git fetch origin
+git rebase origin/main
+```
+
+Resolve conflicts locally before pushing. PRs with stale branches will not be merged.
+
 ### Before pushing
 
 Always run the relevant tests locally and confirm they pass before pushing:
