@@ -1,5 +1,5 @@
 diff --git a/node_modules/expo-image/ios/ImageView.swift b/node_modules/expo-image/ios/ImageView.swift
-index adcf377..9bc3480 100644
+index adcf377..14148a3 100644
 --- a/node_modules/expo-image/ios/ImageView.swift
 +++ b/node_modules/expo-image/ios/ImageView.swift
 @@ -122,6 +122,10 @@ public final class ImageView: ExpoView {
@@ -13,3 +13,16 @@ index adcf377..9bc3480 100644
      // Apply trilinear filtering to smooth out mis-sized images.
      sdImageView.layer.magnificationFilter = .trilinear
      sdImageView.layer.minificationFilter = .trilinear
+@@ -347,6 +351,12 @@ public final class ImageView: ExpoView {
+   }
+ 
+   private func maybeRenderLocalAsset(from source: ImageSource) -> Bool {
++    // Skip remote URLs — UIImage(named:) performs a synchronous asset-catalog
++    // search on the main thread that hangs the UI for every remote image.
++    if let scheme = source.uri?.scheme?.lowercased(), scheme == "http" || scheme == "https" {
++      return false
++    }
++
+     let path: String? = {
+       // .path() on iOS 16 would remove the leading slash, but it doesn't on tvOS 16 🙃
+       // It also crashes with EXC_BREAKPOINT when parsing data:image uris
