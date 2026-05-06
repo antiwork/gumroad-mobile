@@ -1,0 +1,42 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/login-creator.yaml
+- tapOn: Emails
+- assertVisible:
+    id: emails-compose-button
+- tapOn:
+    id: emails-compose-button
+- assertVisible: New email
+- tapOn:
+    id: email-subject-input
+- inputText: Maestro test ${MAESTRO_RUN_TIMESTAMP}
+- assertVisible:
+    id: email-settings-chip
+- tapOn:
+    id: email-settings-chip
+- assertVisible: Settings
+- assertVisible: Audience
+- assertVisible: Channel
+- assertVisible: Engagement
+- assertVisible: Allow comments
+# Disable email channel to avoid sending real emails to the test creator's audience.
+# Post-to-profile stays on, so the publish flow still creates a published post we can verify.
+- tapOn:
+    id: channel-email-checkbox
+- back
+- tapOn:
+    text: "Write your message…"
+    optional: true
+- inputText: "Body content for Maestro publish test."
+- assertVisible:
+    id: email-publish-button
+- tapOn:
+    id: email-publish-button
+- extendedWaitUntil:
+    notVisible: New email
+    timeout: 15000
+# Back on the Emails tab — the published email should appear at the top of the list
+- assertVisible:
+    id: emails-compose-button
+- assertVisible: Maestro test
