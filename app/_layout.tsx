@@ -1,3 +1,4 @@
+import { ComposeProvider } from "@/components/email-compose/compose-context";
 import { ForceUpdateScreen } from "@/components/force-update-screen";
 import { useMinimumVersion } from "@/components/use-minimum-version";
 import { PortalHost } from "@rn-primitives/portal";
@@ -55,6 +56,7 @@ const RootLayout = () => {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: background as string }}>
       <QueryProvider>
         <AuthProvider>
+          <ComposeProvider>
           <PushNotificationRegistrar />
           <RevenueWidgetUpdater />
           <ForceUpdateGuard />
@@ -73,11 +75,13 @@ const RootLayout = () => {
             <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: "none" }} />
             <Stack.Screen name="purchase/[token]" options={{ title: "" }} />
             <Stack.Screen name="post/[id]" options={{ title: "" }} />
+            <Stack.Screen name="(compose)" options={{ presentation: "modal", headerShown: false }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
             <Stack.Screen name="+not-found" options={{ title: "Not Found" }} />
           </Stack>
           <StatusBar style="light" />
           <PortalHost />
+          </ComposeProvider>
         </AuthProvider>
       </QueryProvider>
     </GestureHandlerRootView>

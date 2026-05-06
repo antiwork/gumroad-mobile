@@ -13,7 +13,8 @@ import { safeOpenURL } from "@/lib/open-url";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
-import { Tabs } from "expo-router";
+import * as Haptics from "expo-haptics";
+import { Tabs, useRouter } from "expo-router";
 import { createContext, useContext, useRef, useState } from "react";
 import { Alert, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
@@ -182,6 +183,27 @@ const LibraryHeaderRight = () => (
   </View>
 );
 
+const EmailsHeaderRight = () => {
+  const router = useRouter();
+  return (
+    <View className="mr-3 flex-row items-center gap-4">
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push("/email-compose");
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Compose new email"
+        testID="emails-compose-button"
+        hitSlop={8}
+      >
+        <LineIcon name="plus" size={24} className="text-white" />
+      </Pressable>
+      <SettingsButton />
+    </View>
+  );
+};
+
 export default function TabsLayout() {
   const { isCreator } = useAuth();
   const [isSearchActive, setSearchActive] = useState(false);
@@ -220,6 +242,16 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={color} />,
+              href: isCreator ? undefined : null,
+            }}
+          />
+          <Tabs.Screen
+            name="emails"
+            options={{
+              title: "Emails",
+              headerLeft: () => <LogoIcon />,
+              headerRight: () => <EmailsHeaderRight />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="envelope" size={size} color={color} />,
               href: isCreator ? undefined : null,
             }}
           />

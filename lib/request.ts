@@ -45,12 +45,20 @@ export const request = async <T>(
       throw new UnauthorizedError("Unauthorized");
     }
     if (!response.ok) {
-      const error =
-        response.status === 403
-          ? "Access denied"
-          : response.status === 404
-            ? "Not found"
-            : (await response.text()).slice(0, 10000);
+      let error: string;
+      if (response.status === 403) {
+        error = "Access denied";
+      } else if (response.status === 404) {
+        error = "Not found";
+      } else {
+        const text = (await response.text()).slice(0, 10000);
+        try {
+          const parsed = JSON.parse(text) as { message?: unknown };
+          error = typeof parsed?.message === "string" ? parsed.message : text;
+        } catch {
+          error = text;
+        }
+      }
       console.info("HTTP request", { ...details, error });
       throw new Error(`Request failed: ${response.status} ${error}`);
     }
