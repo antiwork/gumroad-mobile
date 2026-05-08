@@ -48,14 +48,12 @@ export const playbackService = async () => {
 
   TrackPlayer.addEventListener(Event.RemoteJumpForward, async (event) => {
     const interval = event?.interval ?? 30;
-    const { position } = await TrackPlayer.getProgress();
-    await TrackPlayer.seekTo(position + interval);
+    await TrackPlayer.seekBy(interval);
   });
 
   TrackPlayer.addEventListener(Event.RemoteJumpBackward, async (event) => {
     const interval = event?.interval ?? 15;
-    const { position } = await TrackPlayer.getProgress();
-    await TrackPlayer.seekTo(Math.max(0, position - interval));
+    await TrackPlayer.seekBy(-interval);
   });
 
   setInterval(async () => {
