@@ -36,9 +36,7 @@ const MiniAudioPlayerBase = () => {
   };
 
   const handleSkipForward = async () => {
-    const { position, duration } = await TrackPlayer.getProgress();
-    const newPosition = Math.min(position + 30, duration);
-    await TrackPlayer.seekTo(newPosition);
+    await TrackPlayer.seekBy(30);
   };
 
   if (!isVisible || !activeTrack) {

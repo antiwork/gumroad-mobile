@@ -89,15 +89,11 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   };
 
   const handleSkipBack = async () => {
-    const { position } = await TrackPlayer.getProgress();
-    const newPosition = Math.max(position - 15, 0);
-    await TrackPlayer.seekTo(newPosition);
+    await TrackPlayer.seekBy(-15);
   };
 
   const handleSkipForward = async () => {
-    const { position, duration } = await TrackPlayer.getProgress();
-    const newPosition = Math.min(position + 30, duration);
-    await TrackPlayer.seekTo(newPosition);
+    await TrackPlayer.seekBy(30);
   };
 
   const handleClose = async () => {

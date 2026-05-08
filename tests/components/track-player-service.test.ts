@@ -15,6 +15,7 @@ jest.mock("react-native-track-player", () => ({
     getProgress: jest.fn().mockResolvedValue({ position: 60, duration: 300 }),
     getPlaybackState: jest.fn().mockResolvedValue({ state: "playing" }),
     seekTo: jest.fn(),
+    seekBy: jest.fn(),
     skipToNext: jest.fn(),
     skipToPrevious: jest.fn(),
   },
@@ -66,32 +67,31 @@ describe("playbackService", () => {
 
   it("handles RemoteJumpForward with a normal event payload", async () => {
     await eventHandlers["remote-jump-forward"]({ interval: 30 });
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90);
+    expect(mockTrackPlayer.seekBy).toHaveBeenCalledWith(30);
   });
 
   it("handles RemoteJumpForward when event is null", async () => {
     await eventHandlers["remote-jump-forward"](null);
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90);
+    expect(mockTrackPlayer.seekBy).toHaveBeenCalledWith(30);
   });
 
   it("handles RemoteJumpForward when event is undefined", async () => {
     await eventHandlers["remote-jump-forward"](undefined);
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(90);
+    expect(mockTrackPlayer.seekBy).toHaveBeenCalledWith(30);
   });
 
   it("handles RemoteJumpBackward with a normal event payload", async () => {
     await eventHandlers["remote-jump-backward"]({ interval: 15 });
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(45);
+    expect(mockTrackPlayer.seekBy).toHaveBeenCalledWith(-15);
   });
 
   it("handles RemoteJumpBackward when event is null", async () => {
     await eventHandlers["remote-jump-backward"](null);
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(45);
+    expect(mockTrackPlayer.seekBy).toHaveBeenCalledWith(-15);
   });
 
-  it("clamps RemoteJumpBackward to zero", async () => {
-    (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValueOnce({ position: 5, duration: 300 });
-    await eventHandlers["remote-jump-backward"]({ interval: 15 });
-    expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(0);
+  it("handles RemoteJumpBackward when event is undefined", async () => {
+    await eventHandlers["remote-jump-backward"](undefined);
+    expect(mockTrackPlayer.seekBy).toHaveBeenCalledWith(-15);
   });
 });
