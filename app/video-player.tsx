@@ -142,7 +142,12 @@ export default function VideoPlayerScreen() {
           headerTintColor: "#fff",
         }}
       />
-      <VideoView style={styles.video} player={player} allowsPictureInPicture fullscreenOptions={{ enable: true }} />
+      <VideoView
+        style={styles.video}
+        player={player}
+        allowsPictureInPicture
+        fullscreenOptions={{ enable: true, orientation: "landscape", autoExitOnRotate: true }}
+      />
     </View>
   );
 }
