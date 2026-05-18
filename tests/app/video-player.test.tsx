@@ -126,6 +126,42 @@ describe("VideoPlayerScreen", () => {
     expect(mockPlayer.pause).toHaveBeenCalled();
   });
 
+  it("restores the playback position when returning from background", () => {
+    renderScreen();
+    mockPlayer.currentTime = 120;
+    mockPlayer.playing = true;
+
+    act(() => {
+      appStateCallback!("background");
+    });
+
+    mockPlayer.currentTime = 0;
+
+    act(() => {
+      appStateCallback!("active");
+    });
+
+    expect(mockPlayer.currentTime).toBe(120);
+  });
+
+  it("does not seek when the player has retained its position after returning from background", () => {
+    renderScreen();
+    mockPlayer.currentTime = 120;
+    mockPlayer.playing = true;
+
+    act(() => {
+      appStateCallback!("background");
+    });
+
+    mockPlayer.currentTime = 119.5;
+
+    act(() => {
+      appStateCallback!("active");
+    });
+
+    expect(mockPlayer.currentTime).toBe(119.5);
+  });
+
   it("renders an error message when the player reports an error status", () => {
     const { queryByText } = renderScreen();
 
