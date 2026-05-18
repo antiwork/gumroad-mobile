@@ -17,7 +17,7 @@ Explain the reasoning behind your changes, not just the change itself. Describe 
 - **Must**: Include a video for every PR. For user-facing changes, show before/after with light/dark mode and iOS/Android. For non-user-facing changes, record a short walkthrough of the relevant existing functionality to demonstrate understanding and confirm nothing broke.
 - Include updates to any tests, especially end-to-end tests!
 - After reviews begin, avoid force-pushing to your branch. Force-pushing rewrites history and makes review threads hard to follow. Don't worry about messy commits, we squash everything when merging to main.
-- Claude Code Review is set to manual mode. After opening a PR, request a review by posting a `@claude review` comment on the PR.
+- Claude Code Review is set to manual mode. After opening a PR, request a review by posting a `@claude review once` comment on the PR.
 
 ### PR description structure
 
