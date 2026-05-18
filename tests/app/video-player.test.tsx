@@ -1,6 +1,10 @@
 import { AppState } from "react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
+type StatusChangePayload = { status: string; error?: { message: string } };
+let statusChangeListener: ((payload: StatusChangePayload) => void) | null = null;
+const mockSubscriptionRemove = jest.fn();
+
 const mockPlayer = {
   loop: false,
   staysActiveInBackground: true,
@@ -8,6 +12,10 @@ const mockPlayer = {
   currentTime: 0,
   play: jest.fn(),
   pause: jest.fn(),
+  addListener: jest.fn((eventName: string, listener: (payload: StatusChangePayload) => void) => {
+    if (eventName === "statusChange") statusChangeListener = listener;
+    return { remove: mockSubscriptionRemove };
+  }),
 };
 
 jest.mock("expo-video", () => {
@@ -48,7 +56,9 @@ describe("VideoPlayerScreen", () => {
     mockPlayer.playing = true;
     mockPlayer.staysActiveInBackground = true;
     mockPlayer.loop = false;
+    mockPlayer.currentTime = 0;
     appStateCallback = null;
+    statusChangeListener = null;
 
     jest.spyOn(AppState, "addEventListener").mockImplementation((_type, callback) => {
       appStateCallback = callback as (state: string) => void;
@@ -114,5 +124,30 @@ describe("VideoPlayerScreen", () => {
     unmount();
 
     expect(mockPlayer.pause).toHaveBeenCalled();
+  });
+
+  it("renders an error message when the player reports an error status", () => {
+    const { queryByText } = renderScreen();
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "AVPlayer cannot decode the file" } });
+    });
+
+    expect(queryByText("This video failed to load")).toBeTruthy();
+    expect(queryByText("AVPlayer cannot decode the file")).toBeTruthy();
+  });
+
+  it("clears the error state once the player becomes ready to play", () => {
+    const { queryByText } = renderScreen();
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "Transient network error" } });
+    });
+    expect(queryByText("This video failed to load")).toBeTruthy();
+
+    act(() => {
+      statusChangeListener!({ status: "readyToPlay" });
+    });
+    expect(queryByText("This video failed to load")).toBeNull();
   });
 });
