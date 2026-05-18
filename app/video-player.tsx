@@ -1,4 +1,5 @@
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
@@ -6,7 +7,7 @@ import { requestAPI } from "@/lib/request";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { useVideoPlayer, VideoView, type VideoPlayerStatus } from "expo-video";
 import { useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus, StyleSheet, View } from "react-native";
 
@@ -28,6 +29,7 @@ export default function VideoPlayerScreen() {
   const queryClient = useQueryClient();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [currentPosition, setCurrentPosition] = useState(initialPosition ? Number(initialPosition) : 0);
   const currentPositionRef = useRefToLatest(currentPosition);
 
@@ -95,6 +97,33 @@ export default function VideoPlayerScreen() {
     };
   }, [player]);
 
+  useEffect(() => {
+    const subscription = player.addListener(
+      "statusChange",
+      ({ status, error }: { status: VideoPlayerStatus; error?: { message: string } }) => {
+        if (status === "error") {
+          const message = error?.message ?? "Unknown playback error";
+          setPlaybackError(message);
+          Sentry.captureMessage("Video playback failed", {
+            level: "error",
+            extra: {
+              message,
+              videoUrl,
+              sourceUri: uri,
+              streamingUrl,
+              urlRedirectId,
+              productFileId,
+              purchaseId,
+            },
+          });
+        } else if (status === "readyToPlay") {
+          setPlaybackError(null);
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [player, videoUrl, uri, streamingUrl, urlRedirectId, productFileId, purchaseId]);
+
   useEffect(
     () => () => {
       if (!urlRedirectId || !productFileId) return;
@@ -142,6 +171,27 @@ export default function VideoPlayerScreen() {
     );
   }
 
+  if (playbackError) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen
+          options={{
+            title: title ?? "Video",
+            headerStyle: { backgroundColor: "#000" },
+            headerTintColor: "#fff",
+          }}
+        />
+        <View style={styles.errorContainer}>
+          <Text className="text-center text-lg font-semibold text-white">This video failed to load</Text>
+          <Text className="mt-2 text-center text-sm text-white/70">
+            Try downloading the file from the product page instead.
+          </Text>
+          <Text className="mt-4 text-center text-xs text-white/50">{playbackError}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Stack.Screen
@@ -151,7 +201,12 @@ export default function VideoPlayerScreen() {
           headerTintColor: "#fff",
         }}
       />
-      <VideoView style={styles.video} player={player} allowsPictureInPicture fullscreenOptions={{ enable: true }} />
+      <VideoView
+        style={styles.video}
+        player={player}
+        allowsPictureInPicture
+        fullscreenOptions={{ enable: true, orientation: "landscape", autoExitOnRotate: true }}
+      />
     </View>
   );
 }
@@ -165,6 +220,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
   },
   video: {
     flex: 1,

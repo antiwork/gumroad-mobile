@@ -208,12 +208,14 @@ export default function DownloadScreen() {
     <Screen>
       <Stack.Screen options={{ title: purchase?.name ?? "" }} />
       <StyledWebView
+        key={accessToken ?? "anonymous"}
         ref={webViewRef}
         source={{ uri: url }}
         className="flex-1 bg-transparent"
         webviewDebuggingEnabled
         pullToRefreshEnabled
-        incognito
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
         mediaPlaybackRequiresUserAction={false}
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
