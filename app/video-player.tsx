@@ -65,15 +65,24 @@ export default function VideoPlayerScreen() {
   });
 
   const wasPlayingBeforeBackgroundRef = useRef(false);
+  const positionBeforeBackgroundRef = useRef<number | null>(null);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       if (nextState === "background" || nextState === "inactive") {
         wasPlayingBeforeBackgroundRef.current = player.playing;
+        positionBeforeBackgroundRef.current = player.currentTime;
         player.pause();
-      } else if (nextState === "active" && wasPlayingBeforeBackgroundRef.current) {
-        player.play();
-        wasPlayingBeforeBackgroundRef.current = false;
+      } else if (nextState === "active") {
+        const savedPosition = positionBeforeBackgroundRef.current;
+        if (savedPosition !== null && player.currentTime < savedPosition - 1) {
+          player.currentTime = savedPosition;
+        }
+        positionBeforeBackgroundRef.current = null;
+        if (wasPlayingBeforeBackgroundRef.current) {
+          player.play();
+          wasPlayingBeforeBackgroundRef.current = false;
+        }
       }
     });
 
