@@ -3,6 +3,7 @@ import { SaleDetailModal } from "@/components/dashboard/sale-detail-modal";
 import { SaleItem } from "@/components/dashboard/sale-item";
 import { usePurchaseSearch } from "@/components/dashboard/use-purchase-search";
 import { SalePurchase, TimeRange, useSalesAnalytics } from "@/components/dashboard/use-sales-analytics";
+import { ExportAllSalesButton } from "@/components/export-all-sales-button";
 import { LineIcon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -45,7 +46,7 @@ export default function Dashboard() {
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const { isSearchActive } = useDashboardSearch();
   const [searchText, setSearchText] = useState("");
-  const { isSearching, searchResults } = usePurchaseSearch(searchText, data?.purchases ?? []);
+  const { isSearching, searchResults } = usePurchaseSearch(searchText, data?.purchases ?? [], timeRange);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -118,10 +119,13 @@ export default function Dashboard() {
             )}
           </View>
 
-          <View className="flex-row justify-center gap-2">
-            <TimeRangeButton label="Today" value="day" selected={timeRange === "day"} onSelect={setTimeRange} />
-            <TimeRangeButton label="Month" value="month" selected={timeRange === "month"} onSelect={setTimeRange} />
-            <TimeRangeButton label="All time" value="all" selected={timeRange === "all"} onSelect={setTimeRange} />
+          <View className="items-center gap-3">
+            <View className="flex-row justify-center gap-2">
+              <TimeRangeButton label="Today" value="day" selected={timeRange === "day"} onSelect={setTimeRange} />
+              <TimeRangeButton label="Month" value="month" selected={timeRange === "month"} onSelect={setTimeRange} />
+              <TimeRangeButton label="Year" value="year" selected={timeRange === "year"} onSelect={setTimeRange} />
+            </View>
+            <ExportAllSalesButton />
           </View>
         </View>
       )}

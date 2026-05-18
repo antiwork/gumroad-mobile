@@ -91,11 +91,7 @@ export default function VideoPlayerScreen() {
     return () => subscription.remove();
   }, [player]);
 
-  useEffect(() => {
-    return () => {
-      player.pause();
-    };
-  }, [player]);
+  useEffect(() => () => player.pause(), [player]);
 
   useEffect(() => {
     const subscription = player.addListener(

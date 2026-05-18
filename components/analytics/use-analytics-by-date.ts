@@ -1,6 +1,6 @@
 import { useAPIRequest } from "@/lib/request";
 
-export type AnalyticsTimeRange = "1w" | "1m" | "1y" | "all";
+export type AnalyticsTimeRange = "1w" | "1m" | "1y";
 
 export interface AnalyticsByDateResponse {
   success: boolean;

@@ -1,6 +1,7 @@
 import { SalesTab } from "@/components/analytics/sales-tab";
 import { TrafficTab } from "@/components/analytics/traffic-tab";
 import { AnalyticsTimeRange } from "@/components/analytics/use-analytics-by-date";
+import { ExportAllSalesButton } from "@/components/export-all-sales-button";
 import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
@@ -41,11 +42,13 @@ export default function Analytics() {
         />
       </View>
 
-      <View className="flex-row justify-center gap-2 p-4">
-        <TabButton<AnalyticsTimeRange> label="1W" value="1w" selected={timeRange === "1w"} onSelect={setTimeRange} />
-        <TabButton<AnalyticsTimeRange> label="1M" value="1m" selected={timeRange === "1m"} onSelect={setTimeRange} />
-        <TabButton<AnalyticsTimeRange> label="1Y" value="1y" selected={timeRange === "1y"} onSelect={setTimeRange} />
-        <TabButton<AnalyticsTimeRange> label="All" value="all" selected={timeRange === "all"} onSelect={setTimeRange} />
+      <View className="gap-3 p-4">
+        <View className="flex-row justify-center gap-2">
+          <TabButton<AnalyticsTimeRange> label="1W" value="1w" selected={timeRange === "1w"} onSelect={setTimeRange} />
+          <TabButton<AnalyticsTimeRange> label="1M" value="1m" selected={timeRange === "1m"} onSelect={setTimeRange} />
+          <TabButton<AnalyticsTimeRange> label="1Y" value="1y" selected={timeRange === "1y"} onSelect={setTimeRange} />
+        </View>
+        <ExportAllSalesButton className="self-center" />
       </View>
 
       {activeTab === "sales" ? <SalesTab timeRange={timeRange} /> : <TrafficTab timeRange={timeRange} />}

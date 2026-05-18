@@ -1,6 +1,6 @@
 import { useAPIRequest } from "@/lib/request";
 import { useEffect, useState } from "react";
-import { SalePurchase } from "./use-sales-analytics";
+import { SalePurchase, type TimeRange } from "./use-sales-analytics";
 
 interface SearchResponse {
   success: boolean;
@@ -9,7 +9,12 @@ interface SearchResponse {
   purchases: SalePurchase[];
 }
 
-export const usePurchaseSearch = (searchText: string, originalPurchases: SalePurchase[]) => {
+export const buildPurchaseSearchPath = (timeRange: TimeRange, endTime: string, searchText: string) =>
+  `mobile/analytics/data_by_date.json?range=${timeRange}&end_time=${encodeURIComponent(endTime)}&query=${encodeURIComponent(
+    searchText,
+  )}`;
+
+export const usePurchaseSearch = (searchText: string, originalPurchases: SalePurchase[], timeRange: TimeRange) => {
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
 
   useEffect(() => {
@@ -21,8 +26,8 @@ export const usePurchaseSearch = (searchText: string, originalPurchases: SalePur
 
   const endTime = new Date().toISOString();
   const query = useAPIRequest<SearchResponse, SalePurchase[]>({
-    queryKey: ["purchaseSearch", debouncedSearchText],
-    url: `mobile/analytics/data_by_date.json?range=all&end_time=${encodeURIComponent(endTime)}&query=${encodeURIComponent(debouncedSearchText)}`,
+    queryKey: ["purchaseSearch", timeRange, debouncedSearchText],
+    url: buildPurchaseSearchPath(timeRange, endTime, debouncedSearchText),
     enabled: !!debouncedSearchText,
     select: (data) => data.purchases,
   });

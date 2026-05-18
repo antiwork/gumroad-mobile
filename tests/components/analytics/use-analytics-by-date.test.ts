@@ -17,10 +17,6 @@ describe("getGroupBy", () => {
   it('returns "month" for "1y"', () => {
     expect(getGroupBy("1y")).toBe("month");
   });
-
-  it('returns "month" for "all"', () => {
-    expect(getGroupBy("all")).toBe("month");
-  });
 });
 
 describe("sumByDateIndex", () => {

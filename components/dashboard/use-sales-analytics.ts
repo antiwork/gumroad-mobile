@@ -1,7 +1,7 @@
 import { requestAPI, useAPIRequest } from "@/lib/request";
 import { useState } from "react";
 
-export type TimeRange = "day" | "month" | "all";
+export type TimeRange = "day" | "month" | "year";
 
 export interface SalePurchase {
   id: string;
@@ -22,13 +22,16 @@ interface AnalyticsResponse {
   purchases: SalePurchase[];
 }
 
+export const buildSalesAnalyticsPath = (timeRange: TimeRange, endTime: string) =>
+  `mobile/analytics/data_by_date.json?range=${timeRange}&end_time=${encodeURIComponent(endTime)}`;
+
 export const useSalesAnalytics = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>("day");
   const endTime = new Date().toISOString();
 
   const query = useAPIRequest<AnalyticsResponse>({
     queryKey: ["analytics", timeRange],
-    url: `mobile/analytics/data_by_date.json?range=${timeRange}&end_time=${encodeURIComponent(endTime)}`,
+    url: buildSalesAnalyticsPath(timeRange, endTime),
   });
 
   return {
