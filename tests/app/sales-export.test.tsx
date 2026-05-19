@@ -3,7 +3,9 @@ import { Alert as NativeAlert } from "react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
-const mockDownloadFileAsync = jest.fn();
+const mockFileConstructor = jest.fn();
+const mockWrite = jest.fn();
+const mockFetch = jest.fn();
 const mockIsSharingAvailableAsync = jest.fn();
 const mockShareAsync = jest.fn();
 const mockCaptureException = jest.fn();
@@ -26,7 +28,7 @@ jest.mock("expo-router", () => ({
 }));
 
 jest.mock("expo-file-system", () => ({
-  File: { downloadFileAsync: (...args: unknown[]) => mockDownloadFileAsync(...args) },
+  File: jest.fn((...args: unknown[]) => mockFileConstructor(...args)),
   Paths: { cache: "/cache" },
 }));
 
@@ -54,7 +56,13 @@ describe("SalesExportScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue({ isLoading: false, accessToken: "test-access-token" });
-    mockDownloadFileAsync.mockResolvedValue({ uri: "file:///cache/sales.csv" });
+    mockFileConstructor.mockReturnValue({ uri: "file:///cache/sales.csv", write: mockWrite });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? "text/csv" : null) },
+      arrayBuffer: () => Promise.resolve(new Uint8Array([105, 100, 10]).buffer),
+    });
+    global.fetch = mockFetch;
     mockIsSharingAvailableAsync.mockResolvedValue(true);
   });
 
@@ -100,11 +108,29 @@ describe("SalesExportScreen", () => {
         dialogTitle: "Export all sales",
       });
     });
-    expect(mockDownloadFileAsync).toHaveBeenCalledWith(
+    expect(mockFetch).toHaveBeenCalledWith(
       "https://example.com/purchases/export?access_token=test-access-token&mobile_token=test-mobile-token",
-      "/cache",
-      { idempotent: true },
     );
+    expect(mockFileConstructor).toHaveBeenCalledWith("/cache", "sales.csv");
+    expect(mockWrite).toHaveBeenCalledWith(new Uint8Array([105, 100, 10]));
+  });
+
+  it("does not share non-CSV export responses", async () => {
+    jest.spyOn(NativeAlert, "alert");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? "text/html" : null) },
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    });
+
+    render(<SalesExportScreen />);
+
+    fireEvent.press(screen.getByText("Download CSV"));
+
+    await waitFor(() => {
+      expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Large exports arrive by email.");
+    });
+    expect(mockShareAsync).not.toHaveBeenCalled();
   });
 
   it("reports download failures", async () => {

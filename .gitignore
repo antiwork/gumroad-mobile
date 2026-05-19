@@ -28,6 +28,7 @@ play-store-key.json
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+/tmp/e2e-screenshots/
 
 # macOS
 .DS_Store

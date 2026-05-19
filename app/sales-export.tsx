@@ -26,6 +26,17 @@ const isGumroadUrl = (url: string) => {
   }
 };
 
+const downloadSalesExportFile = async (url: string) => {
+  const response = await fetch(url);
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!response.ok) throw new Error("Failed to download file");
+  if (!contentType.includes("text/csv")) throw new Error("Large exports arrive by email.");
+
+  const file = new File(Paths.cache, "sales.csv");
+  file.write(new Uint8Array(await response.arrayBuffer()));
+  return file;
+};
+
 export default function SalesExportScreen() {
   const { isLoading, accessToken } = useAuth();
   const [isDownloading, setIsDownloading] = useState(false);
@@ -46,8 +57,7 @@ export default function SalesExportScreen() {
     try {
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) throw new Error("Sharing is not available on this device");
-      const downloaded = await File.downloadFileAsync(url, Paths.cache, { idempotent: true });
-      setIsDownloading(false);
+      const downloaded = await downloadSalesExportFile(url);
       await Sharing.shareAsync(downloaded.uri, {
         UTI: "public.comma-separated-values-text",
         mimeType: "text/csv",
