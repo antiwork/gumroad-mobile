@@ -1,13 +1,18 @@
 import { StyledWebView } from "@/components/styled";
+import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
+import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
 import { getExportAllSalesUrl } from "@/lib/sales-export";
+import * as Sentry from "@sentry/react-native";
+import { File, Paths } from "expo-file-system";
 import { Stack } from "expo-router";
-import { useCallback, useMemo } from "react";
-import { View } from "react-native";
+import * as Sharing from "expo-sharing";
+import { useCallback, useMemo, useState } from "react";
+import { Alert, View } from "react-native";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
@@ -23,6 +28,7 @@ const isGumroadUrl = (url: string) => {
 
 export default function SalesExportScreen() {
   const { isLoading, accessToken } = useAuth();
+  const [isDownloading, setIsDownloading] = useState(false);
   const url = useMemo(() => getExportAllSalesUrl(accessToken), [accessToken]);
 
   const handleShouldStartLoadWithRequest = useCallback(
@@ -34,6 +40,26 @@ export default function SalesExportScreen() {
     },
     [url],
   );
+
+  const downloadSalesExport = useCallback(async () => {
+    setIsDownloading(true);
+    try {
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) throw new Error("Sharing is not available on this device");
+      const downloaded = await File.downloadFileAsync(url, Paths.cache, { idempotent: true });
+      setIsDownloading(false);
+      await Sharing.shareAsync(downloaded.uri, {
+        UTI: "public.comma-separated-values-text",
+        mimeType: "text/csv",
+        dialogTitle: "Export all sales",
+      });
+    } catch (error) {
+      Sentry.captureException(error);
+      Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [url]);
 
   if (isLoading) {
     return (
@@ -57,6 +83,16 @@ export default function SalesExportScreen() {
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
       />
+      <View className="border-t border-border bg-body-bg p-4">
+        <Button onPress={downloadSalesExport} disabled={isDownloading}>
+          <Text>{isDownloading ? "Downloading..." : "Download CSV"}</Text>
+        </Button>
+      </View>
+      {isDownloading && (
+        <View className="absolute inset-0 items-center justify-center bg-black/50">
+          <LoadingSpinner size="large" />
+        </View>
+      )}
     </Screen>
   );
 }

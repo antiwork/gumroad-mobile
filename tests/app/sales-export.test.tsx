@@ -1,7 +1,12 @@
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { Alert as NativeAlert } from "react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
+const mockDownloadFileAsync = jest.fn();
+const mockIsSharingAvailableAsync = jest.fn();
+const mockShareAsync = jest.fn();
+const mockCaptureException = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -12,7 +17,26 @@ jest.mock("@/lib/open-url", () => ({
 }));
 
 jest.mock("expo-router", () => ({
-  Stack: { Screen: () => null },
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => React.ReactNode } }) => {
+      const React = require("react");
+      return React.createElement(React.Fragment, null, options?.headerRight?.());
+    },
+  },
+}));
+
+jest.mock("expo-file-system", () => ({
+  File: { downloadFileAsync: (...args: unknown[]) => mockDownloadFileAsync(...args) },
+  Paths: { cache: "/cache" },
+}));
+
+jest.mock("expo-sharing", () => ({
+  isAvailableAsync: () => mockIsSharingAvailableAsync(),
+  shareAsync: (...args: unknown[]) => mockShareAsync(...args),
+}));
+
+jest.mock("@sentry/react-native", () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 jest.mock("react-native-webview", () => {
@@ -30,6 +54,8 @@ describe("SalesExportScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue({ isLoading: false, accessToken: "test-access-token" });
+    mockDownloadFileAsync.mockResolvedValue({ uri: "file:///cache/sales.csv" });
+    mockIsSharingAvailableAsync.mockResolvedValue(true);
   });
 
   it("loads the authenticated export page inside the WebView", () => {
@@ -60,5 +86,41 @@ describe("SalesExportScreen", () => {
 
     expect(shouldStart({ url: "https://external.example/test" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+  });
+
+  it("downloads the sales export and opens the native share sheet", async () => {
+    render(<SalesExportScreen />);
+
+    fireEvent.press(screen.getByText("Download CSV"));
+
+    await waitFor(() => {
+      expect(mockShareAsync).toHaveBeenCalledWith("file:///cache/sales.csv", {
+        UTI: "public.comma-separated-values-text",
+        mimeType: "text/csv",
+        dialogTitle: "Export all sales",
+      });
+    });
+    expect(mockDownloadFileAsync).toHaveBeenCalledWith(
+      "https://example.com/purchases/export?access_token=test-access-token&mobile_token=test-mobile-token",
+      "/cache",
+      { idempotent: true },
+    );
+  });
+
+  it("reports download failures", async () => {
+    jest.spyOn(NativeAlert, "alert");
+    mockIsSharingAvailableAsync.mockResolvedValueOnce(false);
+
+    render(<SalesExportScreen />);
+
+    fireEvent.press(screen.getByText("Download CSV"));
+
+    await waitFor(() => {
+      expect(NativeAlert.alert).toHaveBeenCalledWith(
+        "Download failed",
+        "Sharing is not available on this device",
+      );
+    });
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error));
   });
 });
