@@ -1,11 +1,14 @@
 package expo.modules.pdfthumbnail
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import expo.modules.kotlin.exception.CodedException
+import expo.modules.kotlin.exception.Exceptions
+import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
@@ -13,6 +16,9 @@ import java.io.FileOutputStream
 import java.util.UUID
 
 class PdfThumbnailModule : Module() {
+  private val context: Context
+    get() = appContext.reactContext ?: throw Exceptions.AppContextLost()
+
   override fun definition() = ModuleDefinition {
     Name("PdfThumbnail")
 
