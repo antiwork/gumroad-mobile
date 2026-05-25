@@ -80,7 +80,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-notifications",
       {
-        sounds: ["./assets/sounds/chaching.wav"],
+        sounds: ["./assets/sounds/chaching.wav", "./assets/sounds/chaching.caf"],
       },
     ],
     [
