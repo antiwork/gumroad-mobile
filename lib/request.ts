@@ -1,6 +1,5 @@
 import { env } from "@/lib/env";
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { assertDefined } from "./assert";
 import { useAuth } from "./auth-context";
 export class UnauthorizedError extends Error {
@@ -80,17 +79,24 @@ export const requestAPI = async <T>(
 export const useAPIRequest = <TResponse, TData = TResponse>(
   options: Omit<UseQueryOptions<TResponse, Error, TData>, "queryFn"> & { url: string },
 ) => {
-  const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
+  const { accessToken, refreshToken, logout } = useAuth();
 
-  const query = useQuery<TResponse, Error, TData>({
-    queryFn: () => requestAPI<TResponse>(options.url, { accessToken: assertDefined(accessToken) }),
+  return useQuery<TResponse, Error, TData>({
+    queryFn: async () => {
+      try {
+        return await requestAPI<TResponse>(options.url, { accessToken: assertDefined(accessToken) });
+      } catch (error) {
+        if (!(error instanceof UnauthorizedError)) throw error;
+        try {
+          const newAccessToken = await refreshToken();
+          return await requestAPI<TResponse>(options.url, { accessToken: newAccessToken });
+        } catch {
+          await logout();
+          throw error;
+        }
+      }
+    },
     ...options,
     enabled: !!accessToken && (options.enabled ?? true),
   });
-
-  useEffect(() => {
-    if (query.error instanceof UnauthorizedError) logout();
-  }, [query.error, logout]);
-
-  return query;
 };
