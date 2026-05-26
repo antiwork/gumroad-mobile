@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import * as Sentry from "@sentry/react-native";
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { assertDefined } from "./assert";
 import { useAuth } from "./auth-context";
@@ -87,13 +88,20 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
         return await requestAPI<TResponse>(options.url, { accessToken: assertDefined(accessToken) });
       } catch (error) {
         if (!(error instanceof UnauthorizedError)) throw error;
+        let newAccessToken: string;
         try {
-          const newAccessToken = await refreshToken();
-          return await requestAPI<TResponse>(options.url, { accessToken: newAccessToken });
-        } catch {
+          newAccessToken = await refreshToken();
+        } catch (refreshError) {
+          Sentry.captureException(refreshError, { tags: { auth_path: "refresh_failed" } });
           await logout();
           throw error;
         }
+        // Retry once with the refreshed token. If this 401s again (e.g., token's
+        // scopes are stuck and the new endpoint requires more), propagate the
+        // error rather than logging the user out — refresh doesn't upgrade scopes,
+        // so logout wouldn't help anyway. Transient retry failures (5xx, network)
+        // also surface to the caller instead of nuking the session.
+        return await requestAPI<TResponse>(options.url, { accessToken: newAccessToken });
       }
     },
     ...options,
