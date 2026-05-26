@@ -7,10 +7,11 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
+import { cacheFileDestination } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
 import { buildApiUrl } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
-import { File, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { Asset } from "expo-asset";
@@ -71,12 +72,10 @@ const fileIconName = (mediaType: FileMediaType) => {
 const downloadUrl = (urlRedirectToken: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${urlRedirectToken}/${productFileId}`);
 
-const sanitizeFileName = (name: string) => name.replace(/[/\\:*?"<>|]/g, "_").trim();
-
 const downloadFile = (urlRedirectToken: string, productFileId: string, fileName: string) =>
   File.downloadFileAsync(
     downloadUrl(urlRedirectToken, productFileId),
-    new File(Paths.cache, sanitizeFileName(fileName)),
+    cacheFileDestination(productFileId, fileName),
     { idempotent: true },
   );
 
@@ -156,7 +155,8 @@ export default function PostScreen() {
       if (!post?.url_redirect_external_id || !purchase?.url_redirect_token)
         throw new Error("Missing URL redirect token");
       const file = post.files_data?.find((f) => f.id === fileId);
-      const downloadedFile = await downloadFile(purchase.url_redirect_token, fileId, file?.name ?? fileId);
+      if (!file) throw new Error("File metadata not found");
+      const downloadedFile = await downloadFile(purchase.url_redirect_token, fileId, file.name);
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) throw new Error("Sharing is not available on this device");
       await Sharing.shareAsync(downloadedFile.uri);
