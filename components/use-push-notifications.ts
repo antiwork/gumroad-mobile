@@ -85,11 +85,6 @@ const buildNotificationRoute = (data: Record<string, string>): string | null => 
   return `/post/${data.installment_id}${query ? `?${query}` : ""}`;
 };
 
-// Returns the route for an unhandled notification response and marks it consumed.
-// iOS replays cold-start responses to newly registered listeners (see
-// NotificationCenterManager.addDelegate), so both `getLastNotificationResponseAsync`
-// in `app/index.tsx` and `addNotificationResponseReceivedListener` below can fire
-// for the same notification. The identifier set deduplicates them.
 export const consumeNotificationRoute = (
   response: Notifications.NotificationResponse | null,
 ): string | null => {
