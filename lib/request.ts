@@ -115,18 +115,21 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
         return await requestAPI<TResponse>(options.url, { accessToken: newAccessToken });
       }
     },
-    // The production QueryClient sets `retry: 2`. Without this override, an
-    // UnauthorizedError thrown after our internal refresh-retry would re-enter
-    // queryFn via TanStack's retry loop and trigger another refresh exchange.
-    // Doorkeeper rotates the refresh token on every exchange, so a single
-    // scope-stuck 401 would burn 3 rotations. The inflight-dedup only covers
-    // concurrent callers within one queryFn invocation, not sequential retries.
-    // 5xx/network errors still use whatever backoff the caller (or default) sets.
+    ...options,
+    // Placed AFTER ...options on purpose: we must always opt out of TanStack's
+    // retry on UnauthorizedError or the queryFn re-enters its refresh path and
+    // burns extra Doorkeeper rotations (Doorkeeper rotates the refresh token
+    // on every exchange, and inflight-dedup only covers concurrent calls within
+    // one queryFn invocation, not sequential TanStack retries). Caller's retry
+    // policy still applies to any non-auth error.
     retry: (failureCount, error) => {
       if (error instanceof UnauthorizedError) return false;
-      return failureCount < 2;
+      const callerRetry = options.retry;
+      if (callerRetry === undefined) return failureCount < 2;
+      if (typeof callerRetry === "boolean") return callerRetry;
+      if (typeof callerRetry === "number") return failureCount < callerRetry;
+      return callerRetry(failureCount, error);
     },
-    ...options,
     enabled: !!accessToken && (options.enabled ?? true),
   });
 };

@@ -51,6 +51,19 @@ const renderUseAPIRequest = (retry: number | boolean = false) =>
     wrapper: createWrapper(retry),
   });
 
+const renderUseAPIRequestWithCallerRetry = (
+  callerRetry: number | boolean | ((failureCount: number, error: Error) => boolean),
+) =>
+  renderHook(
+    () =>
+      useAPIRequest<{ ok: boolean }>({
+        url: "/test",
+        queryKey: ["test"],
+        retry: callerRetry,
+      }),
+    { wrapper: createWrapper(false) },
+  );
+
 const authHeaderOf = (call: unknown[]): string | undefined => {
   const init = call[1] as RequestInit | undefined;
   const headers = init?.headers as Record<string, string> | undefined;
@@ -198,5 +211,43 @@ describe("useAPIRequest", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(mockRefreshToken).not.toHaveBeenCalled();
     expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  // The auth opt-out must not be bypassable. The next three tests pass different
+  // shapes of `retry` from the caller and verify UnauthorizedError still stops
+  // retries while the caller's policy still applies to non-auth errors.
+  it("ignores a caller-supplied retry:true for UnauthorizedError (auth opt-out wins)", async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, 401));
+    mockRefreshToken.mockResolvedValue("fresh-token");
+
+    const { result } = renderUseAPIRequestWithCallerRetry(true);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockRefreshToken).toHaveBeenCalledTimes(1);
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("ignores a caller-supplied retry:5 for UnauthorizedError (auth opt-out wins)", async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, 401));
+    mockRefreshToken.mockResolvedValue("fresh-token");
+
+    const { result } = renderUseAPIRequestWithCallerRetry(5);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockRefreshToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a caller-supplied retry function for UnauthorizedError but consults it for other errors", async () => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ error: "boom" }, 500))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+    const callerRetry = jest.fn<boolean, [number, Error]>(() => true);
+
+    const { result } = renderUseAPIRequestWithCallerRetry(callerRetry);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(callerRetry).toHaveBeenCalled();
+    const errorArg = callerRetry.mock.calls[0]?.[1];
+    expect(errorArg?.message).toMatch(/500/);
   });
 });
