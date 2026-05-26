@@ -62,19 +62,16 @@ const getExpoPushToken = async () => {
   return tokenData.data;
 };
 
-const handleNotificationResponse = (
-  response: Notifications.NotificationResponse,
-  router: ReturnType<typeof useRouter>,
-) => {
-  const data = response.notification.request.content.data as Record<string, string> | undefined;
-  if (!data?.installment_id) return;
+export const getNotificationRoute = (response: Notifications.NotificationResponse | null): string | null => {
+  const data = response?.notification.request.content.data as Record<string, string> | undefined;
+  if (!data?.installment_id) return null;
 
   const params = new URLSearchParams();
   if (data.purchase_id) params.set("purchaseId", data.purchase_id);
   else if (data.subscription_id) params.set("subscriptionId", data.subscription_id);
   else if (data.follower_id) params.set("followerId", data.follower_id);
   const query = params.toString();
-  router.push(`/post/${data.installment_id}${query ? `?${query}` : ""}` as any);
+  return `/post/${data.installment_id}${query ? `?${query}` : ""}`;
 };
 
 export const usePushNotifications = () => {
@@ -96,12 +93,9 @@ export const usePushNotifications = () => {
   }, [isAuthenticated, accessToken]);
 
   useEffect(() => {
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) handleNotificationResponse(response, router);
-    });
-
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      handleNotificationResponse(response, router);
+      const route = getNotificationRoute(response);
+      if (route) router.push(route as any);
     });
 
     return () => {

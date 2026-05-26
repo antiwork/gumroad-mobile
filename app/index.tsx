@@ -1,4 +1,6 @@
+import { getNotificationRoute } from "@/components/use-push-notifications";
 import { useAuth } from "@/lib/auth-context";
+import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
@@ -23,12 +25,19 @@ export default function Index() {
     // Without this, on low-end Android devices the NativeAnimatedModule may try
     // to add events to a view that has already been removed from the Fabric tree,
     // causing: "addAnimatedEventToView: Animated node with tag [N] does not exist"
-    const id = requestAnimationFrame(() => {
+    const id = requestAnimationFrame(async () => {
       if (!isAuthenticated) {
         router.replace("/login");
-      } else {
-        router.replace(isCreator ? "/(tabs)/dashboard" : "/(tabs)/library");
+        return;
       }
+      const response = await Notifications.getLastNotificationResponseAsync();
+      const notificationRoute = getNotificationRoute(response);
+      if (notificationRoute) {
+        await Notifications.clearLastNotificationResponseAsync();
+        router.replace(notificationRoute as any);
+        return;
+      }
+      router.replace(isCreator ? "/(tabs)/dashboard" : "/(tabs)/library");
     });
 
     return () => cancelAnimationFrame(id);
