@@ -64,6 +64,17 @@ const getExpoPushToken = async () => {
 
 const handledNotificationIdentifiers = new Set<string>();
 
+let indexInitialRoutingComplete = false;
+
+export const markIndexInitialRoutingComplete = () => {
+  indexInitialRoutingComplete = true;
+};
+
+export const __resetPushNotificationsModuleStateForTests = () => {
+  handledNotificationIdentifiers.clear();
+  indexInitialRoutingComplete = false;
+};
+
 const buildNotificationRoute = (data: Record<string, string>): string | null => {
   if (!data.installment_id) return null;
   const params = new URLSearchParams();
@@ -112,8 +123,11 @@ export const usePushNotifications = () => {
 
   useEffect(() => {
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (!indexInitialRoutingComplete) return;
       const route = consumeNotificationRoute(response);
-      if (route) router.push(route as any);
+      if (!route) return;
+      router.push(route as any);
+      Notifications.clearLastNotificationResponseAsync().catch(() => {});
     });
 
     return () => {

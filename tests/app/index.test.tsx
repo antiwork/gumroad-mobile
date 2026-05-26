@@ -25,7 +25,19 @@ jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+const mockMarkIndexInitialRoutingComplete = jest.fn();
+jest.mock("@/components/use-push-notifications", () => {
+  const actual = jest.requireActual<typeof import("@/components/use-push-notifications")>(
+    "@/components/use-push-notifications",
+  );
+  return {
+    ...actual,
+    markIndexInitialRoutingComplete: () => mockMarkIndexInitialRoutingComplete(),
+  };
+});
+
 import Index from "@/app/index";
+import { __resetPushNotificationsModuleStateForTests } from "@/components/use-push-notifications";
 
 describe("Index", () => {
   let rafCallbacks: Array<() => unknown>;
@@ -40,6 +52,7 @@ describe("Index", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    __resetPushNotificationsModuleStateForTests();
     mockGetLastNotificationResponseAsync.mockResolvedValue(null);
     mockClearLastNotificationResponseAsync.mockResolvedValue(undefined);
     rafCallbacks = [];
@@ -85,6 +98,7 @@ describe("Index", () => {
 
     expect(mockReplace).toHaveBeenCalledWith("/login");
     expect(mockGetLastNotificationResponseAsync).not.toHaveBeenCalled();
+    expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
   it("navigates to /(tabs)/dashboard for creators", async () => {
@@ -96,6 +110,7 @@ describe("Index", () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
+    expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
   it("navigates to /(tabs)/library for non-creators", async () => {
@@ -129,6 +144,7 @@ describe("Index", () => {
     expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
     expect(mockPush).toHaveBeenCalledWith("/post/abc123?purchaseId=p1");
     expect(mockClearLastNotificationResponseAsync).toHaveBeenCalled();
+    expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
   it("uses /(tabs)/dashboard as the back target for creators launched via notification", async () => {
@@ -189,5 +205,32 @@ describe("Index", () => {
     unmount();
 
     expect(globalThis.cancelAnimationFrame).toHaveBeenCalledWith(1);
+  });
+
+  it("does not navigate or mark routing complete when the effect is cancelled mid-await", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false });
+    let resolveResponse: ((value: unknown) => void) | undefined;
+    mockGetLastNotificationResponseAsync.mockImplementation(
+      () => new Promise((resolve) => (resolveResponse = resolve)),
+    );
+
+    const { unmount } = render(<Index />);
+
+    await act(async () => {
+      for (const cb of rafCallbacks) cb();
+    });
+
+    unmount();
+    resolveResponse?.({
+      notification: { request: { identifier: "stale-1", content: { data: { installment_id: "stale-post" } } } },
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockMarkIndexInitialRoutingComplete).not.toHaveBeenCalled();
   });
 });
