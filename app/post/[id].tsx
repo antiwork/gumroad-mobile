@@ -71,10 +71,14 @@ const fileIconName = (mediaType: FileMediaType) => {
 const downloadUrl = (urlRedirectToken: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${urlRedirectToken}/${productFileId}`);
 
-const downloadFile = (urlRedirectToken: string, productFileId: string) =>
-  File.downloadFileAsync(downloadUrl(urlRedirectToken, productFileId), Paths.cache, {
-    idempotent: true,
-  });
+const sanitizeFileName = (name: string) => name.replace(/[/\\:*?"<>|]/g, "_").trim();
+
+const downloadFile = (urlRedirectToken: string, productFileId: string, fileName: string) =>
+  File.downloadFileAsync(
+    downloadUrl(urlRedirectToken, productFileId),
+    new File(Paths.cache, sanitizeFileName(fileName)),
+    { idempotent: true },
+  );
 
 const fontDataPromise = Promise.all(
   [
@@ -151,7 +155,8 @@ export default function PostScreen() {
       setDownloadingFileId(fileId);
       if (!post?.url_redirect_external_id || !purchase?.url_redirect_token)
         throw new Error("Missing URL redirect token");
-      const downloadedFile = await downloadFile(purchase.url_redirect_token, fileId);
+      const file = post.files_data?.find((f) => f.id === fileId);
+      const downloadedFile = await downloadFile(purchase.url_redirect_token, fileId, file?.name ?? fileId);
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) throw new Error("Sharing is not available on this device");
       await Sharing.shareAsync(downloadedFile.uri);

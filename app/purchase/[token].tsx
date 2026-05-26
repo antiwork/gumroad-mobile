@@ -47,8 +47,10 @@ type TocDataMessage = {
 const downloadUrl = (token: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
 
-const downloadFile = (token: string, productFileId: string) =>
-  File.downloadFileAsync(downloadUrl(token, productFileId), Paths.cache, {
+const sanitizeFileName = (name: string) => name.replace(/[/\\:*?"<>|]/g, "_").trim();
+
+const downloadFile = (token: string, productFileId: string, fileName: string) =>
+  File.downloadFileAsync(downloadUrl(token, productFileId), new File(Paths.cache, sanitizeFileName(fileName)), {
     idempotent: true,
   });
 
@@ -185,7 +187,14 @@ export default function DownloadScreen() {
       }
 
       setIsDownloading(true);
-      const downloadedFile = await downloadFile(token, message.payload.resourceId);
+      const fallbackName = message.payload.extension
+        ? `${message.payload.resourceId}.${message.payload.extension.toLowerCase()}`
+        : message.payload.resourceId;
+      const downloadedFile = await downloadFile(
+        token,
+        message.payload.resourceId,
+        fileData?.name ?? fallbackName,
+      );
       await shareFile(downloadedFile.uri);
     } catch (error) {
       console.error("Download failed:", error, data);
