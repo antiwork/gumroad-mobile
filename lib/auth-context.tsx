@@ -1,7 +1,7 @@
 import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
-import { request, UnauthorizedError } from "@/lib/request";
+import { KeychainUnavailableError, request, UnauthorizedError } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
@@ -210,6 +210,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
         return tokenResponse.access_token;
+      } catch (error) {
+        // Translate keychain-locked errors (device locked during background fetch,
+        // lock-screen launch, legacy WhenUnlocked entries) into a distinguishable
+        // type so callers can surface the original 401 without forcing logout. The
+        // user's session is intact — we just can't read the refresh token right now.
+        if (isKeychainUnavailableError(error)) throw new KeychainUnavailableError();
+        throw error;
       } finally {
         inflightRefresh.current = null;
       }

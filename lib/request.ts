@@ -10,6 +10,13 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class KeychainUnavailableError extends Error {
+  constructor() {
+    super("Keychain unavailable");
+    this.name = "KeychainUnavailableError";
+  }
+}
+
 const REQUEST_TIMEOUT_MS = 30_000;
 
 export const request = async <T>(
@@ -92,6 +99,10 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
         try {
           newAccessToken = await refreshToken();
         } catch (refreshError) {
+          // Keychain temporarily inaccessible (locked device, background fetch,
+          // legacy WhenUnlocked entry). Don't log out — the session is intact,
+          // we just couldn't read the refresh token. Surface the original 401.
+          if (refreshError instanceof KeychainUnavailableError) throw error;
           Sentry.captureException(refreshError, { tags: { auth_path: "refresh_failed" } });
           await logout();
           throw error;

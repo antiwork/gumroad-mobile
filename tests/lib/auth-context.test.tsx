@@ -28,6 +28,12 @@ jest.mock("@/lib/request", () => ({
       this.name = "UnauthorizedError";
     }
   },
+  KeychainUnavailableError: class KeychainUnavailableError extends Error {
+    constructor() {
+      super("Keychain unavailable");
+      this.name = "KeychainUnavailableError";
+    }
+  },
 }));
 jest.mock("@/lib/query-client", () => ({
   queryClient: { clear: jest.fn() },
@@ -43,6 +49,10 @@ const mockDeleteItemAsync = SecureStore.deleteItemAsync as jest.Mock;
 beforeEach(() => {
   jest.clearAllMocks();
   mockMakeRedirectUri.mockReturnValue("gumroadmobile://redirect");
+  // Restore SecureStore defaults so per-test overrides don't bleed across tests.
+  mockGetItemAsync.mockResolvedValue(null);
+  mockSetItemAsync.mockResolvedValue(true);
+  mockDeleteItemAsync.mockResolvedValue(undefined);
 });
 
 const renderWithProvider = (response: AuthSession.AuthSessionResult | null) => {
@@ -208,6 +218,82 @@ describe("refreshToken", () => {
     const second = await result.current.refreshToken();
     expect(first).toBe("first-access");
     expect(second).toBe("second-access");
+  });
+});
+
+describe("refreshToken keychain-unavailable handling", () => {
+  const { KeychainUnavailableError } = jest.requireMock("@/lib/request");
+
+  it("throws KeychainUnavailableError when reading the refresh token hits 'User interaction is not allowed'", async () => {
+    mockGetItemAsync.mockImplementation((key: string) =>
+      key === "gumroad_refresh_token"
+        ? Promise.reject(new Error("User interaction is not allowed"))
+        : Promise.resolve(null),
+    );
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await expect(result.current.refreshToken()).rejects.toBeInstanceOf(KeychainUnavailableError);
+  });
+
+  it("throws KeychainUnavailableError when reading the refresh token hits 'No keychain is available'", async () => {
+    mockGetItemAsync.mockImplementation((key: string) =>
+      key === "gumroad_refresh_token"
+        ? Promise.reject(new Error("No keychain is available"))
+        : Promise.resolve(null),
+    );
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await expect(result.current.refreshToken()).rejects.toBeInstanceOf(KeychainUnavailableError);
+  });
+
+  it("translates keychain-unavailable errors from storeTokens write into KeychainUnavailableError", async () => {
+    mockGetItemAsync.mockImplementation((key: string) =>
+      key === "gumroad_refresh_token" ? Promise.resolve("stored-refresh") : Promise.resolve(null),
+    );
+    mockRequest.mockResolvedValue({ access_token: "new-access", refresh_token: "new-refresh" });
+    mockSetItemAsync.mockRejectedValue(new Error("User interaction is not allowed"));
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await expect(result.current.refreshToken()).rejects.toBeInstanceOf(KeychainUnavailableError);
+  });
+
+  it("does NOT translate unrelated errors into KeychainUnavailableError", async () => {
+    mockGetItemAsync.mockImplementation((key: string) =>
+      key === "gumroad_refresh_token" ? Promise.resolve("stored-refresh") : Promise.resolve(null),
+    );
+    mockRequest.mockRejectedValue(new Error("Network error"));
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await expect(result.current.refreshToken()).rejects.not.toBeInstanceOf(KeychainUnavailableError);
+    await expect(result.current.refreshToken()).rejects.toThrow("Network error");
+  });
+
+  it("clears the in-flight ref after a keychain-unavailable failure so the next call retries fresh", async () => {
+    let callCount = 0;
+    mockGetItemAsync.mockImplementation((key: string) => {
+      if (key !== "gumroad_refresh_token") return Promise.resolve(null);
+      callCount++;
+      return callCount === 1
+        ? Promise.reject(new Error("User interaction is not allowed"))
+        : Promise.resolve("stored-refresh");
+    });
+    mockRequest.mockResolvedValue({ access_token: "new-access", refresh_token: "new-refresh" });
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await expect(result.current.refreshToken()).rejects.toBeInstanceOf(KeychainUnavailableError);
+
+    const newToken = await result.current.refreshToken();
+    expect(newToken).toBe("new-access");
   });
 });
 
