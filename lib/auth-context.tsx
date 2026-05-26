@@ -112,6 +112,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const storeTokens = useCallback(async (accessToken: string, refreshToken?: string) => {
+    // delete-before-set: forces SecItemAdd instead of SecItemUpdate on iOS. Without this,
+    // an existing entry written under a different kSecAttrAccessible (e.g., WhenUnlocked
+    // from an older app version) silently keeps its old ACL on update — the wedge that
+    // gumroad-mobile #251 traces back to. There is a microsecond window here where the
+    // keychain has no token; if the process is killed between the two awaits the user
+    // sees one extra login on next launch. Acceptable trade for clearing the wedge.
     await SecureStore.deleteItemAsync(accessTokenKey);
     await SecureStore.setItemAsync(accessTokenKey, accessToken, secureStoreOptions);
     if (refreshToken) {
