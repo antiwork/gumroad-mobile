@@ -117,6 +117,26 @@ describe("useAPIRequest", () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
+  it("logs out when refresh fails with a raw keychain error (write-side after server rotation)", async () => {
+    // After a successful Doorkeeper exchange, a keychain write failure leaves
+    // local state inconsistent with server. refreshTokenFn surfaces it as a
+    // plain Error (not KeychainUnavailableError), and useAPIRequest treats it
+    // like any other refresh failure — Sentry + logout — rather than masking
+    // it as transient.
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
+    const writeError = new Error("User interaction is not allowed");
+    mockRefreshToken.mockRejectedValueOnce(writeError);
+
+    const { result } = renderUseAPIRequest();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      writeError,
+      expect.objectContaining({ tags: { auth_path: "refresh_failed" } }),
+    );
+  });
+
   it("logs out and reports to Sentry with auth_path tag when refresh fails with a non-keychain error", async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
     const refreshError = new Error("invalid_grant");

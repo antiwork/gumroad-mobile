@@ -250,7 +250,13 @@ describe("refreshToken keychain-unavailable handling", () => {
     await expect(result.current.refreshToken()).rejects.toBeInstanceOf(KeychainUnavailableError);
   });
 
-  it("translates keychain-unavailable errors from storeTokens write into KeychainUnavailableError", async () => {
+  it("does NOT translate keychain errors from storeTokens write (server has already rotated)", async () => {
+    // The server rotated the refresh token in `request(tokenEndpoint, ...)` above
+    // storeTokens. A keychain write failure here leaves local state inconsistent
+    // with server (our stored refresh token is now dead). Treating it as transient
+    // would let the caller think the session is intact, but the next refresh would
+    // fail with invalid_grant. Let the original error propagate so useAPIRequest
+    // takes the logout path.
     mockGetItemAsync.mockImplementation((key: string) =>
       key === "gumroad_refresh_token" ? Promise.resolve("stored-refresh") : Promise.resolve(null),
     );
@@ -260,7 +266,8 @@ describe("refreshToken keychain-unavailable handling", () => {
     const { result } = renderWithProvider(null);
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    await expect(result.current.refreshToken()).rejects.toBeInstanceOf(KeychainUnavailableError);
+    await expect(result.current.refreshToken()).rejects.not.toBeInstanceOf(KeychainUnavailableError);
+    await expect(result.current.refreshToken()).rejects.toThrow("User interaction is not allowed");
   });
 
   it("does NOT translate unrelated errors into KeychainUnavailableError", async () => {

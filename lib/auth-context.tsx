@@ -197,7 +197,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     inflightRefresh.current = (async () => {
       try {
-        const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+        let storedRefreshToken: string | null;
+        try {
+          storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+        } catch (readError) {
+          // Read-side keychain failure: the server hasn't been contacted yet,
+          // so the session is genuinely intact — we just can't read the refresh
+          // token right now (device locked, background fetch, legacy WhenUnlocked
+          // entry). Translate so callers surface the original 401 without logout.
+          if (isKeychainUnavailableError(readError)) throw new KeychainUnavailableError();
+          throw readError;
+        }
         if (!storedRefreshToken) throw new Error("No refresh token available");
 
         const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
@@ -208,15 +218,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
           },
         });
+        // Past this point the server has rotated the refresh token, so the one
+        // still in our keychain is dead. A write-side keychain failure here is
+        // NOT transient — local state is inconsistent with server, and pretending
+        // otherwise just defers the inevitable logout (the next refresh would
+        // 400 with invalid_grant). Let the error propagate so useAPIRequest
+        // logs the user out rather than masking it as KeychainUnavailableError.
         await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
         return tokenResponse.access_token;
-      } catch (error) {
-        // Translate keychain-locked errors (device locked during background fetch,
-        // lock-screen launch, legacy WhenUnlocked entries) into a distinguishable
-        // type so callers can surface the original 401 without forcing logout. The
-        // user's session is intact — we just can't read the refresh token right now.
-        if (isKeychainUnavailableError(error)) throw new KeychainUnavailableError();
-        throw error;
       } finally {
         inflightRefresh.current = null;
       }
