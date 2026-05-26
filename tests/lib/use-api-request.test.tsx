@@ -71,7 +71,6 @@ const authHeaderOf = (call: unknown[]): string | undefined => {
 };
 
 beforeEach(() => {
-  // mockReset (not just clear) so mockResolvedValueOnce queues don't bleed across tests.
   mockFetch.mockReset();
   mockRefreshToken.mockReset();
   mockLogout.mockReset();
@@ -118,11 +117,6 @@ describe("useAPIRequest", () => {
   });
 
   it("logs out when refresh fails with a raw keychain error (write-side after server rotation)", async () => {
-    // After a successful Doorkeeper exchange, a keychain write failure leaves
-    // local state inconsistent with server. refreshTokenFn surfaces it as a
-    // plain Error (not KeychainUnavailableError), and useAPIRequest treats it
-    // like any other refresh failure — Sentry + logout — rather than masking
-    // it as transient.
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
     const writeError = new Error("User interaction is not allowed");
     mockRefreshToken.mockRejectedValueOnce(writeError);
@@ -177,11 +171,6 @@ describe("useAPIRequest", () => {
     expect(mockLogout).not.toHaveBeenCalled();
   });
 
-  // Production QueryClient sets retry: 2 in lib/query-client.tsx. The next three tests
-  // simulate that to prove the retry override in useAPIRequest behaves correctly:
-  // - UnauthorizedError must not re-enter queryFn (would burn extra refresh rotations)
-  // - 5xx must still retry under the caller's policy
-  // - The KeychainUnavailableError path must not loop on a locked keychain
   it("under production retry:2, a scope-stuck 401 triggers refresh exactly once (no extra rotations)", async () => {
     mockFetch
       .mockResolvedValueOnce(jsonResponse({}, 401))
@@ -233,9 +222,6 @@ describe("useAPIRequest", () => {
     expect(mockLogout).not.toHaveBeenCalled();
   });
 
-  // The auth opt-out must not be bypassable. The next three tests pass different
-  // shapes of `retry` from the caller and verify UnauthorizedError still stops
-  // retries while the caller's policy still applies to non-auth errors.
   it("ignores a caller-supplied retry:true for UnauthorizedError (auth opt-out wins)", async () => {
     mockFetch.mockResolvedValue(jsonResponse({}, 401));
     mockRefreshToken.mockResolvedValue("fresh-token");

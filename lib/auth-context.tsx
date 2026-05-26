@@ -112,12 +112,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const storeTokens = useCallback(async (accessToken: string, refreshToken?: string) => {
-    // delete-before-set: forces SecItemAdd instead of SecItemUpdate on iOS. Without this,
-    // an existing entry written under a different kSecAttrAccessible (e.g., WhenUnlocked
-    // from an older app version) silently keeps its old ACL on update — the wedge that
-    // gumroad-mobile #251 traces back to. There is a microsecond window here where the
-    // keychain has no token; if the process is killed between the two awaits the user
-    // sees one extra login on next launch. Acceptable trade for clearing the wedge.
     await SecureStore.deleteItemAsync(accessTokenKey);
     await SecureStore.setItemAsync(accessTokenKey, accessToken, secureStoreOptions);
     if (refreshToken) {
@@ -201,10 +195,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
         } catch (readError) {
-          // Read-side keychain failure: the server hasn't been contacted yet,
-          // so the session is genuinely intact — we just can't read the refresh
-          // token right now (device locked, background fetch, legacy WhenUnlocked
-          // entry). Translate so callers surface the original 401 without logout.
           if (isKeychainUnavailableError(readError)) throw new KeychainUnavailableError();
           throw readError;
         }
@@ -218,12 +208,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
           },
         });
-        // Past this point the server has rotated the refresh token, so the one
-        // still in our keychain is dead. A write-side keychain failure here is
-        // NOT transient — local state is inconsistent with server, and pretending
-        // otherwise just defers the inevitable logout (the next refresh would
-        // 400 with invalid_grant). Let the error propagate so useAPIRequest
-        // logs the user out rather than masking it as KeychainUnavailableError.
         await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
         return tokenResponse.access_token;
       } finally {

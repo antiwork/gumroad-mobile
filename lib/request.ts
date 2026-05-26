@@ -99,29 +99,15 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
         try {
           newAccessToken = await refreshToken();
         } catch (refreshError) {
-          // Keychain temporarily inaccessible (locked device, background fetch,
-          // legacy WhenUnlocked entry). Don't log out — the session is intact,
-          // we just couldn't read the refresh token. Surface the original 401.
           if (refreshError instanceof KeychainUnavailableError) throw error;
           Sentry.captureException(refreshError, { tags: { auth_path: "refresh_failed" } });
           await logout();
           throw error;
         }
-        // Retry once with the refreshed token. If this 401s again (e.g., token's
-        // scopes are stuck and the new endpoint requires more), propagate the
-        // error rather than logging the user out — refresh doesn't upgrade scopes,
-        // so logout wouldn't help anyway. Transient retry failures (5xx, network)
-        // also surface to the caller instead of nuking the session.
         return await requestAPI<TResponse>(options.url, { accessToken: newAccessToken });
       }
     },
     ...options,
-    // Placed AFTER ...options on purpose: we must always opt out of TanStack's
-    // retry on UnauthorizedError or the queryFn re-enters its refresh path and
-    // burns extra Doorkeeper rotations (Doorkeeper rotates the refresh token
-    // on every exchange, and inflight-dedup only covers concurrent calls within
-    // one queryFn invocation, not sequential TanStack retries). Caller's retry
-    // policy still applies to any non-auth error.
     retry: (failureCount, error) => {
       if (error instanceof UnauthorizedError) return false;
       const callerRetry = options.retry;

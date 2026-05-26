@@ -49,7 +49,6 @@ const mockDeleteItemAsync = SecureStore.deleteItemAsync as jest.Mock;
 beforeEach(() => {
   jest.clearAllMocks();
   mockMakeRedirectUri.mockReturnValue("gumroadmobile://redirect");
-  // Restore SecureStore defaults so per-test overrides don't bleed across tests.
   mockGetItemAsync.mockResolvedValue(null);
   mockSetItemAsync.mockResolvedValue(true);
   mockDeleteItemAsync.mockResolvedValue(undefined);
@@ -251,12 +250,6 @@ describe("refreshToken keychain-unavailable handling", () => {
   });
 
   it("does NOT translate keychain errors from storeTokens write (server has already rotated)", async () => {
-    // The server rotated the refresh token in `request(tokenEndpoint, ...)` above
-    // storeTokens. A keychain write failure here leaves local state inconsistent
-    // with server (our stored refresh token is now dead). Treating it as transient
-    // would let the caller think the session is intact, but the next refresh would
-    // fail with invalid_grant. Let the original error propagate so useAPIRequest
-    // takes the logout path.
     mockGetItemAsync.mockImplementation((key: string) =>
       key === "gumroad_refresh_token" ? Promise.resolve("stored-refresh") : Promise.resolve(null),
     );
