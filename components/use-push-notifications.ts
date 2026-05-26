@@ -62,19 +62,40 @@ const getExpoPushToken = async () => {
   return tokenData.data;
 };
 
-const handleNotificationResponse = (
-  response: Notifications.NotificationResponse,
-  router: ReturnType<typeof useRouter>,
-) => {
-  const data = response.notification.request.content.data as Record<string, string> | undefined;
-  if (!data?.installment_id) return;
+const handledNotificationIdentifiers = new Set<string>();
 
+let indexInitialRoutingComplete = false;
+
+export const markIndexInitialRoutingComplete = () => {
+  indexInitialRoutingComplete = true;
+};
+
+export const __resetPushNotificationsModuleStateForTests = () => {
+  handledNotificationIdentifiers.clear();
+  indexInitialRoutingComplete = false;
+};
+
+const buildNotificationRoute = (data: Record<string, string>): string | null => {
+  if (!data.installment_id) return null;
   const params = new URLSearchParams();
   if (data.purchase_id) params.set("purchaseId", data.purchase_id);
   else if (data.subscription_id) params.set("subscriptionId", data.subscription_id);
   else if (data.follower_id) params.set("followerId", data.follower_id);
   const query = params.toString();
-  router.push(`/post/${data.installment_id}${query ? `?${query}` : ""}` as any);
+  return `/post/${data.installment_id}${query ? `?${query}` : ""}`;
+};
+
+export const consumeNotificationRoute = (
+  response: Notifications.NotificationResponse | null,
+): string | null => {
+  if (!response) return null;
+  const identifier = response.notification.request.identifier;
+  if (handledNotificationIdentifiers.has(identifier)) return null;
+  const data = response.notification.request.content.data as Record<string, string> | undefined;
+  const route = data ? buildNotificationRoute(data) : null;
+  if (!route) return null;
+  handledNotificationIdentifiers.add(identifier);
+  return route;
 };
 
 export const usePushNotifications = () => {
@@ -96,12 +117,12 @@ export const usePushNotifications = () => {
   }, [isAuthenticated, accessToken]);
 
   useEffect(() => {
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) handleNotificationResponse(response, router);
-    });
-
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      handleNotificationResponse(response, router);
+      if (!indexInitialRoutingComplete) return;
+      const route = consumeNotificationRoute(response);
+      if (!route) return;
+      router.push(route as any);
+      Notifications.clearLastNotificationResponseAsync().catch(() => {});
     });
 
     return () => {
