@@ -30,14 +30,16 @@ export default function Index() {
         router.replace("/login");
         return;
       }
+      const defaultRoute = isCreator ? "/(tabs)/dashboard" : "/(tabs)/library";
       const response = await Notifications.getLastNotificationResponseAsync();
       const notificationRoute = getNotificationRoute(response);
       if (notificationRoute) {
-        await Notifications.clearLastNotificationResponseAsync();
-        router.replace(notificationRoute as any);
+        router.replace(defaultRoute);
+        router.push(notificationRoute as any);
+        Notifications.clearLastNotificationResponseAsync().catch(() => {});
         return;
       }
-      router.replace(isCreator ? "/(tabs)/dashboard" : "/(tabs)/library");
+      router.replace(defaultRoute);
     });
 
     return () => cancelAnimationFrame(id);

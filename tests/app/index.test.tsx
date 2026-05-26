@@ -1,8 +1,9 @@
 import { render, act } from "@testing-library/react-native";
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({ replace: mockReplace, push: mockPush }),
 }));
 
 jest.mock("expo-splash-screen", () => ({
@@ -124,9 +125,29 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/post/abc123?purchaseId=p1");
-    expect(mockReplace).not.toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockPush).toHaveBeenCalledWith("/post/abc123?purchaseId=p1");
     expect(mockClearLastNotificationResponseAsync).toHaveBeenCalled();
+  });
+
+  it("uses /(tabs)/dashboard as the back target for creators launched via notification", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true });
+    mockGetLastNotificationResponseAsync.mockResolvedValue({
+      notification: {
+        request: {
+          content: { data: { installment_id: "xyz" } },
+        },
+      },
+    });
+
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
+    expect(mockPush).toHaveBeenCalledWith("/post/xyz");
   });
 
   it("falls back to default route when notification has no installment_id", async () => {
