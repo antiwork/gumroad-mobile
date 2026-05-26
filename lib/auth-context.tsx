@@ -65,8 +65,6 @@ const isKeychainUnavailableError = (error: unknown): boolean =>
   (error.message.includes("User interaction is not allowed") ||
     error.message.includes("No keychain is available"));
 
-const keychainReadRetryDelaysMs = [0, 150, 400, 1000, 2000];
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -91,41 +89,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      for (const delay of keychainReadRetryDelaysMs) {
-        if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-        if (cancelled) return;
-        try {
-          const storedToken = await SecureStore.getItemAsync(accessTokenKey);
-          if (cancelled) return;
-          if (storedToken) {
-            setAccessToken(storedToken);
-            const creatorStatus = await fetchCreatorStatus(storedToken);
-            if (!cancelled) setIsCreator(creatorStatus);
-          }
-          setIsLoading(false);
-          return;
-        } catch (error) {
-          if (!isKeychainUnavailableError(error)) {
-            console.error("Failed to load stored auth:", error);
-            Sentry.captureException(error);
-            if (!cancelled) setIsLoading(false);
-            return;
-          }
-          console.warn("Keychain unavailable (device may be locked):", error);
+    async function loadStoredAuth() {
+      try {
+        const storedToken = await SecureStore.getItemAsync(accessTokenKey);
+        if (storedToken) {
+          setAccessToken(storedToken);
+          const creatorStatus = await fetchCreatorStatus(storedToken);
+          setIsCreator(creatorStatus);
         }
+      } catch (error) {
+        if (isKeychainUnavailableError(error)) {
+          console.warn("Keychain unavailable (device may be locked):", error);
+        } else {
+          console.error("Failed to load stored auth:", error);
+          Sentry.captureException(error);
+        }
+      } finally {
+        setIsLoading(false);
       }
-      Sentry.captureException(new Error("Keychain unavailable after boot retries"), {
-        tags: { auth_path: "keychain_retry_exhausted" },
-      });
-      if (!cancelled) setIsLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    }
+    loadStoredAuth();
   }, []);
 
   const storeTokens = useCallback(async (accessToken: string, refreshToken?: string) => {
