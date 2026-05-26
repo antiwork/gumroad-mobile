@@ -10,6 +10,15 @@ jest.mock("expo-splash-screen", () => ({
   hideAsync: jest.fn(),
 }));
 
+const mockGetLastNotificationResponseAsync = jest.fn();
+const mockClearLastNotificationResponseAsync = jest.fn();
+jest.mock("expo-notifications", () => ({
+  setNotificationHandler: jest.fn(),
+  getLastNotificationResponseAsync: () => mockGetLastNotificationResponseAsync(),
+  clearLastNotificationResponseAsync: () => mockClearLastNotificationResponseAsync(),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+}));
+
 const mockUseAuth = jest.fn();
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -18,12 +27,20 @@ jest.mock("@/lib/auth-context", () => ({
 import Index from "@/app/index";
 
 describe("Index", () => {
-  let rafCallbacks: Array<() => void>;
+  let rafCallbacks: Array<() => unknown>;
   let originalRAF: typeof globalThis.requestAnimationFrame;
   let originalCAF: typeof globalThis.cancelAnimationFrame;
 
+  const flushRaf = async () => {
+    for (const cb of rafCallbacks) {
+      await cb();
+    }
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetLastNotificationResponseAsync.mockResolvedValue(null);
+    mockClearLastNotificationResponseAsync.mockResolvedValue(undefined);
     rafCallbacks = [];
     originalRAF = globalThis.requestAnimationFrame;
     originalCAF = globalThis.cancelAnimationFrame;
@@ -57,37 +74,75 @@ describe("Index", () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it("navigates to /login for unauthenticated users after requestAnimationFrame", () => {
+  it("navigates to /login for unauthenticated users after requestAnimationFrame", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: false, isCreator: false });
     render(<Index />);
 
-    act(() => {
-      rafCallbacks.forEach((cb) => cb());
+    await act(async () => {
+      await flushRaf();
     });
 
     expect(mockReplace).toHaveBeenCalledWith("/login");
+    expect(mockGetLastNotificationResponseAsync).not.toHaveBeenCalled();
   });
 
-  it("navigates to /(tabs)/dashboard for creators", () => {
+  it("navigates to /(tabs)/dashboard for creators", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true });
     render(<Index />);
 
-    act(() => {
-      rafCallbacks.forEach((cb) => cb());
+    await act(async () => {
+      await flushRaf();
     });
 
     expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
   });
 
-  it("navigates to /(tabs)/library for non-creators", () => {
+  it("navigates to /(tabs)/library for non-creators", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false });
     render(<Index />);
 
-    act(() => {
-      rafCallbacks.forEach((cb) => cb());
+    await act(async () => {
+      await flushRaf();
     });
 
     expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+  });
+
+  it("navigates to the linked post when launched from a notification tap", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false });
+    mockGetLastNotificationResponseAsync.mockResolvedValue({
+      notification: {
+        request: {
+          content: { data: { installment_id: "abc123", purchase_id: "p1" } },
+        },
+      },
+    });
+
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/post/abc123?purchaseId=p1");
+    expect(mockReplace).not.toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockClearLastNotificationResponseAsync).toHaveBeenCalled();
+  });
+
+  it("falls back to default route when notification has no installment_id", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false });
+    mockGetLastNotificationResponseAsync.mockResolvedValue({
+      notification: { request: { content: { data: {} } } },
+    });
+
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockClearLastNotificationResponseAsync).not.toHaveBeenCalled();
   });
 
   it("cancels animation frame on unmount", () => {
