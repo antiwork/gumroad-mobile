@@ -114,6 +114,7 @@ describe("Index", () => {
     mockGetLastNotificationResponseAsync.mockResolvedValue({
       notification: {
         request: {
+          identifier: "notif-1",
           content: { data: { installment_id: "abc123", purchase_id: "p1" } },
         },
       },
@@ -135,6 +136,7 @@ describe("Index", () => {
     mockGetLastNotificationResponseAsync.mockResolvedValue({
       notification: {
         request: {
+          identifier: "notif-2",
           content: { data: { installment_id: "xyz" } },
         },
       },
@@ -153,7 +155,7 @@ describe("Index", () => {
   it("falls back to default route when notification has no installment_id", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false });
     mockGetLastNotificationResponseAsync.mockResolvedValue({
-      notification: { request: { content: { data: {} } } },
+      notification: { request: { identifier: "notif-3", content: { data: {} } } },
     });
 
     render(<Index />);
@@ -164,6 +166,20 @@ describe("Index", () => {
 
     expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
     expect(mockClearLastNotificationResponseAsync).not.toHaveBeenCalled();
+  });
+
+  it("falls back to default route when the notifications API throws", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false });
+    mockGetLastNotificationResponseAsync.mockRejectedValue(new Error("native module unavailable"));
+
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("cancels animation frame on unmount", () => {

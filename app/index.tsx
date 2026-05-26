@@ -1,5 +1,6 @@
-import { getNotificationRoute } from "@/components/use-push-notifications";
+import { consumeNotificationRoute } from "@/components/use-push-notifications";
 import { useAuth } from "@/lib/auth-context";
+import * as Sentry from "@sentry/react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -31,8 +32,13 @@ export default function Index() {
         return;
       }
       const defaultRoute = isCreator ? "/(tabs)/dashboard" : "/(tabs)/library";
-      const response = await Notifications.getLastNotificationResponseAsync();
-      const notificationRoute = getNotificationRoute(response);
+      let notificationRoute: string | null = null;
+      try {
+        const response = await Notifications.getLastNotificationResponseAsync();
+        notificationRoute = consumeNotificationRoute(response);
+      } catch (error) {
+        Sentry.captureException(error);
+      }
       if (notificationRoute) {
         router.replace(defaultRoute);
         router.push(notificationRoute as any);

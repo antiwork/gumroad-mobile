@@ -62,16 +62,34 @@ const getExpoPushToken = async () => {
   return tokenData.data;
 };
 
-export const getNotificationRoute = (response: Notifications.NotificationResponse | null): string | null => {
-  const data = response?.notification.request.content.data as Record<string, string> | undefined;
-  if (!data?.installment_id) return null;
+const handledNotificationIdentifiers = new Set<string>();
 
+const buildNotificationRoute = (data: Record<string, string>): string | null => {
+  if (!data.installment_id) return null;
   const params = new URLSearchParams();
   if (data.purchase_id) params.set("purchaseId", data.purchase_id);
   else if (data.subscription_id) params.set("subscriptionId", data.subscription_id);
   else if (data.follower_id) params.set("followerId", data.follower_id);
   const query = params.toString();
   return `/post/${data.installment_id}${query ? `?${query}` : ""}`;
+};
+
+// Returns the route for an unhandled notification response and marks it consumed.
+// iOS replays cold-start responses to newly registered listeners (see
+// NotificationCenterManager.addDelegate), so both `getLastNotificationResponseAsync`
+// in `app/index.tsx` and `addNotificationResponseReceivedListener` below can fire
+// for the same notification. The identifier set deduplicates them.
+export const consumeNotificationRoute = (
+  response: Notifications.NotificationResponse | null,
+): string | null => {
+  if (!response) return null;
+  const identifier = response.notification.request.identifier;
+  if (handledNotificationIdentifiers.has(identifier)) return null;
+  const data = response.notification.request.content.data as Record<string, string> | undefined;
+  const route = data ? buildNotificationRoute(data) : null;
+  if (!route) return null;
+  handledNotificationIdentifiers.add(identifier);
+  return route;
 };
 
 export const usePushNotifications = () => {
@@ -94,7 +112,7 @@ export const usePushNotifications = () => {
 
   useEffect(() => {
     notificationResponseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const route = getNotificationRoute(response);
+      const route = consumeNotificationRoute(response);
       if (route) router.push(route as any);
     });
 
