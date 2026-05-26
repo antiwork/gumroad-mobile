@@ -36,9 +36,9 @@ const jsonResponse = (data: unknown, status = 200) => ({
   text: () => Promise.resolve(JSON.stringify(data)),
 });
 
-const createWrapper = () => {
+const createWrapper = (retry: number | boolean = false) => {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: { queries: { retry, gcTime: 0, retryDelay: 0 } },
   });
   const Wrapper = ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
@@ -46,9 +46,9 @@ const createWrapper = () => {
   return Wrapper;
 };
 
-const renderUseAPIRequest = () =>
+const renderUseAPIRequest = (retry: number | boolean = false) =>
   renderHook(() => useAPIRequest<{ ok: boolean }>({ url: "/test", queryKey: ["test"] }), {
-    wrapper: createWrapper(),
+    wrapper: createWrapper(retry),
   });
 
 const authHeaderOf = (call: unknown[]): string | undefined => {
@@ -58,7 +58,11 @@ const authHeaderOf = (call: unknown[]): string | undefined => {
 };
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  // mockReset (not just clear) so mockResolvedValueOnce queues don't bleed across tests.
+  mockFetch.mockReset();
+  mockRefreshToken.mockReset();
+  mockLogout.mockReset();
+  (Sentry.captureException as jest.Mock).mockClear();
 });
 
 describe("useAPIRequest", () => {
@@ -130,13 +134,59 @@ describe("useAPIRequest", () => {
   it("propagates a transient 5xx on retry without logging out", async () => {
     mockFetch
       .mockResolvedValueOnce(jsonResponse({}, 401))
-      .mockResolvedValueOnce(jsonResponse({ error: "boom" }, 503));
+      .mockResolvedValue(jsonResponse({ error: "boom" }, 503));
     mockRefreshToken.mockResolvedValueOnce("fresh-token");
 
     const { result } = renderUseAPIRequest();
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error?.message).toMatch(/503/);
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  // Production QueryClient sets retry: 2 in lib/query-client.tsx. The next three tests
+  // simulate that to prove the retry override in useAPIRequest behaves correctly:
+  // - UnauthorizedError must not re-enter queryFn (would burn extra refresh rotations)
+  // - 5xx must still retry under the caller's policy
+  // - The KeychainUnavailableError path must not loop on a locked keychain
+  it("under production retry:2, a scope-stuck 401 triggers refresh exactly once (no extra rotations)", async () => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+      .mockResolvedValue(jsonResponse({}, 401));
+    mockRefreshToken.mockResolvedValue("fresh-token");
+
+    const { result } = renderUseAPIRequest(2);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(UnauthorizedError);
+    expect(mockRefreshToken).toHaveBeenCalledTimes(1);
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("under production retry:2, a transient 5xx still retries (auth-only opt-out)", async () => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ error: "boom" }, 500))
+      .mockResolvedValueOnce(jsonResponse({ error: "boom" }, 500))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    const { result } = renderUseAPIRequest(2);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(mockRefreshToken).not.toHaveBeenCalled();
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("under production retry:2, a KeychainUnavailableError path does not retry-loop on a locked keychain", async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, 401));
+    mockRefreshToken.mockRejectedValue(new KeychainUnavailableError());
+
+    const { result } = renderUseAPIRequest(2);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(UnauthorizedError);
+    expect(mockRefreshToken).toHaveBeenCalledTimes(1);
     expect(mockLogout).not.toHaveBeenCalled();
   });
 
