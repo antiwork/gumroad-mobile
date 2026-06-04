@@ -17,7 +17,18 @@ export class KeychainUnavailableError extends Error {
   }
 }
 
+export class ServerError extends Error {
+  statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.name = "ServerError";
+    this.statusCode = statusCode;
+  }
+}
+
 const REQUEST_TIMEOUT_MS = 30_000;
+const RETRY_BASE_DELAY_MS = 1_000;
+const MAX_RETRY_DELAY_MS = 30_000;
 
 export const request = async <T>(
   url: string,
@@ -50,6 +61,10 @@ export const request = async <T>(
     if (response.status === 401) {
       console.info("HTTP request", details);
       throw new UnauthorizedError("Unauthorized");
+    }
+    if (response.status >= 500) {
+      console.info("HTTP request", { ...details, error: "Server error" });
+      throw new ServerError(response.status, `Request failed: ${response.status}`);
     }
     if (!response.ok) {
       const error =
@@ -115,6 +130,12 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
       if (typeof callerRetry === "boolean") return callerRetry;
       if (typeof callerRetry === "number") return failureCount < callerRetry;
       return callerRetry(failureCount, error);
+    },
+    retryDelay: (attemptIndex, error) => {
+      if (error instanceof ServerError) {
+        return Math.min(RETRY_BASE_DELAY_MS * 2 ** attemptIndex, MAX_RETRY_DELAY_MS);
+      }
+      return 0;
     },
     enabled: !!accessToken && (options.enabled ?? true),
   });

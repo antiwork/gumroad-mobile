@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
 
-import { KeychainUnavailableError, UnauthorizedError, useAPIRequest } from "@/lib/request";
+import { KeychainUnavailableError, ServerError, UnauthorizedError, useAPIRequest } from "@/lib/request";
 
 const mockRefreshToken = jest.fn();
 const mockLogout = jest.fn();
@@ -159,6 +159,7 @@ describe("useAPIRequest", () => {
   });
 
   it("propagates a transient 5xx on retry without logging out", async () => {
+    jest.useFakeTimers();
     mockFetch
       .mockResolvedValueOnce(jsonResponse({}, 401))
       .mockResolvedValue(jsonResponse({ error: "boom" }, 503));
@@ -166,9 +167,11 @@ describe("useAPIRequest", () => {
 
     const { result } = renderUseAPIRequest();
 
+    await jest.advanceTimersByTimeAsync(10_000);
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error?.message).toMatch(/503/);
     expect(mockLogout).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it("under production retry:2, a scope-stuck 401 triggers refresh exactly once (no extra rotations)", async () => {
@@ -187,6 +190,7 @@ describe("useAPIRequest", () => {
   });
 
   it("under production retry:2, a transient 5xx still retries (auth-only opt-out)", async () => {
+    jest.useFakeTimers();
     mockFetch
       .mockResolvedValueOnce(jsonResponse({ error: "boom" }, 500))
       .mockResolvedValueOnce(jsonResponse({ error: "boom" }, 500))
@@ -194,10 +198,12 @@ describe("useAPIRequest", () => {
 
     const { result } = renderUseAPIRequest(2);
 
+    await jest.advanceTimersByTimeAsync(10_000);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(mockRefreshToken).not.toHaveBeenCalled();
     expect(mockLogout).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it("under production retry:2, a KeychainUnavailableError path does not retry-loop on a locked keychain", async () => {
@@ -213,13 +219,16 @@ describe("useAPIRequest", () => {
   });
 
   it("does not attempt refresh for non-UnauthorizedError failures", async () => {
-    mockFetch.mockResolvedValueOnce(jsonResponse({ error: "boom" }, 500));
+    jest.useFakeTimers();
+    mockFetch.mockResolvedValue(jsonResponse({ error: "boom" }, 500));
 
     const { result } = renderUseAPIRequest();
 
+    await jest.advanceTimersByTimeAsync(10_000);
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(mockRefreshToken).not.toHaveBeenCalled();
     expect(mockLogout).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it("ignores a caller-supplied retry:true for UnauthorizedError (auth opt-out wins)", async () => {
@@ -244,6 +253,7 @@ describe("useAPIRequest", () => {
   });
 
   it("ignores a caller-supplied retry function for UnauthorizedError but consults it for other errors", async () => {
+    jest.useFakeTimers();
     mockFetch
       .mockResolvedValueOnce(jsonResponse({ error: "boom" }, 500))
       .mockResolvedValueOnce(jsonResponse({ ok: true }));
@@ -251,9 +261,45 @@ describe("useAPIRequest", () => {
 
     const { result } = renderUseAPIRequestWithCallerRetry(callerRetry);
 
+    await jest.advanceTimersByTimeAsync(5_000);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(callerRetry).toHaveBeenCalled();
     const errorArg = callerRetry.mock.calls[0]?.[1];
     expect(errorArg?.message).toMatch(/500/);
+    jest.useRealTimers();
+  });
+
+  it("throws ServerError for 5xx responses", async () => {
+    jest.useFakeTimers();
+    mockFetch.mockResolvedValue(jsonResponse({ error: "boom" }, 502));
+
+    const { result } = renderUseAPIRequest();
+
+    await jest.advanceTimersByTimeAsync(10_000);
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(ServerError);
+    expect((result.current.error as ServerError).statusCode).toBe(502);
+    jest.useRealTimers();
+  });
+
+  it("applies exponential backoff delay for ServerError retries", async () => {
+    jest.useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({}, 502))
+      .mockResolvedValueOnce(jsonResponse({}, 502))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    const { result } = renderUseAPIRequest(3);
+
+    await jest.advanceTimersByTimeAsync(500);
+    expect(result.current.isSuccess).toBe(false);
+
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    await jest.advanceTimersByTimeAsync(2_000);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    jest.useRealTimers();
   });
 });

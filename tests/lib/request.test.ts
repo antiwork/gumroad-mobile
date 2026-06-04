@@ -1,4 +1,4 @@
-import { request, UnauthorizedError } from "@/lib/request";
+import { request, ServerError, UnauthorizedError } from "@/lib/request";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -69,10 +69,29 @@ describe("request", () => {
     await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 404 Not found");
   });
 
-  it("throws on non-ok responses", async () => {
+  it("throws ServerError on 5xx responses", async () => {
     mockFetch.mockReturnValueOnce(jsonResponse({ error: "bad" }, 500));
-    await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 500");
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const thrown = (await request("https://api.example.com/test").catch((e) => e)) as ServerError;
+    expect(thrown).toBeInstanceOf(ServerError);
+    expect(thrown.statusCode).toBe(500);
+    expect(thrown.message).toBe("Request failed: 500");
+  });
+
+  it("throws ServerError on 502 with HTML body without including the body in the message", async () => {
+    const cloudflareHtml = "<html><body>Ran out of time — we weren't able to render the page in time</body></html>";
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 502,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(cloudflareHtml),
+      }),
+    );
+    const thrown = (await request("https://api.example.com/test").catch((e) => e)) as ServerError;
+    expect(thrown).toBeInstanceOf(ServerError);
+    expect(thrown.statusCode).toBe(502);
+    expect(thrown.message).toBe("Request failed: 502");
+    expect(thrown.message).not.toContain("Ran out of time");
   });
 
   it("aborts the request after 30s timeout", async () => {
