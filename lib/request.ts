@@ -110,6 +110,7 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
     ...options,
     retry: (failureCount, error) => {
       if (error instanceof UnauthorizedError) return false;
+      if (error.name === "AbortError") return false;
       const callerRetry = options.retry;
       if (callerRetry === undefined) return failureCount < 2;
       if (typeof callerRetry === "boolean") return callerRetry;
