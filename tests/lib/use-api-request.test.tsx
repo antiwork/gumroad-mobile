@@ -116,6 +116,18 @@ describe("useAPIRequest", () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
+  it("logs out without reporting to Sentry when refresh fails with UnauthorizedError", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
+    mockRefreshToken.mockRejectedValueOnce(new UnauthorizedError("Unauthorized"));
+
+    const { result } = renderUseAPIRequest();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(result.current.error).toBeInstanceOf(UnauthorizedError);
+  });
+
   it("logs out when refresh fails with a raw keychain error (write-side after server rotation)", async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
     const writeError = new Error("User interaction is not allowed");
