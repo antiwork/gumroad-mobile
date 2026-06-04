@@ -28,7 +28,28 @@ jest.mock("@/modules/pdf-thumbnail", () => ({
   generateThumbnail: jest.fn().mockResolvedValue({ uri: "file:///thumb.jpg", width: 300, height: 420 }),
 }));
 
+jest.mock("@/components/pdf-navigation-sheet", () => ({
+  PdfNavigationSheet: () => null,
+}));
+
 let mockOnError: ((e: unknown) => void) | null = null;
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: Error) => void;
+};
+
+const deferred = <T,>(): Deferred<T> => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+};
 
 jest.mock("react-native-pdf", () => {
   const { forwardRef } = require("react");
@@ -49,7 +70,10 @@ const renderWithProviders = () => renderWithQueryClient(<PdfViewerScreen />);
 
 describe("PdfViewerScreen", () => {
   beforeEach(() => {
+    const { File } = require("expo-file-system");
     mockOnError = null;
+    File.downloadFileAsync.mockReset();
+    File.downloadFileAsync.mockResolvedValue({ uri: "file:///cache/test.pdf" });
   });
 
   it("shows error view with Try Again button when PDF fails to load", async () => {
@@ -88,19 +112,53 @@ describe("PdfViewerScreen", () => {
 
     renderWithProviders();
 
+    expect(screen.getByTestId("loading-spinner")).toBeTruthy();
     expect(screen.queryByTestId("pdf-component")).toBeNull();
   });
 
   it("shows error view when PDF download fails", async () => {
     const { File } = require("expo-file-system");
-    File.downloadFileAsync.mockRejectedValue(new Error("Network error"));
+    File.downloadFileAsync.mockRejectedValueOnce(new Error("Network error"));
 
     renderWithProviders();
 
     await waitFor(() => expect(screen.getByText("Try Again")).toBeTruthy());
     expect(screen.getByText(/Unable to load this PDF/)).toBeTruthy();
     expect(screen.queryByTestId("pdf-component")).toBeNull();
+  });
 
-    File.downloadFileAsync.mockResolvedValue({ uri: "file:///cache/test.pdf" });
+  it("ignores stale retry failures after a newer retry succeeds", async () => {
+    const { File } = require("expo-file-system");
+    const slowFailure = deferred<{ uri: string }>();
+    const fastSuccess = deferred<{ uri: string }>();
+    File.downloadFileAsync
+      .mockRejectedValueOnce(new Error("Initial network error"))
+      .mockReturnValueOnce(slowFailure.promise)
+      .mockReturnValueOnce(fastSuccess.promise);
+
+    renderWithProviders();
+
+    await waitFor(() => expect(screen.getByText("Try Again")).toBeTruthy());
+    const retryButton = screen.getByText("Try Again");
+
+    act(() => {
+      fireEvent.press(retryButton);
+      fireEvent.press(retryButton);
+    });
+
+    expect(File.downloadFileAsync).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      fastSuccess.resolve({ uri: "file:///cache/fast.pdf" });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
+
+    await act(async () => {
+      slowFailure.reject(new Error("Stale retry failure"));
+    });
+
+    expect(screen.queryByText(/Unable to load this PDF/)).toBeNull();
+    expect(screen.getByTestId("pdf-component")).toBeTruthy();
   });
 });

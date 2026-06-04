@@ -34,6 +34,7 @@ export default function PdfViewerScreen() {
   const { accessToken } = useAuth();
   const queryClient = useQueryClient();
   const pdfRef = useRef<PdfRef>(null);
+  const cancelDownloadRef = useRef<(() => void) | null>(null);
   const [currentPage, setCurrentPage] = useState(initialPage ? Number(initialPage) : 1);
   const currentPageRef = useRefToLatest(currentPage);
   const [totalPages, setTotalPages] = useState(0);
@@ -59,8 +60,10 @@ export default function PdfViewerScreen() {
         if (!cancelled) setCachedUri(result.uri);
       })
       .catch((e) => {
-        console.error("Error downloading PDF", e);
-        if (!cancelled) setDownloadError(true);
+        if (!cancelled) {
+          console.error("Error downloading PDF", e);
+          setDownloadError(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setIsDownloading(false);
@@ -71,7 +74,14 @@ export default function PdfViewerScreen() {
     };
   }, [uri]);
 
-  useEffect(downloadPdf, [downloadPdf]);
+  useEffect(() => {
+    cancelDownloadRef.current = downloadPdf();
+
+    return () => {
+      cancelDownloadRef.current?.();
+      cancelDownloadRef.current = null;
+    };
+  }, [downloadPdf]);
 
   const switchViewMode = (mode: "single" | "continuous") => {
     // Unmount the PDF component first to let the native rendering thread finish
@@ -170,7 +180,10 @@ export default function PdfViewerScreen() {
             onPress={() => {
               setPdfError(false);
               setPdfKey((k) => k + 1);
-              if (downloadError) downloadPdf();
+              if (downloadError) {
+                cancelDownloadRef.current?.();
+                cancelDownloadRef.current = downloadPdf();
+              }
             }}
           >
             <Text className="text-base font-semibold text-white">Try Again</Text>
@@ -178,7 +191,7 @@ export default function PdfViewerScreen() {
         </View>
       ) : !cachedUri || isDownloading ? (
         <View className="flex-1 items-center justify-center">
-          <LoadingSpinner />
+          <LoadingSpinner testID="loading-spinner" />
         </View>
       ) : pdfMounted ? (
         <Pdf
