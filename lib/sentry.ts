@@ -27,6 +27,10 @@ Sentry.init({
     if (message?.includes("User interaction is not allowed")) {
       return null;
     }
+    const exceptionType = event.exception?.values?.[0]?.type;
+    if (exceptionType === "AbortError" || message === "Aborted") {
+      return null;
+    }
     return event;
   },
   integrations: [navigationIntegration],
