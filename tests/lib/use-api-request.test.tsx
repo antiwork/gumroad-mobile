@@ -104,9 +104,7 @@ describe("useAPIRequest", () => {
   });
 
   it("attempts refresh on 401 and retries with the new token", async () => {
-    mockFetch
-      .mockResolvedValueOnce(jsonResponse({}, 401))
-      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 401)).mockResolvedValueOnce(jsonResponse({ ok: true }));
     mockRefreshToken.mockResolvedValueOnce("fresh-token");
 
     const { result } = renderUseAPIRequest();
@@ -174,9 +172,7 @@ describe("useAPIRequest", () => {
 
   it("propagates a transient 5xx on retry without logging out", async () => {
     jest.useFakeTimers();
-    mockFetch
-      .mockResolvedValueOnce(jsonResponse({}, 401))
-      .mockResolvedValue(jsonResponse({ error: "boom" }, 503));
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 401)).mockResolvedValue(jsonResponse({ error: "boom" }, 503));
     mockRefreshToken.mockResolvedValueOnce("fresh-token");
 
     const { result } = renderUseAPIRequest();
@@ -355,9 +351,7 @@ describe("useAPIRequest", () => {
     jest.useFakeTimers();
     const networkError = new Error("Network request failed");
     const callerRetryDelay = jest.fn<number, [number, Error]>(() => 3_000);
-    mockFetch
-      .mockRejectedValueOnce(networkError)
-      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+    mockFetch.mockRejectedValueOnce(networkError).mockResolvedValueOnce(jsonResponse({ ok: true }));
 
     const { result } = renderUseAPIRequestWithCallerRetryDelay(callerRetryDelay);
 
