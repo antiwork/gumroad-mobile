@@ -243,11 +243,11 @@ describe("useAPIRequest", () => {
     expect(mockRefreshToken).toHaveBeenCalledTimes(1);
   });
 
-  it("does not retry AbortError even with retry:2", async () => {
+  it("does not retry AbortError even with caller-supplied retry:2", async () => {
     const abortError = new DOMException("The operation was aborted.", "AbortError");
     mockFetch.mockRejectedValue(abortError);
 
-    const { result } = renderUseAPIRequest(2);
+    const { result } = renderUseAPIRequestWithCallerRetry(2);
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error?.name).toBe("AbortError");

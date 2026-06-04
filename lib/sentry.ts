@@ -28,7 +28,7 @@ Sentry.init({
       return null;
     }
     const exceptionType = event.exception?.values?.[0]?.type;
-    if (exceptionType === "AbortError" || message === "Aborted") {
+    if (exceptionType === "AbortError") {
       return null;
     }
     return event;
