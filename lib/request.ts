@@ -135,7 +135,10 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
       if (error instanceof ServerError) {
         return Math.min(RETRY_BASE_DELAY_MS * 2 ** attemptIndex, MAX_RETRY_DELAY_MS);
       }
-      return 0;
+      const callerRetryDelay = options.retryDelay;
+      if (typeof callerRetryDelay === "function") return callerRetryDelay(attemptIndex, error);
+      if (typeof callerRetryDelay === "number") return callerRetryDelay;
+      return Math.min(RETRY_BASE_DELAY_MS * 2 ** attemptIndex, MAX_RETRY_DELAY_MS);
     },
     enabled: !!accessToken && (options.enabled ?? true),
   });

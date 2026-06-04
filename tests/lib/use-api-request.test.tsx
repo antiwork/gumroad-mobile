@@ -64,6 +64,20 @@ const renderUseAPIRequestWithCallerRetry = (
     { wrapper: createWrapper(false) },
   );
 
+const renderUseAPIRequestWithCallerRetryDelay = (
+  callerRetryDelay: number | ((attemptIndex: number, error: Error) => number),
+) =>
+  renderHook(
+    () =>
+      useAPIRequest<{ ok: boolean }>({
+        url: "/test",
+        queryKey: ["test"],
+        retry: 2,
+        retryDelay: callerRetryDelay,
+      }),
+    { wrapper: createWrapper(false) },
+  );
+
 const authHeaderOf = (call: unknown[]): string | undefined => {
   const init = call[1] as RequestInit | undefined;
   const headers = init?.headers as Record<string, string> | undefined;
@@ -300,6 +314,60 @@ describe("useAPIRequest", () => {
     await jest.advanceTimersByTimeAsync(2_000);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockFetch).toHaveBeenCalledTimes(3);
+    jest.useRealTimers();
+  });
+
+  it("applies default exponential backoff delay for non-ServerError retries", async () => {
+    jest.useFakeTimers();
+    mockFetch
+      .mockRejectedValueOnce(new Error("Network request failed"))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    const { result } = renderUseAPIRequest(2);
+
+    await jest.advanceTimersByTimeAsync(500);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    await jest.advanceTimersByTimeAsync(500);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    jest.useRealTimers();
+  });
+
+  it("uses caller-supplied numeric retryDelay for non-ServerError retries", async () => {
+    jest.useFakeTimers();
+    mockFetch
+      .mockRejectedValueOnce(new Error("Network request failed"))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    const { result } = renderUseAPIRequestWithCallerRetryDelay(3_000);
+
+    await jest.advanceTimersByTimeAsync(2_999);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    await jest.advanceTimersByTimeAsync(1);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    jest.useRealTimers();
+  });
+
+  it("uses caller-supplied retryDelay function for non-ServerError retries", async () => {
+    jest.useFakeTimers();
+    const networkError = new Error("Network request failed");
+    const callerRetryDelay = jest.fn<number, [number, Error]>(() => 3_000);
+    mockFetch
+      .mockRejectedValueOnce(networkError)
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    const { result } = renderUseAPIRequestWithCallerRetryDelay(callerRetryDelay);
+
+    await jest.advanceTimersByTimeAsync(2_999);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(callerRetryDelay).toHaveBeenCalledWith(0, networkError);
+
+    await jest.advanceTimersByTimeAsync(1);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
     jest.useRealTimers();
   });
 });
