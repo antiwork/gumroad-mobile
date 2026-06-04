@@ -1,6 +1,7 @@
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { PageIndicator } from "@/components/page-indicator";
 import { PdfNavigationSheet } from "@/components/pdf-navigation-sheet";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
@@ -12,12 +13,14 @@ import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Dimensions, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
 import { safeOpenURL } from "@/lib/open-url";
 import { Button } from "@/components/ui/button";
+
+const STALE_BLOB_ERROR = "Unable to resolve data for blob:";
 
 export default function PdfViewerScreen() {
   const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } = useLocalSearchParams<{
@@ -42,6 +45,33 @@ export default function PdfViewerScreen() {
   const [pdfMounted, setPdfMounted] = useState(true);
   const [pdfError, setPdfError] = useState(false);
   const [pdfKey, setPdfKey] = useState(0);
+  const [cachedUri, setCachedUri] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(true);
+
+  const downloadPdf = useCallback(() => {
+    let cancelled = false;
+    setDownloadError(false);
+    setCachedUri(null);
+    setIsDownloading(true);
+    File.downloadFileAsync(uri, Paths.cache, { idempotent: true })
+      .then((result) => {
+        if (!cancelled) setCachedUri(result.uri);
+      })
+      .catch((e) => {
+        console.error("Error downloading PDF", e);
+        if (!cancelled) setDownloadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsDownloading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [uri]);
+
+  useEffect(downloadPdf, [downloadPdf]);
 
   const switchViewMode = (mode: "single" | "continuous") => {
     // Unmount the PDF component first to let the native rendering thread finish
@@ -131,7 +161,7 @@ export default function PdfViewerScreen() {
           ),
         }}
       />
-      {pdfError ? (
+      {pdfError || downloadError ? (
         <View className="flex-1 items-center justify-center gap-4 px-8">
           <Text className="text-center text-lg text-foreground">
             Unable to load this PDF. The file may be temporarily unavailable.
@@ -140,16 +170,21 @@ export default function PdfViewerScreen() {
             onPress={() => {
               setPdfError(false);
               setPdfKey((k) => k + 1);
+              if (downloadError) downloadPdf();
             }}
           >
             <Text className="text-base font-semibold text-white">Try Again</Text>
           </Button>
         </View>
+      ) : !cachedUri || isDownloading ? (
+        <View className="flex-1 items-center justify-center">
+          <LoadingSpinner />
+        </View>
       ) : pdfMounted ? (
         <Pdf
           key={`${viewMode}-${pdfKey}`}
           ref={pdfRef}
-          source={{ uri }}
+          source={{ uri: cachedUri }}
           style={styles.pdf}
           trustAllCerts={false}
           fitPolicy={0}
@@ -164,7 +199,10 @@ export default function PdfViewerScreen() {
           onPageChanged={(page) => setCurrentPage(page)}
           onPressLink={(url) => safeOpenURL(url)}
           onError={(error) => {
-            Sentry.captureException(error);
+            const message = error instanceof Error ? error.message : String(error);
+            if (!message.includes(STALE_BLOB_ERROR)) {
+              Sentry.captureException(error);
+            }
             console.error("PDF Error:", error);
             setPdfError(true);
           }}
@@ -174,7 +212,7 @@ export default function PdfViewerScreen() {
       <PdfNavigationSheet
         open={showTocModal}
         onOpenChange={setShowTocModal}
-        uri={uri}
+        uri={cachedUri ?? uri}
         tableOfContents={tableOfContents}
         totalPages={totalPages}
         currentPage={currentPage}

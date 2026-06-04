@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
 jest.mock("expo-router", () => ({
@@ -52,10 +52,10 @@ describe("PdfViewerScreen", () => {
     mockOnError = null;
   });
 
-  it("shows error view with Try Again button when PDF fails to load", () => {
+  it("shows error view with Try Again button when PDF fails to load", async () => {
     renderWithProviders();
 
-    expect(screen.getByTestId("pdf-component")).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
     expect(screen.queryByText("Try Again")).toBeNull();
 
     act(() => {
@@ -67,8 +67,10 @@ describe("PdfViewerScreen", () => {
     expect(screen.queryByTestId("pdf-component")).toBeNull();
   });
 
-  it("re-mounts PDF component when Try Again is pressed", () => {
+  it("re-mounts PDF component when Try Again is pressed", async () => {
     renderWithProviders();
+
+    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
 
     act(() => {
       mockOnError!(new Error("ENOENT"));
@@ -76,7 +78,29 @@ describe("PdfViewerScreen", () => {
 
     fireEvent.press(screen.getByText("Try Again"));
 
-    expect(screen.getByTestId("pdf-component")).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
     expect(screen.queryByText("Try Again")).toBeNull();
+  });
+
+  it("shows loading spinner while downloading PDF", () => {
+    const { File } = require("expo-file-system");
+    File.downloadFileAsync.mockReturnValueOnce(new Promise(() => {}));
+
+    renderWithProviders();
+
+    expect(screen.queryByTestId("pdf-component")).toBeNull();
+  });
+
+  it("shows error view when PDF download fails", async () => {
+    const { File } = require("expo-file-system");
+    File.downloadFileAsync.mockRejectedValue(new Error("Network error"));
+
+    renderWithProviders();
+
+    await waitFor(() => expect(screen.getByText("Try Again")).toBeTruthy());
+    expect(screen.getByText(/Unable to load this PDF/)).toBeTruthy();
+    expect(screen.queryByTestId("pdf-component")).toBeNull();
+
+    File.downloadFileAsync.mockResolvedValue({ uri: "file:///cache/test.pdf" });
   });
 });
