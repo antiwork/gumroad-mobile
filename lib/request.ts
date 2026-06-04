@@ -100,7 +100,11 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
           newAccessToken = await refreshToken();
         } catch (refreshError) {
           if (refreshError instanceof KeychainUnavailableError) throw error;
-          Sentry.captureException(refreshError, { tags: { auth_path: "refresh_failed" } });
+          if (refreshError instanceof UnauthorizedError) {
+            console.warn(refreshError);
+          } else {
+            Sentry.captureException(refreshError, { tags: { auth_path: "refresh_failed" } });
+          }
           await logout();
           throw error;
         }
