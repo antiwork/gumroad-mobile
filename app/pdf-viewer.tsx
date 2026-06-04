@@ -135,16 +135,16 @@ export default function PdfViewerScreen() {
           headerRight: () => (
             <View className="flex-row items-center gap-1">
               <TouchableOpacity
+                testID="share-pdf-button"
                 disabled={isSharing}
                 onPress={async () => {
                   setIsSharing(true);
                   try {
                     const isAvailable = await Sharing.isAvailableAsync();
                     if (!isAvailable) return;
-                    const downloaded = await File.downloadFileAsync(uri, Paths.cache, {
-                      idempotent: true,
-                    });
-                    await Sharing.shareAsync(downloaded.uri);
+                    const sharedUri =
+                      cachedUri ?? (await File.downloadFileAsync(uri, Paths.cache, { idempotent: true })).uri;
+                    await Sharing.shareAsync(sharedUri);
                   } finally {
                     setIsSharing(false);
                   }

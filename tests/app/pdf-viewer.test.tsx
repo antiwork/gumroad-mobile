@@ -3,7 +3,12 @@ import { renderWithQueryClient } from "../render-with-query-client";
 
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ uri: "https://example.com/test.pdf", title: "Test PDF" }),
-  Stack: { Screen: () => null },
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => React.ReactNode } }) => {
+      const React = require("react");
+      return React.createElement(React.Fragment, null, options?.headerRight?.());
+    },
+  },
 }));
 
 jest.mock("expo-sharing", () => ({
@@ -71,9 +76,13 @@ const renderWithProviders = () => renderWithQueryClient(<PdfViewerScreen />);
 describe("PdfViewerScreen", () => {
   beforeEach(() => {
     const { File } = require("expo-file-system");
+    const Sharing = require("expo-sharing");
     mockOnError = null;
     File.downloadFileAsync.mockReset();
     File.downloadFileAsync.mockResolvedValue({ uri: "file:///cache/test.pdf" });
+    Sharing.isAvailableAsync.mockReset();
+    Sharing.shareAsync.mockReset();
+    Sharing.isAvailableAsync.mockResolvedValue(true);
   });
 
   it("shows error view with Try Again button when PDF fails to load", async () => {
@@ -160,5 +169,19 @@ describe("PdfViewerScreen", () => {
 
     expect(screen.queryByText(/Unable to load this PDF/)).toBeNull();
     expect(screen.getByTestId("pdf-component")).toBeTruthy();
+  });
+
+  it("shares the cached PDF file when available", async () => {
+    const { File } = require("expo-file-system");
+    const Sharing = require("expo-sharing");
+
+    renderWithProviders();
+
+    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId("share-pdf-button"));
+
+    await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalledWith("file:///cache/test.pdf"));
+    expect(File.downloadFileAsync).toHaveBeenCalledTimes(1);
   });
 });
