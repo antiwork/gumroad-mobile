@@ -98,6 +98,7 @@ export const PdfNavigationSheet = ({
   const [failedPages, setFailedPages] = useState<Set<number>>(new Set());
   const thumbnailWidth = (containerWidth - THUMBNAIL_GAP * (THUMBNAIL_COLUMNS + 1)) / THUMBNAIL_COLUMNS;
   const thumbnailHeight = thumbnailWidth * 1.4;
+  const isLocalFile = uri.startsWith("file://");
 
   useEffect(() => {
     if (hasToc) setActiveTab("contents");
@@ -106,20 +107,30 @@ export const PdfNavigationSheet = ({
   const downloadPdf = useCallback(() => {
     let cancelled = false;
     setDownloadError(false);
+
+    if (isLocalFile) {
+      setCachedUri(uri);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setCachedUri(null);
     File.downloadFileAsync(uri, Paths.cache, { idempotent: true })
       .then((result) => {
         if (!cancelled) setCachedUri(result.uri);
       })
       .catch((e) => {
-        console.error("Error downloading PDF", e);
-        if (!cancelled) setDownloadError(true);
+        if (!cancelled) {
+          console.error("Error downloading PDF", e);
+          setDownloadError(true);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [uri]);
+  }, [isLocalFile, uri]);
 
   useEffect(downloadPdf, [downloadPdf]);
 
