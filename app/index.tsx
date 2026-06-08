@@ -40,6 +40,12 @@ export default function Index() {
         const response = await Notifications.getLastNotificationResponseAsync();
         if (cancelled) return;
         notificationRoute = consumeNotificationRoute(response);
+        Sentry.addBreadcrumb?.({
+          category: "notifications",
+          level: "info",
+          message: "Cold-start notification routing",
+          data: { hasResponse: response != null, route: notificationRoute },
+        });
       } catch (error) {
         Sentry.captureException(error);
       }

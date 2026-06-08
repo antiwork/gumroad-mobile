@@ -72,10 +72,48 @@ describe("consumeNotificationRoute", () => {
     ).toBe("/post/post3?followerId=f3");
   });
 
+  it("reads the payload from the iOS trigger when content.data is null", () => {
+    const response = {
+      notification: {
+        request: {
+          identifier: "ios-1",
+          content: { data: null },
+          trigger: { payload: { installment_id: "postIos", purchase_id: "pIos", aps: { alert: {} } } },
+        },
+      },
+    } as any;
+    expect(consumeNotificationRoute(response)).toBe("/post/postIos?purchaseId=pIos");
+  });
+
   it("deduplicates by notification identifier", () => {
     const response = makeResponse("dup-1", { installment_id: "post-dup" });
     expect(consumeNotificationRoute(response)).toBe("/post/post-dup");
     expect(consumeNotificationRoute(response)).toBeNull();
+  });
+
+  it("ignores the tag and message fields the Android FCM payload carries", () => {
+    expect(
+      consumeNotificationRoute(
+        makeResponse("a-1", {
+          installment_id: "postA",
+          purchase_id: "pA",
+          tag: "postA",
+          message: "New content added to product",
+        }),
+      ),
+    ).toBe("/post/postA?purchaseId=pA");
+  });
+
+  it("routes each of several distinct notifications (distinct tags are not deduped)", () => {
+    expect(consumeNotificationRoute(makeResponse("postA", { installment_id: "postA", tag: "postA" }))).toBe(
+      "/post/postA",
+    );
+    expect(consumeNotificationRoute(makeResponse("postB", { installment_id: "postB", tag: "postB" }))).toBe(
+      "/post/postB",
+    );
+    expect(consumeNotificationRoute(makeResponse("postC", { installment_id: "postC", tag: "postC" }))).toBe(
+      "/post/postC",
+    );
   });
 });
 

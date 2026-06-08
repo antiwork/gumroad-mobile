@@ -75,7 +75,7 @@ export const __resetPushNotificationsModuleStateForTests = () => {
   indexInitialRoutingComplete = false;
 };
 
-const buildNotificationRoute = (data: Record<string, string>): string | null => {
+const buildNotificationRoute = (data: Record<string, any>): string | null => {
   if (!data.installment_id) return null;
   const params = new URLSearchParams();
   if (data.purchase_id) params.set("purchaseId", data.purchase_id);
@@ -89,11 +89,28 @@ export const consumeNotificationRoute = (
   response: Notifications.NotificationResponse | null,
 ): string | null => {
   if (!response) return null;
-  const identifier = response.notification.request.identifier;
+  const request = response.notification.request as {
+    identifier: string;
+    content?: { data?: Record<string, any> | null };
+    trigger?: { payload?: Record<string, any> | null } | null;
+  };
+  const identifier = request.identifier;
   if (handledNotificationIdentifiers.has(identifier)) return null;
-  const data = response.notification.request.content.data as Record<string, string> | undefined;
-  const route = data ? buildNotificationRoute(data) : null;
-  if (!route) return null;
+  const payloads = [request.content?.data, request.trigger?.payload];
+  let route: string | null = null;
+  for (const payload of payloads) {
+    if (payload) route = buildNotificationRoute(payload);
+    if (route) break;
+  }
+  if (!route) {
+    Sentry.addBreadcrumb?.({
+      category: "notifications",
+      level: "warning",
+      message: "Notification tapped but no post route was built",
+      data: { contentData: request.content?.data ?? null, triggerPayload: request.trigger?.payload ?? null },
+    });
+    return null;
+  }
   handledNotificationIdentifiers.add(identifier);
   return route;
 };
