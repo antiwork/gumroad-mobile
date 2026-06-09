@@ -1,4 +1,4 @@
-import { requestAPI } from "@/lib/request";
+import { requestAPI, ServerError } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { Platform } from "react-native";
 
@@ -41,9 +41,11 @@ export const updateMediaLocation = async ({
   } catch (error) {
     // Log but don't throw - media location sync is non-critical
     console.warn("Failed to update media location:", error);
-    // AbortError is expected when requests timeout (e.g. poor connectivity)
-    // during periodic background sync - no need to report to Sentry
-    if (!(error instanceof Error && error.name === "AbortError")) {
+    // AbortError (request timeout on poor connectivity) and ServerError (transient
+    // backend 5xx such as Heroku 502s) are expected during periodic background sync
+    // and are not actionable code bugs - no need to report to Sentry
+    const isAbortError = error instanceof Error && error.name === "AbortError";
+    if (!isAbortError && !(error instanceof ServerError)) {
       Sentry.captureException(error);
     }
   }

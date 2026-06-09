@@ -28,6 +28,7 @@ jest.mock("@/lib/auth-context", () => ({
 }));
 
 import { updateMediaLocation } from "@/lib/media-location";
+import { ServerError } from "@/lib/request";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -66,6 +67,22 @@ describe("updateMediaLocation", () => {
     await updateMediaLocation(defaultParams);
 
     expect(mockCaptureException).toHaveBeenCalledWith(networkError);
+  });
+
+  it("does not report transient ServerError (5xx) to Sentry", async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse(502));
+
+    await updateMediaLocation(defaultParams);
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("does not report a directly thrown ServerError to Sentry", async () => {
+    mockFetch.mockRejectedValueOnce(new ServerError(500, "Request failed: 500"));
+
+    await updateMediaLocation(defaultParams);
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it("does not throw on failure (non-critical sync)", async () => {
