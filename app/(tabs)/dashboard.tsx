@@ -5,6 +5,7 @@ import { usePurchaseSearch } from "@/components/dashboard/use-purchase-search";
 import { SalePurchase, TimeRange, useSalesAnalytics } from "@/components/dashboard/use-sales-analytics";
 import { ExportAllSalesButton } from "@/components/export-all-sales-button";
 import { LineIcon } from "@/components/icon";
+import { useSales } from "@/components/sales/use-sales";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
@@ -47,6 +48,8 @@ export default function Dashboard() {
   const { isSearchActive } = useDashboardSearch();
   const [searchText, setSearchText] = useState("");
   const { isSearching, searchResults } = usePurchaseSearch(searchText, data?.purchases ?? [], timeRange);
+  const isAllRange = timeRange === "all";
+  const allSales = useSales("", isAllRange);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -78,8 +81,17 @@ export default function Dashboard() {
   }
 
   const salesCount = data?.sales_count ?? 0;
-  const displayData = isSearchActive ? searchResults : (data?.purchases ?? []);
-  const isLoading = isSearchActive ? isSearching : isLoadingAnalytics;
+  const displayData = isSearchActive ? searchResults : isAllRange ? allSales.sales : (data?.purchases ?? []);
+  const isLoading = isSearchActive
+    ? isSearching
+    : isAllRange
+      ? isLoadingAnalytics || allSales.isLoading
+      : isLoadingAnalytics;
+
+  const handleRefresh = () => {
+    refetch();
+    if (isAllRange) allSales.refetch();
+  };
 
   return (
     <Screen>
@@ -124,6 +136,7 @@ export default function Dashboard() {
               <TimeRangeButton label="Today" value="day" selected={timeRange === "day"} onSelect={setTimeRange} />
               <TimeRangeButton label="Month" value="month" selected={timeRange === "month"} onSelect={setTimeRange} />
               <TimeRangeButton label="Year" value="year" selected={timeRange === "year"} onSelect={setTimeRange} />
+              <TimeRangeButton label="All" value="all" selected={timeRange === "all"} onSelect={setTimeRange} />
             </View>
             <ExportAllSalesButton />
           </View>
@@ -140,14 +153,27 @@ export default function Dashboard() {
           keyExtractor={(item) => item.id}
           refreshControl={
             !isSearchActive ? (
-              <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={accentColor} />
+              <RefreshControl refreshing={isRefetching} onRefresh={handleRefresh} tintColor={accentColor} />
             ) : undefined
           }
+          onEndReached={() => {
+            if (isAllRange && !isSearchActive && allSales.hasNextPage && !allSales.isFetchingNextPage) {
+              allSales.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
           renderItem={({ item }) => <SaleItem sale={item} onPress={() => setSelectedSaleId(item.id)} />}
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
               <Text className="font-sans text-lg text-muted">No sales found</Text>
             </View>
+          }
+          ListFooterComponent={
+            isAllRange && allSales.isFetchingNextPage ? (
+              <View className="items-center py-4">
+                <LoadingSpinner size="small" />
+              </View>
+            ) : null
           }
         />
       )}
