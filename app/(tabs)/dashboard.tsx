@@ -1,7 +1,6 @@
 import { useDashboardSearch } from "@/app/(tabs)/_layout";
 import { SaleDetailModal } from "@/components/dashboard/sale-detail-modal";
 import { SaleItem } from "@/components/dashboard/sale-item";
-import { usePurchaseSearch } from "@/components/dashboard/use-purchase-search";
 import { SalePurchase, TimeRange, useSalesAnalytics } from "@/components/dashboard/use-sales-analytics";
 import { ExportAllSalesButton } from "@/components/export-all-sales-button";
 import { LineIcon } from "@/components/icon";
@@ -45,11 +44,12 @@ export default function Dashboard() {
   const accentColor = useCSSVariable("--color-accent") as string;
   const mutedColor = useCSSVariable("--color-muted") as string;
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
-  const { isSearchActive } = useDashboardSearch();
+  const { isSearchActive, setSearchActive } = useDashboardSearch();
   const [searchText, setSearchText] = useState("");
-  const { isSearching, searchResults } = usePurchaseSearch(searchText, data?.purchases ?? [], timeRange);
   const isAllRange = timeRange === "all";
-  const allSales = useSales("", isAllRange);
+  // Search spans all sales (web parity), independent of the selected date range, and paginates.
+  const salesSearch = useSales(searchText, isSearchActive);
+  const allSales = useSales("", isAllRange && !isSearchActive);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -81,9 +81,9 @@ export default function Dashboard() {
   }
 
   const salesCount = data?.sales_count ?? 0;
-  const displayData = isSearchActive ? searchResults : isAllRange ? allSales.sales : (data?.purchases ?? []);
+  const displayData = isSearchActive ? salesSearch.sales : isAllRange ? allSales.sales : (data?.purchases ?? []);
   const isLoading = isSearchActive
-    ? isSearching
+    ? salesSearch.isSearching || (salesSearch.isLoading && salesSearch.sales.length === 0)
     : isAllRange
       ? isLoadingAnalytics || allSales.isLoading
       : isLoadingAnalytics;
@@ -97,6 +97,9 @@ export default function Dashboard() {
     <Screen>
       {isSearchActive ? (
         <View className="flex-row items-center gap-2 border-b border-border px-4 py-3">
+          <Pressable onPress={() => setSearchActive(false)} hitSlop={8} className="pr-1">
+            <LineIcon name="arrow-left-stroke" size={24} className="text-foreground" />
+          </Pressable>
           <View className="flex-1 flex-row items-center rounded border border-border bg-background px-3 py-2">
             <LineIcon name="search" size={20} className="text-muted" />
             <TextInput
@@ -157,7 +160,9 @@ export default function Dashboard() {
             ) : undefined
           }
           onEndReached={() => {
-            if (isAllRange && !isSearchActive && allSales.hasNextPage && !allSales.isFetchingNextPage) {
+            if (isSearchActive) {
+              if (salesSearch.hasNextPage && !salesSearch.isFetchingNextPage) salesSearch.fetchNextPage();
+            } else if (isAllRange && allSales.hasNextPage && !allSales.isFetchingNextPage) {
               allSales.fetchNextPage();
             }
           }}
@@ -169,12 +174,13 @@ export default function Dashboard() {
             </View>
           }
           ListFooterComponent={
-            isAllRange && allSales.isFetchingNextPage ? (
+            (isSearchActive ? salesSearch.isFetchingNextPage : isAllRange && allSales.isFetchingNextPage) ? (
               <View className="items-center py-4">
                 <LoadingSpinner size="small" />
               </View>
             ) : null
           }
+          keyboardShouldPersistTaps="handled"
         />
       )}
 
