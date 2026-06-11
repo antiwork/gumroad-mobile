@@ -14,6 +14,15 @@ import { AppState, type AppStateStatus, StyleSheet, View } from "react-native";
 const fetchStreamingPlaylistUrl = async (streamingUrl: string, accessToken: string): Promise<string> =>
   (await requestAPI<{ playlist_url: string }>(streamingUrl, { accessToken })).playlist_url;
 
+const withReleasedPlayerGuard = (operation: () => void) => {
+  try {
+    operation();
+  } catch (error) {
+    if ((error as { code?: string })?.code === "ERR_USING_RELEASED_SHARED_OBJECT") return;
+    throw error;
+  }
+};
+
 export default function VideoPlayerScreen() {
   const { accessToken } = useAuth();
   const { uri, streamingUrl, title, urlRedirectId, productFileId, purchaseId, initialPosition } = useLocalSearchParams<{
@@ -71,27 +80,29 @@ export default function VideoPlayerScreen() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (nextState === "background" || nextState === "inactive") {
-        wasPlayingBeforeBackgroundRef.current = player.playing;
-        positionBeforeBackgroundRef.current = player.currentTime;
-        player.pause();
-      } else if (nextState === "active") {
-        const savedPosition = positionBeforeBackgroundRef.current;
-        if (savedPosition !== null && player.currentTime < savedPosition - 1) {
-          player.currentTime = savedPosition;
+      withReleasedPlayerGuard(() => {
+        if (nextState === "background" || nextState === "inactive") {
+          wasPlayingBeforeBackgroundRef.current = player.playing;
+          positionBeforeBackgroundRef.current = player.currentTime;
+          player.pause();
+        } else if (nextState === "active") {
+          const savedPosition = positionBeforeBackgroundRef.current;
+          if (savedPosition !== null && player.currentTime < savedPosition - 1) {
+            player.currentTime = savedPosition;
+          }
+          positionBeforeBackgroundRef.current = null;
+          if (wasPlayingBeforeBackgroundRef.current) {
+            player.play();
+            wasPlayingBeforeBackgroundRef.current = false;
+          }
         }
-        positionBeforeBackgroundRef.current = null;
-        if (wasPlayingBeforeBackgroundRef.current) {
-          player.play();
-          wasPlayingBeforeBackgroundRef.current = false;
-        }
-      }
+      });
     });
 
     return () => subscription.remove();
   }, [player]);
 
-  useEffect(() => () => player.pause(), [player]);
+  useEffect(() => () => withReleasedPlayerGuard(() => player.pause()), [player]);
 
   useEffect(() => {
     const subscription = player.addListener(
