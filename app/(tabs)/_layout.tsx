@@ -13,7 +13,7 @@ import { safeOpenURL } from "@/lib/open-url";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { createContext, useContext, useRef, useState } from "react";
 import { Alert, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
@@ -94,12 +94,18 @@ const SettingsButton = () => {
 
 const SettingsSheet = () => {
   const { isSettingsOpen, setSettingsOpen } = useSettingsSheet();
-  const { logout } = useAuth();
+  const { logout, isCreator } = useAuth();
   const { data: user, isLoading: isUserLoading } = useUser();
+  const router = useRouter();
 
   const handleLogout = () => {
     setSettingsOpen(false);
     logout();
+  };
+
+  const handlePayoutSettings = () => {
+    setSettingsOpen(false);
+    router.push("/settings/payments");
   };
 
   const handleDeleteAccount = () => {
@@ -117,6 +123,16 @@ const SettingsSheet = () => {
         <SheetTitle>Settings</SheetTitle>
       </SheetHeader>
       <SheetContent>
+        {isCreator ? (
+          <View className="border-b border-border p-4">
+            <Text className="mb-2 font-sans text-lg text-foreground">Payouts</Text>
+            <Text className="mb-4 text-sm text-muted-foreground">Manage how and when you get paid.</Text>
+            <Button variant="outline" onPress={handlePayoutSettings}>
+              <Text>Payout settings</Text>
+              <LineIcon name="dollar-circle" size={20} className="text-foreground" />
+            </Button>
+          </View>
+        ) : null}
         <View className="border-b border-border p-4">
           <Text className="mb-2 font-sans text-lg text-foreground">Feedback</Text>
           <Text className="mb-4 text-sm text-muted-foreground">Report a bug or suggest an improvement.</Text>
