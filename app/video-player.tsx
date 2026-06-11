@@ -14,11 +14,17 @@ import { AppState, type AppStateStatus, StyleSheet, View } from "react-native";
 const fetchStreamingPlaylistUrl = async (streamingUrl: string, accessToken: string): Promise<string> =>
   (await requestAPI<{ playlist_url: string }>(streamingUrl, { accessToken })).playlist_url;
 
+const isReleasedPlayerError = (error: unknown): boolean => {
+  const { code, message } = (error ?? {}) as { code?: string; message?: string };
+  if (code === "ERR_USING_RELEASED_SHARED_OBJECT" || code === "ERR_NATIVE_SHARED_OBJECT_NOT_FOUND") return true;
+  return /shared object that was already released|find the native shared object/i.test(message ?? "");
+};
+
 const withReleasedPlayerGuard = (operation: () => void) => {
   try {
     operation();
   } catch (error) {
-    if ((error as { code?: string })?.code === "ERR_USING_RELEASED_SHARED_OBJECT") return;
+    if (isReleasedPlayerError(error)) return;
     throw error;
   }
 };
