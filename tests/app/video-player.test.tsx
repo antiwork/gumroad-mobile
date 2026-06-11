@@ -126,6 +126,28 @@ describe("VideoPlayerScreen", () => {
     expect(mockPlayer.pause).toHaveBeenCalled();
   });
 
+  it("does not crash on unmount when the player has already been released", () => {
+    const { unmount } = renderScreen();
+    mockPlayer.pause.mockImplementation(() => {
+      throw Object.assign(new Error("Cannot use shared object that was already released"), {
+        code: "ERR_USING_RELEASED_SHARED_OBJECT",
+      });
+    });
+
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it("does not crash on background when the player has already been released", () => {
+    renderScreen();
+    mockPlayer.pause.mockImplementation(() => {
+      throw Object.assign(new Error("Cannot use shared object that was already released"), {
+        code: "ERR_USING_RELEASED_SHARED_OBJECT",
+      });
+    });
+
+    expect(() => act(() => appStateCallback!("background"))).not.toThrow();
+  });
+
   it("restores the playback position when returning from background", () => {
     renderScreen();
     mockPlayer.currentTime = 120;
