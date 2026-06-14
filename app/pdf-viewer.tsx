@@ -9,7 +9,7 @@ import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { cacheFileDestination } from "@/lib/file-utils";
 import { updateMediaLocation } from "@/lib/media-location";
-import { File, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
@@ -54,7 +54,7 @@ export default function PdfViewerScreen() {
   const [isDownloading, setIsDownloading] = useState(true);
 
   const downloadDestination = useCallback(
-    () => (productFileId ? cacheFileDestination(productFileId, fileName ?? DEFAULT_PDF_FILE_NAME) : Paths.cache),
+    () => cacheFileDestination(productFileId ?? "pdf-viewer", fileName ?? DEFAULT_PDF_FILE_NAME),
     [productFileId, fileName],
   );
 
