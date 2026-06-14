@@ -138,6 +138,7 @@ export default function DownloadScreen() {
           params: {
             uri: downloadUrl(token, message.payload.resourceId),
             title: purchase?.name,
+            fileName: fileData?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
             productFileId: message.payload.resourceId,
             purchaseId: purchase?.purchase_id,

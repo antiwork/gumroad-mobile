@@ -2,7 +2,12 @@ import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
 jest.mock("expo-router", () => ({
-  useLocalSearchParams: () => ({ uri: "https://example.com/test.pdf", title: "Test PDF" }),
+  useLocalSearchParams: () => ({
+    uri: "https://example.com/test.pdf",
+    title: "Test PDF",
+    fileName: "HOW TO BECOME AN ELITE PLAYER AND BE BETTER THAN 99%.pdf",
+    productFileId: "pf1",
+  }),
   Stack: {
     Screen: ({ options }: { options?: { headerRight?: () => React.ReactNode } }) => {
       const React = require("react");
@@ -16,10 +21,29 @@ jest.mock("expo-sharing", () => ({
   shareAsync: jest.fn(),
 }));
 
-jest.mock("expo-file-system", () => ({
-  File: { downloadFileAsync: jest.fn().mockResolvedValue({ uri: "file:///cache/test.pdf" }) },
-  Paths: { cache: "/cache" },
-}));
+jest.mock("expo-file-system", () => {
+  const Paths = { cache: "/cache" };
+  class Directory {
+    uri: string;
+    exists = true;
+    constructor(parent: string | { uri: string }, name: string) {
+      const base = typeof parent === "string" ? parent : parent.uri;
+      this.uri = `${base}/${name}`;
+    }
+    create() {}
+  }
+  class File {
+    name: string;
+    uri: string;
+    static downloadFileAsync = jest.fn().mockResolvedValue({ uri: "file:///cache/test.pdf" });
+    constructor(parent: string | { uri: string }, name?: string) {
+      const base = typeof parent === "string" ? parent : parent.uri;
+      this.name = name ?? "";
+      this.uri = name === undefined ? base : `${base}/${name}`;
+    }
+  }
+  return { Directory, File, Paths };
+});
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ accessToken: "test-token" }),
@@ -169,6 +193,18 @@ describe("PdfViewerScreen", () => {
 
     expect(screen.queryByText(/Unable to load this PDF/)).toBeNull();
     expect(screen.getByTestId("pdf-component")).toBeTruthy();
+  });
+
+  it("downloads to a sanitized cache destination so PDFs with special characters in the name load", async () => {
+    const { File } = require("expo-file-system");
+
+    renderWithProviders();
+
+    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
+
+    const destination = File.downloadFileAsync.mock.calls[0][1];
+    expect(destination.uri).toBe("/cache/pf1/HOW TO BECOME AN ELITE PLAYER AND BE BETTER THAN 99_.pdf");
+    expect(destination.uri).not.toContain("%");
   });
 
   it("shares the cached PDF file when available", async () => {
