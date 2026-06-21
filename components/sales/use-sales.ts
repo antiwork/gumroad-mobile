@@ -44,7 +44,11 @@ export const useSales = (searchText: string, enabled = true, { requireQuery = fa
 
   const sales = useMemo(() => query.data?.pages.flatMap((page) => page.purchases) ?? [], [query.data]);
   const totalCount = query.data?.pages[0]?.pagination.count ?? 0;
-  const isSearching = !!searchText.trim() && (searchText.trim() !== debouncedSearchText || query.isLoading);
+  const isSearching =
+    !!searchText.trim() &&
+    (searchText.trim() !== debouncedSearchText ||
+      query.isLoading ||
+      (query.isFetching && query.isPlaceholderData));
 
   return { ...query, sales, totalCount, isSearching };
 };

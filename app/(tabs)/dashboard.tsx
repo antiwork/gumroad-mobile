@@ -92,7 +92,7 @@ export default function Dashboard() {
       ? allSales.sales
       : (data?.purchases ?? []);
   const isLoading = isSearchActive
-    ? !isSearchIdle && (salesSearch.isSearching || (salesSearch.isLoading && salesSearch.sales.length === 0))
+    ? !isSearchIdle && salesSearch.isSearching
     : isAllRange
       ? isLoadingAnalytics || allSales.isLoading
       : isLoadingAnalytics;

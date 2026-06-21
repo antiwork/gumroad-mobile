@@ -585,7 +585,7 @@ const EmailsCard = ({ sale, emails, action }: { sale: SaleDetail; emails: SaleEm
     action.run(
       (token) =>
         email.type === "receipt"
-          ? saleActions.resendReceipt(email.id, token)
+          ? saleActions.resendReceipt(sale.purchase_id, token)
           : saleActions.sendPost(sale.purchase_id, email.id, token),
       { successMessage: email.type === "receipt" ? "Receipt resent" : "Post resent", skipRefetch: true },
     );
