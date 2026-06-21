@@ -1,22 +1,29 @@
 import { StyledWebView } from "@/components/styled";
+import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
+import * as Sentry from "@sentry/react-native";
 import { Stack } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
+import type { WebViewErrorEvent, WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
+const allowedHostSuffixes = [".stripe.com", ".paypal.com", ".cloudflare.com"];
+
 const isWebUrl = (url: string) => /^https?:\/\//.test(url);
 
-const isGumroadUrl = (url: string) => {
+const isAllowedInWebView = (url: string) => {
   try {
-    return new URL(url).origin === gumroadOrigin;
+    const { origin, hostname } = new URL(url);
+    if (origin === gumroadOrigin) return true;
+    return allowedHostSuffixes.some((suffix) => hostname === suffix.slice(1) || hostname.endsWith(suffix));
   } catch {
     return false;
   }
@@ -26,6 +33,7 @@ export default function PayoutSettingsScreen() {
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
   const [canSave, setCanSave] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const url = useMemo(
     () =>
@@ -49,12 +57,27 @@ export default function PayoutSettingsScreen() {
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
-      if (request.url === url || !isWebUrl(request.url) || isGumroadUrl(request.url)) return true;
+      if (request.url === url || !isWebUrl(request.url) || isAllowedInWebView(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },
     [url],
   );
+
+  const handleRetry = useCallback(() => {
+    setHasError(false);
+    webViewRef.current?.reload();
+  }, []);
+
+  const handleError = useCallback((event: WebViewErrorEvent) => {
+    setHasError(true);
+    Sentry.captureException(new Error(`Payouts WebView load error: ${event.nativeEvent.description}`));
+  }, []);
+
+  const handleHttpError = useCallback((event: WebViewHttpErrorEvent) => {
+    setHasError(true);
+    Sentry.captureException(new Error(`Payouts WebView HTTP error: ${event.nativeEvent.statusCode}`));
+  }, []);
 
   if (isLoading) {
     return (
@@ -70,25 +93,39 @@ export default function PayoutSettingsScreen() {
         options={{
           title: "Payouts",
           headerRight: () => (
-            <TouchableOpacity onPress={handleSave} disabled={!canSave} className="mr-3">
-              <Text className={canSave ? "font-sans text-accent" : "font-sans text-muted"}>Save</Text>
+            <TouchableOpacity onPress={handleSave} disabled={!canSave || hasError} className="mr-3">
+              <Text className={canSave && !hasError ? "font-sans text-accent" : "font-sans text-muted"}>Save</Text>
             </TouchableOpacity>
           ),
         }}
       />
-      <StyledWebView
-        key={accessToken ?? "anonymous"}
-        ref={webViewRef}
-        source={{ uri: url }}
-        className="flex-1 bg-transparent"
-        webviewDebuggingEnabled
-        pullToRefreshEnabled
-        sharedCookiesEnabled
-        thirdPartyCookiesEnabled
-        originWhitelist={["*"]}
-        onMessage={handleMessage}
-        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-      />
+      {hasError ? (
+        <View className="flex-1 items-center justify-center gap-4 bg-body-bg p-6">
+          <Text className="text-center text-lg font-bold text-foreground">Something went wrong</Text>
+          <Text className="text-center font-sans text-muted">
+            We couldn&apos;t load your payout settings. Please check your connection and try again.
+          </Text>
+          <Button onPress={handleRetry}>
+            <Text>Retry</Text>
+          </Button>
+        </View>
+      ) : (
+        <StyledWebView
+          key={accessToken ?? "anonymous"}
+          ref={webViewRef}
+          source={{ uri: url }}
+          className="flex-1 bg-transparent"
+          webviewDebuggingEnabled={__DEV__}
+          pullToRefreshEnabled
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          originWhitelist={["*"]}
+          onMessage={handleMessage}
+          onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+          onError={handleError}
+          onHttpError={handleHttpError}
+        />
+      )}
     </Screen>
   );
 }
