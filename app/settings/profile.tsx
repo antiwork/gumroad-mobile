@@ -11,7 +11,7 @@ import { Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
-import type { WebViewErrorEvent, WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
+import type { WebViewErrorEvent } from "react-native-webview/lib/WebViewTypes";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
@@ -65,23 +65,22 @@ export default function ProfileSettingsScreen() {
   const handleRetry = useCallback(() => {
     setCanSave(false);
     setHasError(false);
+    webViewRef.current?.reload();
   }, []);
 
   const handleError = useCallback((event: WebViewErrorEvent) => {
+    const isGumroadDocument = (() => {
+      try {
+        return new URL(event.nativeEvent.url).origin === gumroadOrigin;
+      } catch {
+        return false;
+      }
+    })();
+    if (!isGumroadDocument) return;
     setCanSave(false);
     setHasError(true);
     Sentry.captureException(new Error(`Profile WebView load error: ${event.nativeEvent.description}`));
   }, []);
-
-  const handleHttpError = useCallback(
-    (event: WebViewHttpErrorEvent) => {
-      if (event.nativeEvent.url !== url) return;
-      setCanSave(false);
-      setHasError(true);
-      Sentry.captureException(new Error(`Profile WebView HTTP error: ${event.nativeEvent.statusCode}`));
-    },
-    [url],
-  );
 
   useEffect(() => setCanSave(false), [accessToken]);
 
@@ -105,8 +104,22 @@ export default function ProfileSettingsScreen() {
           ),
         }}
       />
+      <StyledWebView
+        key={accessToken ?? "anonymous"}
+        ref={webViewRef}
+        source={{ uri: url }}
+        className="flex-1 bg-transparent"
+        webviewDebuggingEnabled={__DEV__}
+        pullToRefreshEnabled
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
+        originWhitelist={["*"]}
+        onMessage={handleMessage}
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onError={handleError}
+      />
       {hasError ? (
-        <View className="flex-1 items-center justify-center gap-4 bg-body-bg p-6">
+        <View className="absolute inset-0 items-center justify-center gap-4 bg-body-bg p-6">
           <Text className="text-center text-lg font-bold text-foreground">Something went wrong</Text>
           <Text className="text-center font-sans text-muted">
             We couldn&apos;t load your profile settings. Please check your connection and try again.
@@ -115,23 +128,7 @@ export default function ProfileSettingsScreen() {
             <Text>Retry</Text>
           </Button>
         </View>
-      ) : (
-        <StyledWebView
-          key={accessToken ?? "anonymous"}
-          ref={webViewRef}
-          source={{ uri: url }}
-          className="flex-1 bg-transparent"
-          webviewDebuggingEnabled={__DEV__}
-          pullToRefreshEnabled
-          sharedCookiesEnabled
-          thirdPartyCookiesEnabled
-          originWhitelist={["*"]}
-          onMessage={handleMessage}
-          onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-          onError={handleError}
-          onHttpError={handleHttpError}
-        />
-      )}
+      ) : null}
     </Screen>
   );
 }
