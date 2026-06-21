@@ -126,6 +126,56 @@ describe("VideoPlayerScreen", () => {
     expect(mockPlayer.pause).toHaveBeenCalled();
   });
 
+  it("does not crash on unmount when the player has already been released", () => {
+    const { unmount } = renderScreen();
+    mockPlayer.pause.mockImplementation(() => {
+      throw Object.assign(new Error("Cannot use shared object that was already released"), {
+        code: "ERR_USING_RELEASED_SHARED_OBJECT",
+      });
+    });
+
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it("does not crash on background when the player has already been released", () => {
+    renderScreen();
+    mockPlayer.pause.mockImplementation(() => {
+      throw Object.assign(new Error("Cannot use shared object that was already released"), {
+        code: "ERR_USING_RELEASED_SHARED_OBJECT",
+      });
+    });
+
+    expect(() => act(() => appStateCallback!("background"))).not.toThrow();
+  });
+
+  it("does not crash on unmount when the player call fails with the iOS not-found exception", () => {
+    const { unmount } = renderScreen();
+    mockPlayer.pause.mockImplementation(() => {
+      throw Object.assign(
+        new Error(
+          "Calling the 'pause' function has failed\n→ Caused by: Unable to find the native shared object associated with given JavaScript object",
+        ),
+        { code: "ERR_FUNCTION_CALL" },
+      );
+    });
+
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it("does not crash on background when the player call fails with the iOS not-found exception", () => {
+    renderScreen();
+    mockPlayer.pause.mockImplementation(() => {
+      throw Object.assign(
+        new Error(
+          "Calling the 'pause' function has failed\n→ Caused by: Unable to find the native shared object associated with given JavaScript object",
+        ),
+        { code: "ERR_FUNCTION_CALL" },
+      );
+    });
+
+    expect(() => act(() => appStateCallback!("background"))).not.toThrow();
+  });
+
   it("restores the playback position when returning from background", () => {
     renderScreen();
     mockPlayer.currentTime = 120;
