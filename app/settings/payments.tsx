@@ -8,7 +8,7 @@ import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
 import * as Sentry from "@sentry/react-native";
 import { Stack } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 import type { WebViewErrorEvent, WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
@@ -49,9 +49,7 @@ export default function PayoutSettingsScreen() {
     try {
       const message = JSON.parse(event.nativeEvent.data) as { type: string; canUpdate?: boolean };
       if (message.type === "settingsCanUpdate") setCanSave(Boolean(message.canUpdate));
-    } catch {
-      // ignore non-JSON messages
-    }
+    } catch {}
   }, []);
 
   const handleShouldStartLoadWithRequest = useCallback(
@@ -65,19 +63,27 @@ export default function PayoutSettingsScreen() {
   );
 
   const handleRetry = useCallback(() => {
+    setCanSave(false);
     setHasError(false);
-    webViewRef.current?.reload();
   }, []);
 
   const handleError = useCallback((event: WebViewErrorEvent) => {
+    setCanSave(false);
     setHasError(true);
     Sentry.captureException(new Error(`Payouts WebView load error: ${event.nativeEvent.description}`));
   }, []);
 
-  const handleHttpError = useCallback((event: WebViewHttpErrorEvent) => {
-    setHasError(true);
-    Sentry.captureException(new Error(`Payouts WebView HTTP error: ${event.nativeEvent.statusCode}`));
-  }, []);
+  const handleHttpError = useCallback(
+    (event: WebViewHttpErrorEvent) => {
+      if (event.nativeEvent.url !== url) return;
+      setCanSave(false);
+      setHasError(true);
+      Sentry.captureException(new Error(`Payouts WebView HTTP error: ${event.nativeEvent.statusCode}`));
+    },
+    [url],
+  );
+
+  useEffect(() => setCanSave(false), [accessToken]);
 
   if (isLoading) {
     return (
