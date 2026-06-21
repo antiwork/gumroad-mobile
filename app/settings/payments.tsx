@@ -11,7 +11,7 @@ import { Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
-import type { WebViewErrorEvent } from "react-native-webview/lib/WebViewTypes";
+import type { WebViewErrorEvent, WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
@@ -41,6 +41,8 @@ export default function PayoutSettingsScreen() {
     [accessToken],
   );
 
+  const mainUrlRef = useRef(url);
+
   const handleSave = useCallback(() => {
     webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppSettingsSave" }));
   }, []);
@@ -69,20 +71,25 @@ export default function PayoutSettingsScreen() {
   }, []);
 
   const handleError = useCallback((event: WebViewErrorEvent) => {
-    const isGumroadDocument = (() => {
-      try {
-        return new URL(event.nativeEvent.url).origin === gumroadOrigin;
-      } catch {
-        return false;
-      }
-    })();
-    if (!isGumroadDocument) return;
+    if (event.nativeEvent.url !== mainUrlRef.current) return;
     setCanSave(false);
     setHasError(true);
     Sentry.captureException(new Error(`Payouts WebView load error: ${event.nativeEvent.description}`));
   }, []);
 
-  useEffect(() => setCanSave(false), [accessToken]);
+  const handleHttpError = useCallback((event: WebViewHttpErrorEvent) => {
+    if (event.nativeEvent.url !== mainUrlRef.current) return;
+    setCanSave(false);
+    setHasError(true);
+    Sentry.captureException(
+      new Error(`Payouts WebView HTTP error ${event.nativeEvent.statusCode}: ${event.nativeEvent.description}`),
+    );
+  }, []);
+
+  useEffect(() => {
+    setCanSave(false);
+    setHasError(false);
+  }, [accessToken]);
 
   if (isLoading) {
     return (
@@ -116,7 +123,11 @@ export default function PayoutSettingsScreen() {
         originWhitelist={["*"]}
         onMessage={handleMessage}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onNavigationStateChange={(navState) => {
+          mainUrlRef.current = navState.url;
+        }}
         onError={handleError}
+        onHttpError={handleHttpError}
       />
       {hasError ? (
         <View className="absolute inset-0 items-center justify-center gap-4 bg-body-bg p-6">
