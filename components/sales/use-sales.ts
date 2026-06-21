@@ -19,7 +19,7 @@ interface SalesResponse {
 export const buildSalesPath = (page: number, query: string) =>
   `mobile/sales.json?page=${page}${query ? `&query=${encodeURIComponent(query)}` : ""}`;
 
-export const useSales = (searchText: string, enabled = true) => {
+export const useSales = (searchText: string, enabled = true, { requireQuery = false } = {}) => {
   const { accessToken } = useAuth();
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
 
@@ -38,7 +38,7 @@ export const useSales = (searchText: string, enabled = true) => {
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.pagination.next ?? undefined,
-    enabled: !!accessToken && enabled,
+    enabled: !!accessToken && enabled && (!requireQuery || debouncedSearchText.length > 0),
     placeholderData: keepPreviousData,
   });
 

@@ -22,8 +22,8 @@ import { Text } from "@/components/ui/text";
 import { assertDefined } from "@/lib/assert";
 import { safeOpenURL } from "@/lib/open-url";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Alert, ScrollView, Switch, TextInput, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, KeyboardTypeOptions, Modal, Pressable, ScrollView, Switch, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
@@ -53,16 +53,63 @@ const formatDate = (iso: string) =>
 const formatDiscount = (discount: NonNullable<CustomerDetail["discount"]>, currencySymbol: string) =>
   discount.type === "fixed" ? `${currencySymbol}${(discount.cents / 100).toFixed(2)}` : `${discount.percents}%`;
 
-const promptText = (title: string, message: string, defaultValue: string, onSubmit: (value: string) => void) => {
-  Alert.prompt(
-    title,
-    message,
-    [
-      { text: "Cancel", style: "cancel" },
-      { text: "Save", onPress: (value?: string) => value !== undefined && onSubmit(value) },
-    ],
-    "plain-text",
-    defaultValue,
+type PromptConfig = {
+  title: string;
+  message: string;
+  defaultValue: string;
+  keyboardType?: KeyboardTypeOptions;
+  onSubmit: (value: string) => void;
+};
+
+type PromptFn = (config: PromptConfig) => void;
+
+const usePrompt = () => {
+  const [config, setConfig] = useState<PromptConfig | null>(null);
+  const prompt = useCallback<PromptFn>((next) => setConfig(next), []);
+  const close = useCallback(() => setConfig(null), []);
+  return { prompt, config, close };
+};
+
+const PromptModal = ({ config, onClose }: { config: PromptConfig | null; onClose: () => void }) => {
+  const [value, setValue] = useState("");
+  const mutedColor = useCSSVariable("--color-muted") as string;
+
+  useEffect(() => {
+    if (config) setValue(config.defaultValue);
+  }, [config]);
+
+  const save = () => {
+    config?.onSubmit(value);
+    onClose();
+  };
+
+  return (
+    <Modal visible={!!config} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable className="flex-1 items-center justify-center bg-black/50 p-6" onPress={onClose}>
+        <Pressable className="w-full max-w-md gap-4 rounded-lg border border-border bg-card p-4" onPress={() => {}}>
+          <View className="gap-1">
+            <Text className="text-lg font-bold">{config?.title}</Text>
+            <Text className="text-sm text-muted">{config?.message}</Text>
+          </View>
+          <TextInput
+            className="rounded border border-border px-3 py-2 font-sans text-base text-foreground"
+            placeholderTextColor={mutedColor}
+            keyboardType={config?.keyboardType ?? "default"}
+            value={value}
+            onChangeText={setValue}
+            autoFocus
+          />
+          <View className="flex-row justify-end gap-2">
+            <Button variant="outline" size="sm" onPress={onClose}>
+              <Text>Cancel</Text>
+            </Button>
+            <Button size="sm" onPress={save}>
+              <Text>Save</Text>
+            </Button>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 };
 
@@ -106,13 +153,35 @@ const StatusBadges = ({ sale, customer }: { sale: SaleDetail; customer?: Custome
   );
 };
 
-const EmailCard = ({ sale, customer, action }: { sale: SaleDetail; customer?: CustomerDetail; action: SaleAction }) => {
+const EmailCard = ({
+  sale,
+  customer,
+  action,
+  prompt,
+}: {
+  sale: SaleDetail;
+  customer?: CustomerDetail;
+  action: SaleAction;
+  prompt: PromptFn;
+}) => {
+  const serverCanContact = customer?.can_contact;
+  const [canContact, setCanContact] = useState(serverCanContact ?? false);
+
+  useEffect(() => {
+    if (serverCanContact !== undefined) setCanContact(serverCanContact);
+  }, [serverCanContact]);
+
   const editEmail = () =>
-    promptText("Edit email", "New email for this customer", customer?.email ?? sale.purchase_email, (email) =>
-      action.run((token) => saleActions.updateSale(sale.purchase_id, { email }, token), {
-        successMessage: "Email updated successfully.",
-      }),
-    );
+    prompt({
+      title: "Edit email",
+      message: "New email for this customer",
+      defaultValue: customer?.email ?? sale.purchase_email,
+      keyboardType: "email-address",
+      onSubmit: (email) =>
+        action.run((token) => saleActions.updateSale(sale.purchase_id, { email }, token), {
+          successMessage: "Email updated successfully.",
+        }),
+    });
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
@@ -133,10 +202,13 @@ const EmailCard = ({ sale, customer, action }: { sale: SaleDetail; customer?: Cu
         <CardContent className="flex-row items-center justify-between">
           <Text className="font-bold">Receives emails</Text>
           <Switch
-            value={customer.can_contact}
+            value={canContact}
             disabled={action.isBusy}
             onValueChange={(value) => {
-              action.run((token) => saleActions.changeCanContact(sale.purchase_id, value, token));
+              setCanContact(value);
+              action.run((token) => saleActions.changeCanContact(sale.purchase_id, value, token)).then((ok) => {
+                if (!ok) setCanContact(!value);
+              });
             }}
           />
         </CardContent>
@@ -145,14 +217,29 @@ const EmailCard = ({ sale, customer, action }: { sale: SaleDetail; customer?: Cu
   );
 };
 
-const GifteeCard = ({ sale, customer, action }: { sale: SaleDetail; customer: CustomerDetail; action: SaleAction }) => {
+const GifteeCard = ({
+  sale,
+  customer,
+  action,
+  prompt,
+}: {
+  sale: SaleDetail;
+  customer: CustomerDetail;
+  action: SaleAction;
+  prompt: PromptFn;
+}) => {
   if (!customer.giftee_email) return null;
   const editGiftee = () =>
-    promptText("Edit giftee email", "New email for the gift recipient", customer.giftee_email ?? "", (email) =>
-      action.run((token) => saleActions.updateSale(sale.purchase_id, { giftee_email: email }, token), {
-        successMessage: "Email updated successfully.",
-      }),
-    );
+    prompt({
+      title: "Edit giftee email",
+      message: "New email for the gift recipient",
+      defaultValue: customer.giftee_email ?? "",
+      keyboardType: "email-address",
+      onSubmit: (email) =>
+        action.run((token) => saleActions.updateSale(sale.purchase_id, { giftee_email: email }, token), {
+          successMessage: "Email updated successfully.",
+        }),
+    });
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
@@ -170,14 +257,30 @@ const GifteeCard = ({ sale, customer, action }: { sale: SaleDetail; customer: Cu
   );
 };
 
-const OrderCard = ({ sale, customer, action }: { sale: SaleDetail; customer?: CustomerDetail; action: SaleAction }) => {
+const OrderCard = ({
+  sale,
+  customer,
+  action,
+  prompt,
+}: {
+  sale: SaleDetail;
+  customer?: CustomerDetail;
+  action: SaleAction;
+  prompt: PromptFn;
+}) => {
   const [showOptions, setShowOptions] = useState(false);
   const { data: options, isLoading: isLoadingOptions } = useSaleOptions(sale.purchase_id, showOptions);
 
   const editSeats = () =>
-    promptText("Edit seats", "Number of seats", String(sale.quantity), (value) => {
-      const quantity = parseInt(value, 10);
-      if (quantity > 0) action.run((token) => saleActions.updateSale(sale.purchase_id, { quantity }, token));
+    prompt({
+      title: "Edit seats",
+      message: "Number of seats",
+      defaultValue: String(sale.quantity),
+      keyboardType: "number-pad",
+      onSubmit: (value) => {
+        const quantity = parseInt(value, 10);
+        if (quantity > 0) action.run((token) => saleActions.updateSale(sale.purchase_id, { quantity }, token));
+      },
     });
 
   return (
@@ -561,10 +664,12 @@ const ShippingCard = ({
   sale,
   customer,
   action,
+  prompt,
 }: {
   sale: SaleDetail;
   customer: CustomerDetail;
   action: SaleAction;
+  prompt: PromptFn;
 }) => {
   const shipping = customer.shipping;
   const [isEditing, setEditing] = useState(false);
@@ -591,9 +696,14 @@ const ShippingCard = ({
       .then((ok) => ok && setEditing(false));
 
   const markShipped = () =>
-    promptText("Mark as shipped", "Tracking URL (optional)", shipping.tracking.url ?? "", (trackingUrl) =>
-      action.run((token) => saleActions.markAsShipped(sale.purchase_id, trackingUrl.trim() || null, token)),
-    );
+    prompt({
+      title: "Mark as shipped",
+      message: "Tracking URL (optional)",
+      defaultValue: shipping.tracking.url ?? "",
+      keyboardType: "url",
+      onSubmit: (trackingUrl) =>
+        action.run((token) => saleActions.markAsShipped(sale.purchase_id, trackingUrl.trim() || null, token)),
+    });
 
   const fields: { key: keyof typeof address; placeholder: string }[] = [
     { key: "full_name", placeholder: "Full name" },
@@ -672,6 +782,19 @@ const ShippingCard = ({
 const LicenseCard = ({ customer, action }: { customer: CustomerDetail; action: SaleAction }) => {
   const license = customer.license;
   if (!license) return null;
+
+  const toggleLicense = () => {
+    const run = () => action.run((token) => saleActions.updateLicense(license.id, !license.enabled, token));
+    if (!license.enabled) {
+      run();
+      return;
+    }
+    Alert.alert("Disable license", "Are you sure you want to disable this license key?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Disable license", style: "destructive", onPress: run },
+    ]);
+  };
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
@@ -693,7 +816,7 @@ const LicenseCard = ({ customer, action }: { customer: CustomerDetail; action: S
           variant={license.enabled ? "destructive" : "default"}
           size="sm"
           disabled={action.isBusy}
-          onPress={() => action.run((token) => saleActions.updateLicense(license.id, !license.enabled, token))}
+          onPress={toggleLicense}
         >
           <Text>{license.enabled ? "Disable license" : "Enable license"}</Text>
         </Button>
@@ -704,6 +827,17 @@ const LicenseCard = ({ customer, action }: { customer: CustomerDetail; action: S
 
 const AccessCard = ({ sale, customer, action }: { sale: SaleDetail; customer: CustomerDetail; action: SaleAction }) => {
   if (customer.is_access_revoked === null) return null;
+
+  const confirmRevoke = () =>
+    Alert.alert("Revoke access", "Are you sure you want to revoke this customer's access?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Revoke access",
+        style: "destructive",
+        onPress: () => action.run((token) => saleActions.revokeAccess(sale.purchase_id, token)),
+      },
+    ]);
+
   return (
     <Card>
       <CardHeader>
@@ -719,12 +853,7 @@ const AccessCard = ({ sale, customer, action }: { sale: SaleDetail; customer: Cu
             <Text>Re-enable access</Text>
           </Button>
         ) : (
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={action.isBusy}
-            onPress={() => action.run((token) => saleActions.revokeAccess(sale.purchase_id, token))}
-          >
+          <Button variant="destructive" size="sm" disabled={action.isBusy} onPress={confirmRevoke}>
             <Text>Revoke access</Text>
           </Button>
         )}
@@ -733,13 +862,17 @@ const AccessCard = ({ sale, customer, action }: { sale: SaleDetail; customer: Cu
   );
 };
 
-const CallCard = ({ customer, action }: { customer: CustomerDetail; action: SaleAction }) => {
+const CallCard = ({ customer, action, prompt }: { customer: CustomerDetail; action: SaleAction; prompt: PromptFn }) => {
   const call = customer.call;
   if (!call) return null;
   const editUrl = () =>
-    promptText("Edit call URL", "URL for joining the call", call.call_url ?? "", (callUrl) =>
-      action.run((token) => saleActions.updateCallUrl(call.id, callUrl, token)),
-    );
+    prompt({
+      title: "Edit call URL",
+      message: "URL for joining the call",
+      defaultValue: call.call_url ?? "",
+      keyboardType: "url",
+      onSubmit: (callUrl) => action.run((token) => saleActions.updateCallUrl(call.id, callUrl, token)),
+    });
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
@@ -794,14 +927,27 @@ const CommissionCard = ({ customer, action }: { customer: CustomerDetail; action
   );
 };
 
-const ReviewCard = ({ sale, customer, action }: { sale: SaleDetail; customer: CustomerDetail; action: SaleAction }) => {
+const ReviewCard = ({
+  sale,
+  customer,
+  action,
+  prompt,
+}: {
+  sale: SaleDetail;
+  customer: CustomerDetail;
+  action: SaleAction;
+  prompt: PromptFn;
+}) => {
   const review = customer.review;
   if (!review) return null;
 
   const editResponse = () =>
-    promptText("Respond to review", "Your public response", review.response?.message ?? "", (message) =>
-      action.run((token) => saleActions.updateReviewResponse(sale.purchase_id, message, token)),
-    );
+    prompt({
+      title: "Respond to review",
+      message: "Your public response",
+      defaultValue: review.response?.message ?? "",
+      onSubmit: (message) => action.run((token) => saleActions.updateReviewResponse(sale.purchase_id, message, token)),
+    });
   const deleteResponse = () =>
     Alert.alert("Delete response", "Remove your response to this review?", [
       { text: "Cancel", style: "cancel" },
@@ -878,6 +1024,7 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
   const currentSaleId = overrideSaleId ?? saleId;
   const { data, isLoading } = useSaleDetail(currentSaleId);
   const action = useSaleAction(currentSaleId);
+  const { prompt, config: promptConfig, close: closePrompt } = usePrompt();
   const sale = data?.purchase;
   const customer = data?.customer;
 
@@ -896,10 +1043,10 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
             <LoadingSpinner size="large" />
           </View>
         ) : sale ? (
-          <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, gap: 16 }}>
+          <ScrollView key={currentSaleId} className="flex-1" contentContainerStyle={{ padding: 16, gap: 16 }}>
             <StatusBadges sale={sale} customer={customer} />
 
-            <EmailCard sale={sale} customer={customer} action={action} />
+            <EmailCard sale={sale} customer={customer} action={action} prompt={prompt} />
 
             {!!customer?.name && (
               <Card>
@@ -912,9 +1059,9 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
               </Card>
             )}
 
-            {customer && <GifteeCard sale={sale} customer={customer} action={action} />}
+            {customer && <GifteeCard sale={sale} customer={customer} action={action} prompt={prompt} />}
 
-            <OrderCard sale={sale} customer={customer} action={action} />
+            <OrderCard sale={sale} customer={customer} action={action} prompt={prompt} />
 
             <ContentCard productPurchases={data?.product_purchases ?? []} onSelectSale={setOverrideSaleId} />
 
@@ -926,12 +1073,12 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
                 <ChargesCard charges={data?.charges ?? []} action={action} />
                 <EmailsCard sale={sale} emails={data?.emails ?? []} action={action} />
                 <MissedPostsCard sale={sale} action={action} />
-                <ShippingCard sale={sale} customer={customer} action={action} />
+                <ShippingCard sale={sale} customer={customer} action={action} prompt={prompt} />
                 <LicenseCard customer={customer} action={action} />
                 <AccessCard sale={sale} customer={customer} action={action} />
-                <CallCard customer={customer} action={action} />
+                <CallCard customer={customer} action={action} prompt={prompt} />
                 <CommissionCard customer={customer} action={action} />
-                <ReviewCard sale={sale} customer={customer} action={action} />
+                <ReviewCard sale={sale} customer={customer} action={action} prompt={prompt} />
                 {!!customer.affiliate && (
                   <Card>
                     <CardHeader>
@@ -974,6 +1121,7 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
           </View>
         )}
       </SheetContent>
+      <PromptModal config={promptConfig} onClose={closePrompt} />
     </Sheet>
   );
 };

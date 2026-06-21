@@ -48,7 +48,7 @@ export default function Dashboard() {
   const [searchText, setSearchText] = useState("");
   const isAllRange = timeRange === "all";
   // Search spans all sales (web parity), independent of the selected date range, and paginates.
-  const salesSearch = useSales(searchText, isSearchActive);
+  const salesSearch = useSales(searchText, isSearchActive, { requireQuery: true });
   const allSales = useSales("", isAllRange && !isSearchActive);
   const inputRef = useRef<TextInput>(null);
 
@@ -81,16 +81,29 @@ export default function Dashboard() {
   }
 
   const salesCount = data?.sales_count ?? 0;
-  const displayData = isSearchActive ? salesSearch.sales : isAllRange ? allSales.sales : (data?.purchases ?? []);
+  const isSearchIdle = isSearchActive && searchText.trim().length === 0;
+  const displayData = isSearchActive
+    ? isSearchIdle
+      ? []
+      : salesSearch.sales
+    : isAllRange
+      ? allSales.sales
+      : (data?.purchases ?? []);
   const isLoading = isSearchActive
-    ? salesSearch.isSearching || (salesSearch.isLoading && salesSearch.sales.length === 0)
+    ? !isSearchIdle && (salesSearch.isSearching || (salesSearch.isLoading && salesSearch.sales.length === 0))
     : isAllRange
       ? isLoadingAnalytics || allSales.isLoading
       : isLoadingAnalytics;
+  const salesError = isSearchActive && !isSearchIdle ? salesSearch.error : isAllRange ? allSales.error : null;
 
   const handleRefresh = () => {
     refetch();
     if (isAllRange) allSales.refetch();
+  };
+
+  const retrySales = () => {
+    if (isSearchActive) salesSearch.refetch();
+    else if (isAllRange) allSales.refetch();
   };
 
   return (
@@ -146,7 +159,14 @@ export default function Dashboard() {
         </View>
       )}
 
-      {isLoading ? (
+      {salesError ? (
+        <View className="flex-1 items-center justify-center gap-4 p-4">
+          <Text className="text-center font-sans text-lg text-muted">Couldn&apos;t load sales.</Text>
+          <Button variant="outline" size="sm" onPress={retrySales}>
+            <Text>Try again</Text>
+          </Button>
+        </View>
+      ) : isLoading ? (
         <View className="flex-1 items-center justify-center">
           <LoadingSpinner size="large" />
         </View>
@@ -170,7 +190,9 @@ export default function Dashboard() {
           renderItem={({ item }) => <SaleItem sale={item} onPress={() => setSelectedSaleId(item.id)} />}
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
-              <Text className="font-sans text-lg text-muted">No sales found</Text>
+              <Text className="font-sans text-lg text-muted">
+                {isSearchIdle ? "Type to search your sales" : "No sales found"}
+              </Text>
             </View>
           }
           ListFooterComponent={
