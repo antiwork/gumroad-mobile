@@ -87,9 +87,10 @@ export default function PayoutSettingsScreen() {
   }, []);
 
   useEffect(() => {
+    mainUrlRef.current = url;
     setCanSave(false);
     setHasError(false);
-  }, [accessToken]);
+  }, [url]);
 
   if (isLoading) {
     return (
