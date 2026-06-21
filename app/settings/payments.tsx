@@ -34,6 +34,7 @@ export default function PayoutSettingsScreen() {
   const webViewRef = useRef<BaseWebView>(null);
   const [canSave, setCanSave] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const url = useMemo(
     () =>
@@ -65,10 +66,11 @@ export default function PayoutSettingsScreen() {
   );
 
   const handleRetry = useCallback(() => {
+    mainUrlRef.current = url;
     setCanSave(false);
     setHasError(false);
-    webViewRef.current?.reload();
-  }, []);
+    setReloadKey((k) => k + 1);
+  }, [url]);
 
   const handleError = useCallback((event: WebViewErrorEvent) => {
     if (event.nativeEvent.url !== mainUrlRef.current) return;
@@ -113,7 +115,7 @@ export default function PayoutSettingsScreen() {
         }}
       />
       <StyledWebView
-        key={accessToken ?? "anonymous"}
+        key={`${accessToken ?? "anonymous"}-${reloadKey}`}
         ref={webViewRef}
         source={{ uri: url }}
         className="flex-1 bg-transparent"
