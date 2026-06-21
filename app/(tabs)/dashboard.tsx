@@ -61,6 +61,7 @@ export default function Dashboard() {
   }, [isSearchActive]);
 
   const showAnalyticsError = !isSearchActive && !isAllRange && !!error;
+  const showHeaderAnalyticsError = !isSearchActive && isAllRange && !!error;
 
   if (showAnalyticsError) {
     return (
@@ -94,7 +95,7 @@ export default function Dashboard() {
   const isLoading = isSearchActive
     ? !isSearchIdle && salesSearch.isSearching
     : isAllRange
-      ? isLoadingAnalytics || allSales.isLoading
+      ? allSales.isLoading
       : isLoadingAnalytics;
   const salesError = isSearchActive && !isSearchIdle ? salesSearch.error : isAllRange ? allSales.error : null;
 
@@ -139,6 +140,13 @@ export default function Dashboard() {
           <View className="mb-4 h-20 items-center justify-center">
             {isLoadingAnalytics ? (
               <LoadingSpinner size="small" />
+            ) : showHeaderAnalyticsError ? (
+              <View className="flex-row items-center gap-2">
+                <Text className="font-sans text-sm text-muted">Couldn&apos;t load totals.</Text>
+                <Button variant="ghost" size="sm" onPress={() => refetch()}>
+                  <Text>Retry</Text>
+                </Button>
+              </View>
             ) : (
               <>
                 <Text className="font-sans text-4xl text-foreground">{data?.formatted_revenue ?? "$0"}</Text>
@@ -187,7 +195,8 @@ export default function Dashboard() {
           }
           onEndReached={() => {
             if (isSearchActive) {
-              if (salesSearch.hasNextPage && !salesSearch.isFetchingNextPage) salesSearch.fetchNextPage();
+              if (!isSearchIdle && salesSearch.hasNextPage && !salesSearch.isFetchingNextPage)
+                salesSearch.fetchNextPage();
             } else if (isAllRange && allSales.hasNextPage && !allSales.isFetchingNextPage) {
               allSales.fetchNextPage();
             }
