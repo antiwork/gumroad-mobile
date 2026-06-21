@@ -123,16 +123,6 @@ const SettingsSheet = () => {
         <SheetTitle>Settings</SheetTitle>
       </SheetHeader>
       <SheetContent>
-        {isCreator ? (
-          <View className="border-b border-border p-4">
-            <Text className="mb-2 font-sans text-lg text-foreground">Profile</Text>
-            <Text className="mb-4 text-sm text-muted-foreground">Edit your profile and customize how it looks.</Text>
-            <Button variant="outline" onPress={handleEditProfile}>
-              <Text>Edit profile</Text>
-              <LineIcon name="user-circle" size={20} className="text-foreground" />
-            </Button>
-          </View>
-        ) : null}
         <View className="border-b border-border p-4">
           <Text className="mb-2 font-sans text-lg text-foreground">Feedback</Text>
           <Text className="mb-4 text-sm text-muted-foreground">Report a bug or suggest an improvement.</Text>
@@ -164,6 +154,12 @@ const SettingsSheet = () => {
               </>
             ) : null}
           </View>
+          {isCreator ? (
+            <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
+              <Text>Edit profile</Text>
+              <LineIcon name="user-circle" size={20} className="text-foreground" />
+            </Button>
+          ) : null}
           <Button onPress={handleLogout}>
             <Text>Logout</Text>
             <LineIcon name="arrow-out-left-square-half" size={20} className="text-primary-foreground" />
