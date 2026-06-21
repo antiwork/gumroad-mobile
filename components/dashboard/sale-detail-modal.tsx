@@ -97,6 +97,8 @@ const PromptModal = ({ config, onClose }: { config: PromptConfig | null; onClose
             keyboardType={config?.keyboardType ?? "default"}
             value={value}
             onChangeText={setValue}
+            returnKeyType="done"
+            onSubmitEditing={save}
             autoFocus
           />
           <View className="flex-row justify-end gap-2">
@@ -620,6 +622,7 @@ const EmailsCard = ({ sale, emails, action }: { sale: SaleDetail; emails: SaleEm
 };
 
 const MissedPostsCard = ({ sale, action }: { sale: SaleDetail; action: SaleAction }) => {
+  const queryClient = useQueryClient();
   const { data: missedPosts } = useMissedPosts(sale.purchase_id);
   const [sentPostIds, setSentPostIds] = useState<string[]>([]);
   if (!missedPosts || missedPosts.length === 0) return null;
@@ -628,7 +631,11 @@ const MissedPostsCard = ({ sale, action }: { sale: SaleDetail; action: SaleActio
     action
       .run((token) => saleActions.sendPost(sale.purchase_id, post.id, token), { skipRefetch: true })
       .then((ok) => {
-        if (ok) setSentPostIds((ids) => [...ids, post.id]);
+        if (ok) {
+          setSentPostIds((ids) => [...ids, post.id]);
+          queryClient.invalidateQueries({ queryKey: ["missedPosts", sale.purchase_id] });
+          queryClient.invalidateQueries({ queryKey: ["sale", sale.purchase_id] });
+        }
       });
 
   return (
@@ -672,9 +679,15 @@ const ShippingCard = ({
   prompt: PromptFn;
 }) => {
   const shipping = customer.shipping;
+  const serverAddress = shipping?.address ?? null;
   const [isEditing, setEditing] = useState(false);
-  const [address, setAddress] = useState(shipping?.address ?? null);
+  const [address, setAddress] = useState(serverAddress);
   const mutedColor = useCSSVariable("--color-muted") as string;
+
+  useEffect(() => {
+    if (!isEditing) setAddress(serverAddress);
+  }, [serverAddress, isEditing]);
+
   if (!shipping || !address) return null;
 
   const saveAddress = () =>

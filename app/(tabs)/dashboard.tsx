@@ -60,7 +60,9 @@ export default function Dashboard() {
     }
   }, [isSearchActive]);
 
-  if (error) {
+  const showAnalyticsError = !isSearchActive && !isAllRange && !!error;
+
+  if (showAnalyticsError) {
     return (
       <Screen>
         <View className="flex-1 items-center justify-center">
@@ -176,7 +178,11 @@ export default function Dashboard() {
           keyExtractor={(item) => item.id}
           refreshControl={
             !isSearchActive ? (
-              <RefreshControl refreshing={isRefetching} onRefresh={handleRefresh} tintColor={accentColor} />
+              <RefreshControl
+                refreshing={isRefetching || (isAllRange && allSales.isRefetching)}
+                onRefresh={handleRefresh}
+                tintColor={accentColor}
+              />
             ) : undefined
           }
           onEndReached={() => {
