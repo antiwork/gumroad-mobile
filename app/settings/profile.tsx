@@ -29,6 +29,9 @@ const isAllowedInWebView = (url: string) => {
   }
 };
 
+const buildProfileUrl = (token: string | null) =>
+  `${env.EXPO_PUBLIC_GUMROAD_URL}/settings/profile?display=mobile_app&access_token=${token}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
+
 export default function ProfileSettingsScreen() {
   const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
@@ -36,11 +39,11 @@ export default function ProfileSettingsScreen() {
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const url = useMemo(
-    () =>
-      `${env.EXPO_PUBLIC_GUMROAD_URL}/settings/profile?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`,
-    [accessToken],
-  );
+  const sessionTokenRef = useRef(accessToken);
+  if (sessionTokenRef.current == null) sessionTokenRef.current = accessToken;
+  const sessionToken = sessionTokenRef.current;
+
+  const url = useMemo(() => buildProfileUrl(sessionToken), [sessionToken]);
 
   const mainUrlRef = useRef(url);
 
@@ -66,11 +69,12 @@ export default function ProfileSettingsScreen() {
   );
 
   const handleRetry = useCallback(() => {
-    mainUrlRef.current = url;
+    sessionTokenRef.current = accessToken;
+    mainUrlRef.current = buildProfileUrl(accessToken);
     setCanSave(false);
     setHasError(false);
     setReloadKey((k) => k + 1);
-  }, [url]);
+  }, [accessToken]);
 
   const handleError = useCallback((event: WebViewErrorEvent) => {
     if (event.nativeEvent.url !== mainUrlRef.current) return;
@@ -115,7 +119,7 @@ export default function ProfileSettingsScreen() {
         }}
       />
       <StyledWebView
-        key={`${accessToken ?? "anonymous"}-${reloadKey}`}
+        key={`${sessionToken ?? "anonymous"}-${reloadKey}`}
         ref={webViewRef}
         source={{ uri: url }}
         className="flex-1 bg-transparent"
