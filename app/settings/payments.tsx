@@ -11,7 +11,7 @@ import { Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
-import type { WebViewErrorEvent, WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
+import type { WebViewErrorEvent, WebViewHttpErrorEvent, WebViewOpenWindowEvent } from "react-native-webview/lib/WebViewTypes";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
@@ -67,6 +67,10 @@ export default function PayoutSettingsScreen() {
     },
     [url],
   );
+
+  const handleOpenWindow = useCallback((event: WebViewOpenWindowEvent) => {
+    safeOpenURL(event.nativeEvent.targetUrl);
+  }, []);
 
   const handleRetry = useCallback(() => {
     sessionTokenRef.current = accessToken;
@@ -130,6 +134,7 @@ export default function PayoutSettingsScreen() {
         originWhitelist={["*"]}
         onMessage={handleMessage}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onOpenWindow={handleOpenWindow}
         onNavigationStateChange={(navState) => {
           mainUrlRef.current = navState.url;
         }}
