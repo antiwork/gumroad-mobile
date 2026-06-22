@@ -19,11 +19,18 @@ const allowedHostSuffixes = [".stripe.com", ".paypal.com", ".cloudflare.com"];
 
 const isWebUrl = (url: string) => /^https?:\/\//.test(url);
 
+const isPaymentProviderUrl = (url: string) => {
+  try {
+    const { hostname } = new URL(url);
+    return allowedHostSuffixes.some((suffix) => hostname === suffix.slice(1) || hostname.endsWith(suffix));
+  } catch {
+    return false;
+  }
+};
+
 const isAllowedInWebView = (url: string) => {
   try {
-    const { origin, hostname } = new URL(url);
-    if (origin === gumroadOrigin) return true;
-    return allowedHostSuffixes.some((suffix) => hostname === suffix.slice(1) || hostname.endsWith(suffix));
+    return new URL(url).origin === gumroadOrigin || isPaymentProviderUrl(url);
   } catch {
     return false;
   }
@@ -69,7 +76,12 @@ export default function PayoutSettingsScreen() {
   );
 
   const handleOpenWindow = useCallback((event: WebViewOpenWindowEvent) => {
-    safeOpenURL(event.nativeEvent.targetUrl);
+    const { targetUrl } = event.nativeEvent;
+    if (isPaymentProviderUrl(targetUrl)) {
+      webViewRef.current?.injectJavaScript(`window.location.href = ${JSON.stringify(targetUrl)}; true;`);
+    } else {
+      safeOpenURL(targetUrl);
+    }
   }, []);
 
   const handleRetry = useCallback(() => {

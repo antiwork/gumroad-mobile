@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
+const mockInjectJavaScript = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -28,8 +29,10 @@ jest.mock("react-native-webview", () => {
   const React = require("react");
   const { View } = require("react-native");
   return {
-    WebView: (props: Record<string, unknown>) =>
-      React.createElement(View, { testID: "payments-webview", ...props }),
+    WebView: React.forwardRef(function MockWebView(props: Record<string, unknown>, ref: unknown) {
+      React.useImperativeHandle(ref, () => ({ injectJavaScript: mockInjectJavaScript, postMessage: jest.fn() }));
+      return React.createElement(View, { testID: "payments-webview", ...props });
+    }),
   };
 });
 
@@ -67,5 +70,21 @@ describe("PayoutSettingsScreen", () => {
 
     expect(shouldStart({ url: "https://external.example/test" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+  });
+
+  it("opens target=_blank help links externally but keeps provider popups in the WebView", () => {
+    render(<PayoutSettingsScreen />);
+
+    const onOpenWindow = screen.getByTestId("payments-webview").props.onOpenWindow as (event: {
+      nativeEvent: { targetUrl: string };
+    }) => void;
+
+    onOpenWindow({ nativeEvent: { targetUrl: "https://example.com/help/article/260-your-payout-settings-page" } });
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://example.com/help/article/260-your-payout-settings-page");
+
+    mockSafeOpenURL.mockClear();
+    onOpenWindow({ nativeEvent: { targetUrl: "https://connect.stripe.com/setup/s/abc" } });
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
+    expect(mockInjectJavaScript).toHaveBeenCalled();
   });
 });
