@@ -634,7 +634,7 @@ const MissedPostsCard = ({ sale, action }: { sale: SaleDetail; action: SaleActio
         if (ok) {
           setSentPostIds((ids) => [...ids, post.id]);
           queryClient.invalidateQueries({ queryKey: ["missedPosts", sale.purchase_id] });
-          queryClient.invalidateQueries({ queryKey: ["sale", sale.purchase_id] });
+          queryClient.invalidateQueries({ queryKey: ["sale", sale.id] });
         }
       });
 

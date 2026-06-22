@@ -2,7 +2,7 @@ import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI, useAPIRequest } from "@/lib/request";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert } from "react-native";
 
 interface ActionResult {
@@ -115,11 +115,14 @@ export const useSaleAction = (saleId: string | null) => {
   const { accessToken } = useAuth();
   const queryClient = useQueryClient();
   const [isBusy, setBusy] = useState(false);
+  const busyRef = useRef(false);
 
   const run = async (
     action: (accessToken: string) => Promise<ActionResult>,
     { successMessage, skipRefetch }: { successMessage?: string; skipRefetch?: boolean } = {},
   ) => {
+    if (busyRef.current) return false;
+    busyRef.current = true;
     setBusy(true);
     try {
       const result = await action(assertDefined(accessToken));

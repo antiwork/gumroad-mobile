@@ -1,7 +1,7 @@
 import { SalePurchase } from "@/components/dashboard/use-sales-analytics";
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
-import { requestAPI } from "@/lib/request";
+import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
@@ -20,7 +20,7 @@ export const buildSalesPath = (page: number, query: string) =>
   `mobile/sales.json?page=${page}${query ? `&query=${encodeURIComponent(query)}` : ""}`;
 
 export const useSales = (searchText: string, enabled = true, { requireQuery = false } = {}) => {
-  const { accessToken } = useAuth();
+  const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
 
   useEffect(() => {
@@ -49,6 +49,10 @@ export const useSales = (searchText: string, enabled = true, { requireQuery = fa
     (searchText.trim() !== debouncedSearchText ||
       query.isLoading ||
       (query.isFetching && query.isPlaceholderData));
+
+  useEffect(() => {
+    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
+  }, [isAuthLoading, accessToken, query.error, logout]);
 
   return { ...query, sales, totalCount, isSearching };
 };

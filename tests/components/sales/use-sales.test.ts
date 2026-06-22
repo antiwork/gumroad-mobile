@@ -4,12 +4,19 @@ import { act, renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
 
 const mockRequestAPI = jest.fn();
+const mockLogout = jest.fn();
 jest.mock("@/lib/request", () => ({
   requestAPI: (...args: unknown[]) => mockRequestAPI(...args),
+  UnauthorizedError: class extends Error {
+    constructor(message?: string) {
+      super(message);
+      this.name = "UnauthorizedError";
+    }
+  },
 }));
 
 jest.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ accessToken: "test-token" }),
+  useAuth: () => ({ accessToken: "test-token", logout: mockLogout, isLoading: false }),
 }));
 
 jest.mock("@/lib/assert", () => ({

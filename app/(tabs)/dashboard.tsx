@@ -47,7 +47,6 @@ export default function Dashboard() {
   const { isSearchActive, setSearchActive } = useDashboardSearch();
   const [searchText, setSearchText] = useState("");
   const isAllRange = timeRange === "all";
-  // Search spans all sales (web parity), independent of the selected date range, and paginates.
   const salesSearch = useSales(searchText, isSearchActive, { requireQuery: true });
   const allSales = useSales("", isAllRange && !isSearchActive);
   const inputRef = useRef<TextInput>(null);
