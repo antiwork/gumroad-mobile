@@ -634,7 +634,7 @@ const MissedPostsCard = ({ sale, action }: { sale: SaleDetail; action: SaleActio
         if (ok) {
           setSentPostIds((ids) => [...ids, post.id]);
           queryClient.invalidateQueries({ queryKey: ["missedPosts", sale.purchase_id] });
-          queryClient.invalidateQueries({ queryKey: ["sale", sale.id] });
+          queryClient.invalidateQueries({ queryKey: ["sale", sale.purchase_id] });
         }
       });
 
@@ -1062,13 +1062,13 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
 
             <EmailCard sale={sale} customer={customer} action={action} prompt={prompt} />
 
-            {!!customer?.name && (
+            {!!(customer?.name || sale.full_name) && (
               <Card>
                 <CardHeader>
                   <CardTitle>Full name</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Text className="font-bold">{customer.name}</Text>
+                  <Text className="font-bold">{customer?.name || sale.full_name}</Text>
                 </CardContent>
               </Card>
             )}
