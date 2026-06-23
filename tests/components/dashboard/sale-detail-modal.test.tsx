@@ -1,6 +1,7 @@
 import { SaleDetailModal } from "@/components/dashboard/sale-detail-modal";
 import { CustomerDetail, SaleDetail } from "@/components/dashboard/use-sales-analytics";
-import { fireEvent, screen } from "@testing-library/react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import { act } from "react";
 import { Alert, Switch } from "react-native";
 import { renderWithQueryClient } from "../../render-with-query-client";
@@ -128,6 +129,26 @@ describe("SaleDetailModal", () => {
     const actionFn = mockRun.mock.calls[0][0] as (token: string) => void;
     actionFn("test-token");
     expect(mockUpdateSale).toHaveBeenCalledWith("purchase-1", { email: "new@test.com" }, "test-token");
+  });
+
+  it("clears the prompt when the sheet closes so it can't target the wrong sale", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <SaleDetailModal saleId="purchase-1" onClose={jest.fn()} />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.press(screen.getByText("Edit"));
+    expect(screen.getByText("New email for this customer")).toBeTruthy();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <SaleDetailModal saleId={null} onClose={jest.fn()} />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByText("New email for this customer")).toBeNull();
   });
 
   it("optimistically toggles the Receives emails switch and runs the action", () => {

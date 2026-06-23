@@ -1043,7 +1043,8 @@ export const SaleDetailModal = ({ saleId, onClose }: { saleId: string | null; on
 
   useEffect(() => {
     setOverrideSaleId(null);
-  }, [saleId]);
+    closePrompt();
+  }, [saleId, closePrompt]);
 
   return (
     <Sheet open={!!saleId} onOpenChange={(open) => !open && onClose()}>
