@@ -7,8 +7,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
+import { cacheFileDestination } from "@/lib/file-utils";
 import { updateMediaLocation } from "@/lib/media-location";
-import { File, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,11 +22,13 @@ import { safeOpenURL } from "@/lib/open-url";
 import { Button } from "@/components/ui/button";
 
 const STALE_BLOB_ERROR = "Unable to resolve data for blob:";
+const DEFAULT_PDF_FILE_NAME = "document.pdf";
 
 export default function PdfViewerScreen() {
-  const { uri, title, urlRedirectId, productFileId, purchaseId, initialPage } = useLocalSearchParams<{
+  const { uri, title, fileName, urlRedirectId, productFileId, purchaseId, initialPage } = useLocalSearchParams<{
     uri: string;
     title?: string;
+    fileName?: string;
     urlRedirectId?: string;
     productFileId?: string;
     purchaseId?: string;
@@ -50,12 +53,17 @@ export default function PdfViewerScreen() {
   const [downloadError, setDownloadError] = useState(false);
   const [isDownloading, setIsDownloading] = useState(true);
 
+  const downloadDestination = useCallback(
+    () => cacheFileDestination(productFileId ?? "pdf-viewer", fileName ?? DEFAULT_PDF_FILE_NAME),
+    [productFileId, fileName],
+  );
+
   const downloadPdf = useCallback(() => {
     let cancelled = false;
     setDownloadError(false);
     setCachedUri(null);
     setIsDownloading(true);
-    File.downloadFileAsync(uri, Paths.cache, { idempotent: true })
+    File.downloadFileAsync(uri, downloadDestination(), { idempotent: true })
       .then((result) => {
         if (!cancelled) setCachedUri(result.uri);
       })
@@ -72,7 +80,7 @@ export default function PdfViewerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [uri]);
+  }, [uri, downloadDestination]);
 
   useEffect(() => {
     cancelDownloadRef.current = downloadPdf();
@@ -143,7 +151,7 @@ export default function PdfViewerScreen() {
                     const isAvailable = await Sharing.isAvailableAsync();
                     if (!isAvailable) return;
                     const sharedUri =
-                      cachedUri ?? (await File.downloadFileAsync(uri, Paths.cache, { idempotent: true })).uri;
+                      cachedUri ?? (await File.downloadFileAsync(uri, downloadDestination(), { idempotent: true })).uri;
                     await Sharing.shareAsync(sharedUri);
                   } finally {
                     setIsSharing(false);

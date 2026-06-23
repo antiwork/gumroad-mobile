@@ -13,7 +13,7 @@ import { safeOpenURL } from "@/lib/open-url";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { createContext, useContext, useRef, useState } from "react";
 import { Alert, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
@@ -94,12 +94,23 @@ const SettingsButton = () => {
 
 const SettingsSheet = () => {
   const { isSettingsOpen, setSettingsOpen } = useSettingsSheet();
-  const { logout } = useAuth();
+  const { logout, isCreator } = useAuth();
   const { data: user, isLoading: isUserLoading } = useUser();
+  const router = useRouter();
 
   const handleLogout = () => {
     setSettingsOpen(false);
     logout();
+  };
+
+  const handleEditProfile = () => {
+    setSettingsOpen(false);
+    router.push("/settings/profile");
+  };
+
+  const handlePayoutSettings = () => {
+    setSettingsOpen(false);
+    router.push("/settings/payments");
   };
 
   const handleDeleteAccount = () => {
@@ -148,6 +159,18 @@ const SettingsSheet = () => {
               </>
             ) : null}
           </View>
+          {isCreator ? (
+            <>
+              <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
+                <Text>Edit profile</Text>
+                <LineIcon name="user-circle" size={20} className="text-foreground" />
+              </Button>
+              <Button variant="outline" className="mb-2" onPress={handlePayoutSettings}>
+                <Text>Payout settings</Text>
+                <LineIcon name="dollar-circle" size={20} className="text-foreground" />
+              </Button>
+            </>
+          ) : null}
           <Button onPress={handleLogout}>
             <Text>Logout</Text>
             <LineIcon name="arrow-out-left-square-half" size={20} className="text-primary-foreground" />
