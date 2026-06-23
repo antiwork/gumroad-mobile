@@ -74,6 +74,7 @@ const RootLayout = () => {
             <Stack.Screen name="purchase/[token]" options={{ title: "" }} />
             <Stack.Screen name="sales-export" options={{ title: "Export all sales" }} />
             <Stack.Screen name="settings/profile" options={{ title: "Profile" }} />
+            <Stack.Screen name="settings/payments" options={{ title: "Payouts" }} />
             <Stack.Screen name="post/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
             <Stack.Screen name="+not-found" options={{ title: "Not Found" }} />

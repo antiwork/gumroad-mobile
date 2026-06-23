@@ -108,6 +108,11 @@ const SettingsSheet = () => {
     router.push("/settings/profile");
   };
 
+  const handlePayoutSettings = () => {
+    setSettingsOpen(false);
+    router.push("/settings/payments");
+  };
+
   const handleDeleteAccount = () => {
     safeOpenURL(`${env.EXPO_PUBLIC_GUMROAD_URL}/settings/advanced`);
   };
@@ -158,6 +163,10 @@ const SettingsSheet = () => {
             <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
               <Text>Edit profile</Text>
               <LineIcon name="user-circle" size={20} className="text-foreground" />
+            </Button>
+            <Button variant="outline" className="mb-2" onPress={handlePayoutSettings}>
+              <Text>Payout settings</Text>
+              <LineIcon name="dollar-circle" size={20} className="text-foreground" />
             </Button>
           ) : null}
           <Button onPress={handleLogout}>
