@@ -138,6 +138,7 @@ export const useSaleAction = (saleId: string | null) => {
       Alert.alert("Error", error instanceof Error ? error.message : "Action failed");
       return false;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
