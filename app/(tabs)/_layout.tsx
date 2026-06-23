@@ -160,14 +160,16 @@ const SettingsSheet = () => {
             ) : null}
           </View>
           {isCreator ? (
-            <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
-              <Text>Edit profile</Text>
-              <LineIcon name="user-circle" size={20} className="text-foreground" />
-            </Button>
-            <Button variant="outline" className="mb-2" onPress={handlePayoutSettings}>
-              <Text>Payout settings</Text>
-              <LineIcon name="dollar-circle" size={20} className="text-foreground" />
-            </Button>
+            <>
+              <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
+                <Text>Edit profile</Text>
+                <LineIcon name="user-circle" size={20} className="text-foreground" />
+              </Button>
+              <Button variant="outline" className="mb-2" onPress={handlePayoutSettings}>
+                <Text>Payout settings</Text>
+                <LineIcon name="dollar-circle" size={20} className="text-foreground" />
+              </Button>
+            </>
           ) : null}
           <Button onPress={handleLogout}>
             <Text>Logout</Text>
