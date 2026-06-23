@@ -66,7 +66,7 @@ const SearchButton = () => {
   const { isSearchActive, setSearchActive } = useDashboardSearch();
   return (
     <TouchableOpacity onPress={() => setSearchActive(!isSearchActive)}>
-      <LineIcon name="search" size={24} className={isSearchActive ? "text-accent" : "text-foreground"} />
+      <LineIcon name="search" size={24} className={isSearchActive ? "text-accent" : "text-white"} />
     </TouchableOpacity>
   );
 };

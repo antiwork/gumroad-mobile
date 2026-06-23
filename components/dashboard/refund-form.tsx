@@ -88,7 +88,7 @@ export const RefundForm = ({ sale, onRefundSuccess }: { sale: SaleDetail; onRefu
         setRefundSuccess(true);
         setIsPartialRefund(isPartialAmount);
 
-        queryClient.invalidateQueries({ queryKey: ["sale", sale.id] });
+        queryClient.invalidateQueries({ queryKey: ["sale", sale.purchase_id] });
         queryClient.invalidateQueries({ queryKey: ["analytics"] });
 
         onRefundSuccess?.();

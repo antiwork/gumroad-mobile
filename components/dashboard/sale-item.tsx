@@ -18,9 +18,9 @@ export const SaleItem = ({ sale, onPress }: SaleItemProps) => (
         <Text className="text-lg">📦</Text>
       </View>
     )}
-    <View className="flex-1">
+    <View className="min-w-0 flex-1">
       <View className="flex-row items-center gap-1.5">
-        <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
+        <Text className="shrink text-sm font-bold text-foreground" numberOfLines={1}>
           {sale.product_name}
         </Text>
         <StatusBadge sale={sale} />
@@ -29,7 +29,7 @@ export const SaleItem = ({ sale, onPress }: SaleItemProps) => (
         {sale.email}
       </Text>
     </View>
-    <View className="items-end gap-1">
+    <View className="shrink-0 items-end gap-1">
       <Text className="text-sm font-bold">{sale.formatted_total_price}</Text>
       <Text className="text-xs">{sale.timestamp}</Text>
     </View>

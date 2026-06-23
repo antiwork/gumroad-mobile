@@ -1,10 +1,10 @@
 import { useDashboardSearch } from "@/app/(tabs)/_layout";
 import { SaleDetailModal } from "@/components/dashboard/sale-detail-modal";
 import { SaleItem } from "@/components/dashboard/sale-item";
-import { usePurchaseSearch } from "@/components/dashboard/use-purchase-search";
 import { SalePurchase, TimeRange, useSalesAnalytics } from "@/components/dashboard/use-sales-analytics";
 import { ExportAllSalesButton } from "@/components/export-all-sales-button";
 import { LineIcon } from "@/components/icon";
+import { useSales } from "@/components/sales/use-sales";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
@@ -44,9 +44,11 @@ export default function Dashboard() {
   const accentColor = useCSSVariable("--color-accent") as string;
   const mutedColor = useCSSVariable("--color-muted") as string;
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
-  const { isSearchActive } = useDashboardSearch();
+  const { isSearchActive, setSearchActive } = useDashboardSearch();
   const [searchText, setSearchText] = useState("");
-  const { isSearching, searchResults } = usePurchaseSearch(searchText, data?.purchases ?? [], timeRange);
+  const isAllRange = timeRange === "all";
+  const salesSearch = useSales(searchText, isSearchActive, { requireQuery: true });
+  const allSales = useSales("", isAllRange && !isSearchActive);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -57,7 +59,10 @@ export default function Dashboard() {
     }
   }, [isSearchActive]);
 
-  if (error) {
+  const showAnalyticsError = !isSearchActive && !isAllRange && !!error;
+  const showHeaderAnalyticsError = !isSearchActive && isAllRange && !!error;
+
+  if (showAnalyticsError) {
     return (
       <Screen>
         <View className="flex-1 items-center justify-center">
@@ -78,13 +83,38 @@ export default function Dashboard() {
   }
 
   const salesCount = data?.sales_count ?? 0;
-  const displayData = isSearchActive ? searchResults : (data?.purchases ?? []);
-  const isLoading = isSearchActive ? isSearching : isLoadingAnalytics;
+  const isSearchIdle = isSearchActive && searchText.trim().length === 0;
+  const displayData = isSearchActive
+    ? isSearchIdle
+      ? []
+      : salesSearch.sales
+    : isAllRange
+      ? allSales.sales
+      : (data?.purchases ?? []);
+  const isLoading = isSearchActive
+    ? !isSearchIdle && salesSearch.isSearching
+    : isAllRange
+      ? allSales.isLoading
+      : isLoadingAnalytics;
+  const salesError = isSearchActive && !isSearchIdle ? salesSearch.error : isAllRange ? allSales.error : null;
+
+  const handleRefresh = () => {
+    refetch();
+    if (isAllRange) allSales.refetch();
+  };
+
+  const retrySales = () => {
+    if (isSearchActive) salesSearch.refetch();
+    else if (isAllRange) allSales.refetch();
+  };
 
   return (
     <Screen>
       {isSearchActive ? (
         <View className="flex-row items-center gap-2 border-b border-border px-4 py-3">
+          <Pressable onPress={() => setSearchActive(false)} hitSlop={8} className="pr-1">
+            <LineIcon name="arrow-left-stroke" size={24} className="text-foreground" />
+          </Pressable>
           <View className="flex-1 flex-row items-center rounded border border-border bg-background px-3 py-2">
             <LineIcon name="search" size={20} className="text-muted" />
             <TextInput
@@ -109,6 +139,13 @@ export default function Dashboard() {
           <View className="mb-4 h-20 items-center justify-center">
             {isLoadingAnalytics ? (
               <LoadingSpinner size="small" />
+            ) : showHeaderAnalyticsError ? (
+              <View className="flex-row items-center gap-2">
+                <Text className="font-sans text-sm text-muted">Couldn&apos;t load totals.</Text>
+                <Button variant="ghost" size="sm" onPress={() => refetch()}>
+                  <Text>Retry</Text>
+                </Button>
+              </View>
             ) : (
               <>
                 <Text className="font-sans text-4xl text-foreground">{data?.formatted_revenue ?? "$0"}</Text>
@@ -124,13 +161,21 @@ export default function Dashboard() {
               <TimeRangeButton label="Today" value="day" selected={timeRange === "day"} onSelect={setTimeRange} />
               <TimeRangeButton label="Month" value="month" selected={timeRange === "month"} onSelect={setTimeRange} />
               <TimeRangeButton label="Year" value="year" selected={timeRange === "year"} onSelect={setTimeRange} />
+              <TimeRangeButton label="All" value="all" selected={timeRange === "all"} onSelect={setTimeRange} />
             </View>
             <ExportAllSalesButton />
           </View>
         </View>
       )}
 
-      {isLoading ? (
+      {salesError ? (
+        <View className="flex-1 items-center justify-center gap-4 p-4">
+          <Text className="text-center font-sans text-lg text-muted">Couldn&apos;t load sales.</Text>
+          <Button variant="outline" size="sm" onPress={retrySales}>
+            <Text>Try again</Text>
+          </Button>
+        </View>
+      ) : isLoading ? (
         <View className="flex-1 items-center justify-center">
           <LoadingSpinner size="large" />
         </View>
@@ -140,15 +185,38 @@ export default function Dashboard() {
           keyExtractor={(item) => item.id}
           refreshControl={
             !isSearchActive ? (
-              <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={accentColor} />
+              <RefreshControl
+                refreshing={isRefetching || (isAllRange && allSales.isRefetching)}
+                onRefresh={handleRefresh}
+                tintColor={accentColor}
+              />
             ) : undefined
           }
+          onEndReached={() => {
+            if (isSearchActive) {
+              if (!isSearchIdle && salesSearch.hasNextPage && !salesSearch.isFetchingNextPage)
+                salesSearch.fetchNextPage();
+            } else if (isAllRange && allSales.hasNextPage && !allSales.isFetchingNextPage) {
+              allSales.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
           renderItem={({ item }) => <SaleItem sale={item} onPress={() => setSelectedSaleId(item.id)} />}
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
-              <Text className="font-sans text-lg text-muted">No sales found</Text>
+              <Text className="font-sans text-lg text-muted">
+                {isSearchIdle ? "Type to search your sales" : "No sales found"}
+              </Text>
             </View>
           }
+          ListFooterComponent={
+            (isSearchActive ? salesSearch.isFetchingNextPage : isAllRange && allSales.isFetchingNextPage) ? (
+              <View className="items-center py-4">
+                <LoadingSpinner size="small" />
+              </View>
+            ) : null
+          }
+          keyboardShouldPersistTaps="handled"
         />
       )}
 
