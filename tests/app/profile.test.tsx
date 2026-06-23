@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
+const mockInjectJavaScript = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -28,7 +29,10 @@ jest.mock("react-native-webview", () => {
   const React = require("react");
   const { View } = require("react-native");
   return {
-    WebView: (props: Record<string, unknown>) => React.createElement(View, { testID: "profile-webview", ...props }),
+    WebView: React.forwardRef(function MockWebView(props: Record<string, unknown>, ref: unknown) {
+      React.useImperativeHandle(ref, () => ({ injectJavaScript: mockInjectJavaScript, postMessage: jest.fn() }));
+      return React.createElement(View, { testID: "profile-webview", ...props });
+    }),
   };
 });
 
@@ -51,6 +55,10 @@ describe("ProfileSettingsScreen", () => {
     expect(source.uri).toContain("access_token=test-access-token");
     expect(source.uri).toContain("mobile_token=test-mobile-token");
     expect(source.uri).toBe(expectedUrl);
+
+    const props = screen.getByTestId("profile-webview").props;
+    expect(props.setSupportMultipleWindows).toBe(true);
+    expect(props.javaScriptCanOpenWindowsAutomatically).toBe(true);
   });
 
   it("keeps Gumroad navigation in the WebView and opens unrelated links outside it", () => {
@@ -65,5 +73,21 @@ describe("ProfileSettingsScreen", () => {
 
     expect(shouldStart({ url: "https://external.example/test" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+  });
+
+  it("opens target=_blank help links externally but keeps provider popups in the WebView", () => {
+    render(<ProfileSettingsScreen />);
+
+    const onOpenWindow = screen.getByTestId("profile-webview").props.onOpenWindow as (event: {
+      nativeEvent: { targetUrl: string };
+    }) => void;
+
+    onOpenWindow({ nativeEvent: { targetUrl: "https://example.com/help/article/123" } });
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://example.com/help/article/123");
+
+    mockSafeOpenURL.mockClear();
+    onOpenWindow({ nativeEvent: { targetUrl: "https://connect.stripe.com/setup/s/abc" } });
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
+    expect(mockInjectJavaScript).toHaveBeenCalled();
   });
 });

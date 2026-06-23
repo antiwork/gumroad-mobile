@@ -11,7 +11,7 @@ import { Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
-import type { WebViewErrorEvent, WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
+import type { WebViewErrorEvent, WebViewHttpErrorEvent, WebViewOpenWindowEvent } from "react-native-webview/lib/WebViewTypes";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
@@ -19,11 +19,18 @@ const allowedHostSuffixes = [".stripe.com", ".paypal.com", ".cloudflare.com"];
 
 const isWebUrl = (url: string) => /^https?:\/\//.test(url);
 
+const isPaymentProviderUrl = (url: string) => {
+  try {
+    const { hostname } = new URL(url);
+    return allowedHostSuffixes.some((suffix) => hostname === suffix.slice(1) || hostname.endsWith(suffix));
+  } catch {
+    return false;
+  }
+};
+
 const isAllowedInWebView = (url: string) => {
   try {
-    const { origin, hostname } = new URL(url);
-    if (origin === gumroadOrigin) return true;
-    return allowedHostSuffixes.some((suffix) => hostname === suffix.slice(1) || hostname.endsWith(suffix));
+    return new URL(url).origin === gumroadOrigin || isPaymentProviderUrl(url);
   } catch {
     return false;
   }
@@ -67,6 +74,15 @@ export default function ProfileSettingsScreen() {
     },
     [url],
   );
+
+  const handleOpenWindow = useCallback((event: WebViewOpenWindowEvent) => {
+    const { targetUrl } = event.nativeEvent;
+    if (isPaymentProviderUrl(targetUrl)) {
+      webViewRef.current?.injectJavaScript(`window.location.href = ${JSON.stringify(targetUrl)}; true;`);
+    } else {
+      safeOpenURL(targetUrl);
+    }
+  }, []);
 
   const handleRetry = useCallback(() => {
     sessionTokenRef.current = accessToken;
@@ -127,9 +143,12 @@ export default function ProfileSettingsScreen() {
         pullToRefreshEnabled
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
+        setSupportMultipleWindows
+        javaScriptCanOpenWindowsAutomatically
         originWhitelist={["*"]}
         onMessage={handleMessage}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onOpenWindow={handleOpenWindow}
         onNavigationStateChange={(navState) => {
           mainUrlRef.current = navState.url;
         }}
