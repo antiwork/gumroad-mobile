@@ -55,6 +55,10 @@ describe("PayoutSettingsScreen", () => {
     expect(source.uri).toContain("access_token=test-access-token");
     expect(source.uri).toContain("mobile_token=test-mobile-token");
     expect(source.uri).toBe(expectedUrl);
+
+    const props = screen.getByTestId("payments-webview").props;
+    expect(props.setSupportMultipleWindows).toBe(true);
+    expect(props.javaScriptCanOpenWindowsAutomatically).toBe(true);
   });
 
   it("keeps payment-provider and Gumroad navigation in the WebView and opens unrelated links outside it", () => {

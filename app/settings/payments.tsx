@@ -143,6 +143,8 @@ export default function PayoutSettingsScreen() {
         pullToRefreshEnabled
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
+        setSupportMultipleWindows
+        javaScriptCanOpenWindowsAutomatically
         originWhitelist={["*"]}
         onMessage={handleMessage}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
