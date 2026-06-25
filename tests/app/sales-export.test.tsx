@@ -4,8 +4,11 @@ import { Alert as NativeAlert } from "react-native";
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
 const mockFileConstructor = jest.fn();
-const mockWrite = jest.fn();
-const mockFetch = jest.fn();
+const mockDownloadFileAsync = jest.fn();
+const mockOpen = jest.fn();
+const mockReadBytes = jest.fn();
+const mockClose = jest.fn();
+const mockDelete = jest.fn();
 const mockIsSharingAvailableAsync = jest.fn();
 const mockShareAsync = jest.fn();
 const mockCaptureException = jest.fn();
@@ -27,10 +30,12 @@ jest.mock("expo-router", () => ({
   },
 }));
 
-jest.mock("expo-file-system", () => ({
-  File: jest.fn((...args: unknown[]) => mockFileConstructor(...args)),
-  Paths: { cache: "/cache" },
-}));
+jest.mock("expo-file-system", () => {
+  const File = jest.fn((...args: unknown[]) => mockFileConstructor(...args));
+  (File as unknown as { downloadFileAsync: unknown }).downloadFileAsync = (...args: unknown[]) =>
+    mockDownloadFileAsync(...args);
+  return { File, Paths: { cache: "/cache" } };
+});
 
 jest.mock("expo-sharing", () => ({
   isAvailableAsync: () => mockIsSharingAvailableAsync(),
@@ -56,13 +61,14 @@ describe("SalesExportScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue({ isLoading: false, accessToken: "test-access-token" });
-    mockFileConstructor.mockReturnValue({ uri: "file:///cache/sales.csv", write: mockWrite });
-    mockFetch.mockResolvedValue({
-      ok: true,
-      headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? "text/csv" : null) },
-      arrayBuffer: () => Promise.resolve(new Uint8Array([105, 100, 10]).buffer),
+    mockFileConstructor.mockReturnValue({
+      uri: "file:///cache/sales.csv",
+      open: mockOpen,
+      delete: mockDelete,
     });
-    global.fetch = mockFetch;
+    mockOpen.mockReturnValue({ readBytes: mockReadBytes, close: mockClose });
+    mockReadBytes.mockReturnValue(new Uint8Array([80]));
+    mockDownloadFileAsync.mockResolvedValue({ uri: "file:///cache/sales.csv" });
     mockIsSharingAvailableAsync.mockResolvedValue(true);
   });
 
@@ -108,20 +114,18 @@ describe("SalesExportScreen", () => {
         dialogTitle: "Export all sales",
       });
     });
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://example.com/purchases/export?access_token=test-access-token&mobile_token=test-mobile-token",
-    );
     expect(mockFileConstructor).toHaveBeenCalledWith("/cache", "sales.csv");
-    expect(mockWrite).toHaveBeenCalledWith(new Uint8Array([105, 100, 10]));
+    expect(mockDownloadFileAsync).toHaveBeenCalledWith(
+      "https://example.com/purchases/export?access_token=test-access-token&mobile_token=test-mobile-token",
+      expect.objectContaining({ uri: "file:///cache/sales.csv" }),
+      { idempotent: true },
+    );
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 
-  it("does not share non-CSV export responses", async () => {
+  it("does not share export responses that are not a CSV", async () => {
     jest.spyOn(NativeAlert, "alert");
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? "text/html" : null) },
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    });
+    mockReadBytes.mockReturnValueOnce(new Uint8Array([60]));
 
     render(<SalesExportScreen />);
 
@@ -130,6 +134,7 @@ describe("SalesExportScreen", () => {
     await waitFor(() => {
       expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Large exports arrive by email.");
     });
+    expect(mockDelete).toHaveBeenCalled();
     expect(mockShareAsync).not.toHaveBeenCalled();
   });
 
