@@ -1,0 +1,142 @@
+import { AgentChat } from "@/components/agent/agent-chat";
+import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act } from "react";
+import { renderWithQueryClient } from "../../render-with-query-client";
+
+jest.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({ accessToken: "test-token" }),
+}));
+
+const mockSendAgentMessage = jest.fn();
+const mockExecuteAgentAction = jest.fn();
+jest.mock("@/lib/agent", () => ({
+  ...jest.requireActual("@/lib/agent"),
+  sendAgentMessage: (...args: unknown[]) => mockSendAgentMessage(...args),
+  executeAgentAction: (...args: unknown[]) => mockExecuteAgentAction(...args),
+}));
+
+const GREETING = "Hi! I'm your store assistant.";
+const SUGGESTIONS = ["How are my sales doing?", "List my products"];
+
+const renderChat = () => renderWithQueryClient(<AgentChat greeting={GREETING} suggestions={SUGGESTIONS} />);
+
+describe("AgentChat", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("renders the greeting and starter suggestions", () => {
+    renderChat();
+
+    expect(screen.getByText(GREETING)).toBeTruthy();
+    expect(screen.getByText("How are my sales doing?")).toBeTruthy();
+    expect(screen.getByText("List my products")).toBeTruthy();
+  });
+
+  it("sends a typed message and shows the assistant reply", async () => {
+    mockSendAgentMessage.mockResolvedValue({ reply: "You have 3 products.", proposedAction: null });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How many products do I have?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("You have 3 products.")).toBeTruthy());
+    expect(mockSendAgentMessage).toHaveBeenCalledWith({
+      accessToken: "test-token",
+      messages: [
+        { role: "assistant", content: GREETING },
+        { role: "user", content: "How many products do I have?" },
+      ],
+    });
+  });
+
+  it("hides suggestions once a message is sent", async () => {
+    mockSendAgentMessage.mockResolvedValue({ reply: "Done.", proposedAction: null });
+
+    renderChat();
+
+    await act(async () => {
+      fireEvent.press(screen.getByText("List my products"));
+    });
+
+    await waitFor(() => expect(screen.queryByText("How are my sales doing?")).toBeNull());
+  });
+
+  it("applies a proposed action when confirmed", async () => {
+    mockSendAgentMessage.mockResolvedValue({
+      reply: "I've prepared a discount.",
+      proposedAction: {
+        type: "create_discount",
+        params: { code: "LAUNCH", percent_off: 20 },
+        summary: "Create a 20% off code called LAUNCH",
+      },
+    });
+    mockExecuteAgentAction.mockResolvedValue("Created discount LAUNCH.");
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "Create a launch discount");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Create a 20% off code called LAUNCH")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.press(screen.getByText("Confirm"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Applied")).toBeTruthy());
+    expect(mockExecuteAgentAction).toHaveBeenCalledWith({
+      accessToken: "test-token",
+      action: {
+        type: "create_discount",
+        params: { code: "LAUNCH", percent_off: 20 },
+        summary: "Create a 20% off code called LAUNCH",
+      },
+    });
+  });
+
+  it("dismisses a proposed action without applying it", async () => {
+    mockSendAgentMessage.mockResolvedValue({
+      reply: "I've prepared a discount.",
+      proposedAction: {
+        type: "create_discount",
+        params: { code: "LAUNCH", percent_off: 20 },
+        summary: "Create a 20% off code called LAUNCH",
+      },
+    });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "Create a launch discount");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Create a 20% off code called LAUNCH")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.press(screen.getByText("Dismiss"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Dismissed")).toBeTruthy());
+    expect(mockExecuteAgentAction).not.toHaveBeenCalled();
+  });
+
+  it("shows a fallback assistant message when the request fails", async () => {
+    mockSendAgentMessage.mockRejectedValue(new Error("network down"));
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Sorry, I ran into a problem. Please try again.")).toBeTruthy());
+  });
+});

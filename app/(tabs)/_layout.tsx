@@ -234,6 +234,16 @@ export default function TabsLayout() {
             }}
           />
           <Tabs.Screen
+            name="agent"
+            options={{
+              title: "Agent",
+              headerLeft: () => <LogoIcon />,
+              headerRight: () => <LibraryHeaderRight />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="message-bubble-dots" size={size} color={color} />,
+              href: isCreator ? undefined : null,
+            }}
+          />
+          <Tabs.Screen
             name="library"
             options={{
               title: "Library",
