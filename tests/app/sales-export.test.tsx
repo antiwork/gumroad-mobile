@@ -123,7 +123,7 @@ describe("SalesExportScreen", () => {
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
-  it("does not share export responses that are not a CSV", async () => {
+  it("shows an info alert without reporting to Sentry when the export is too large", async () => {
     jest.spyOn(NativeAlert, "alert");
     mockReadBytes.mockReturnValueOnce(new Uint8Array([60]));
 
@@ -132,8 +132,9 @@ describe("SalesExportScreen", () => {
     fireEvent.press(screen.getByText("Download CSV"));
 
     await waitFor(() => {
-      expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Large exports arrive by email.");
+      expect(NativeAlert.alert).toHaveBeenCalledWith("Large export", "Large exports arrive by email.");
     });
+    expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockDelete).toHaveBeenCalled();
     expect(mockShareAsync).not.toHaveBeenCalled();
   });
@@ -149,11 +150,12 @@ describe("SalesExportScreen", () => {
     await waitFor(() => {
       expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Failed to download file");
     });
+    expect(mockCaptureException).toHaveBeenCalled();
     expect(mockDelete).toHaveBeenCalled();
     expect(mockShareAsync).not.toHaveBeenCalled();
   });
 
-  it("surfaces the original error even if deleting the temp file fails", async () => {
+  it("still surfaces the large-export notice even if deleting the temp file fails", async () => {
     jest.spyOn(NativeAlert, "alert");
     mockReadBytes.mockReturnValueOnce(new Uint8Array([60]));
     mockDelete.mockImplementationOnce(() => {
@@ -165,7 +167,7 @@ describe("SalesExportScreen", () => {
     fireEvent.press(screen.getByText("Download CSV"));
 
     await waitFor(() => {
-      expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Large exports arrive by email.");
+      expect(NativeAlert.alert).toHaveBeenCalledWith("Large export", "Large exports arrive by email.");
     });
     expect(mockShareAsync).not.toHaveBeenCalled();
   });

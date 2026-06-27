@@ -28,6 +28,7 @@ const isGumroadUrl = (url: string) => {
 
 const SALES_CSV_FILE_NAME = "sales.csv";
 const HTML_TAG_OPEN_BYTE = "<".charCodeAt(0);
+const LARGE_EXPORT_MESSAGE = "Large exports arrive by email.";
 
 const downloadSalesExportFile = async (url: string) => {
   const file = new File(Paths.cache, SALES_CSV_FILE_NAME);
@@ -45,7 +46,7 @@ const downloadSalesExportFile = async (url: string) => {
     firstByte === undefined
       ? "Failed to download file"
       : firstByte === HTML_TAG_OPEN_BYTE
-        ? "Large exports arrive by email."
+        ? LARGE_EXPORT_MESSAGE
         : null;
 
   if (failureMessage !== null) {
@@ -84,8 +85,12 @@ export default function SalesExportScreen() {
         dialogTitle: "Export all sales",
       });
     } catch (error) {
-      Sentry.captureException(error);
-      Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
+      if (error instanceof Error && error.message === LARGE_EXPORT_MESSAGE) {
+        Alert.alert("Large export", LARGE_EXPORT_MESSAGE);
+      } else {
+        Sentry.captureException(error);
+        Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
+      }
     } finally {
       setIsDownloading(false);
     }
