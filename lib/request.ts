@@ -10,6 +10,13 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class SessionExpiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SessionExpiredError";
+  }
+}
+
 export class KeychainUnavailableError extends Error {
   constructor() {
     super("Keychain unavailable");
@@ -124,7 +131,7 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
           newAccessToken = await refreshToken();
         } catch (refreshError) {
           if (refreshError instanceof KeychainUnavailableError) throw error;
-          if (refreshError instanceof UnauthorizedError) {
+          if (refreshError instanceof UnauthorizedError || refreshError instanceof SessionExpiredError) {
             console.warn(refreshError);
           } else {
             Sentry.captureException(refreshError, { tags: { auth_path: "refresh_failed" } });
