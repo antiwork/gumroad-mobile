@@ -99,6 +99,13 @@ describe("sentry beforeSend", () => {
         "actionable FCM misconfiguration (token failure, but not a transient cause)",
         errorEvent([{ type: "Error", value: "Fetching the token failed: java.io.IOException: AUTHENTICATION_FAILED" }]),
       ],
+      [
+        "non-download API failure with a native network cause (no download context)",
+        errorEvent([
+          { type: "Error", value: "Token refresh request failed" },
+          { type: "Error", value: "java.net.ConnectException: Failed to connect to api.gumroad.com" },
+        ]),
+      ],
     ];
 
     it.each(kept)("keeps: %s", (_label, event) => {

@@ -7,22 +7,16 @@ export const navigationIntegration = Sentry.reactNavigationIntegration({
 });
 
 // Drop transient, non-actionable failures that flood Sentry as handled
-// exceptions (issue 7336845703): flaky-network downloads, FCM token hiccups,
-// declined notification permissions. Scan every value since the signal is often
-// in a chained `Caused by:` cause, and keep HTTP-status failures like
-// "response has status 404" — those are real bugs.
-const NON_ACTIONABLE_MARKERS = [
+// exceptions (issue 7336845703). Self-sufficient signals are dropped anywhere;
+// generic native network errors are dropped only when a download/asset context
+// co-occurs, so an actionable failure on another path with the same cause still
+// reports. HTTP-status failures like "response has status 404" are kept.
+const TRANSIENT_MARKERS = [
   "The network connection was lost.",
   "The request timed out.",
   "The Internet connection appears to be offline.",
   "Could not connect to the server.",
   "A server with the specified hostname could not be found.",
-  "SocketTimeoutException",
-  "SocketException",
-  "UnknownHostException",
-  "ConnectException",
-  "ConnectionShutdownException",
-  "StreamResetException",
   "Unable to download asset from url:",
   "SERVICE_NOT_AVAILABLE",
   "Notifications are not allowed for this application",
@@ -30,12 +24,28 @@ const NON_ACTIONABLE_MARKERS = [
   "User interaction is not allowed",
 ];
 
-const isNonActionableError = (event: ErrorEvent) =>
-  event.exception?.values?.some((value) => {
-    if (value.type === "AbortError") return true;
-    const text = `${value.type ?? ""}: ${value.value ?? ""}`;
-    return NON_ACTIONABLE_MARKERS.some((marker) => text.includes(marker));
-  }) ?? false;
+const NATIVE_NETWORK_MARKERS = [
+  "SocketTimeoutException",
+  "SocketException",
+  "UnknownHostException",
+  "ConnectException",
+  "ConnectionShutdownException",
+  "StreamResetException",
+];
+
+const DOWNLOAD_CONTEXT_MARKERS = ["downloadFileAsync", "ExpoAsset.downloadAsync", "Unable to download"];
+
+const isNonActionableError = (event: ErrorEvent) => {
+  const values = event.exception?.values;
+  if (!values) return false;
+  if (values.some((value) => value.type === "AbortError")) return true;
+  const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
+  if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
+  return (
+    DOWNLOAD_CONTEXT_MARKERS.some((marker) => text.includes(marker)) &&
+    NATIVE_NETWORK_MARKERS.some((marker) => text.includes(marker))
+  );
+};
 
 Sentry.init({
   dsn: env.EXPO_PUBLIC_SENTRY_DSN,
