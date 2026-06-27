@@ -1,9 +1,51 @@
 import * as Sentry from "@sentry/react-native";
+import type { ErrorEvent } from "@sentry/core";
 import { env } from "@/lib/env";
 
 export const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: true,
 });
+
+// Drop transient, non-actionable failures that flood Sentry as handled
+// exceptions (issue 7336845703). Self-sufficient signals are dropped anywhere;
+// generic native network errors are dropped only when a download/asset context
+// co-occurs, so an actionable failure on another path with the same cause still
+// reports. HTTP-status failures like "response has status 404" are kept.
+const TRANSIENT_MARKERS = [
+  "The network connection was lost.",
+  "The request timed out.",
+  "The Internet connection appears to be offline.",
+  "Could not connect to the server.",
+  "A server with the specified hostname could not be found.",
+  "Unable to download asset from url:",
+  "SERVICE_NOT_AVAILABLE",
+  "Notifications are not allowed for this application",
+  "Network request failed",
+  "User interaction is not allowed",
+];
+
+const NATIVE_NETWORK_MARKERS = [
+  "SocketTimeoutException",
+  "SocketException",
+  "UnknownHostException",
+  "ConnectException",
+  "ConnectionShutdownException",
+  "StreamResetException",
+];
+
+const DOWNLOAD_CONTEXT_MARKERS = ["downloadFileAsync", "ExpoAsset.downloadAsync", "Unable to download"];
+
+const isNonActionableError = (event: ErrorEvent) => {
+  const values = event.exception?.values;
+  if (!values) return false;
+  if (values[0]?.type === "AbortError") return true;
+  const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
+  if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
+  return (
+    DOWNLOAD_CONTEXT_MARKERS.some((marker) => text.includes(marker)) &&
+    NATIVE_NETWORK_MARKERS.some((marker) => text.includes(marker))
+  );
+};
 
 Sentry.init({
   dsn: env.EXPO_PUBLIC_SENTRY_DSN,
@@ -20,15 +62,7 @@ Sentry.init({
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0,
   beforeSend(event) {
-    const message = event.exception?.values?.[0]?.value ?? event.exception?.values?.[0]?.type;
-    if (message === "Network request failed" || message === "TypeError: Network request failed") {
-      return null;
-    }
-    if (message?.includes("User interaction is not allowed")) {
-      return null;
-    }
-    const exceptionType = event.exception?.values?.[0]?.type;
-    if (exceptionType === "AbortError") {
+    if (isNonActionableError(event)) {
       return null;
     }
     return event;
