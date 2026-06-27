@@ -1,9 +1,43 @@
 import * as Sentry from "@sentry/react-native";
+import type { ErrorEvent } from "@sentry/core";
 import { env } from "@/lib/env";
 
 export const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: true,
 });
+
+// Drop transient, non-actionable failures that flood Sentry as handled
+// exceptions (issue 7336845703): flaky-network downloads, FCM token hiccups,
+// declined notification permissions. Scan every value since the signal is often
+// in a chained `Caused by:` cause, and keep HTTP-status failures like
+// "response has status 404" — those are real bugs.
+const NON_ACTIONABLE_MARKERS = [
+  "The network connection was lost.",
+  "The request timed out.",
+  "The Internet connection appears to be offline.",
+  "Could not connect to the server.",
+  "A server with the specified hostname could not be found.",
+  "SocketTimeoutException",
+  "SocketException",
+  "UnknownHostException",
+  "ConnectException",
+  "SSLException",
+  "ConnectionShutdownException",
+  "StreamResetException",
+  "Unable to download asset from url:",
+  "Fetching the token failed",
+  "SERVICE_NOT_AVAILABLE",
+  "Notifications are not allowed for this application",
+  "Network request failed",
+  "User interaction is not allowed",
+  "AbortError",
+];
+
+const isNonActionableError = (event: ErrorEvent) =>
+  event.exception?.values?.some((value) => {
+    const text = `${value.type ?? ""}: ${value.value ?? ""}`;
+    return NON_ACTIONABLE_MARKERS.some((marker) => text.includes(marker));
+  }) ?? false;
 
 Sentry.init({
   dsn: env.EXPO_PUBLIC_SENTRY_DSN,
@@ -20,15 +54,7 @@ Sentry.init({
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0,
   beforeSend(event) {
-    const message = event.exception?.values?.[0]?.value ?? event.exception?.values?.[0]?.type;
-    if (message === "Network request failed" || message === "TypeError: Network request failed") {
-      return null;
-    }
-    if (message?.includes("User interaction is not allowed")) {
-      return null;
-    }
-    const exceptionType = event.exception?.values?.[0]?.type;
-    if (exceptionType === "AbortError") {
+    if (isNonActionableError(event)) {
       return null;
     }
     return event;
