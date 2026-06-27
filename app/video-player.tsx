@@ -115,27 +115,14 @@ export default function VideoPlayerScreen() {
       "statusChange",
       ({ status, error }: { status: VideoPlayerStatus; error?: { message: string } }) => {
         if (status === "error") {
-          const message = error?.message ?? "Unknown playback error";
-          setPlaybackError(message);
-          Sentry.captureMessage("Video playback failed", {
-            level: "error",
-            extra: {
-              message,
-              videoUrl,
-              sourceUri: uri,
-              streamingUrl,
-              urlRedirectId,
-              productFileId,
-              purchaseId,
-            },
-          });
+          setPlaybackError(error?.message ?? "Unknown playback error");
         } else if (status === "readyToPlay") {
           setPlaybackError(null);
         }
       },
     );
     return () => subscription.remove();
-  }, [player, videoUrl, uri, streamingUrl, urlRedirectId, productFileId, purchaseId]);
+  }, [player]);
 
   useEffect(
     () => () => {

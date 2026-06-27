@@ -43,6 +43,7 @@ jest.mock("@/lib/media-location", () => ({
 }));
 
 import VideoPlayerScreen from "@/app/video-player";
+import * as Sentry from "@sentry/react-native";
 import { act } from "react";
 
 let appStateCallback: ((state: string) => void) | null = null;
@@ -221,6 +222,7 @@ describe("VideoPlayerScreen", () => {
 
     expect(queryByText("This video failed to load")).toBeTruthy();
     expect(queryByText("AVPlayer cannot decode the file")).toBeTruthy();
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 
   it("clears the error state once the player becomes ready to play", () => {
