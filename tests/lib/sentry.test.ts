@@ -106,6 +106,13 @@ describe("sentry beforeSend", () => {
           { type: "Error", value: "java.net.ConnectException: Failed to connect to api.gumroad.com" },
         ]),
       ],
+      [
+        "real primary error with an AbortError later in the chain",
+        errorEvent([
+          { type: "TypeError", value: "Cannot read property 'x' of undefined" },
+          { type: "AbortError", value: "Aborted" },
+        ]),
+      ],
     ];
 
     it.each(kept)("keeps: %s", (_label, event) => {
