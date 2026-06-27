@@ -1,7 +1,7 @@
 import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
-import { KeychainUnavailableError, request, UnauthorizedError } from "@/lib/request";
+import { KeychainUnavailableError, request, SessionExpiredError, UnauthorizedError } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
@@ -198,16 +198,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (isKeychainUnavailableError(readError)) throw new KeychainUnavailableError();
           throw readError;
         }
-        if (!storedRefreshToken) throw new Error("No refresh token available");
+        if (!storedRefreshToken) throw new SessionExpiredError("No refresh token available");
 
-        const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
-          method: "POST",
-          data: {
-            grant_type: "refresh_token",
-            refresh_token: storedRefreshToken,
-            client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-          },
-        });
+        let tokenResponse: { access_token: string; refresh_token?: string };
+        try {
+          tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
+            method: "POST",
+            data: {
+              grant_type: "refresh_token",
+              refresh_token: storedRefreshToken,
+              client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
+            },
+          });
+        } catch (requestError) {
+          if (requestError instanceof Error && requestError.message.includes("invalid_grant")) {
+            throw new SessionExpiredError("Refresh token is invalid or expired");
+          }
+          throw requestError;
+        }
         await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
         return tokenResponse.access_token;
       } finally {
