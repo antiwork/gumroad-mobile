@@ -1,8 +1,20 @@
 diff --git a/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm b/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
-index de46c98..ddc97f2 100644
+index de46c98..eb132ce 100644
 --- a/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
 +++ b/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
-@@ -390,7 +390,11 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+@@ -375,6 +375,11 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+             
+                 // decode file path
+                 _path = (__bridge_transfer NSString *)CFURLCreateStringByReplacingPercentEscapes(NULL, (CFStringRef)_path, CFSTR(""));
++                if (_path == nil || _path.length == 0) {
++                    [self notifyOnChangeWithMessage:@"error|Load pdf failed. Invalid file path."];
++                    _pdfDocument = Nil;
++                    return;
++                }
+                 NSURL *fileURL = [NSURL fileURLWithPath:_path];
+                 _pdfDocument = [[PDFDocument alloc] initWithURL:fileURL];
+             }
+@@ -390,7 +395,11 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
                      return;
                  }
  
@@ -15,7 +27,7 @@ index de46c98..ddc97f2 100644
              } else {
  
                  [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"error|Load pdf failed. path=%s",_path.UTF8String]]];
-@@ -540,13 +544,17 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+@@ -540,13 +549,17 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
              PDFPage *pdfPage = [_pdfDocument pageAtIndex:_page-1];
              if (pdfPage && _page == 1) {
                  dispatch_async(dispatch_get_main_queue(), ^{
@@ -39,7 +51,7 @@ index de46c98..ddc97f2 100644
                      }
                  });
              } else if (pdfPage) {
-@@ -559,8 +567,12 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+@@ -559,8 +572,12 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
  
                  CGPoint pointLeftTop = CGPointMake(0, pdfPageRect.size.height);
                  PDFDestination *pdfDest = [[PDFDestination alloc] initWithPage:pdfPage atPoint:pointLeftTop];
@@ -54,7 +66,7 @@ index de46c98..ddc97f2 100644
              }
          }
  
-@@ -620,15 +632,19 @@ - (void)dealloc{
+@@ -620,15 +637,19 @@ - (void)dealloc{
  - (void)onDocumentChanged:(NSNotification *)noti
  {
  
@@ -81,7 +93,7 @@ index de46c98..ddc97f2 100644
      }
  
  }
-@@ -722,12 +738,16 @@ -(NSString *) getTableContents
+@@ -722,12 +743,16 @@ -(NSString *) getTableContents
  - (void)onPageChanged:(NSNotification *)noti
  {
  
