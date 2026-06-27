@@ -138,6 +138,38 @@ describe("SalesExportScreen", () => {
     expect(mockShareAsync).not.toHaveBeenCalled();
   });
 
+  it("treats a zero-byte download as a failure and deletes the file", async () => {
+    jest.spyOn(NativeAlert, "alert");
+    mockReadBytes.mockReturnValueOnce(new Uint8Array([]));
+
+    render(<SalesExportScreen />);
+
+    fireEvent.press(screen.getByText("Download CSV"));
+
+    await waitFor(() => {
+      expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Failed to download file");
+    });
+    expect(mockDelete).toHaveBeenCalled();
+    expect(mockShareAsync).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the original error even if deleting the temp file fails", async () => {
+    jest.spyOn(NativeAlert, "alert");
+    mockReadBytes.mockReturnValueOnce(new Uint8Array([60]));
+    mockDelete.mockImplementationOnce(() => {
+      throw new Error("delete failed");
+    });
+
+    render(<SalesExportScreen />);
+
+    fireEvent.press(screen.getByText("Download CSV"));
+
+    await waitFor(() => {
+      expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Large exports arrive by email.");
+    });
+    expect(mockShareAsync).not.toHaveBeenCalled();
+  });
+
   it("reports download failures", async () => {
     jest.spyOn(NativeAlert, "alert");
     mockIsSharingAvailableAsync.mockResolvedValueOnce(false);

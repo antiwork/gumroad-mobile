@@ -41,9 +41,18 @@ const downloadSalesExportFile = async (url: string) => {
     handle.close();
   }
 
-  if (firstByte === HTML_TAG_OPEN_BYTE) {
-    file.delete();
-    throw new Error("Large exports arrive by email.");
+  const failureMessage =
+    firstByte === undefined
+      ? "Failed to download file"
+      : firstByte === HTML_TAG_OPEN_BYTE
+        ? "Large exports arrive by email."
+        : null;
+
+  if (failureMessage !== null) {
+    try {
+      file.delete();
+    } catch {}
+    throw new Error(failureMessage);
   }
   return file;
 };
