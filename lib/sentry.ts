@@ -38,7 +38,8 @@ const DOWNLOAD_CONTEXT_MARKERS = ["downloadFileAsync", "ExpoAsset.downloadAsync"
 const isNonActionableError = (event: ErrorEvent) => {
   const values = event.exception?.values;
   if (!values) return false;
-  if (values[0]?.type === "AbortError") return true;
+  const primaryType = values[0]?.type;
+  if (primaryType === "AbortError" || primaryType === "UnauthorizedError") return true;
   const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
   if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
   return (

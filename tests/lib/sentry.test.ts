@@ -69,6 +69,7 @@ describe("sentry beforeSend", () => {
       ["generic network failure", errorEvent([{ type: "TypeError", value: "Network request failed" }])],
       ["aborted request", errorEvent([{ type: "AbortError", value: "Aborted" }])],
       ["user interaction not allowed", errorEvent([{ type: "Error", value: "User interaction is not allowed" }])],
+      ["expired session (UnauthorizedError)", errorEvent([{ type: "UnauthorizedError", value: "Unauthorized" }])],
     ];
 
     it.each(dropped)("drops: %s", (_label, event) => {
@@ -104,6 +105,13 @@ describe("sentry beforeSend", () => {
         errorEvent([
           { type: "Error", value: "Token refresh request failed" },
           { type: "Error", value: "java.net.ConnectException: Failed to connect to api.gumroad.com" },
+        ]),
+      ],
+      [
+        "real primary error with an UnauthorizedError later in the chain",
+        errorEvent([
+          { type: "TypeError", value: "Cannot read property 'id' of undefined" },
+          { type: "UnauthorizedError", value: "Unauthorized" },
         ]),
       ],
       [
