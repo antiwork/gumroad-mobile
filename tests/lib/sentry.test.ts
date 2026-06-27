@@ -87,6 +87,14 @@ describe("sentry beforeSend", () => {
         ]),
       ],
       ["generic application error", errorEvent([{ type: "TypeError", value: "Cannot read property 'id' of undefined" }])],
+      [
+        "persistent TLS failure (actionable cert/config bug)",
+        errorEvent([{ type: "Error", value: "javax.net.ssl.SSLException: Connection closed by peer" }]),
+      ],
+      [
+        "non-abort error that merely mentions AbortError in its message",
+        errorEvent([{ type: "TypeError", value: "Failed to handle AbortError fallback path" }]),
+      ],
     ];
 
     it.each(kept)("keeps: %s", (_label, event) => {

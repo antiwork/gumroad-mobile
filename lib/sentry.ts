@@ -21,7 +21,6 @@ const NON_ACTIONABLE_MARKERS = [
   "SocketException",
   "UnknownHostException",
   "ConnectException",
-  "SSLException",
   "ConnectionShutdownException",
   "StreamResetException",
   "Unable to download asset from url:",
@@ -30,11 +29,11 @@ const NON_ACTIONABLE_MARKERS = [
   "Notifications are not allowed for this application",
   "Network request failed",
   "User interaction is not allowed",
-  "AbortError",
 ];
 
 const isNonActionableError = (event: ErrorEvent) =>
   event.exception?.values?.some((value) => {
+    if (value.type === "AbortError") return true;
     const text = `${value.type ?? ""}: ${value.value ?? ""}`;
     return NON_ACTIONABLE_MARKERS.some((marker) => text.includes(marker));
   }) ?? false;
