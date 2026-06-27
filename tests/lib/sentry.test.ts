@@ -95,6 +95,10 @@ describe("sentry beforeSend", () => {
         "non-abort error that merely mentions AbortError in its message",
         errorEvent([{ type: "TypeError", value: "Failed to handle AbortError fallback path" }]),
       ],
+      [
+        "actionable FCM misconfiguration (token failure, but not a transient cause)",
+        errorEvent([{ type: "Error", value: "Fetching the token failed: java.io.IOException: AUTHENTICATION_FAILED" }]),
+      ],
     ];
 
     it.each(kept)("keeps: %s", (_label, event) => {

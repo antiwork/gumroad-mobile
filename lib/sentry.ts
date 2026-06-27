@@ -24,7 +24,6 @@ const NON_ACTIONABLE_MARKERS = [
   "ConnectionShutdownException",
   "StreamResetException",
   "Unable to download asset from url:",
-  "Fetching the token failed",
   "SERVICE_NOT_AVAILABLE",
   "Notifications are not allowed for this application",
   "Network request failed",
