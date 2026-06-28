@@ -39,9 +39,23 @@ describe("cacheFileDestination", () => {
     expect(destination.name).not.toMatch(/[/\\:*?"<>|]/);
   });
 
+  it("neutralizes square brackets and other URI delimiters that crash native path parsing", () => {
+    const destination = cacheFileDestination("file-id", "301 [NSFW] Rider [2023].png");
+
+    expect(destination.name).toBe("301 _NSFW_ Rider _2023_.png");
+    expect(destination.name).not.toMatch(/[[\]{}^`]/);
+  });
+
   it("preserves spaces, which are valid in file URIs", () => {
     const destination = cacheFileDestination("file-id", "my great file.pdf");
 
     expect(destination.name).toBe("my great file.pdf");
+  });
+
+  it("clamps overly long names while preserving the extension", () => {
+    const destination = cacheFileDestination("file-id", `${"a".repeat(250)}.pdf`);
+
+    expect(destination.name).toHaveLength(200);
+    expect(destination.name.endsWith(".pdf")).toBe(true);
   });
 });
