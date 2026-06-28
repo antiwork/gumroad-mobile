@@ -51,4 +51,11 @@ describe("cacheFileDestination", () => {
 
     expect(destination.name).toBe("my great file.pdf");
   });
+
+  it("clamps overly long names while preserving the extension", () => {
+    const destination = cacheFileDestination("file-id", `${"a".repeat(250)}.pdf`);
+
+    expect(destination.name).toHaveLength(200);
+    expect(destination.name.endsWith(".pdf")).toBe(true);
+  });
 });
