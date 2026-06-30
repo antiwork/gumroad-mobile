@@ -1,13 +1,3 @@
-/**
- * Regression test for the Android "chipmunk" playback bug: increasing playback
- * speed raised the audio pitch on some media because ExoPlayer audio offload
- * bypasses the Sonic pitch-correction processor. The fix disables offload in
- * setupPlayer via `updateOptions({ android: { audioOffload: false } })`, which
- * forces every track through Sonic so pitch is preserved at all speeds.
- *
- * See antiwork/gumroad-private#802.
- */
-
 jest.mock("react-native-track-player", () => ({
   __esModule: true,
   default: {
