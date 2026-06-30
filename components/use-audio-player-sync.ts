@@ -69,6 +69,16 @@ export const setupPlayer = async () => {
     ],
     forwardJumpInterval: 30,
     backwardJumpInterval: 15,
+    android: {
+      // Disable ExoPlayer audio offload. When a track is offloaded to the
+      // device's audio HAL, playback-rate changes bypass the Sonic audio
+      // processor that preserves pitch, so speeding up (e.g. 1.5x) raises the
+      // pitch ("chipmunk" effect). Offload eligibility is codec/sample-rate
+      // dependent, which is why only *some* media exhibited the bug while
+      // others on the same device played correctly. Forcing offload off routes
+      // every track through Sonic so pitch is preserved at all speeds.
+      audioOffload: false,
+    },
   });
   const loopEnabled = await getStoredLoopEnabled();
   await TrackPlayer.setRepeatMode(loopEnabled ? RepeatMode.Queue : RepeatMode.Off);
