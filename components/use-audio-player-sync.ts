@@ -69,6 +69,9 @@ export const setupPlayer = async () => {
     ],
     forwardJumpInterval: 30,
     backwardJumpInterval: 15,
+    android: {
+      audioOffload: false,
+    },
   });
   const loopEnabled = await getStoredLoopEnabled();
   await TrackPlayer.setRepeatMode(loopEnabled ? RepeatMode.Queue : RepeatMode.Off);
