@@ -250,7 +250,7 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={color} />,
-              href: null,
+              href: isCreator ? undefined : null,
             }}
           />
           <Tabs.Screen
