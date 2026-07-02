@@ -13,8 +13,6 @@ import { useCSSVariable } from "uniwind";
 const KEYBOARD_VERTICAL_OFFSET = 88;
 
 interface DisplayMessage extends ChatMessage {
-  // A proposed change attached to an assistant turn. Once the seller acts on it, we record the
-  // outcome so the confirmation card collapses into a status line and can't be triggered twice.
   proposedAction?: ProposedAction;
   actionStatus?: "applied" | "dismissed";
 }
@@ -138,11 +136,11 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     const trimmed = text.trim();
     if (trimmed.length === 0 || isSending) return;
 
-    // Only the plain role/content pairs go to the server; UI-only fields stay local.
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
-    const history: ChatMessage[] = [...messages, userMessage].map(
-      ({ role, content }): ChatMessage => ({ role, content }),
-    );
+    const history: ChatMessage[] = [...messages, userMessage].map(({ role, content }): ChatMessage => ({
+      role,
+      content,
+    }));
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     sendMutation.mutate(history);
@@ -153,6 +151,12 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     executeMutation.mutate(action, {
       onSuccess: () => {
         setMessages((prev) => prev.map((msg, i) => (i === index ? { ...msg, actionStatus: "applied" } : msg)));
+      },
+      onError: () => {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "Sorry, I couldn't apply that change. Please try again." },
+        ]);
       },
       onSettled: () => setPendingActionIndex(null),
     });

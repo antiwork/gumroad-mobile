@@ -7,8 +7,6 @@ export interface ChatMessage {
   content: string;
 }
 
-// A store change the agent has prepared. It is NOT applied until the seller confirms it, at which
-// point we POST it back to the actions endpoint.
 export interface ProposedAction {
   type: "create_discount" | "update_product_price" | "publish_product" | "unpublish_product";
   params: Record<string, unknown>;
@@ -23,8 +21,7 @@ interface AgentMetaResponse {
 }
 
 type SendMessageResponse =
-  | { success: true; reply: string; proposed_action: ProposedAction | null }
-  | { success: false; error: string };
+  { success: true; reply: string; proposed_action: ProposedAction | null } | { success: false; error: string };
 
 interface ExecuteActionResponse {
   success: boolean;

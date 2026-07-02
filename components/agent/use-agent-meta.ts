@@ -1,5 +1,5 @@
 import { fetchAgentMeta } from "@/lib/agent";
-import { UnauthorizedError } from "@/lib/request";
+import { KeychainUnavailableError, UnauthorizedError } from "@/lib/request";
 import { useAuth } from "@/lib/auth-context";
 import { assertDefined } from "@/lib/assert";
 import { useQuery } from "@tanstack/react-query";
@@ -10,13 +10,11 @@ interface AgentMeta {
   suggestions: string[];
 }
 
-// The meta endpoint returns 403 when the seller isn't entitled to the agent. We surface that as
-// `enabled: false` rather than an error so the screen can show a friendly empty state.
 export const useAgentMeta = () => {
   const { accessToken, refreshToken, logout } = useAuth();
 
   return useQuery<AgentMeta>({
-    queryKey: ["agent-meta"],
+    queryKey: ["agent-meta", accessToken],
     enabled: !!accessToken,
     queryFn: async () => {
       const run = async (token: string) => {
@@ -38,7 +36,8 @@ export const useAgentMeta = () => {
         try {
           const newToken = await refreshToken();
           return await run(newToken);
-        } catch {
+        } catch (refreshError) {
+          if (refreshError instanceof KeychainUnavailableError) throw error;
           await logout();
           throw error;
         }
