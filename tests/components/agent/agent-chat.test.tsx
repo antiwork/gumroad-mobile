@@ -139,4 +139,34 @@ describe("AgentChat", () => {
 
     await waitFor(() => expect(screen.getByText("Sorry, I ran into a problem. Please try again.")).toBeTruthy());
   });
+
+  it("shows an error message when applying a confirmed action fails", async () => {
+    mockSendAgentMessage.mockResolvedValue({
+      reply: "I've prepared a discount.",
+      proposedAction: {
+        type: "create_discount",
+        params: { code: "LAUNCH", percent_off: 20 },
+        summary: "Create a 20% off code called LAUNCH",
+      },
+    });
+    mockExecuteAgentAction.mockRejectedValue(new Error("Product was deleted"));
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "Create a launch discount");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Create a 20% off code called LAUNCH")).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.press(screen.getByText("Confirm"));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("Sorry, I couldn't apply that change. Please try again.")).toBeTruthy(),
+    );
+    expect(screen.queryByText("Applied")).toBeNull();
+  });
 });

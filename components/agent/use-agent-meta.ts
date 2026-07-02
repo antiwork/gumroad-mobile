@@ -1,7 +1,6 @@
 import { fetchAgentMeta } from "@/lib/agent";
-import { KeychainUnavailableError, UnauthorizedError } from "@/lib/request";
+import { useAuthedRequest } from "@/lib/authed-request";
 import { useAuth } from "@/lib/auth-context";
-import { assertDefined } from "@/lib/assert";
 import { useQuery } from "@tanstack/react-query";
 
 interface AgentMeta {
@@ -11,13 +10,14 @@ interface AgentMeta {
 }
 
 export const useAgentMeta = () => {
-  const { accessToken, refreshToken, logout } = useAuth();
+  const { accessToken } = useAuth();
+  const authedRequest = useAuthedRequest();
 
   return useQuery<AgentMeta>({
     queryKey: ["agent-meta", accessToken],
     enabled: !!accessToken,
-    queryFn: async () => {
-      const run = async (token: string) => {
+    queryFn: () =>
+      authedRequest(async (token) => {
         try {
           const data = await fetchAgentMeta(token);
           return { enabled: data.enabled, greeting: data.greeting, suggestions: data.suggestions };
@@ -27,21 +27,6 @@ export const useAgentMeta = () => {
           }
           throw error;
         }
-      };
-
-      try {
-        return await run(assertDefined(accessToken));
-      } catch (error) {
-        if (!(error instanceof UnauthorizedError)) throw error;
-        try {
-          const newToken = await refreshToken();
-          return await run(newToken);
-        } catch (refreshError) {
-          if (refreshError instanceof KeychainUnavailableError) throw error;
-          await logout();
-          throw error;
-        }
-      }
-    },
+      }),
   });
 };

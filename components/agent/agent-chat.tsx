@@ -3,8 +3,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
 import { type ChatMessage, type ProposedAction, executeAgentAction, sendAgentMessage } from "@/lib/agent";
-import { useAuth } from "@/lib/auth-context";
-import { assertDefined } from "@/lib/assert";
+import { useAuthedRequest } from "@/lib/authed-request";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, TextInput, View } from "react-native";
@@ -97,7 +96,7 @@ const MessageBubble = ({
 };
 
 export const AgentChat = ({ greeting, suggestions }: Props) => {
-  const { accessToken } = useAuth();
+  const authedRequest = useAuthedRequest();
   const [messages, setMessages] = useState<DisplayMessage[]>([{ role: "assistant", content: greeting }]);
   const [input, setInput] = useState("");
   const [pendingActionIndex, setPendingActionIndex] = useState<number | null>(null);
@@ -106,7 +105,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
 
   const sendMutation = useMutation({
     mutationFn: (history: ChatMessage[]) =>
-      sendAgentMessage({ messages: history, accessToken: assertDefined(accessToken) }),
+      authedRequest((token) => sendAgentMessage({ messages: history, accessToken: token })),
     onSuccess: ({ reply, proposedAction }) => {
       setMessages((prev) => [
         ...prev,
@@ -122,7 +121,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   });
 
   const executeMutation = useMutation({
-    mutationFn: (action: ProposedAction) => executeAgentAction({ action, accessToken: assertDefined(accessToken) }),
+    mutationFn: (action: ProposedAction) =>
+      authedRequest((token) => executeAgentAction({ action, accessToken: token })),
   });
 
   const isSending = sendMutation.isPending;
