@@ -101,7 +101,7 @@ describe("Index", () => {
     expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("navigates to /(tabs)/dashboard for creators", async () => {
+  it("navigates to /(tabs)/agent for creators", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true });
     render(<Index />);
 
@@ -109,7 +109,7 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/agent");
     expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
@@ -147,7 +147,7 @@ describe("Index", () => {
     expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("uses /(tabs)/dashboard as the back target for creators launched via notification", async () => {
+  it("uses /(tabs)/agent as the back target for creators launched via notification", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true });
     mockGetLastNotificationResponseAsync.mockResolvedValue({
       notification: {
@@ -164,7 +164,7 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/agent");
     expect(mockPush).toHaveBeenCalledWith("/post/xyz");
   });
 

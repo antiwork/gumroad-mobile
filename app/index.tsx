@@ -34,7 +34,7 @@ export default function Index() {
         markIndexInitialRoutingComplete();
         return;
       }
-      const defaultRoute = isCreator ? "/(tabs)/dashboard" : "/(tabs)/library";
+      const defaultRoute = isCreator ? "/(tabs)/agent" : "/(tabs)/library";
       let notificationRoute: string | null = null;
       try {
         const response = await Notifications.getLastNotificationResponseAsync();
