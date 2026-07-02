@@ -76,10 +76,14 @@ const MessageBubble = ({
   const isUser = message.role === "user";
   return (
     <View className={isUser ? "items-end" : "items-start"} accessibilityLabel={isUser ? "You" : "Assistant"}>
-      <View className="max-w-[85%]">
-        <View className={`rounded-2xl px-4 py-2 ${isUser ? "bg-accent" : "border border-border bg-card"}`}>
-          <Text className={isUser ? "text-accent-foreground" : "text-foreground"}>{message.content}</Text>
-        </View>
+      <View className={isUser ? "max-w-[85%]" : "w-full"}>
+        {isUser ? (
+          <View className="rounded-2xl rounded-br-md bg-accent px-4 py-2">
+            <Text className="text-accent-foreground">{message.content}</Text>
+          </View>
+        ) : (
+          <Text className="text-foreground">{message.content}</Text>
+        )}
         {message.proposedAction ? (
           <ProposedActionCard
             action={message.proposedAction}
@@ -126,6 +130,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   });
 
   const isSending = sendMutation.isPending;
+  const hasText = input.trim().length > 0;
 
   useEffect(() => {
     const timeout = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
@@ -191,11 +196,9 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         )}
         ListFooterComponent={
           isSending ? (
-            <View className="items-start">
-              <View className="bg-filled flex-row items-center gap-2 rounded-2xl border border-border px-4 py-2">
-                <LoadingSpinner size="small" />
-                <Text className="text-muted">Thinking...</Text>
-              </View>
+            <View className="flex-row items-center gap-2" role="status" accessibilityLabel="Working on it">
+              <LoadingSpinner size="small" />
+              <Text className="text-sm text-muted">Working on it...</Text>
             </View>
           ) : null
         }
@@ -211,27 +214,35 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         </View>
       ) : null}
 
-      <View className="flex-row items-end gap-2 border-t border-border p-4">
-        <TextInput
-          className="max-h-32 flex-1 rounded-2xl border border-border bg-background px-4 py-3 font-sans text-base text-foreground"
-          placeholder="Ask about your store or describe a change..."
-          placeholderTextColor={mutedColor}
-          value={input}
-          onChangeText={setInput}
-          multiline
-          editable={!isSending}
-          accessibilityLabel="Message"
-        />
-        <Button
-          variant="accent"
-          size="icon"
-          className="rounded-2xl"
-          disabled={isSending || input.trim().length === 0}
-          onPress={() => send(input)}
-          accessibilityLabel="Send"
-        >
-          <LineIcon name="arrow-right-stroke" size={20} className="text-accent-foreground" />
-        </Button>
+      <View className="border-t border-border p-4">
+        <View className="gap-1 rounded-2xl border border-border bg-background p-2">
+          <TextInput
+            className="max-h-32 px-2 py-2 font-sans text-base text-foreground"
+            placeholder="Ask about your store or describe a change..."
+            placeholderTextColor={mutedColor}
+            value={input}
+            onChangeText={setInput}
+            multiline
+            editable={!isSending}
+            accessibilityLabel="Message"
+          />
+          <View className="flex-row justify-end">
+            <Button
+              variant={hasText ? "accent" : "outline"}
+              size="icon"
+              className="size-11 rounded-full"
+              disabled={isSending || !hasText}
+              onPress={() => send(input)}
+              accessibilityLabel="Send"
+            >
+              <LineIcon
+                name="arrow-up-stroke"
+                size={20}
+                className={hasText ? "text-accent-foreground" : "text-muted"}
+              />
+            </Button>
+          </View>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
