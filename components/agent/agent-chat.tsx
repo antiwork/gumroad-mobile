@@ -41,8 +41,8 @@ const ProposedActionCard = ({
       <Text className="font-sans font-semibold text-foreground">{action.title ?? "Proposed change"}</Text>
       {action.fields && action.fields.length > 0 ? (
         <View className="gap-1">
-          {action.fields.map((field) => (
-            <View key={field.label} className="flex-row gap-2">
+          {action.fields.map((field, i) => (
+            <View key={`${i}-${field.label}`} className="flex-row gap-2">
               <Text className="text-sm text-muted">{field.label}</Text>
               <Text className="flex-1 text-right text-sm text-foreground">{field.value}</Text>
             </View>
