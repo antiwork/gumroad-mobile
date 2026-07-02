@@ -26,14 +26,35 @@ const isGumroadUrl = (url: string) => {
   }
 };
 
-const downloadSalesExportFile = async (url: string) => {
-  const response = await fetch(url);
-  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-  if (!response.ok) throw new Error("Failed to download file");
-  if (!contentType.includes("text/csv")) throw new Error("Large exports arrive by email.");
+const SALES_CSV_FILE_NAME = "sales.csv";
+const HTML_TAG_OPEN_BYTE = "<".charCodeAt(0);
+const LARGE_EXPORT_MESSAGE = "Large exports arrive by email.";
 
-  const file = new File(Paths.cache, "sales.csv");
-  file.write(new Uint8Array(await response.arrayBuffer()));
+const downloadSalesExportFile = async (url: string) => {
+  const file = new File(Paths.cache, SALES_CSV_FILE_NAME);
+  await File.downloadFileAsync(url, file, { idempotent: true });
+
+  const handle = file.open();
+  let firstByte: number | undefined;
+  try {
+    firstByte = handle.readBytes(1)[0];
+  } finally {
+    handle.close();
+  }
+
+  const failureMessage =
+    firstByte === undefined
+      ? "Failed to download file"
+      : firstByte === HTML_TAG_OPEN_BYTE
+        ? LARGE_EXPORT_MESSAGE
+        : null;
+
+  if (failureMessage !== null) {
+    try {
+      file.delete();
+    } catch {}
+    throw new Error(failureMessage);
+  }
   return file;
 };
 
@@ -64,8 +85,12 @@ export default function SalesExportScreen() {
         dialogTitle: "Export all sales",
       });
     } catch (error) {
-      Sentry.captureException(error);
-      Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
+      if (error instanceof Error && error.message === LARGE_EXPORT_MESSAGE) {
+        Alert.alert("Large export", LARGE_EXPORT_MESSAGE);
+      } else {
+        Sentry.captureException(error);
+        Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
+      }
     } finally {
       setIsDownloading(false);
     }

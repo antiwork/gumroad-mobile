@@ -14,7 +14,7 @@ import { saveLastTab } from "@/lib/tab-preference";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
-import { Tabs, usePathname } from "expo-router";
+import { Tabs, usePathname, useRouter } from "expo-router";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
@@ -67,7 +67,7 @@ const SearchButton = () => {
   const { isSearchActive, setSearchActive } = useDashboardSearch();
   return (
     <TouchableOpacity onPress={() => setSearchActive(!isSearchActive)}>
-      <LineIcon name="search" size={24} className={isSearchActive ? "text-accent" : "text-foreground"} />
+      <LineIcon name="search" size={24} className={isSearchActive ? "text-accent" : "text-white"} />
     </TouchableOpacity>
   );
 };
@@ -95,12 +95,23 @@ const SettingsButton = () => {
 
 const SettingsSheet = () => {
   const { isSettingsOpen, setSettingsOpen } = useSettingsSheet();
-  const { logout } = useAuth();
+  const { logout, isCreator } = useAuth();
   const { data: user, isLoading: isUserLoading } = useUser();
+  const router = useRouter();
 
   const handleLogout = () => {
     setSettingsOpen(false);
     logout();
+  };
+
+  const handleEditProfile = () => {
+    setSettingsOpen(false);
+    router.push("/settings/profile");
+  };
+
+  const handlePayoutSettings = () => {
+    setSettingsOpen(false);
+    router.push("/settings/payments");
   };
 
   const handleDeleteAccount = () => {
@@ -149,6 +160,18 @@ const SettingsSheet = () => {
               </>
             ) : null}
           </View>
+          {isCreator ? (
+            <>
+              <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
+                <Text>Edit profile</Text>
+                <LineIcon name="user-circle" size={20} className="text-foreground" />
+              </Button>
+              <Button variant="outline" className="mb-2" onPress={handlePayoutSettings}>
+                <Text>Payout settings</Text>
+                <LineIcon name="dollar-circle" size={20} className="text-foreground" />
+              </Button>
+            </>
+          ) : null}
           <Button onPress={handleLogout}>
             <Text>Logout</Text>
             <LineIcon name="arrow-out-left-square-half" size={20} className="text-primary-foreground" />

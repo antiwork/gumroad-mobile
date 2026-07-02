@@ -222,6 +222,7 @@ export default function PostScreen() {
       params: {
         uri: downloadUrl(purchase.url_redirect_token, fileId),
         title: post.name,
+        fileName: file?.name,
         urlRedirectId: post.url_redirect_external_id,
         productFileId: fileId,
         purchaseId: purchase.purchase_id,
