@@ -189,7 +189,6 @@ export default function TabsLayout() {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const pathname = usePathname();
 
-  // Remember the tab the user is on so the next app launch lands there.
   useEffect(() => {
     const tab = pathname.split("/").filter(Boolean)[0];
     if (tab) saveLastTab(tab);
@@ -228,8 +227,6 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={color} />,
-              // Hidden from the tab bar — the Agent tab is the creator home now.
-              // Route kept so existing deep links to /dashboard still resolve.
               href: null,
             }}
           />
