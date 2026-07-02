@@ -26,6 +26,15 @@ export class ServerError extends Error {
   }
 }
 
+export class RequestError extends Error {
+  statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.name = "RequestError";
+    this.statusCode = statusCode;
+  }
+}
+
 const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 30_000;
@@ -74,7 +83,7 @@ export const request = async <T>(
             ? "Not found"
             : (await response.text()).slice(0, 10000);
       console.info("HTTP request", { ...details, error });
-      throw new Error(`Request failed: ${response.status} ${error}`);
+      throw new RequestError(response.status, `Request failed: ${response.status} ${error}`);
     }
     console.info("HTTP request", details);
     if (options?.skipResponseBody) return undefined as T;
