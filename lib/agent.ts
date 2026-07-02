@@ -7,10 +7,17 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ProposedActionField {
+  label: string;
+  value: string;
+}
+
 export interface ProposedAction {
   type: "create_discount" | "update_product_price" | "publish_product" | "unpublish_product";
   params: Record<string, unknown>;
   summary: string;
+  title?: string;
+  fields?: ProposedActionField[];
 }
 
 interface AgentMetaResponse {
