@@ -154,6 +154,35 @@ describe("Index", () => {
     expect(mockReplace).toHaveBeenCalledWith("/(tabs)/analytics");
   });
 
+  it("skips the sales lookup when launched from a notification with no saved tab", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
+    mockGetLastNotificationResponseAsync.mockResolvedValue({
+      notification: { request: { identifier: "notif-fast", content: { data: { installment_id: "fast1" } } } },
+    });
+
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockRequestAPI).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/analytics");
+    expect(mockPush).toHaveBeenCalledWith("/post/fast1");
+  });
+
+  it("does not restore a creator-only saved tab for non-creators", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false, accessToken: "t" });
+    mockGetSavedTab.mockResolvedValue("agent");
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+  });
+
   it("restores the saved tab on subsequent launches", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
     mockGetSavedTab.mockResolvedValue("agent");

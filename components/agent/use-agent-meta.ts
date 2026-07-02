@@ -22,7 +22,7 @@ export const useAgentMeta = () => {
           const data = await fetchAgentMeta(token);
           return { enabled: data.enabled, greeting: data.greeting, suggestions: data.suggestions };
         } catch (error) {
-          if (error instanceof Error && error.message.includes("403")) {
+          if (error instanceof Error && /^Request failed: 403\b/.test(error.message)) {
             return { enabled: false, greeting: "", suggestions: [] };
           }
           throw error;
