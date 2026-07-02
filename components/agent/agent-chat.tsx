@@ -157,10 +157,12 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     if (trimmed.length === 0 || isSending) return;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
-    const history: ChatMessage[] = [...messages, userMessage].map(({ role, content }): ChatMessage => ({
-      role,
-      content,
-    }));
+    const history: ChatMessage[] = [...messages, userMessage].map(
+      ({ role, content }): ChatMessage => ({
+        role,
+        content,
+      }),
+    );
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     sendMutation.mutate(history);
@@ -230,33 +232,28 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
       ) : null}
 
       <View className="border-t border-border p-4">
-        <View className="gap-1 rounded border border-border bg-background p-2">
+        <View className="relative rounded border border-border bg-background">
           <TextInput
-            className="max-h-32 px-2 py-2 font-sans text-base text-foreground"
+            className="max-h-32 py-3 pr-16 pl-3 font-sans text-base text-foreground"
             placeholder="Ask about your store or describe a change..."
             placeholderTextColor={mutedColor}
             value={input}
             onChangeText={setInput}
             multiline
             editable={!isSending}
+            autoFocus
             accessibilityLabel="Message"
           />
-          <View className="flex-row justify-end">
-            <Button
-              variant={hasText ? "accent" : "default"}
-              size="icon"
-              className="size-11 rounded-full"
-              disabled={isSending || !hasText}
-              onPress={() => send(input)}
-              accessibilityLabel="Send"
-            >
-              <LineIcon
-                name="arrow-up-stroke"
-                size={20}
-                className={hasText ? "text-accent-foreground" : "text-muted"}
-              />
-            </Button>
-          </View>
+          <Button
+            variant={hasText ? "accent" : "default"}
+            size="icon"
+            className="absolute right-1.5 bottom-1.5 size-11 rounded-full"
+            disabled={isSending || !hasText}
+            onPress={() => send(input)}
+            accessibilityLabel="Send"
+          >
+            <LineIcon name="arrow-up-stroke" size={20} className={hasText ? "text-accent-foreground" : "text-muted"} />
+          </Button>
         </View>
       </View>
     </KeyboardAvoidingView>
