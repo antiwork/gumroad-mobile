@@ -1,6 +1,7 @@
 import { fetchAgentMeta } from "@/lib/agent";
 import { useAuthedRequest } from "@/lib/authed-request";
 import { useAuth } from "@/lib/auth-context";
+import { RequestError } from "@/lib/request";
 import { useQuery } from "@tanstack/react-query";
 
 interface AgentMeta {
@@ -22,7 +23,7 @@ export const useAgentMeta = () => {
           const data = await fetchAgentMeta(token);
           return { enabled: data.enabled, greeting: data.greeting, suggestions: data.suggestions };
         } catch (error) {
-          if (error instanceof Error && /^Request failed: 403\b/.test(error.message)) {
+          if (error instanceof RequestError && error.statusCode === 403) {
             return { enabled: false, greeting: "", suggestions: [] };
           }
           throw error;

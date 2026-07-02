@@ -15,23 +15,21 @@ type TabRoute = `/(tabs)/${TabName}`;
 
 const FIRST_LAUNCH_CHECK_TIMEOUT_MS = 3_000;
 
-const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> =>
-  Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
-
 const resolveFirstLaunchRoute = async (isCreator: boolean, accessToken: string | null): Promise<TabRoute> => {
   if (!isCreator) return "/(tabs)/library";
   if (!accessToken) return "/(tabs)/analytics";
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FIRST_LAUNCH_CHECK_TIMEOUT_MS);
   try {
-    const response = await withTimeout(
-      requestAPI<{ success: boolean; sales_count: number }>(buildSalesAnalyticsPath("year", new Date().toISOString()), {
-        accessToken,
-      }),
-      FIRST_LAUNCH_CHECK_TIMEOUT_MS,
-      { success: true, sales_count: 1 },
+    const response = await requestAPI<{ success: boolean; sales_count: number }>(
+      buildSalesAnalyticsPath("year", new Date().toISOString()),
+      { accessToken, signal: controller.signal },
     );
     return response.success && response.sales_count === 0 ? "/(tabs)/library" : "/(tabs)/analytics";
   } catch {
     return "/(tabs)/analytics";
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
