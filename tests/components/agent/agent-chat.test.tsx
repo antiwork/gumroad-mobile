@@ -127,6 +127,36 @@ describe("AgentChat", () => {
     expect(mockExecuteAgentAction).not.toHaveBeenCalled();
   });
 
+  it("renders the action title and structured fields when provided", async () => {
+    mockSendAgentMessage.mockResolvedValue({
+      reply: "I've prepared a discount.",
+      proposedAction: {
+        type: "create_discount",
+        params: { code: "LAUNCH", percent_off: 20 },
+        summary: "Create a 20% off code called LAUNCH",
+        title: "Create discount",
+        fields: [
+          { label: "Code", value: "LAUNCH" },
+          { label: "Discount", value: "20% off" },
+        ],
+      },
+    });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "Create a launch discount");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Create discount")).toBeTruthy());
+    expect(screen.getByText("Code")).toBeTruthy();
+    expect(screen.getByText("LAUNCH")).toBeTruthy();
+    expect(screen.getByText("Discount")).toBeTruthy();
+    expect(screen.getByText("20% off")).toBeTruthy();
+    expect(screen.queryByText("Create a 20% off code called LAUNCH")).toBeNull();
+  });
+
   it("shows a fallback assistant message when the request fails", async () => {
     mockSendAgentMessage.mockRejectedValue(new Error("network down"));
 

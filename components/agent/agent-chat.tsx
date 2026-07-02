@@ -36,27 +36,42 @@ const ProposedActionCard = ({
   onConfirm: () => void;
   onDismiss: () => void;
 }) => (
-  <View className="mt-2 gap-2 rounded-2xl border border-dashed border-border p-4">
-    <Text className="font-sans font-semibold text-foreground">Proposed change</Text>
-    <Text className="text-foreground">{action.summary}</Text>
-    {status === "applied" ? (
-      <Text className="text-accent" role="status">
-        Applied
-      </Text>
-    ) : status === "dismissed" ? (
-      <Text className="text-muted" role="status">
-        Dismissed
-      </Text>
-    ) : (
-      <View className="flex-row gap-2">
-        <Button variant="accent" size="sm" disabled={isPending} onPress={onConfirm}>
-          <Text>{isApplying ? "Applying..." : "Confirm"}</Text>
-        </Button>
-        <Button variant="outline" size="sm" disabled={isPending} onPress={onDismiss}>
-          <Text>Dismiss</Text>
-        </Button>
-      </View>
-    )}
+  <View className="mt-2 rounded border border-border bg-card">
+    <View className="gap-2 p-4">
+      <Text className="font-sans font-semibold text-foreground">{action.title ?? "Proposed change"}</Text>
+      {action.fields && action.fields.length > 0 ? (
+        <View className="gap-1">
+          {action.fields.map((field) => (
+            <View key={field.label} className="flex-row gap-2">
+              <Text className="text-sm text-muted">{field.label}</Text>
+              <Text className="flex-1 text-right text-sm text-foreground">{field.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text className="text-foreground">{action.summary}</Text>
+      )}
+    </View>
+    <View className="flex-row items-center justify-end gap-2 border-t border-border p-3">
+      {status === "applied" ? (
+        <Text className="mr-auto text-accent" role="status">
+          Applied
+        </Text>
+      ) : status === "dismissed" ? (
+        <Text className="mr-auto text-muted" role="status">
+          Dismissed
+        </Text>
+      ) : (
+        <>
+          <Button variant="outline" size="sm" disabled={isPending} onPress={onDismiss}>
+            <Text>Dismiss</Text>
+          </Button>
+          <Button variant="accent" size="sm" disabled={isPending} onPress={onConfirm}>
+            <Text>{isApplying ? "Applying..." : "Confirm"}</Text>
+          </Button>
+        </>
+      )}
+    </View>
   </View>
 );
 
