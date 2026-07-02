@@ -1,5 +1,8 @@
 import { consumeNotificationRoute, markIndexInitialRoutingComplete } from "@/components/use-push-notifications";
+import { buildSalesAnalyticsPath } from "@/components/dashboard/use-sales-analytics";
 import { useAuth } from "@/lib/auth-context";
+import { requestAPI } from "@/lib/request";
+import { getSavedTab, TabName } from "@/lib/tab-preference";
 import * as Sentry from "@sentry/react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
@@ -8,8 +11,30 @@ import { useEffect } from "react";
 
 SplashScreen.preventAutoHideAsync();
 
+type TabRoute = `/(tabs)/${TabName}`;
+
+const FIRST_LAUNCH_CHECK_TIMEOUT_MS = 3_000;
+
+const resolveFirstLaunchRoute = async (isCreator: boolean, accessToken: string | null): Promise<TabRoute> => {
+  if (!isCreator) return "/(tabs)/library";
+  if (!accessToken) return "/(tabs)/analytics";
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FIRST_LAUNCH_CHECK_TIMEOUT_MS);
+  try {
+    const response = await requestAPI<{ success: boolean; sales_count: number }>(
+      buildSalesAnalyticsPath("year", new Date().toISOString()),
+      { accessToken, signal: controller.signal },
+    );
+    return response.success && response.sales_count === 0 ? "/(tabs)/library" : "/(tabs)/analytics";
+  } catch {
+    return "/(tabs)/analytics";
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 export default function Index() {
-  const { isLoading, isAuthenticated, isCreator } = useAuth();
+  const { isLoading, isAuthenticated, isCreator, accessToken } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -34,22 +59,37 @@ export default function Index() {
         markIndexInitialRoutingComplete();
         return;
       }
-      const defaultRoute = isCreator ? "/(tabs)/dashboard" : "/(tabs)/library";
-      let notificationRoute: string | null = null;
+
+      let notificationResponse: Notifications.NotificationResponse | null = null;
       try {
-        const response = await Notifications.getLastNotificationResponseAsync();
-        if (cancelled) return;
-        notificationRoute = consumeNotificationRoute(response);
-        Sentry.addBreadcrumb?.({
-          category: "notifications",
-          level: "info",
-          message: "Cold-start notification routing",
-          data: { hasResponse: response != null, route: notificationRoute },
-        });
+        notificationResponse = await Notifications.getLastNotificationResponseAsync();
       } catch (error) {
         Sentry.captureException(error);
       }
       if (cancelled) return;
+
+      const savedTab = await getSavedTab();
+      if (cancelled) return;
+
+      const effectiveSavedTab: TabName | null = savedTab && !isCreator && savedTab !== "library" ? null : savedTab;
+
+      let defaultRoute: TabRoute;
+      if (effectiveSavedTab) {
+        defaultRoute = `/(tabs)/${effectiveSavedTab}`;
+      } else if (notificationResponse) {
+        defaultRoute = isCreator ? "/(tabs)/analytics" : "/(tabs)/library";
+      } else {
+        defaultRoute = await resolveFirstLaunchRoute(isCreator, accessToken);
+      }
+      if (cancelled) return;
+
+      const notificationRoute = consumeNotificationRoute(notificationResponse);
+      Sentry.addBreadcrumb?.({
+        category: "notifications",
+        level: "info",
+        message: "Cold-start notification routing",
+        data: { hasResponse: notificationResponse != null, route: notificationRoute },
+      });
       if (notificationRoute) {
         router.replace(defaultRoute);
         router.push(notificationRoute as any);
@@ -64,7 +104,7 @@ export default function Index() {
       cancelled = true;
       cancelAnimationFrame(id);
     };
-  }, [isLoading, isAuthenticated, isCreator, router]);
+  }, [isLoading, isAuthenticated, isCreator, accessToken, router]);
 
   return null;
 }

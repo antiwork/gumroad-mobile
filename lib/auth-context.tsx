@@ -2,6 +2,7 @@ import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
 import { KeychainUnavailableError, request, UnauthorizedError } from "@/lib/request";
+import { clearSavedTab } from "@/lib/tab-preference";
 import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
@@ -62,8 +63,7 @@ const secureStoreOptions: SecureStore.SecureStoreOptions = {
 
 const isKeychainUnavailableError = (error: unknown): boolean =>
   error instanceof Error &&
-  (error.message.includes("User interaction is not allowed") ||
-    error.message.includes("No keychain is available"));
+  (error.message.includes("User interaction is not allowed") || error.message.includes("No keychain is available"));
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -174,6 +174,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       await SecureStore.deleteItemAsync(accessTokenKey);
       await SecureStore.deleteItemAsync(refreshTokenKey);
+      await clearSavedTab();
       setAccessToken(null);
       setIsCreator(false);
       queryClient.clear();

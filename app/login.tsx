@@ -24,7 +24,7 @@ export default function LoginScreen() {
     }
   }, [login]);
 
-  if (isAuthenticated) return <Redirect href={isCreator ? "/(tabs)/dashboard" : "/(tabs)/library"} />;
+  if (isAuthenticated) return <Redirect href="/" />;
 
   const busy = isLoading || isSigningIn;
 
