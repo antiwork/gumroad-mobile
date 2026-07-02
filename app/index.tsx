@@ -1,5 +1,8 @@
 import { consumeNotificationRoute, markIndexInitialRoutingComplete } from "@/components/use-push-notifications";
+import { buildSalesAnalyticsPath } from "@/components/dashboard/use-sales-analytics";
 import { useAuth } from "@/lib/auth-context";
+import { requestAPI } from "@/lib/request";
+import { getSavedTab } from "@/lib/tab-preference";
 import * as Sentry from "@sentry/react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
@@ -8,8 +11,26 @@ import { useEffect } from "react";
 
 SplashScreen.preventAutoHideAsync();
 
+// First launch only (no saved tab yet): creators who have made sales land on
+// Analytics, everyone else lands on Library. Every subsequent launch restores
+// whichever tab the user last used (saved in lib/tab-preference).
+const resolveFirstLaunchRoute = async (isCreator: boolean, accessToken: string | null): Promise<string> => {
+  if (!isCreator) return "/(tabs)/library";
+  if (!accessToken) return "/(tabs)/analytics";
+  try {
+    const response = await requestAPI<{ success: boolean; sales_count: number }>(
+      buildSalesAnalyticsPath("year", new Date().toISOString()),
+      { accessToken },
+    );
+    return response.sales_count > 0 ? "/(tabs)/analytics" : "/(tabs)/library";
+  } catch {
+    // Can't tell (offline, slow API) — Analytics is the safer creator default.
+    return "/(tabs)/analytics";
+  }
+};
+
 export default function Index() {
-  const { isLoading, isAuthenticated, isCreator } = useAuth();
+  const { isLoading, isAuthenticated, isCreator, accessToken } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -34,7 +55,10 @@ export default function Index() {
         markIndexInitialRoutingComplete();
         return;
       }
-      const defaultRoute = isCreator ? "/(tabs)/agent" : "/(tabs)/library";
+      const savedTab = await getSavedTab();
+      if (cancelled) return;
+      const defaultRoute = savedTab ? `/(tabs)/${savedTab}` : await resolveFirstLaunchRoute(isCreator, accessToken);
+      if (cancelled) return;
       let notificationRoute: string | null = null;
       try {
         const response = await Notifications.getLastNotificationResponseAsync();
@@ -51,11 +75,11 @@ export default function Index() {
       }
       if (cancelled) return;
       if (notificationRoute) {
-        router.replace(defaultRoute);
+        router.replace(defaultRoute as any);
         router.push(notificationRoute as any);
         Notifications.clearLastNotificationResponseAsync().catch(() => {});
       } else {
-        router.replace(defaultRoute);
+        router.replace(defaultRoute as any);
       }
       markIndexInitialRoutingComplete();
     });
@@ -64,7 +88,7 @@ export default function Index() {
       cancelled = true;
       cancelAnimationFrame(id);
     };
-  }, [isLoading, isAuthenticated, isCreator, router]);
+  }, [isLoading, isAuthenticated, isCreator, accessToken, router]);
 
   return null;
 }

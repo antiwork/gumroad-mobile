@@ -25,6 +25,21 @@ jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+const mockGetSavedTab = jest.fn();
+jest.mock("@/lib/tab-preference", () => ({
+  getSavedTab: () => mockGetSavedTab(),
+  saveLastTab: jest.fn(),
+}));
+
+const mockRequestAPI = jest.fn();
+jest.mock("@/lib/request", () => ({
+  requestAPI: (...args: unknown[]) => mockRequestAPI(...args),
+}));
+
+jest.mock("@/components/dashboard/use-sales-analytics", () => ({
+  buildSalesAnalyticsPath: jest.fn(() => "mobile/analytics/data_by_date.json"),
+}));
+
 const mockMarkIndexInitialRoutingComplete = jest.fn();
 jest.mock("@/components/use-push-notifications", () => {
   const actual = jest.requireActual<typeof import("@/components/use-push-notifications")>(
@@ -55,6 +70,8 @@ describe("Index", () => {
     __resetPushNotificationsModuleStateForTests();
     mockGetLastNotificationResponseAsync.mockResolvedValue(null);
     mockClearLastNotificationResponseAsync.mockResolvedValue(undefined);
+    mockGetSavedTab.mockResolvedValue(null);
+    mockRequestAPI.mockResolvedValue({ success: true, sales_count: 42 });
     rafCallbacks = [];
     originalRAF = globalThis.requestAnimationFrame;
     originalCAF = globalThis.cancelAnimationFrame;
@@ -101,8 +118,45 @@ describe("Index", () => {
     expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("navigates to /(tabs)/agent for creators", async () => {
-    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true });
+  it("first launch: navigates to /(tabs)/analytics for creators with sales", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/analytics");
+    expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("first launch: navigates to /(tabs)/library for creators with no sales", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
+    mockRequestAPI.mockResolvedValue({ success: true, sales_count: 0 });
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+  });
+
+  it("first launch: falls back to /(tabs)/analytics for creators when the sales check fails", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
+    mockRequestAPI.mockRejectedValue(new Error("offline"));
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/analytics");
+  });
+
+  it("restores the saved tab on subsequent launches", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
+    mockGetSavedTab.mockResolvedValue("agent");
     render(<Index />);
 
     await act(async () => {
@@ -110,7 +164,7 @@ describe("Index", () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith("/(tabs)/agent");
-    expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
+    expect(mockRequestAPI).not.toHaveBeenCalled();
   });
 
   it("navigates to /(tabs)/library for non-creators", async () => {
@@ -147,8 +201,9 @@ describe("Index", () => {
     expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("uses /(tabs)/agent as the back target for creators launched via notification", async () => {
-    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true });
+  it("uses the saved tab as the back target for creators launched via notification", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
+    mockGetSavedTab.mockResolvedValue("agent");
     mockGetLastNotificationResponseAsync.mockResolvedValue({
       notification: {
         request: {

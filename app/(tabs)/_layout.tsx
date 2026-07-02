@@ -10,11 +10,12 @@ import { useUser } from "@/components/use-user";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
+import { saveLastTab } from "@/lib/tab-preference";
 import { BottomTabBar } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
-import { Tabs } from "expo-router";
-import { createContext, useContext, useRef, useState } from "react";
+import { Tabs, usePathname } from "expo-router";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
 
@@ -186,6 +187,13 @@ export default function TabsLayout() {
   const { isCreator } = useAuth();
   const [isSearchActive, setSearchActive] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Remember the tab the user is on so the next app launch lands there.
+  useEffect(() => {
+    const tab = pathname.split("/").filter(Boolean)[0];
+    if (tab) saveLastTab(tab);
+  }, [pathname]);
   const [accent, muted, border] = useCSSVariable(["--color-accent", "--color-muted", "--color-border"]);
   const headerTitleStyle = useResolveClassNames("font-sans text-white");
   const tabBarLabelStyle = useResolveClassNames("font-sans font-normal text-xs");

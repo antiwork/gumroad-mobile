@@ -24,7 +24,8 @@ export default function LoginScreen() {
     }
   }, [login]);
 
-  if (isAuthenticated) return <Redirect href={isCreator ? "/(tabs)/agent" : "/(tabs)/library"} />;
+  // Route back through index so the saved-tab / first-launch logic decides the landing tab.
+  if (isAuthenticated) return <Redirect href="/" />;
 
   const busy = isLoading || isSigningIn;
 
