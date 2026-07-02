@@ -215,7 +215,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
       ) : null}
 
       <View className="border-t border-border p-4">
-        <View className="gap-1 rounded-2xl border border-border bg-background p-2">
+        <View className="gap-1 rounded border border-border bg-background p-2">
           <TextInput
             className="max-h-32 px-2 py-2 font-sans text-base text-foreground"
             placeholder="Ask about your store or describe a change..."
@@ -228,7 +228,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           />
           <View className="flex-row justify-end">
             <Button
-              variant={hasText ? "accent" : "outline"}
+              variant={hasText ? "accent" : "default"}
               size="icon"
               className="size-11 rounded-full"
               disabled={isSending || !hasText}
