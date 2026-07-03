@@ -79,8 +79,7 @@ Do not push code with failing tests. CI is not a substitute for local verificati
 - Always use the latest version of TypeScript and React Native
 - Sentence case headers and buttons and stuff, not title case
 - Always write the code
-- Don't leave comments in the code
-- No explanatory comments please
+- Default to no comments in the code; when one is genuinely needed, follow the comment style in AGENTS.md
 - Don't apologize for errors, fix them
 - Assign raw numbers to named constants (e.g., `MAX_CHARACTER_LIMIT` instead of `500`) to clarify their purpose.
 - Avoid abstracting code into shared components if the duplication is coincidental. If two interfaces look similar but serve different purposes, keep them separate to allow independent evolution.
