@@ -5,7 +5,7 @@
 - Place both hooks and components in the `components` directory
 - Prefer defining functions with const rather than the function keyword
 - Inline props types unless used elsewhere, don't create separate `ComponentProps` types for components
-- Don't leave comments in the code
+- Default to no comments in the code; when one is genuinely needed, follow the comment style in AGENTS.md
 - Don't remove comments, especially TODOs, unless asked to do so
 
 ## Styling
