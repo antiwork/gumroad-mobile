@@ -1,5 +1,5 @@
 import { getAudioAccessToken, getAudioContext } from "@/lib/audio-player-store";
-import { updateMediaLocation } from "@/lib/media-location";
+import { isMeaningfulLocation, updateMediaLocation } from "@/lib/media-location";
 import TrackPlayer, { Event, State } from "react-native-track-player";
 import { isPlayerInitialized } from "./use-audio-player-sync";
 
@@ -9,6 +9,7 @@ const syncCurrentPosition = async (isEnd = false) => {
   if (!context || !context.urlRedirectId || !accessToken) return;
 
   const { position } = await TrackPlayer.getProgress();
+  if (!isMeaningfulLocation(position, isEnd)) return;
   const location = isEnd && context.contentLength ? context.contentLength : Math.floor(position);
 
   await updateMediaLocation({

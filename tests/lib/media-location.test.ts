@@ -111,3 +111,23 @@ describe("updateMediaLocation", () => {
     );
   });
 });
+
+import { isMeaningfulLocation } from "@/lib/media-location";
+
+describe("isMeaningfulLocation", () => {
+  it("rejects positions under 3 seconds so a restarted track cannot overwrite saved progress", () => {
+    expect(isMeaningfulLocation(0, false)).toBe(false);
+    expect(isMeaningfulLocation(1, false)).toBe(false);
+    expect(isMeaningfulLocation(2.9, false)).toBe(false);
+  });
+
+  it("accepts positions of 3 seconds or more", () => {
+    expect(isMeaningfulLocation(3, false)).toBe(true);
+    expect(isMeaningfulLocation(1501, false)).toBe(true);
+  });
+
+  it("always accepts end-of-track saves", () => {
+    expect(isMeaningfulLocation(0, true)).toBe(true);
+    expect(isMeaningfulLocation(1, true)).toBe(true);
+  });
+});
