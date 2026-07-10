@@ -10,6 +10,11 @@ type MediaLocationRequest = {
   location: number;
 };
 
+// Positions under 3 seconds are treated as noise: saving them would overwrite a
+// listener's real progress whenever a track restarts from the beginning (for
+// example after a failed resume). End-of-track saves are always meaningful.
+export const isMeaningfulLocation = (position: number, isEnd: boolean) => isEnd || position >= 3;
+
 export const updateMediaLocation = async ({
   urlRedirectId,
   productFileId,

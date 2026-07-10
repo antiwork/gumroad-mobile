@@ -158,6 +158,7 @@ export default function DownloadScreen() {
             title: fileData.name ?? purchase?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
             purchaseId: purchase?.purchase_id,
+            resumeAt: fileData.latest_media_location?.location,
           }));
           await playAudio({
             resourceId: message.payload.resourceId,

@@ -182,6 +182,7 @@ export default function PostScreen() {
         title: f.name ?? post.name,
         urlRedirectId: post.url_redirect_external_id,
         purchaseId: purchase.purchase_id,
+        resumeAt: f.latest_media_location?.location,
       }));
       const file = allAudioFiles.find((f) => f.id === fileId);
       await playAudio({
