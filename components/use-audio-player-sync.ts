@@ -133,7 +133,11 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
           setAudioContext(currentAudioRef.current);
           if (state !== State.Playing && state !== State.Buffering) {
             const { position } = await TrackPlayer.getProgress();
-            if (position < 3 && track.resumeAt && track.resumeAt >= 3) {
+            if (
+              !isMeaningfulLocation(position, false) &&
+              track.resumeAt &&
+              isMeaningfulLocation(track.resumeAt, false)
+            ) {
               await TrackPlayer.seekTo(track.resumeAt);
             }
           }
