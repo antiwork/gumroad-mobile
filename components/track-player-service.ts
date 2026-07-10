@@ -3,14 +3,14 @@ import { isMeaningfulLocation, updateMediaLocation } from "@/lib/media-location"
 import TrackPlayer, { Event, State } from "react-native-track-player";
 import { isPlayerInitialized } from "./use-audio-player-sync";
 
-const syncCurrentPosition = async (isEnd = false) => {
+const syncCurrentPosition = async () => {
   const context = getAudioContext();
   const accessToken = getAudioAccessToken();
   if (!context || !context.urlRedirectId || !accessToken) return;
 
   const { position } = await TrackPlayer.getProgress();
-  if (!isMeaningfulLocation(position, isEnd)) return;
-  const location = isEnd && context.contentLength ? context.contentLength : Math.floor(position);
+  if (!isMeaningfulLocation(position, false)) return;
+  const location = Math.floor(position);
 
   await updateMediaLocation({
     urlRedirectId: context.urlRedirectId,

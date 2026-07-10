@@ -1,5 +1,5 @@
-import { useAuth } from "@/lib/auth-context";
 import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
+import { useAuth } from "@/lib/auth-context";
 import { isMeaningfulLocation, updateMediaLocation } from "@/lib/media-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
@@ -23,6 +23,7 @@ export type AudioTrackInfo = {
 
 let isPlayerSetup = false;
 let playerSetupListeners: (() => void)[] = [];
+let hasRestoredSavedPosition = false;
 
 export const isPlayerInitialized = () => isPlayerSetup;
 
@@ -131,7 +132,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
         if (track) {
           currentAudioRef.current = { ...track, contentLength: activeTrack.duration };
           setAudioContext(currentAudioRef.current);
-          if (state !== State.Playing && state !== State.Buffering) {
+          if (!hasRestoredSavedPosition && state !== State.Playing && state !== State.Buffering) {
             const { position } = await TrackPlayer.getProgress();
             if (
               !isMeaningfulLocation(position, false) &&
@@ -139,6 +140,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
               isMeaningfulLocation(track.resumeAt, false)
             ) {
               await TrackPlayer.seekTo(track.resumeAt);
+              hasRestoredSavedPosition = true;
             }
           }
         }
