@@ -27,7 +27,7 @@ jest.mock("@/lib/auth-context", () => ({
   useAuth: jest.fn(() => ({ accessToken: "test" })),
 }));
 
-import { updateMediaLocation } from "@/lib/media-location";
+import { isMeaningfulLocation, updateMediaLocation } from "@/lib/media-location";
 import { ServerError } from "@/lib/request";
 
 beforeEach(() => {
@@ -111,8 +111,6 @@ describe("updateMediaLocation", () => {
     );
   });
 });
-
-import { isMeaningfulLocation } from "@/lib/media-location";
 
 describe("isMeaningfulLocation", () => {
   it("rejects positions under 3 seconds so a restarted track cannot overwrite saved progress", () => {
