@@ -12,6 +12,7 @@ const encoder = new TextEncoder();
 
 const streamResponse = (frames: string[], { ok = true, contentType = "text/event-stream" } = {}) => {
   let index = 0;
+  const cancel = jest.fn(() => Promise.resolve());
   return {
     ok,
     status: ok ? 200 : 500,
@@ -22,8 +23,10 @@ const streamResponse = (frames: string[], { ok = true, contentType = "text/event
           index < frames.length
             ? Promise.resolve({ value: encoder.encode(frames[index++]), done: false })
             : Promise.resolve({ value: undefined, done: true }),
+        cancel,
       }),
     },
+    cancel,
   };
 };
 
@@ -106,13 +109,13 @@ describe("streamAgentMessage", () => {
   });
 
   it("throws the server's message on an error event", async () => {
-    mockFetch.mockResolvedValue(
-      streamResponse(['event: error\ndata: {"message":"That conversation could not be found."}\n\n']),
-    );
+    const response = streamResponse(['event: error\ndata: {"message":"That conversation could not be found."}\n\n']);
+    mockFetch.mockResolvedValue(response);
 
     await expect(
       streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" }),
     ).rejects.toThrow("That conversation could not be found.");
+    expect(response.cancel).toHaveBeenCalled();
   });
 
   it("throws when the response is not an event stream", async () => {

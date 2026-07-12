@@ -161,24 +161,28 @@ export const streamAgentMessage = async ({
   const decoder = new TextDecoder();
   let buffer = "";
 
-  for (;;) {
-    const { value, done: streamDone } = await reader.read();
-    if (streamDone) break;
-    buffer += decoder.decode(value, { stream: true });
-    let separator = buffer.indexOf("\n\n");
-    while (separator !== -1) {
-      const frame = buffer.slice(0, separator);
-      buffer = buffer.slice(separator + 2);
-      if (frame.trim().length > 0) done = handleFrame(frame) ?? done;
-      separator = buffer.indexOf("\n\n");
+  try {
+    for (;;) {
+      const { value, done: streamDone } = await reader.read();
+      if (streamDone) break;
+      buffer += decoder.decode(value, { stream: true });
+      let separator = buffer.indexOf("\n\n");
+      while (separator !== -1) {
+        const frame = buffer.slice(0, separator);
+        buffer = buffer.slice(separator + 2);
+        if (frame.trim().length > 0) done = handleFrame(frame) ?? done;
+        separator = buffer.indexOf("\n\n");
+      }
     }
-  }
-  if (buffer.trim().length > 0) {
-    try {
-      done = handleFrame(buffer) ?? done;
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) throw error;
+    if (buffer.trim().length > 0) {
+      try {
+        done = handleFrame(buffer) ?? done;
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+      }
     }
+  } finally {
+    reader.cancel().catch(() => {});
   }
 
   if (!done) throw new Error("Agent stream ended without a done event");
