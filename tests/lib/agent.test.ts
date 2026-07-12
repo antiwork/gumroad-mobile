@@ -7,15 +7,23 @@ const mockFetch = jest.fn();
 jest.mock("expo/fetch", () => ({ fetch: (...args: unknown[]) => mockFetch(...args) }));
 
 import { streamAgentMessage } from "@/lib/agent";
+import { UnauthorizedError } from "@/lib/request";
 
 const encoder = new TextEncoder();
 
-const streamResponse = (frames: string[], { ok = true, contentType = "text/event-stream" } = {}) => {
+const streamResponse = (
+  frames: string[],
+  {
+    ok = true,
+    status,
+    contentType = "text/event-stream",
+  }: { ok?: boolean; status?: number; contentType?: string } = {},
+) => {
   let index = 0;
-  const cancel = jest.fn(() => Promise.resolve());
+  const cancel = jest.fn().mockResolvedValue(undefined);
   return {
     ok,
-    status: ok ? 200 : 500,
+    status: status ?? (ok ? 200 : 500),
     headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? contentType : null) },
     body: {
       getReader: () => ({
@@ -116,6 +124,14 @@ describe("streamAgentMessage", () => {
       streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" }),
     ).rejects.toThrow("That conversation could not be found.");
     expect(response.cancel).toHaveBeenCalled();
+  });
+
+  it("throws UnauthorizedError on a 401 so the caller can refresh the token and retry", async () => {
+    mockFetch.mockResolvedValue(streamResponse([], { ok: false, status: 401, contentType: "application/json" }));
+
+    await expect(
+      streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" }),
+    ).rejects.toThrow(UnauthorizedError);
   });
 
   it("throws when the response is not an event stream", async () => {

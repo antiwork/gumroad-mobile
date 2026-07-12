@@ -35,7 +35,7 @@ export class RequestError extends Error {
   }
 }
 
-const REQUEST_TIMEOUT_MS = 30_000;
+export const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 30_000;
 
