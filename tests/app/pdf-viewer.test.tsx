@@ -123,9 +123,7 @@ describe("PdfViewerScreen", () => {
   it("shows error view with Try Again button when PDF fails to load", async () => {
     renderWithProviders();
 
-    // Flush the mocked download promise chain deterministically instead of
-    // polling with waitFor — on slow CI runners the polling loses the race
-    // against the microtask that mounts the PDF and the test times out.
+    // Flushing microtasks is deterministic; polling with waitFor times out on slow CI runners.
     await act(async () => {});
     expect(screen.getByTestId("pdf-component")).toBeTruthy();
     expect(screen.queryByText("Try Again")).toBeNull();

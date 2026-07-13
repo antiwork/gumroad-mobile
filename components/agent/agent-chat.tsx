@@ -127,17 +127,12 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const [input, setInput] = useState("");
   const [pendingActionIndex, setPendingActionIndex] = useState<number | null>(null);
   const conversationIdRef = useRef<string | null>(null);
-  // Flips true the moment the seller sends their first message. Guards the mount-time resume
-  // below: once a turn is in flight (which may create a brand-new stored conversation), a late
-  // "latest conversation" response must not overwrite the chat or its conversation id.
   const hasSentMessageRef = useRef(false);
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
 
-  // On open, resume the most recently active stored conversation (the same store the web Agent
-  // chat writes to) so a chat started on either surface picks up where it left off. Any turn the
-  // seller sends before this resolves wins: we skip hydration rather than clobber the new chat.
-  // Resuming is best-effort — a failed fetch just means starting fresh.
+  // Resume the latest stored conversation on open. If the seller sends a message before this
+  // resolves, their new chat wins and we skip hydration.
   useEffect(() => {
     let cancelled = false;
     void authedRequest((token) => fetchLatestAgentConversation(token))
@@ -152,9 +147,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
               ...(message.proposed_action ? { proposedAction: message.proposed_action } : {}),
               ...(message.action_status
                 ? { actionStatus: message.action_status }
-                : // A proposal persisted without a status was never confirmed in the session it was
-                  // made. Its context is gone, so render it as dismissed rather than offering a
-                  // stale, re-confirmable change after reopening the app.
+                : // A proposal that was never confirmed is stale after resuming, so show it as dismissed.
                   message.proposed_action
                   ? { actionStatus: "dismissed" as const }
                   : {}),
@@ -213,7 +206,6 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     const trimmed = text.trim();
     if (trimmed.length === 0 || isSending) return;
 
-    // From here on the seller owns the chat: block the mount-time resume from replacing it.
     hasSentMessageRef.current = true;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
@@ -262,9 +254,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         accessibilityLabel="Conversation"
         keyExtractor={(_, index) => String(index)}
         keyboardShouldPersistTaps="handled"
-        // Scroll on content growth rather than on state changes: during streaming, tokens can
-        // arrive faster than any debounce, and this fires exactly when the rendered list actually
-        // gets taller (new messages, each streamed token, spinner appearing).
+        // Scrolling on content growth keeps up with streaming tokens, which arrive faster than a debounce would fire.
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item, index }) => (
           <MessageBubble
