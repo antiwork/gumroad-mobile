@@ -10,6 +10,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: "gumroadmobile",
   userInterfaceStyle: "automatic",
   ios: {
+    buildNumber: "2",
     supportsTablet: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
