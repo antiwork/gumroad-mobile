@@ -2,7 +2,7 @@ import { LineIcon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
-import { type ChatMessage, type ProposedAction, executeAgentAction, sendAgentMessage } from "@/lib/agent";
+import { type ChatMessage, type ProposedAction, executeAgentAction, streamAgentMessage } from "@/lib/agent";
 import { useAuthedRequest } from "@/lib/authed-request";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -117,15 +117,28 @@ const MessageBubble = ({
 export const AgentChat = ({ greeting, suggestions }: Props) => {
   const authedRequest = useAuthedRequest();
   const [messages, setMessages] = useState<DisplayMessage[]>([{ role: "assistant", content: greeting }]);
+  const [streamingReply, setStreamingReply] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [pendingActionIndex, setPendingActionIndex] = useState<number | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
 
   const sendMutation = useMutation({
     mutationFn: (history: ChatMessage[]) =>
-      authedRequest((token) => sendAgentMessage({ messages: history, accessToken: token })),
-    onSuccess: ({ reply, proposedAction }) => {
+      authedRequest((token) =>
+        streamAgentMessage({
+          messages: history,
+          conversationId: conversationIdRef.current,
+          accessToken: token,
+          handlers: {
+            onToken: (text) => setStreamingReply((prev) => (prev ?? "") + text),
+            onReset: () => setStreamingReply(null),
+          },
+        }),
+      ),
+    onSuccess: ({ reply, proposedAction, conversationId }) => {
+      conversationIdRef.current = conversationId;
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: reply, ...(proposedAction ? { proposedAction } : {}) },
@@ -137,11 +150,14 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         { role: "assistant", content: "Sorry, I ran into a problem. Please try again." },
       ]);
     },
+    onSettled: () => setStreamingReply(null),
   });
 
   const executeMutation = useMutation({
     mutationFn: (action: ProposedAction) =>
-      authedRequest((token) => executeAgentAction({ action, accessToken: token })),
+      authedRequest((token) =>
+        executeAgentAction({ action, conversationId: conversationIdRef.current, accessToken: token }),
+      ),
   });
 
   const isSending = sendMutation.isPending;
@@ -150,7 +166,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   useEffect(() => {
     const timeout = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     return () => clearTimeout(timeout);
-  }, [messages, isSending]);
+  }, [messages, isSending, streamingReply]);
 
   const send = (text: string) => {
     const trimmed = text.trim();
@@ -213,10 +229,18 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         )}
         ListFooterComponent={
           isSending ? (
-            <View className="flex-row items-center gap-2" role="status" accessibilityLabel="Working on it">
-              <LoadingSpinner size="small" />
-              <Text className="text-sm text-muted">Working on it...</Text>
-            </View>
+            streamingReply ? (
+              <View className="items-start">
+                <View className="w-full">
+                  <Text className="text-foreground">{streamingReply}</Text>
+                </View>
+              </View>
+            ) : (
+              <View className="flex-row items-center gap-2" role="status" accessibilityLabel="Working on it">
+                <LoadingSpinner size="small" />
+                <Text className="text-sm text-muted">Working on it...</Text>
+              </View>
+            )
           ) : null
         }
       />

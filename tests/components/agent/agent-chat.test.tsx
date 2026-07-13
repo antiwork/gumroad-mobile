@@ -7,11 +7,13 @@ jest.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ accessToken: "test-token" }),
 }));
 
-const mockSendAgentMessage = jest.fn();
+jest.mock("expo/fetch", () => ({ fetch: jest.fn() }));
+
+const mockStreamAgentMessage = jest.fn();
 const mockExecuteAgentAction = jest.fn();
 jest.mock("@/lib/agent", () => ({
   ...jest.requireActual("@/lib/agent"),
-  sendAgentMessage: (...args: unknown[]) => mockSendAgentMessage(...args),
+  streamAgentMessage: (...args: unknown[]) => mockStreamAgentMessage(...args),
   executeAgentAction: (...args: unknown[]) => mockExecuteAgentAction(...args),
 }));
 
@@ -34,7 +36,11 @@ describe("AgentChat", () => {
   });
 
   it("sends a typed message and shows the assistant reply", async () => {
-    mockSendAgentMessage.mockResolvedValue({ reply: "You have 3 products.", proposedAction: null });
+    mockStreamAgentMessage.mockResolvedValue({
+      reply: "You have 3 products.",
+      proposedAction: null,
+      conversationId: "conv-123",
+    });
 
     renderChat();
 
@@ -44,8 +50,10 @@ describe("AgentChat", () => {
     });
 
     await waitFor(() => expect(screen.getByText("You have 3 products.")).toBeTruthy());
-    expect(mockSendAgentMessage).toHaveBeenCalledWith({
+    expect(mockStreamAgentMessage).toHaveBeenCalledWith({
       accessToken: "test-token",
+      conversationId: null,
+      handlers: { onToken: expect.any(Function), onReset: expect.any(Function) },
       messages: [
         { role: "assistant", content: GREETING },
         { role: "user", content: "How many products do I have?" },
@@ -54,7 +62,7 @@ describe("AgentChat", () => {
   });
 
   it("hides suggestions once a message is sent", async () => {
-    mockSendAgentMessage.mockResolvedValue({ reply: "Done.", proposedAction: null });
+    mockStreamAgentMessage.mockResolvedValue({ reply: "Done.", proposedAction: null, conversationId: "conv-123" });
 
     renderChat();
 
@@ -66,8 +74,9 @@ describe("AgentChat", () => {
   });
 
   it("applies a proposed action when confirmed", async () => {
-    mockSendAgentMessage.mockResolvedValue({
+    mockStreamAgentMessage.mockResolvedValue({
       reply: "I've prepared a discount.",
+      conversationId: "conv-123",
       proposedAction: {
         type: "create_discount",
         params: { code: "LAUNCH", percent_off: 20 },
@@ -92,6 +101,7 @@ describe("AgentChat", () => {
     await waitFor(() => expect(screen.getByText("Applied")).toBeTruthy());
     expect(mockExecuteAgentAction).toHaveBeenCalledWith({
       accessToken: "test-token",
+      conversationId: "conv-123",
       action: {
         type: "create_discount",
         params: { code: "LAUNCH", percent_off: 20 },
@@ -101,8 +111,9 @@ describe("AgentChat", () => {
   });
 
   it("dismisses a proposed action without applying it", async () => {
-    mockSendAgentMessage.mockResolvedValue({
+    mockStreamAgentMessage.mockResolvedValue({
       reply: "I've prepared a discount.",
+      conversationId: "conv-123",
       proposedAction: {
         type: "create_discount",
         params: { code: "LAUNCH", percent_off: 20 },
@@ -128,8 +139,9 @@ describe("AgentChat", () => {
   });
 
   it("renders the action title and structured fields when provided", async () => {
-    mockSendAgentMessage.mockResolvedValue({
+    mockStreamAgentMessage.mockResolvedValue({
       reply: "I've prepared a discount.",
+      conversationId: "conv-123",
       proposedAction: {
         type: "create_discount",
         params: { code: "LAUNCH", percent_off: 20 },
@@ -158,7 +170,7 @@ describe("AgentChat", () => {
   });
 
   it("shows a fallback assistant message when the request fails", async () => {
-    mockSendAgentMessage.mockRejectedValue(new Error("network down"));
+    mockStreamAgentMessage.mockRejectedValue(new Error("network down"));
 
     renderChat();
 
@@ -171,8 +183,9 @@ describe("AgentChat", () => {
   });
 
   it("shows an error message when applying a confirmed action fails", async () => {
-    mockSendAgentMessage.mockResolvedValue({
+    mockStreamAgentMessage.mockResolvedValue({
       reply: "I've prepared a discount.",
+      conversationId: "conv-123",
       proposedAction: {
         type: "create_discount",
         params: { code: "LAUNCH", percent_off: 20 },
