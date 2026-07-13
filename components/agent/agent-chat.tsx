@@ -2,7 +2,13 @@ import { LineIcon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
-import { type ChatMessage, type ProposedAction, executeAgentAction, streamAgentMessage } from "@/lib/agent";
+import {
+  type ChatMessage,
+  type ProposedAction,
+  executeAgentAction,
+  fetchLatestAgentConversation,
+  streamAgentMessage,
+} from "@/lib/agent";
 import { useAuthedRequest } from "@/lib/authed-request";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -121,8 +127,41 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const [input, setInput] = useState("");
   const [pendingActionIndex, setPendingActionIndex] = useState<number | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  const hasSentMessageRef = useRef(false);
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
+
+  // Resume the latest stored conversation on open. If the seller sends a message before this
+  // resolves, their new chat wins and we skip hydration.
+  useEffect(() => {
+    let cancelled = false;
+    void authedRequest((token) => fetchLatestAgentConversation(token))
+      .then((conversation) => {
+        if (cancelled || !conversation || conversation.messages.length === 0 || hasSentMessageRef.current) return;
+        setMessages([
+          { role: "assistant", content: greeting },
+          ...conversation.messages.map(
+            (message): DisplayMessage => ({
+              role: message.role,
+              content: message.content,
+              ...(message.proposed_action ? { proposedAction: message.proposed_action } : {}),
+              ...(message.action_status
+                ? { actionStatus: message.action_status }
+                : // A proposal that was never confirmed is stale after resuming, so show it as dismissed.
+                  message.proposed_action
+                  ? { actionStatus: "dismissed" as const }
+                  : {}),
+            }),
+          ),
+        ]);
+        conversationIdRef.current = conversation.id;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume runs once, on mount
+  }, []);
 
   const sendMutation = useMutation({
     mutationFn: (history: ChatMessage[]) =>
@@ -163,14 +202,11 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const isSending = sendMutation.isPending;
   const hasText = input.trim().length > 0;
 
-  useEffect(() => {
-    const timeout = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-    return () => clearTimeout(timeout);
-  }, [messages, isSending, streamingReply]);
-
   const send = (text: string) => {
     const trimmed = text.trim();
     if (trimmed.length === 0 || isSending) return;
+
+    hasSentMessageRef.current = true;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -218,6 +254,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         accessibilityLabel="Conversation"
         keyExtractor={(_, index) => String(index)}
         keyboardShouldPersistTaps="handled"
+        // Scrolling on content growth keeps up with streaming tokens, which arrive faster than a debounce would fire.
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item, index }) => (
           <MessageBubble
             message={item}

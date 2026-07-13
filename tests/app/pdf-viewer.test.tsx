@@ -108,6 +108,12 @@ import { act } from "react";
 const renderWithProviders = () => renderWithQueryClient(<PdfViewerScreen />);
 
 describe("PdfViewerScreen", () => {
+  // The first test in this suite pays the cold-render cost of the whole PDF screen.
+  // On a loaded CI runner that can exceed jest's default 5s test budget, which made
+  // this file the repo's recurring flake (fails on busy runs, passes on reruns with
+  // no code change). Give the suite a budget that absorbs a slow cold start.
+  jest.setTimeout(20000);
+
   beforeEach(() => {
     const { File } = require("expo-file-system");
     const Sharing = require("expo-sharing");
@@ -123,7 +129,9 @@ describe("PdfViewerScreen", () => {
   it("shows error view with Try Again button when PDF fails to load", async () => {
     renderWithProviders();
 
-    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
+    // Flushing microtasks is deterministic; polling with waitFor times out on slow CI runners.
+    await act(async () => {});
+    expect(screen.getByTestId("pdf-component")).toBeTruthy();
     expect(screen.queryByText("Try Again")).toBeNull();
 
     act(() => {
@@ -138,7 +146,8 @@ describe("PdfViewerScreen", () => {
   it("re-mounts PDF component when Try Again is pressed", async () => {
     renderWithProviders();
 
-    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
+    await act(async () => {});
+    expect(screen.getByTestId("pdf-component")).toBeTruthy();
 
     act(() => {
       mockOnError!(new Error("ENOENT"));
@@ -146,7 +155,8 @@ describe("PdfViewerScreen", () => {
 
     fireEvent.press(screen.getByText("Try Again"));
 
-    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
+    await act(async () => {});
+    expect(screen.getByTestId("pdf-component")).toBeTruthy();
     expect(screen.queryByText("Try Again")).toBeNull();
   });
 
