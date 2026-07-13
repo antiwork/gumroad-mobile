@@ -108,6 +108,12 @@ import { act } from "react";
 const renderWithProviders = () => renderWithQueryClient(<PdfViewerScreen />);
 
 describe("PdfViewerScreen", () => {
+  // The first test in this suite pays the cold-render cost of the whole PDF screen.
+  // On a loaded CI runner that can exceed jest's default 5s test budget, which made
+  // this file the repo's recurring flake (fails on busy runs, passes on reruns with
+  // no code change). Give the suite a budget that absorbs a slow cold start.
+  jest.setTimeout(20000);
+
   beforeEach(() => {
     const { File } = require("expo-file-system");
     const Sharing = require("expo-sharing");
