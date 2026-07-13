@@ -11,10 +11,12 @@ jest.mock("expo/fetch", () => ({ fetch: jest.fn() }));
 
 const mockStreamAgentMessage = jest.fn();
 const mockExecuteAgentAction = jest.fn();
+const mockFetchLatestAgentConversation = jest.fn();
 jest.mock("@/lib/agent", () => ({
   ...jest.requireActual("@/lib/agent"),
   streamAgentMessage: (...args: unknown[]) => mockStreamAgentMessage(...args),
   executeAgentAction: (...args: unknown[]) => mockExecuteAgentAction(...args),
+  fetchLatestAgentConversation: (...args: unknown[]) => mockFetchLatestAgentConversation(...args),
 }));
 
 const GREETING = "Hi! I'm your store assistant.";
@@ -25,6 +27,7 @@ const renderChat = () => renderWithQueryClient(<AgentChat greeting={GREETING} su
 describe("AgentChat", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFetchLatestAgentConversation.mockResolvedValue(null);
   });
 
   it("renders the greeting and starter suggestions", () => {
@@ -78,7 +81,7 @@ describe("AgentChat", () => {
       reply: "I've prepared a discount.",
       conversationId: "conv-123",
       proposedAction: {
-        type: "create_discount",
+        type: "api_write",
         params: { code: "LAUNCH", percent_off: 20 },
         summary: "Create a 20% off code called LAUNCH",
       },
@@ -103,7 +106,7 @@ describe("AgentChat", () => {
       accessToken: "test-token",
       conversationId: "conv-123",
       action: {
-        type: "create_discount",
+        type: "api_write",
         params: { code: "LAUNCH", percent_off: 20 },
         summary: "Create a 20% off code called LAUNCH",
       },
@@ -115,7 +118,7 @@ describe("AgentChat", () => {
       reply: "I've prepared a discount.",
       conversationId: "conv-123",
       proposedAction: {
-        type: "create_discount",
+        type: "api_write",
         params: { code: "LAUNCH", percent_off: 20 },
         summary: "Create a 20% off code called LAUNCH",
       },
@@ -143,7 +146,7 @@ describe("AgentChat", () => {
       reply: "I've prepared a discount.",
       conversationId: "conv-123",
       proposedAction: {
-        type: "create_discount",
+        type: "api_write",
         params: { code: "LAUNCH", percent_off: 20 },
         summary: "Create a 20% off code called LAUNCH",
         title: "Create discount",
@@ -187,7 +190,7 @@ describe("AgentChat", () => {
       reply: "I've prepared a discount.",
       conversationId: "conv-123",
       proposedAction: {
-        type: "create_discount",
+        type: "api_write",
         params: { code: "LAUNCH", percent_off: 20 },
         summary: "Create a 20% off code called LAUNCH",
       },
@@ -211,5 +214,113 @@ describe("AgentChat", () => {
       expect(screen.getByText("Sorry, I couldn't apply that change. Please try again.")).toBeTruthy(),
     );
     expect(screen.queryByText("Applied")).toBeNull();
+  });
+
+  it("renders streamed tokens in the footer, drops them on reset, and commits the final reply", async () => {
+    let resolveTurn!: (result: { reply: string; proposedAction: null; conversationId: string }) => void;
+    mockStreamAgentMessage.mockImplementation(
+      ({ handlers }: { handlers: { onToken: (text: string) => void; onReset: () => void } }) =>
+        new Promise((resolve) => {
+          resolveTurn = resolve;
+          handlers.onToken("Checking your ");
+          handlers.onToken("store...");
+        }),
+    );
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Checking your store...")).toBeTruthy());
+    expect(screen.queryByText("Working on it...")).toBeNull();
+
+    const { handlers } = mockStreamAgentMessage.mock.calls[0][0] as {
+      handlers: { onToken: (text: string) => void; onReset: () => void };
+    };
+    await act(async () => {
+      handlers.onReset();
+    });
+    expect(screen.queryByText("Checking your store...")).toBeNull();
+    expect(screen.getByText("Working on it...")).toBeTruthy();
+
+    await act(async () => {
+      handlers.onToken("Sales are ");
+      handlers.onToken("up 20%.");
+    });
+    await waitFor(() => expect(screen.getByText("Sales are up 20%.")).toBeTruthy());
+
+    await act(async () => {
+      resolveTurn({ reply: "Sales are up 20% this week.", proposedAction: null, conversationId: "conv-123" });
+    });
+    await waitFor(() => expect(screen.getByText("Sales are up 20% this week.")).toBeTruthy());
+    expect(screen.queryByText("Sales are up 20%.")).toBeNull();
+  });
+
+  it("resumes the latest stored conversation on open and continues it", async () => {
+    mockFetchLatestAgentConversation.mockResolvedValue({
+      id: "conv-resumed",
+      title: "Sales check",
+      messages: [
+        { role: "user", content: "How are sales?" },
+        { role: "assistant", content: "Sales are up 20% this week." },
+      ],
+    });
+    mockStreamAgentMessage.mockResolvedValue({
+      reply: "You have 3 products.",
+      proposedAction: null,
+      conversationId: "conv-resumed",
+    });
+
+    renderChat();
+
+    await waitFor(() => expect(screen.getByText("Sales are up 20% this week.")).toBeTruthy());
+    expect(screen.getByText("How are sales?")).toBeTruthy();
+    expect(screen.queryByText("How are my sales doing?")).toBeNull();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How many products do I have?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() =>
+      expect(mockStreamAgentMessage).toHaveBeenCalledWith(expect.objectContaining({ conversationId: "conv-resumed" })),
+    );
+  });
+
+  it("renders a resumed unconfirmed proposal as dismissed", async () => {
+    mockFetchLatestAgentConversation.mockResolvedValue({
+      id: "conv-resumed",
+      title: "Discount",
+      messages: [
+        { role: "user", content: "Create a launch discount" },
+        {
+          role: "assistant",
+          content: "I've prepared a discount.",
+          proposed_action: {
+            type: "api_write",
+            params: { code: "LAUNCH" },
+            summary: "Create a 20% off code called LAUNCH",
+          },
+        },
+      ],
+    });
+
+    renderChat();
+
+    await waitFor(() => expect(screen.getByText("Dismissed")).toBeTruthy());
+    expect(screen.queryByText("Confirm")).toBeNull();
+  });
+
+  it("starts a fresh chat when fetching the latest conversation fails", async () => {
+    mockFetchLatestAgentConversation.mockRejectedValue(new Error("network down"));
+
+    renderChat();
+
+    await waitFor(() => expect(mockFetchLatestAgentConversation).toHaveBeenCalled());
+    expect(screen.getByText(GREETING)).toBeTruthy();
+    expect(screen.getByText("How are my sales doing?")).toBeTruthy();
   });
 });

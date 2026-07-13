@@ -2,7 +2,13 @@ import { LineIcon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
-import { type ChatMessage, type ProposedAction, executeAgentAction, streamAgentMessage } from "@/lib/agent";
+import {
+  type ChatMessage,
+  type ProposedAction,
+  executeAgentAction,
+  fetchLatestAgentConversation,
+  streamAgentMessage,
+} from "@/lib/agent";
 import { useAuthedRequest } from "@/lib/authed-request";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -121,8 +127,48 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const [input, setInput] = useState("");
   const [pendingActionIndex, setPendingActionIndex] = useState<number | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  // Flips true the moment the seller sends their first message. Guards the mount-time resume
+  // below: once a turn is in flight (which may create a brand-new stored conversation), a late
+  // "latest conversation" response must not overwrite the chat or its conversation id.
+  const hasSentMessageRef = useRef(false);
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
+
+  // On open, resume the most recently active stored conversation (the same store the web Agent
+  // chat writes to) so a chat started on either surface picks up where it left off. Any turn the
+  // seller sends before this resolves wins: we skip hydration rather than clobber the new chat.
+  // Resuming is best-effort — a failed fetch just means starting fresh.
+  useEffect(() => {
+    let cancelled = false;
+    void authedRequest((token) => fetchLatestAgentConversation(token))
+      .then((conversation) => {
+        if (cancelled || !conversation || conversation.messages.length === 0 || hasSentMessageRef.current) return;
+        setMessages([
+          { role: "assistant", content: greeting },
+          ...conversation.messages.map(
+            (message): DisplayMessage => ({
+              role: message.role,
+              content: message.content,
+              ...(message.proposed_action ? { proposedAction: message.proposed_action } : {}),
+              ...(message.action_status
+                ? { actionStatus: message.action_status }
+                : // A proposal persisted without a status was never confirmed in the session it was
+                  // made. Its context is gone, so render it as dismissed rather than offering a
+                  // stale, re-confirmable change after reopening the app.
+                  message.proposed_action
+                  ? { actionStatus: "dismissed" as const }
+                  : {}),
+            }),
+          ),
+        ]);
+        conversationIdRef.current = conversation.id;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume runs once, on mount
+  }, []);
 
   const sendMutation = useMutation({
     mutationFn: (history: ChatMessage[]) =>
@@ -163,14 +209,12 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const isSending = sendMutation.isPending;
   const hasText = input.trim().length > 0;
 
-  useEffect(() => {
-    const timeout = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-    return () => clearTimeout(timeout);
-  }, [messages, isSending, streamingReply]);
-
   const send = (text: string) => {
     const trimmed = text.trim();
     if (trimmed.length === 0 || isSending) return;
+
+    // From here on the seller owns the chat: block the mount-time resume from replacing it.
+    hasSentMessageRef.current = true;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -218,6 +262,10 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         accessibilityLabel="Conversation"
         keyExtractor={(_, index) => String(index)}
         keyboardShouldPersistTaps="handled"
+        // Scroll on content growth rather than on state changes: during streaming, tokens can
+        // arrive faster than any debounce, and this fires exactly when the rendered list actually
+        // gets taller (new messages, each streamed token, spinner appearing).
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item, index }) => (
           <MessageBubble
             message={item}

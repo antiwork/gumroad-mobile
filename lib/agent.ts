@@ -14,7 +14,7 @@ export interface ProposedActionField {
 }
 
 export interface ProposedAction {
-  type: "api_write" | "create_discount" | "update_product_price" | "publish_product" | "unpublish_product";
+  type: "api_write";
   params: Record<string, unknown>;
   summary: string;
   title?: string;
@@ -28,10 +28,6 @@ interface AgentMetaResponse {
   suggestions: string[];
 }
 
-type SendMessageResponse =
-  | { success: true; reply: string; proposed_action: ProposedAction | null; conversation_id?: string }
-  | { success: false; error: string };
-
 interface ExecuteActionResponse {
   success: boolean;
   message: string;
@@ -40,22 +36,27 @@ interface ExecuteActionResponse {
 export const fetchAgentMeta = (accessToken: string) =>
   requestAPI<AgentMetaResponse>("mobile/agent/meta", { method: "GET", accessToken });
 
-export const sendAgentMessage = async ({
-  messages,
-  conversationId,
-  accessToken,
-}: {
-  messages: ChatMessage[];
-  conversationId?: string | null;
-  accessToken: string;
-}): Promise<{ reply: string; proposedAction: ProposedAction | null; conversationId: string | null }> => {
-  const json = await requestAPI<SendMessageResponse>("mobile/agent/messages", {
-    method: "POST",
-    data: { messages, ...(conversationId ? { conversation_id: conversationId } : {}) },
+export interface ConversationMessage {
+  role: ChatRole;
+  content: string;
+  proposed_action?: ProposedAction | null;
+  action_status?: "applied" | "dismissed" | null;
+}
+
+export interface AgentConversation {
+  id: string;
+  title: string | null;
+  messages: ConversationMessage[];
+}
+
+type LatestConversationResponse = { success: true; conversation: AgentConversation | null };
+
+export const fetchLatestAgentConversation = async (accessToken: string): Promise<AgentConversation | null> => {
+  const json = await requestAPI<LatestConversationResponse>("mobile/agent/conversations/latest", {
+    method: "GET",
     accessToken,
   });
-  if (!json.success) throw new Error(json.error);
-  return { reply: json.reply, proposedAction: json.proposed_action, conversationId: json.conversation_id ?? null };
+  return json.conversation;
 };
 
 export const executeAgentAction = async ({
