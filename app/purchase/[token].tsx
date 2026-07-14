@@ -45,6 +45,13 @@ type TocDataMessage = {
   };
 };
 
+const webViewInternalSchemes = ["about:", "data:", "blob:", "javascript:"];
+
+const isWebViewInternalUrl = (url: string) => {
+  const lower = url.toLowerCase();
+  return webViewInternalSchemes.some((scheme) => lower.startsWith(scheme));
+};
+
 const downloadUrl = (token: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
 
@@ -88,7 +95,7 @@ export default function DownloadScreen() {
         request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL) ||
         request.url.startsWith("https://challenges.cloudflare.com/") ||
         request.url.startsWith("https://connect-js.stripe.com/") ||
-        !/^https?:\/\//.test(request.url)
+        isWebViewInternalUrl(request.url)
       )
         return true;
       safeOpenURL(request.url);
