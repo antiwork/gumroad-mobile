@@ -25,13 +25,14 @@ interface AnalyticsResponse {
 export const buildSalesAnalyticsPath = (timeRange: TimeRange, endTime: string) =>
   `mobile/analytics/data_by_date.json?range=${timeRange}&end_time=${encodeURIComponent(endTime)}`;
 
-export const useSalesAnalytics = () => {
+export const useSalesAnalytics = ({ enabled = true } = {}) => {
   const [timeRange, setTimeRange] = useState<TimeRange>("day");
   const endTime = new Date().toISOString();
 
   const query = useAPIRequest<AnalyticsResponse>({
     queryKey: ["analytics", timeRange],
     url: buildSalesAnalyticsPath(timeRange, endTime),
+    enabled,
   });
 
   return {

@@ -171,7 +171,7 @@ describe("Index", () => {
     expect(mockPush).toHaveBeenCalledWith("/post/fast1");
   });
 
-  it("does not restore a creator-only saved tab for non-creators", async () => {
+  it("restores the saved tab for non-creators", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false, accessToken: "t" });
     mockGetSavedTab.mockResolvedValue("agent");
     render(<Index />);
@@ -180,7 +180,7 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/agent");
   });
 
   it("restores the saved tab on subsequent launches", async () => {
