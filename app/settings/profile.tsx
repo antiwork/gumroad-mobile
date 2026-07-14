@@ -11,13 +11,22 @@ import { Stack } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
-import type { WebViewErrorEvent, WebViewHttpErrorEvent, WebViewOpenWindowEvent } from "react-native-webview/lib/WebViewTypes";
+import type {
+  WebViewErrorEvent,
+  WebViewHttpErrorEvent,
+  WebViewOpenWindowEvent,
+} from "react-native-webview/lib/WebViewTypes";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
 const allowedHostSuffixes = [".stripe.com", ".paypal.com", ".cloudflare.com"];
 
-const isWebUrl = (url: string) => /^https?:\/\//.test(url);
+const webViewInternalSchemes = ["about:", "data:", "blob:", "javascript:"];
+
+const isWebViewInternalUrl = (url: string) => {
+  const lower = url.toLowerCase();
+  return webViewInternalSchemes.some((scheme) => lower.startsWith(scheme));
+};
 
 const isPaymentProviderUrl = (url: string) => {
   try {
@@ -68,7 +77,7 @@ export default function ProfileSettingsScreen() {
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
-      if (request.url === url || !isWebUrl(request.url) || isAllowedInWebView(request.url)) return true;
+      if (request.url === url || isWebViewInternalUrl(request.url) || isAllowedInWebView(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },

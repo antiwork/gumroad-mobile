@@ -70,9 +70,22 @@ describe("ProfileSettingsScreen", () => {
     }) => boolean;
 
     expect(shouldStart({ url: "https://example.com/settings/profile" })).toBe(true);
+    expect(shouldStart({ url: "about:blank" })).toBe(true);
 
     expect(shouldStart({ url: "https://external.example/test" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+  });
+
+  it("hands non-web scheme navigations to the OS instead of loading them in the WebView", () => {
+    render(<ProfileSettingsScreen />);
+
+    const shouldStart = screen.getByTestId("profile-webview").props.onShouldStartLoadWithRequest as (request: {
+      url: string;
+      mainDocumentURL?: string;
+    }) => boolean;
+
+    expect(shouldStart({ url: "mailto:support@example.com" })).toBe(false);
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("mailto:support@example.com");
   });
 
   it("opens target=_blank help links externally but keeps provider popups in the WebView", () => {
