@@ -89,7 +89,7 @@ describe("SalesExportScreen", () => {
     }) => boolean;
 
     expect(shouldStart({ url: "https://example.com/settings" })).toBe(true);
-    expect(shouldStart({ url: "mailto:support@example.com" })).toBe(true);
+    expect(shouldStart({ url: "about:blank" })).toBe(true);
     expect(
       shouldStart({
         url: "https://cdn.example.test/embed",
@@ -100,6 +100,10 @@ describe("SalesExportScreen", () => {
 
     expect(shouldStart({ url: "https://external.example/test" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+
+    mockSafeOpenURL.mockClear();
+    expect(shouldStart({ url: "mailto:support@example.com" })).toBe(false);
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("mailto:support@example.com");
   });
 
   it("downloads the sales export and opens the native share sheet", async () => {
@@ -181,10 +185,7 @@ describe("SalesExportScreen", () => {
     fireEvent.press(screen.getByText("Download CSV"));
 
     await waitFor(() => {
-      expect(NativeAlert.alert).toHaveBeenCalledWith(
-        "Download failed",
-        "Sharing is not available on this device",
-      );
+      expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Sharing is not available on this device");
     });
     expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error));
   });

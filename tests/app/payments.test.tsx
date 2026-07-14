@@ -71,9 +71,26 @@ describe("PayoutSettingsScreen", () => {
 
     expect(shouldStart({ url: "https://connect-js.stripe.com/v1.0/connect.js" })).toBe(true);
     expect(shouldStart({ url: "https://example.com/settings/payments" })).toBe(true);
+    expect(shouldStart({ url: "about:blank" })).toBe(true);
 
     expect(shouldStart({ url: "https://external.example/test" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+  });
+
+  it("hands non-web scheme navigations to the OS instead of loading them in the WebView", () => {
+    render(<PayoutSettingsScreen />);
+
+    const shouldStart = screen.getByTestId("payments-webview").props.onShouldStartLoadWithRequest as (request: {
+      url: string;
+      mainDocumentURL?: string;
+    }) => boolean;
+
+    expect(shouldStart({ url: "intent://pay/#Intent;scheme=upi;end" })).toBe(false);
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("intent://pay/#Intent;scheme=upi;end");
+
+    mockSafeOpenURL.mockClear();
+    expect(shouldStart({ url: "mailto:support@example.com" })).toBe(false);
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("mailto:support@example.com");
   });
 
   it("opens target=_blank help links externally but keeps provider popups in the WebView", () => {

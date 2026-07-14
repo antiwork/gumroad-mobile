@@ -16,7 +16,12 @@ import { Alert, View } from "react-native";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
-const isWebUrl = (url: string) => /^https?:\/\//.test(url);
+const webViewInternalSchemes = ["about:", "data:", "blob:", "javascript:"];
+
+const isWebViewInternalUrl = (url: string) => {
+  const lower = url.toLowerCase();
+  return webViewInternalSchemes.some((scheme) => lower.startsWith(scheme));
+};
 
 const isGumroadUrl = (url: string) => {
   try {
@@ -66,7 +71,7 @@ export default function SalesExportScreen() {
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
-      if (request.url === url || !isWebUrl(request.url) || isGumroadUrl(request.url)) return true;
+      if (request.url === url || isWebViewInternalUrl(request.url) || isGumroadUrl(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },
