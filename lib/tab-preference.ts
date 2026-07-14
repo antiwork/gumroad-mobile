@@ -2,9 +2,9 @@ import * as SecureStore from "expo-secure-store";
 
 const LAST_TAB_KEY = "gumroad_last_tab";
 
-export type TabName = "agent" | "analytics" | "library";
+export type TabName = "agent" | "analytics" | "dashboard" | "library";
 
-const VALID_TABS: TabName[] = ["agent", "analytics", "library"];
+const VALID_TABS: TabName[] = ["agent", "analytics", "dashboard", "library"];
 
 export const getSavedTab = async (): Promise<TabName | null> => {
   try {

@@ -3,6 +3,7 @@ import { SaleDetailModal } from "@/components/dashboard/sale-detail-modal";
 import { SaleItem } from "@/components/dashboard/sale-item";
 import { SalePurchase, TimeRange, useSalesAnalytics } from "@/components/dashboard/use-sales-analytics";
 import { ExportAllSalesButton } from "@/components/export-all-sales-button";
+import { GettingStartedPlaceholder } from "@/components/getting-started-placeholder";
 import { LineIcon } from "@/components/icon";
 import { useSales } from "@/components/sales/use-sales";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ const TimeRangeButton = ({
 );
 
 export default function Dashboard() {
-  const { isLoading: isAuthLoading } = useAuth();
+  const { isLoading: isAuthLoading, isCreator } = useAuth();
   const {
     data,
     isLoading: isLoadingAnalytics,
@@ -40,15 +41,15 @@ export default function Dashboard() {
     isRefetching,
     timeRange,
     setTimeRange,
-  } = useSalesAnalytics();
+  } = useSalesAnalytics({ enabled: isCreator });
   const accentColor = useCSSVariable("--color-accent") as string;
   const mutedColor = useCSSVariable("--color-muted") as string;
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const { isSearchActive, setSearchActive } = useDashboardSearch();
   const [searchText, setSearchText] = useState("");
   const isAllRange = timeRange === "all";
-  const salesSearch = useSales(searchText, isSearchActive, { requireQuery: true });
-  const allSales = useSales("", isAllRange && !isSearchActive);
+  const salesSearch = useSales(searchText, isCreator && isSearchActive, { requireQuery: true });
+  const allSales = useSales("", isCreator && isAllRange && !isSearchActive);
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -78,6 +79,14 @@ export default function Dashboard() {
         <View className="flex-1 items-center justify-center">
           <LoadingSpinner size="large" />
         </View>
+      </Screen>
+    );
+  }
+
+  if (!isCreator) {
+    return (
+      <Screen>
+        <GettingStartedPlaceholder message="Create your first product and your sales will show up here." />
       </Screen>
     );
   }

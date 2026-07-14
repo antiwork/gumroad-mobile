@@ -207,7 +207,6 @@ const LibraryHeaderRight = () => (
 );
 
 export default function TabsLayout() {
-  const { isCreator } = useAuth();
   const [isSearchActive, setSearchActive] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const pathname = usePathname();
@@ -250,7 +249,6 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={color} />,
-              href: isCreator ? undefined : null,
             }}
           />
           <Tabs.Screen
@@ -260,7 +258,6 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <LibraryHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-big" size={size} color={color} />,
-              href: isCreator ? undefined : null,
             }}
           />
           <Tabs.Screen
@@ -270,7 +267,6 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <LibraryHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="message-bubble-dots" size={size} color={color} />,
-              href: isCreator ? undefined : null,
             }}
           />
           <Tabs.Screen

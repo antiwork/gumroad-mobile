@@ -71,11 +71,9 @@ export default function Index() {
       const savedTab = await getSavedTab();
       if (cancelled) return;
 
-      const effectiveSavedTab: TabName | null = savedTab && !isCreator && savedTab !== "library" ? null : savedTab;
-
       let defaultRoute: TabRoute;
-      if (effectiveSavedTab) {
-        defaultRoute = `/(tabs)/${effectiveSavedTab}`;
+      if (savedTab) {
+        defaultRoute = `/(tabs)/${savedTab}`;
       } else if (notificationResponse) {
         defaultRoute = isCreator ? "/(tabs)/analytics" : "/(tabs)/library";
       } else {
