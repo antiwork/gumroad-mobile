@@ -42,6 +42,11 @@ export class RequestError extends Error {
   }
 }
 
+// A 400 with "invalid_grant" from the OAuth token endpoint means the grant (refresh token or
+// authorization code) is expired or revoked — an expected end-of-session state, not a bug.
+export const isInvalidGrantError = (error: unknown): boolean =>
+  error instanceof RequestError && error.statusCode === 400 && error.message.includes('"invalid_grant"');
+
 export const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 30_000;

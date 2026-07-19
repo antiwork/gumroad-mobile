@@ -20,27 +20,40 @@ jest.mock("expo-web-browser", () => ({
 jest.mock("expo-router", () => ({
   useRouter: () => ({ replace: jest.fn() }),
 }));
-jest.mock("@/lib/request", () => ({
-  request: jest.fn(),
-  UnauthorizedError: class UnauthorizedError extends Error {
-    constructor(message: string) {
+jest.mock("@/lib/request", () => {
+  class RequestError extends Error {
+    statusCode: number;
+    constructor(statusCode: number, message: string) {
       super(message);
-      this.name = "UnauthorizedError";
+      this.name = "RequestError";
+      this.statusCode = statusCode;
     }
-  },
-  SessionExpiredError: class SessionExpiredError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = "SessionExpiredError";
-    }
-  },
-  KeychainUnavailableError: class KeychainUnavailableError extends Error {
-    constructor() {
-      super("Keychain unavailable");
-      this.name = "KeychainUnavailableError";
-    }
-  },
-}));
+  }
+  return {
+    request: jest.fn(),
+    RequestError,
+    isInvalidGrantError: (error: unknown) =>
+      error instanceof RequestError && error.statusCode === 400 && error.message.includes('"invalid_grant"'),
+    UnauthorizedError: class UnauthorizedError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = "UnauthorizedError";
+      }
+    },
+    SessionExpiredError: class SessionExpiredError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = "SessionExpiredError";
+      }
+    },
+    KeychainUnavailableError: class KeychainUnavailableError extends Error {
+      constructor() {
+        super("Keychain unavailable");
+        this.name = "KeychainUnavailableError";
+      }
+    },
+  };
+});
 jest.mock("@/lib/query-client", () => ({
   queryClient: { clear: jest.fn() },
 }));
@@ -102,6 +115,41 @@ describe("AuthProvider handleAuthResponse", () => {
     await waitFor(() => {
       expect(Sentry.captureException).toHaveBeenCalledWith(serverError);
     });
+  });
+
+  it("does not report invalid_grant during the code exchange to Sentry", async () => {
+    const { RequestError } = jest.requireMock("@/lib/request");
+    mockRequest.mockRejectedValue(new RequestError(400, 'Request failed: 400 {"error":"invalid_grant"}'));
+
+    const { result } = renderWithProvider({
+      type: "success",
+      errorCode: null,
+      error: null,
+      params: { code: "auth-code" },
+      authentication: null,
+      url: "",
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockRequest).toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it("reports unexpected code-exchange failures to Sentry", async () => {
+    const exchangeError = new Error("Network error");
+    mockRequest.mockRejectedValue(exchangeError);
+
+    const { result } = renderWithProvider({
+      type: "success",
+      errorCode: null,
+      error: null,
+      params: { code: "auth-code" },
+      authentication: null,
+      url: "",
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(Sentry.captureException).toHaveBeenCalledWith(exchangeError);
   });
 });
 
@@ -174,14 +222,27 @@ describe("refreshToken", () => {
   });
 
   it("throws SessionExpiredError when the server rejects the refresh token (invalid_grant)", async () => {
+    const { RequestError, SessionExpiredError } = jest.requireMock("@/lib/request");
     mockGetItemAsync.mockImplementation(refreshTokenStored);
-    mockRequest.mockRejectedValue(new Error('Request failed: 400 {"error":"invalid_grant"}'));
+    mockRequest.mockRejectedValue(new RequestError(400, 'Request failed: 400 {"error":"invalid_grant"}'));
 
     const { result } = renderWithProvider(null);
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    const { SessionExpiredError } = jest.requireMock("@/lib/request");
     await expect(result.current.refreshToken()).rejects.toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("rethrows other 400 responses from the token endpoint unchanged", async () => {
+    const { RequestError, SessionExpiredError } = jest.requireMock("@/lib/request");
+    mockGetItemAsync.mockImplementation(refreshTokenStored);
+    const otherError = new RequestError(400, 'Request failed: 400 {"error":"invalid_request"}');
+    mockRequest.mockRejectedValue(otherError);
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await expect(result.current.refreshToken()).rejects.toBe(otherError);
+    await expect(result.current.refreshToken()).rejects.not.toBeInstanceOf(SessionExpiredError);
   });
 
   it("does NOT call logout when refresh fails (caller decides)", async () => {
@@ -256,9 +317,7 @@ describe("refreshToken keychain-unavailable handling", () => {
 
   it("throws KeychainUnavailableError when reading the refresh token hits 'No keychain is available'", async () => {
     mockGetItemAsync.mockImplementation((key: string) =>
-      key === "gumroad_refresh_token"
-        ? Promise.reject(new Error("No keychain is available"))
-        : Promise.resolve(null),
+      key === "gumroad_refresh_token" ? Promise.reject(new Error("No keychain is available")) : Promise.resolve(null),
     );
 
     const { result } = renderWithProvider(null);

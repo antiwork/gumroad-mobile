@@ -1,7 +1,13 @@
 import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
-import { KeychainUnavailableError, request, SessionExpiredError, UnauthorizedError } from "@/lib/request";
+import {
+  isInvalidGrantError,
+  KeychainUnavailableError,
+  request,
+  SessionExpiredError,
+  UnauthorizedError,
+} from "@/lib/request";
 import { clearSavedTab } from "@/lib/tab-preference";
 import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
@@ -140,8 +146,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
         } catch (error) {
-          console.error("Failed to exchange code for tokens:", error);
-          Sentry.captureException(error);
+          if (isInvalidGrantError(error)) {
+            console.warn("Authorization code expired or already used:", error);
+          } else {
+            console.error("Failed to exchange code for tokens:", error);
+            Sentry.captureException(error);
+          }
         } finally {
           setIsLoading(false);
         }
@@ -212,7 +222,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             },
           });
         } catch (requestError) {
-          if (requestError instanceof Error && requestError.message.includes("invalid_grant")) {
+          if (isInvalidGrantError(requestError)) {
             throw new SessionExpiredError("Refresh token is invalid or expired");
           }
           throw requestError;
