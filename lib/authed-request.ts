@@ -1,6 +1,6 @@
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
-import { KeychainUnavailableError, UnauthorizedError } from "@/lib/request";
+import { KeychainUnavailableError, SessionExpiredError, UnauthorizedError } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 
 export const useAuthedRequest = () => {
@@ -16,7 +16,7 @@ export const useAuthedRequest = () => {
         newToken = await refreshToken();
       } catch (refreshError) {
         if (refreshError instanceof KeychainUnavailableError) throw error;
-        if (refreshError instanceof UnauthorizedError) {
+        if (refreshError instanceof UnauthorizedError || refreshError instanceof SessionExpiredError) {
           console.warn(refreshError);
         } else {
           Sentry.captureException(refreshError, { tags: { auth_path: "refresh_failed" } });

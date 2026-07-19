@@ -1,7 +1,13 @@
 import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
-import { KeychainUnavailableError, request, UnauthorizedError } from "@/lib/request";
+import {
+  isInvalidGrantError,
+  KeychainUnavailableError,
+  request,
+  SessionExpiredError,
+  UnauthorizedError,
+} from "@/lib/request";
 import { clearSavedTab } from "@/lib/tab-preference";
 import * as Sentry from "@sentry/react-native";
 import * as AuthSession from "expo-auth-session";
@@ -140,8 +146,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
         } catch (error) {
-          console.error("Failed to exchange code for tokens:", error);
-          Sentry.captureException(error);
+          if (isInvalidGrantError(error)) {
+            console.warn("Authorization code expired or already used:", error);
+          } else {
+            console.error("Failed to exchange code for tokens:", error);
+            Sentry.captureException(error);
+          }
         } finally {
           setIsLoading(false);
         }
@@ -199,16 +209,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (isKeychainUnavailableError(readError)) throw new KeychainUnavailableError();
           throw readError;
         }
-        if (!storedRefreshToken) throw new Error("No refresh token available");
+        if (!storedRefreshToken) throw new SessionExpiredError("No refresh token available");
 
-        const tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
-          method: "POST",
-          data: {
-            grant_type: "refresh_token",
-            refresh_token: storedRefreshToken,
-            client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-          },
-        });
+        let tokenResponse: { access_token: string; refresh_token?: string };
+        try {
+          tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
+            method: "POST",
+            data: {
+              grant_type: "refresh_token",
+              refresh_token: storedRefreshToken,
+              client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
+            },
+          });
+        } catch (requestError) {
+          if (isInvalidGrantError(requestError)) {
+            throw new SessionExpiredError("Refresh token is invalid or expired");
+          }
+          throw requestError;
+        }
         await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
         return tokenResponse.access_token;
       } finally {

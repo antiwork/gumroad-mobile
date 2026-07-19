@@ -10,6 +10,13 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class SessionExpiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SessionExpiredError";
+  }
+}
+
 export class KeychainUnavailableError extends Error {
   constructor() {
     super("Keychain unavailable");
@@ -34,6 +41,11 @@ export class RequestError extends Error {
     this.statusCode = statusCode;
   }
 }
+
+// A 400 with "invalid_grant" from the OAuth token endpoint means the grant (refresh token or
+// authorization code) is expired or revoked — an expected end-of-session state, not a bug.
+export const isInvalidGrantError = (error: unknown): boolean =>
+  error instanceof RequestError && error.statusCode === 400 && error.message.includes('"invalid_grant"');
 
 export const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
@@ -124,7 +136,7 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
           newAccessToken = await refreshToken();
         } catch (refreshError) {
           if (refreshError instanceof KeychainUnavailableError) throw error;
-          if (refreshError instanceof UnauthorizedError) {
+          if (refreshError instanceof UnauthorizedError || refreshError instanceof SessionExpiredError) {
             console.warn(refreshError);
           } else {
             Sentry.captureException(refreshError, { tags: { auth_path: "refresh_failed" } });

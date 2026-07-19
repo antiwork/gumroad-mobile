@@ -3,7 +3,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
 
-import { KeychainUnavailableError, ServerError, UnauthorizedError, useAPIRequest } from "@/lib/request";
+import {
+  KeychainUnavailableError,
+  ServerError,
+  SessionExpiredError,
+  UnauthorizedError,
+  useAPIRequest,
+} from "@/lib/request";
 
 const mockRefreshToken = jest.fn();
 const mockLogout = jest.fn();
@@ -140,6 +146,18 @@ describe("useAPIRequest", () => {
     expect(result.current.error).toBeInstanceOf(UnauthorizedError);
   });
 
+  it("logs out without reporting to Sentry when refresh fails with SessionExpiredError", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
+    mockRefreshToken.mockRejectedValueOnce(new SessionExpiredError("No refresh token available"));
+
+    const { result } = renderUseAPIRequest();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(result.current.error).toBeInstanceOf(UnauthorizedError);
+  });
+
   it("logs out when refresh fails with a raw keychain error (write-side after server rotation)", async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
     const writeError = new Error("User interaction is not allowed");
@@ -157,7 +175,7 @@ describe("useAPIRequest", () => {
 
   it("logs out and reports to Sentry with auth_path tag when refresh fails with a non-keychain error", async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
-    const refreshError = new Error("invalid_grant");
+    const refreshError = new Error("Unexpected refresh failure");
     mockRefreshToken.mockRejectedValueOnce(refreshError);
 
     const { result } = renderUseAPIRequest();
