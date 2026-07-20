@@ -16,3 +16,18 @@ export const cacheFileDestination = (uniqueKey: string, fileName: string) => {
   if (!dir.exists) dir.create({ idempotent: true });
   return new File(dir, sanitizeFileName(fileName));
 };
+
+// HTTP status failures (expo-file-system reports them as "response has status: <code>") are
+// deterministic, so retrying only wastes time; everything else is a dropped connection or
+// timeout, which on mobile networks usually succeeds on a second attempt.
+const isRetryableDownloadError = (error: unknown) =>
+  !(error instanceof Error && error.message.includes("response has status"));
+
+export const downloadFileWithRetry = async (url: string, destination: File): Promise<File> => {
+  try {
+    return await File.downloadFileAsync(url, destination, { idempotent: true });
+  } catch (error) {
+    if (!isRetryableDownloadError(error)) throw error;
+    return await File.downloadFileAsync(url, destination, { idempotent: true });
+  }
+};

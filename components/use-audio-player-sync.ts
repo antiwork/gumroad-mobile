@@ -1,6 +1,6 @@
 import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
 import { useAuth } from "@/lib/auth-context";
-import { isMeaningfulLocation, updateMediaLocation } from "@/lib/media-location";
+import { isMeaningfulLocation, isResumableLocation, updateMediaLocation } from "@/lib/media-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
 import type { WebView } from "react-native-webview";
@@ -19,6 +19,7 @@ export type AudioTrackInfo = {
   urlRedirectId?: string;
   purchaseId?: string;
   resumeAt?: number;
+  contentLength?: number;
 };
 
 let isPlayerSetup = false;
@@ -50,7 +51,17 @@ export const withPlayerReady = <P extends object>(Component: React.ComponentType
 export const setupPlayer = async () => {
   if (isPlayerSetup) return;
 
-  await TrackPlayer.setupPlayer();
+  try {
+    await TrackPlayer.setupPlayer();
+  } catch (error) {
+    // On Android the playback service can outlive the JS bundle (background playback keeps it
+    // running after the app is swiped away). When JS starts again over that live service,
+    // setupPlayer rejects with this code even though the player is fully usable. Treating it
+    // as a failure left isPlayerSetup false forever, so every audio tap was silently ignored.
+    const isAlreadyInitialized =
+      error instanceof Error && "code" in error && error.code === "player_already_initialized";
+    if (!isAlreadyInitialized) throw error;
+  }
   await TrackPlayer.updateOptions({
     capabilities: [
       Capability.Play,
@@ -125,18 +136,19 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
           urlRedirectId: t.urlRedirectId,
           purchaseId: t.purchaseId,
           resumeAt: t.resumeAt,
+          contentLength: t.contentLength,
         }));
       }
       if (activeTrack?.id) {
         const track = allTracksRef.current.find((t) => t.resourceId === activeTrack.id);
         if (track) {
-          currentAudioRef.current = { ...track, contentLength: activeTrack.duration };
+          currentAudioRef.current = { ...track, contentLength: activeTrack.duration ?? track.contentLength };
           setAudioContext(currentAudioRef.current);
           if (!hasRestoredSavedPosition && state !== State.Playing && state !== State.Buffering) {
             const { position } = await TrackPlayer.getProgress();
             if (
               !isMeaningfulLocation(position, false) &&
-              track.resumeAt &&
+              isResumableLocation(track.resumeAt, track.contentLength ?? activeTrack.duration) &&
               isMeaningfulLocation(track.resumeAt, false)
             ) {
               await TrackPlayer.seekTo(track.resumeAt);
@@ -247,7 +259,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
   const updateCurrentAudioRef = useCallback((resourceId: string, duration?: number) => {
     const track = allTracksRef.current.find((t) => t.resourceId === resourceId);
     if (track) {
-      const context = { ...track, contentLength: duration };
+      const context = { ...track, contentLength: duration ?? track.contentLength };
       currentAudioRef.current = context;
       setAudioContext(context);
     }
@@ -319,6 +331,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
             urlRedirectId: track.urlRedirectId,
             purchaseId: track.purchaseId,
             resumeAt: track.resumeAt,
+            contentLength: track.contentLength,
           })),
         );
 
@@ -328,7 +341,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
         }
 
         const resumePosition = resumeAt ?? audio.resumeAt;
-        if (resumePosition) {
+        if (isResumableLocation(resumePosition, audio.contentLength)) {
           await TrackPlayer.seekTo(resumePosition);
         }
       } else if (previousContext?.resourceId !== audio.resourceId) {
@@ -336,7 +349,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
         if (trackIndex >= 0) {
           await TrackPlayer.skip(trackIndex);
           const resumePosition = resumeAt ?? audio.resumeAt;
-          if (resumePosition) await TrackPlayer.seekTo(resumePosition);
+          if (isResumableLocation(resumePosition, audio.contentLength)) await TrackPlayer.seekTo(resumePosition);
         }
       }
 

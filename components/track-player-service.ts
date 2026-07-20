@@ -4,18 +4,28 @@ import TrackPlayer, { Event, State } from "react-native-track-player";
 import { isPlayerInitialized } from "./use-audio-player-sync";
 
 const syncCurrentPosition = async () => {
-  const context = getAudioContext();
   const accessToken = getAudioAccessToken();
-  if (!context || !context.urlRedirectId || !accessToken) return;
+  if (!accessToken) return;
+
+  // Prefer the native active track, which carries its own urlRedirectId/purchaseId. The JS
+  // store context is only updated while a screen is mounted, so after the queue auto-advances
+  // with no UI open (Android keeps playing when the app is swiped away) the store still points
+  // at the previous track and would save this track's position onto the wrong file.
+  const activeTrack = await TrackPlayer.getActiveTrack();
+  const context = getAudioContext();
+  const urlRedirectId = activeTrack?.urlRedirectId ?? context?.urlRedirectId;
+  const productFileId = activeTrack?.id ?? context?.resourceId;
+  const purchaseId = activeTrack?.purchaseId ?? context?.purchaseId;
+  if (!urlRedirectId || !productFileId) return;
 
   const { position } = await TrackPlayer.getProgress();
   if (!isMeaningfulLocation(position, false)) return;
   const location = Math.floor(position);
 
   await updateMediaLocation({
-    urlRedirectId: context.urlRedirectId,
-    productFileId: context.resourceId,
-    purchaseId: context.purchaseId,
+    urlRedirectId,
+    productFileId,
+    purchaseId,
     location,
     accessToken,
   });

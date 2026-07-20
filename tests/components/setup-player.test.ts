@@ -52,3 +52,32 @@ describe("setupPlayer", () => {
     expect(options.android.audioOffload).toBe(false);
   });
 });
+
+describe("setupPlayer when the native player already exists", () => {
+  // setupPlayer remembers success in module state, so each test needs a fresh module copy.
+  const freshSetupPlayer = () => {
+    let fresh: typeof setupPlayer = setupPlayer;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      fresh = (require("../../components/use-audio-player-sync") as { setupPlayer: typeof setupPlayer }).setupPlayer;
+    });
+    return fresh;
+  };
+
+  it("continues with configuration instead of failing when the playback service survived an app restart", async () => {
+    const alreadyInitialized = Object.assign(new Error("The player has already been initialized via setupPlayer."), {
+      code: "player_already_initialized",
+    });
+    (mockTrackPlayer.setupPlayer as jest.Mock).mockRejectedValueOnce(alreadyInitialized);
+
+    await expect(freshSetupPlayer()()).resolves.toBeUndefined();
+
+    expect(mockTrackPlayer.updateOptions).toHaveBeenCalled();
+  });
+
+  it("still surfaces other setup failures", async () => {
+    (mockTrackPlayer.setupPlayer as jest.Mock).mockRejectedValueOnce(new Error("something else broke"));
+
+    await expect(freshSetupPlayer()()).rejects.toThrow("something else broke");
+  });
+});

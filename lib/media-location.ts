@@ -15,6 +15,14 @@ type MediaLocationRequest = {
 // example after a failed resume). End-of-track saves are always meaningful.
 export const isMeaningfulLocation = (position: number, isEnd: boolean) => isEnd || position >= 3;
 
+// A saved location at or past the end of the track means the listener already finished it.
+// Seeking there starts playback at the very end and it stops immediately, which reads as
+// "the track won't play" — so finished tracks restart from the beginning, matching web.
+export const isResumableLocation = (
+  location: number | undefined,
+  contentLength: number | undefined,
+): location is number => !!location && !(contentLength && location >= contentLength);
+
 export const updateMediaLocation = async ({
   urlRedirectId,
   productFileId,

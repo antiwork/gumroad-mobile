@@ -7,7 +7,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
-import { cacheFileDestination } from "@/lib/file-utils";
+import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
 import { buildApiUrl } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
@@ -73,11 +73,7 @@ const downloadUrl = (urlRedirectToken: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${urlRedirectToken}/${productFileId}`);
 
 const downloadFile = (urlRedirectToken: string, productFileId: string, fileName: string) =>
-  File.downloadFileAsync(
-    downloadUrl(urlRedirectToken, productFileId),
-    cacheFileDestination(productFileId, fileName),
-    { idempotent: true },
-  );
+  downloadFileWithRetry(downloadUrl(urlRedirectToken, productFileId), cacheFileDestination(productFileId, fileName));
 
 const fontDataPromise = Promise.all(
   [
@@ -183,6 +179,7 @@ export default function PostScreen() {
         urlRedirectId: post.url_redirect_external_id,
         purchaseId: purchase.purchase_id,
         resumeAt: f.latest_media_location?.location,
+        contentLength: f.content_length,
       }));
       const file = allAudioFiles.find((f) => f.id === fileId);
       await playAudio({
