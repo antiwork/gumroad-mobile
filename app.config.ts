@@ -4,13 +4,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Gumroad",
   slug: "gumroad",
-  version: "2026.07.13",
+  version: "2026.07.20",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "gumroadmobile",
   userInterfaceStyle: "automatic",
   ios: {
-    buildNumber: "2",
+    buildNumber: "1",
     supportsTablet: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
