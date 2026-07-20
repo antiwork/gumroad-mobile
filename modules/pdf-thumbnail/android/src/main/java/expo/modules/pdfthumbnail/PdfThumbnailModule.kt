@@ -38,8 +38,10 @@ class PdfThumbnailModule : Module() {
 
           val pdfPage = renderer.openPage(page)
           try {
-            val width = pdfPage.width
-            val height = pdfPage.height
+            val maxThumbnailDimension = 480f
+            val scale = minOf(1f, maxThumbnailDimension / maxOf(pdfPage.width, pdfPage.height))
+            val width = (pdfPage.width * scale).toInt().coerceAtLeast(1)
+            val height = (pdfPage.height * scale).toInt().coerceAtLeast(1)
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             try {
               bitmap.eraseColor(Color.WHITE)
