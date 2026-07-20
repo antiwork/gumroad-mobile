@@ -280,7 +280,9 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     return () => subscription.remove();
   }, [syncMediaLocation, updateCurrentAudioRef]);
 
-  const playAudio = useCallback(
+  const playAudioChainRef = useRef<Promise<void>>(Promise.resolve());
+
+  const performPlayAudio = useCallback(
     async ({
       resourceId,
       resumeAt,
@@ -312,12 +314,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
         await syncMediaLocation(position);
       }
 
-      const isNewPlaylist =
-        !previousContext ||
-        allTracksRef.current.length !== tracks.length ||
-        !allTracksRef.current.every((t, i) => t.resourceId === tracks[i].resourceId);
-
-      if (isNewPlaylist) {
+      const loadPlaylist = async () => {
         allTracksRef.current = tracks;
         await TrackPlayer.reset();
         await TrackPlayer.add(
@@ -344,12 +341,30 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
         if (isResumableLocation(resumePosition, audio.contentLength)) {
           await TrackPlayer.seekTo(resumePosition);
         }
+      };
+
+      const isNewPlaylist =
+        !previousContext ||
+        allTracksRef.current.length !== tracks.length ||
+        !allTracksRef.current.every((t, i) => t.resourceId === tracks[i].resourceId);
+
+      if (isNewPlaylist) {
+        await loadPlaylist();
       } else if (previousContext?.resourceId !== audio.resourceId) {
-        const trackIndex = tracks.findIndex((t) => t.resourceId === audio.resourceId);
-        if (trackIndex >= 0) {
-          await TrackPlayer.skip(trackIndex);
+        // Resolve the skip target against the NATIVE queue, not the JS track list.
+        // The JS ref can say "same playlist" while the native player holds an empty
+        // or different queue (the playback service restarted, or a reset happened
+        // elsewhere) — skipping by a JS-derived index then throws
+        // "The track index is out of bounds". If the track isn't in the native
+        // queue, rebuild the playlist instead of skipping.
+        const queue = await TrackPlayer.getQueue();
+        const queueIndex = queue.findIndex((t) => t.id === audio.resourceId);
+        if (queueIndex >= 0) {
+          await TrackPlayer.skip(queueIndex);
           const resumePosition = resumeAt ?? audio.resumeAt;
           if (isResumableLocation(resumePosition, audio.contentLength)) await TrackPlayer.seekTo(resumePosition);
+        } else {
+          await loadPlaylist();
         }
       } else {
         // Replaying the track that's already loaded. If it finished, the native player is
@@ -372,6 +387,18 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
       await sendAudioPlayerInfo({ isPlaying: true });
     },
     [sendAudioPlayerInfo, syncMediaLocation],
+  );
+
+  // Serialize playAudio calls: two rapid taps can otherwise interleave
+  // reset/add/skip across the async boundaries, leaving the second call
+  // skipping into a queue the first call just cleared.
+  const playAudio = useCallback(
+    (options: Parameters<typeof performPlayAudio>[0]) => {
+      const next = playAudioChainRef.current.catch(() => {}).then(() => performPlayAudio(options));
+      playAudioChainRef.current = next;
+      return next;
+    },
+    [performPlayAudio],
   );
 
   return { pauseAudio, playAudio, activeResourceId, isPlaying };
