@@ -1,3 +1,8 @@
+jest.mock("@sentry/react-native", () => ({
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+}));
+
 jest.mock("expo-file-system", () => {
   const Paths = { cache: "/cache" };
   class Directory {
@@ -24,7 +29,8 @@ jest.mock("expo-file-system", () => {
 });
 
 import { File } from "expo-file-system";
-import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
+import * as Sentry from "@sentry/react-native";
+import { cacheFileDestination, downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
 
 describe("cacheFileDestination", () => {
   it("neutralizes URL-significant characters that break native file URI parsing", () => {
@@ -66,6 +72,7 @@ describe("downloadFileWithRetry", () => {
   let downloadMock: jest.Mock;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     downloadMock = jest.fn();
     (File as unknown as { downloadFileAsync: jest.Mock }).downloadFileAsync = downloadMock;
   });
@@ -84,13 +91,66 @@ describe("downloadFileWithRetry", () => {
     expect(downloadMock).toHaveBeenCalledTimes(2);
   });
 
-  it("does not retry HTTP status failures, which are deterministic", async () => {
-    downloadMock.mockRejectedValue(new Error("response has status: 404"));
+  it("does not retry non-404 HTTP status failures, which are deterministic", async () => {
+    downloadMock.mockRejectedValue(new Error("response has status: 403"));
 
     await expect(downloadFileWithRetry("https://example.com/f", destination)).rejects.toThrow(
-      "response has status: 404",
+      "response has status: 403",
     );
     expect(downloadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes the URL and retries once on a 404", async () => {
+    downloadMock.mockRejectedValueOnce(new Error("response has status: 404")).mockResolvedValue(destination);
+    const refreshUrl = jest.fn().mockResolvedValue("https://example.com/fresh");
+
+    await expect(downloadFileWithRetry("https://example.com/stale", destination, { refreshUrl })).resolves.toBe(
+      destination,
+    );
+    expect(refreshUrl).toHaveBeenCalledTimes(1);
+    expect(downloadMock).toHaveBeenNthCalledWith(1, "https://example.com/stale", destination, { idempotent: true });
+    expect(downloadMock).toHaveBeenNthCalledWith(2, "https://example.com/fresh", destination, { idempotent: true });
+  });
+
+  it("throws FileUnavailableError with a breadcrumb, not a raw 404, when the refreshed retry also 404s", async () => {
+    downloadMock.mockRejectedValue(new Error("response has status: 404"));
+    const refreshUrl = jest.fn().mockResolvedValue("https://example.com/fresh");
+
+    await expect(downloadFileWithRetry("https://example.com/stale", destination, { refreshUrl })).rejects.toThrow(
+      FileUnavailableError,
+    );
+    expect(downloadMock).toHaveBeenCalledTimes(2);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(expect.objectContaining({ category: "download" }));
+  });
+
+  it("retries the original URL once on a 404 when no refreshUrl is provided", async () => {
+    downloadMock.mockRejectedValueOnce(new Error("response has status: 404")).mockResolvedValue(destination);
+
+    await expect(downloadFileWithRetry("https://example.com/f", destination)).resolves.toBe(destination);
+    expect(downloadMock).toHaveBeenCalledTimes(2);
+    expect(downloadMock).toHaveBeenNthCalledWith(2, "https://example.com/f", destination, { idempotent: true });
+  });
+
+  it("falls back to retrying the original URL when refreshing the URL fails", async () => {
+    downloadMock.mockRejectedValueOnce(new Error("response has status: 404")).mockResolvedValue(destination);
+    const refreshUrl = jest.fn().mockRejectedValue(new Error("Network request failed"));
+
+    await expect(downloadFileWithRetry("https://example.com/f", destination, { refreshUrl })).resolves.toBe(
+      destination,
+    );
+    expect(downloadMock).toHaveBeenNthCalledWith(2, "https://example.com/f", destination, { idempotent: true });
+  });
+
+  it("surfaces a non-404 failure from the post-404 retry unchanged", async () => {
+    downloadMock
+      .mockRejectedValueOnce(new Error("response has status: 404"))
+      .mockRejectedValueOnce(new Error("Network request failed"));
+    const refreshUrl = jest.fn().mockResolvedValue("https://example.com/fresh");
+
+    await expect(downloadFileWithRetry("https://example.com/f", destination, { refreshUrl })).rejects.toThrow(
+      "Network request failed",
+    );
+    expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
   });
 
   it("surfaces the second failure when the retry also fails", async () => {

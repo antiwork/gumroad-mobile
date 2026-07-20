@@ -6,6 +6,7 @@ import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
+import { downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
 import { getExportAllSalesUrl } from "@/lib/sales-export";
 import * as Sentry from "@sentry/react-native";
 import { File, Paths } from "expo-file-system";
@@ -37,7 +38,9 @@ const LARGE_EXPORT_MESSAGE = "Large exports arrive by email.";
 
 const downloadSalesExportFile = async (url: string) => {
   const file = new File(Paths.cache, SALES_CSV_FILE_NAME);
-  await File.downloadFileAsync(url, file, { idempotent: true });
+  // The export URL is derived from the access token, so there is no fresher URL to fetch on a
+  // 404 — the helper retries the same URL once.
+  await downloadFileWithRetry(url, file);
 
   const handle = file.open();
   let firstByte: number | undefined;
@@ -93,7 +96,7 @@ export default function SalesExportScreen() {
       if (error instanceof Error && error.message === LARGE_EXPORT_MESSAGE) {
         Alert.alert("Large export", LARGE_EXPORT_MESSAGE);
       } else {
-        Sentry.captureException(error);
+        if (!(error instanceof FileUnavailableError)) Sentry.captureException(error);
         Alert.alert("Download failed", error instanceof Error ? error.message : "Failed to download file");
       }
     } finally {

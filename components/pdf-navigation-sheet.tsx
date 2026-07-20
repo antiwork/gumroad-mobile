@@ -7,7 +7,8 @@ import { memo, useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, TouchableOpacity, View } from "react-native";
 import { TableContent } from "react-native-pdf";
 import { generateThumbnail } from "@/modules/pdf-thumbnail";
-import { File, Paths } from "expo-file-system";
+import { downloadFileWithRetry } from "@/lib/file-utils";
+import { Paths } from "expo-file-system";
 
 const THUMBNAIL_COLUMNS = 3;
 const THUMBNAIL_GAP = 12;
@@ -116,7 +117,9 @@ export const PdfNavigationSheet = ({
     }
 
     setCachedUri(null);
-    File.downloadFileAsync(uri, Paths.cache, { idempotent: true })
+    // The uri prop is usually the viewer's already-downloaded local file; a remote uri here has
+    // no purchase context to derive a fresh URL from, so a stale-token 404 retries the same URL.
+    downloadFileWithRetry(uri, Paths.cache)
       .then((result) => {
         if (!cancelled) setCachedUri(result.uri);
       })
