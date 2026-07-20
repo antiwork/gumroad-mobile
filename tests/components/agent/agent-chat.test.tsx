@@ -1,6 +1,7 @@
 import { AgentChat } from "@/components/agent/agent-chat";
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { act } from "react";
+import { KeyboardAvoidingView, Platform } from "react-native";
 import { renderWithQueryClient } from "../../render-with-query-client";
 
 jest.mock("@/lib/auth-context", () => ({
@@ -322,5 +323,25 @@ describe("AgentChat", () => {
     await waitFor(() => expect(mockFetchLatestAgentConversation).toHaveBeenCalled());
     expect(screen.getByText(GREETING)).toBeTruthy();
     expect(screen.getByText("How are my sales doing?")).toBeTruthy();
+  });
+
+  it("keeps keyboard avoidance active on Android", () => {
+    const originalOS = Platform.OS;
+    Platform.OS = "android";
+    try {
+      renderChat();
+      const keyboardAvoidingView = screen.UNSAFE_getByType(KeyboardAvoidingView);
+      expect(keyboardAvoidingView.props.behavior).toBe("padding");
+      expect(keyboardAvoidingView.props.keyboardVerticalOffset).toBe(0);
+    } finally {
+      Platform.OS = originalOS;
+    }
+  });
+
+  it("offsets keyboard avoidance below the header on iOS", () => {
+    renderChat();
+    const keyboardAvoidingView = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    expect(keyboardAvoidingView.props.behavior).toBe("padding");
+    expect(keyboardAvoidingView.props.keyboardVerticalOffset).toBeGreaterThan(0);
   });
 });

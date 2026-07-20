@@ -243,8 +243,9 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   return (
     <KeyboardAvoidingView
       className="flex-1"
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={KEYBOARD_VERTICAL_OFFSET}
+      // With edge-to-edge enabled, Android no longer resizes the window for the keyboard, so both platforms need explicit padding behavior.
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === "ios" ? KEYBOARD_VERTICAL_OFFSET : 0}
     >
       <FlatList<DisplayMessage>
         ref={listRef}
