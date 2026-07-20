@@ -278,6 +278,7 @@ export default function PostScreen() {
                 style={{ height: bodyHeight, width: width - 32, backgroundColor: "transparent" }}
                 scrollEnabled={false}
                 showsVerticalScrollIndicator={false}
+                allowsFullscreenVideo
                 onMessage={handleHeightMessage}
                 injectedJavaScript={`
                   const sendHeight = () => window.ReactNativeWebView.postMessage(String(document.body.scrollHeight));

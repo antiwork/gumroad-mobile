@@ -234,6 +234,8 @@ export default function DownloadScreen() {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         mediaPlaybackRequiresUserAction={false}
+        // Android blocks the HTML5 fullscreen API in WebViews unless this is enabled, so videos playing inline (like embedded players in rich content) would have a fullscreen button that does nothing. iOS ignores this prop.
+        allowsFullscreenVideo
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onMessage={handleMessage}

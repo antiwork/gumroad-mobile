@@ -111,4 +111,10 @@ describe("DownloadScreen", () => {
     expect(shouldStart({ url: "intent://pay#Intent;scheme=upi;end", navigationType: "click" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("intent://pay#Intent;scheme=upi;end");
   });
+
+  it("allows fullscreen video for content playing inline in the WebView", () => {
+    render(<DownloadScreen />);
+
+    expect(screen.getByTestId("purchase-webview").props.allowsFullscreenVideo).toBe(true);
+  });
 });
