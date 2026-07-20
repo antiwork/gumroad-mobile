@@ -1,10 +1,12 @@
 import type { ErrorEvent } from "@sentry/core";
 
 let capturedBeforeSend: ((event: ErrorEvent) => ErrorEvent | null) | undefined;
+let capturedInitOptions: Record<string, unknown> | undefined;
 
 jest.mock("@sentry/react-native", () => ({
   init: jest.fn((options: { beforeSend?: (event: ErrorEvent) => ErrorEvent | null }) => {
     capturedBeforeSend = options.beforeSend;
+    capturedInitOptions = options as Record<string, unknown>;
   }),
   reactNavigationIntegration: jest.fn(() => ({ name: "ReactNavigation" })),
 }));
@@ -20,6 +22,16 @@ const runBeforeSend = (event: ErrorEvent) => {
 describe("sentry beforeSend", () => {
   beforeAll(() => {
     require("@/lib/sentry");
+  });
+
+  describe("iOS app-hang detection (gumroad-to issue 7384299696)", () => {
+    it("enables v2 app-hang tracking so hangs interrupted by app suspension are not falsely reported", () => {
+      expect(capturedInitOptions?.enableAppHangTrackingV2).toBe(true);
+    });
+
+    it("does not report non-fully-blocking hangs (main thread still processing some events)", () => {
+      expect(capturedInitOptions?.enableReportNonFullyBlockingAppHangs).toBe(false);
+    });
   });
 
   describe("drops non-actionable transient errors (gumroad-to issue 7336845703)", () => {

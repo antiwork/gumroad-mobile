@@ -1,6 +1,17 @@
 import * as Sentry from "@sentry/react-native";
 import type { ErrorEvent } from "@sentry/core";
+import type { ReactNativeOptions } from "@sentry/react-native";
 import { env } from "@/lib/env";
+
+// App-hang detection options forwarded to the native iOS SDK. The React Native
+// wrapper passes unrecognized init keys straight through to sentry-cocoa's
+// SentryOptions (verified in sentry-cocoa 8.58.0, bundled with
+// @sentry/react-native 7.11), but the wrapper's TypeScript types don't declare
+// them yet, so they're typed here.
+type NativeAppHangOptions = {
+  enableAppHangTrackingV2?: boolean;
+  enableReportNonFullyBlockingAppHangs?: boolean;
+};
 
 export const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: true,
@@ -77,7 +88,7 @@ const isNonActionableError = (event: ErrorEvent) => {
   );
 };
 
-Sentry.init({
+const options: ReactNativeOptions & NativeAppHangOptions = {
   dsn: env.EXPO_PUBLIC_SENTRY_DSN,
   tracesSampleRate: __DEV__ ? 1 : 0.1,
   // Reduce from default 100 to 30 to prevent main-thread hangs.
@@ -85,6 +96,16 @@ Sentry.init({
   // thread via addEscapedString, which blocks for 2000ms+ with 100 breadcrumbs.
   // See: https://gumroad-to.sentry.io/issues/7435371854/
   maxBreadcrumbs: 30,
+  // Use v2 app-hang detection on iOS. The default (v1) detector falsely reports
+  // "App Hanging: at least 2000 ms" when iOS suspends the app mid-run-loop
+  // (backgrounding, PDF text selection, OS framework work) — the sampled stacks
+  // on https://gumroad-to.sentry.io/issues/7384299696/ are almost all
+  // didEnterBackground/fsync and system frameworks, not app code. V2 cancels
+  // hangs interrupted by backgrounding and reports the actual hang duration.
+  enableAppHangTrackingV2: true,
+  // Non-fully-blocking hangs (the run loop still processes some events) are not
+  // user-visible freezes; only report hangs where the main thread is truly stuck.
+  enableReportNonFullyBlockingAppHangs: false,
   // Session replay disabled: the native SentrySessionReplay.createAndCaptureInBackground
   // method blocks the main thread for 2000ms+, causing app hangs on iOS.
   // See: https://github.com/getsentry/sentry-react-native/issues/4838
@@ -98,6 +119,8 @@ Sentry.init({
     return event;
   },
   integrations: [navigationIntegration],
-});
+};
+
+Sentry.init(options);
 
 export { Sentry };
