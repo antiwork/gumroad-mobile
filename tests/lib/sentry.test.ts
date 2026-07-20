@@ -25,6 +25,10 @@ describe("sentry beforeSend", () => {
   describe("drops non-actionable transient errors (gumroad-to issue 7336845703)", () => {
     const dropped: [string, ErrorEvent][] = [
       ["iOS network lost", errorEvent([{ type: "Error", value: "Unable to download a file: The network connection was lost." }])],
+      [
+        "stale blob after app suspension (gumroad-to issue 7376092087)",
+        errorEvent([{ type: "Error", value: "Unable to resolve data for blob: 8e39a7c2-1f4b-4b6e-9a70-000000000000" }]),
+      ],
       ["iOS timeout", errorEvent([{ type: "Error", value: "Unable to download a file: The request timed out." }])],
       ["iOS offline", errorEvent([{ type: "Error", value: "Unable to download a file: The Internet connection appears to be offline." }])],
       [
