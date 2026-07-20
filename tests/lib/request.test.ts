@@ -75,6 +75,48 @@ describe("request", () => {
     await expect(request("https://api.example.com/test")).rejects.toThrow(UnauthorizedError);
   });
 
+  it("throws UnauthorizedError when the API redirects an unauthenticated request to /login (404)", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        redirected: true,
+        url: "https://api.example.com/login",
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("Not Found"),
+      }),
+    );
+    await expect(request("https://api.example.com/v2/things")).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("does not treat a direct request to /login as unauthorized", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        redirected: true,
+        url: "https://api.example.com/login",
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("Not Found"),
+      }),
+    );
+    await expect(request("https://api.example.com/login")).rejects.toThrow("Request failed: 404 Not found");
+  });
+
+  it("still throws the generic 404 error when the response was not redirected", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        redirected: false,
+        url: "https://api.example.com/test",
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("Not Found"),
+      }),
+    );
+    await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 404 Not found");
+  });
+
   it("throws a clean error on 403 without leaking the response body", async () => {
     const xmlBody = '<?xml version="1.0" encoding="UTF-8"?><Error><Code>AccessDenied</Code></Error>';
     mockFetch.mockReturnValueOnce(
