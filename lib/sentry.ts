@@ -19,6 +19,11 @@ const TRANSIENT_MARKERS = [
   "A server with the specified hostname could not be found.",
   "Unable to download asset from url:",
   "SERVICE_NOT_AVAILABLE",
+  // Firebase Installations failed to authenticate the device (clock skew,
+  // restored backups reusing another device's installation ID, flaky Play
+  // Services). The push-token fetch is re-attempted on the next app launch,
+  // and AUTHENTICATION_FAILED (a real FCM misconfiguration) still reports.
+  "FIS_AUTH_ERROR",
   "Notifications are not allowed for this application",
   "Network request failed",
   "Network request timed out",

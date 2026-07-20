@@ -32,10 +32,16 @@ describe("sentry beforeSend", () => {
         "stale blob after app suspension (gumroad-to issue 7376092087)",
         errorEvent([{ type: "Error", value: "Unable to resolve data for blob: 8e39a7c2-1f4b-4b6e-9a70-000000000000" }]),
       ],
-      ["gateway timeout from the API (gumroad-to issue 7376627649)", errorEvent([{ type: "Error", value: "Request failed: 504 <!DOCTYPE html..." }])],
+      [
+        "gateway timeout from the API (gumroad-to issue 7376627649)",
+        errorEvent([{ type: "Error", value: "Request failed: 504 <!DOCTYPE html..." }]),
+      ],
       ["bad gateway from the API", errorEvent([{ type: "Error", value: "Request failed: 502" }])],
       ["service unavailable from the API", errorEvent([{ type: "Error", value: "Request failed: 503" }])],
-      ["whatwg-fetch timeout variant (gumroad-to issue 7375667799)", errorEvent([{ type: "TypeError", value: "Network request timed out" }])],
+      [
+        "whatwg-fetch timeout variant (gumroad-to issue 7375667799)",
+        errorEvent([{ type: "TypeError", value: "Network request timed out" }]),
+      ],
       [
         "Android stale/purged blob variant (gumroad-to issue 7383427894)",
         errorEvent([{ type: "Error", value: "The specified blob is invalid" }]),
@@ -100,6 +106,16 @@ describe("sentry beforeSend", () => {
         ]),
       ],
       [
+        "Android FCM token registration via Firebase Installations auth (FIS_AUTH_ERROR)",
+        errorEvent([
+          {
+            type: "Error",
+            value:
+              "Fetching the token failed: java.util.concurrent.ExecutionException: java.io.IOException: FIS_AUTH_ERROR",
+          },
+        ]),
+      ],
+      [
         "notifications not allowed",
         errorEvent([{ type: "Error", value: "Notifications are not allowed for this application" }]),
       ],
@@ -120,7 +136,10 @@ describe("sentry beforeSend", () => {
         "download 404 (real missing file)",
         errorEvent([{ type: "Error", value: "Unable to download a file: response has status 404" }]),
       ],
-      ["plain 500 from the API (possible malformed request built by the app)", errorEvent([{ type: "Error", value: "Request failed: 500" }])],
+      [
+        "plain 500 from the API (possible malformed request built by the app)",
+        errorEvent([{ type: "Error", value: "Request failed: 500" }]),
+      ],
       [
         "illegal path character (real bug, not transient)",
         errorEvent([
