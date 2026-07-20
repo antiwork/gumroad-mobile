@@ -21,6 +21,7 @@ const TRANSIENT_MARKERS = [
   "SERVICE_NOT_AVAILABLE",
   "Notifications are not allowed for this application",
   "Network request failed",
+  "Network request timed out",
   "User interaction is not allowed",
 ];
 
@@ -43,7 +44,15 @@ const DOWNLOAD_CONTEXT_MARKERS = ["downloadFileAsync", "ExpoAsset.downloadAsync"
 // leftovers are dropped — a stale-blob read that carries app stack frames points at a call site
 // outside lib/request.ts and must still report. 4,771 events / 0 crashes as of 2026-07:
 // https://gumroad-to.sentry.io/issues/7376092087/
-const STALE_BLOB_MARKER = "Unable to resolve data for blob";
+const STALE_BLOB_MARKERS = ["Unable to resolve data for blob", "The specified blob is invalid"];
+
+// Gateway/capacity failures from the API (502 bad gateway, 503 unavailable, 504 gateway
+// timeout) are upstream infrastructure conditions, not mobile defects: the request layer
+// already retries GETs once and react-query retries queries with backoff, and screens show
+// their error states. Reporting each occurrence here produced 9K+ events with nothing to fix
+// on this side (issue 7376627649). Plain 500s are NOT dropped — a malformed request built by
+// the app can surface as a 500, and those need eyes.
+const GATEWAY_ERROR_MARKERS = ["Request failed: 502", "Request failed: 503", "Request failed: 504"];
 
 const hasAppFrames = (event: ErrorEvent) =>
   (event.exception?.values ?? []).some((value) => (value.stacktrace?.frames ?? []).some((frame) => frame.in_app));
@@ -55,7 +64,8 @@ const isNonActionableError = (event: ErrorEvent) => {
   if (primaryType === "AbortError" || primaryType === "UnauthorizedError") return true;
   const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
   if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
-  if (text.includes(STALE_BLOB_MARKER) && !hasAppFrames(event)) return true;
+  if (STALE_BLOB_MARKERS.some((marker) => text.includes(marker)) && !hasAppFrames(event)) return true;
+  if (GATEWAY_ERROR_MARKERS.some((marker) => text.includes(marker))) return true;
   return (
     DOWNLOAD_CONTEXT_MARKERS.some((marker) => text.includes(marker)) &&
     NATIVE_NETWORK_MARKERS.some((marker) => text.includes(marker))
