@@ -351,6 +351,14 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
           const resumePosition = resumeAt ?? audio.resumeAt;
           if (isResumableLocation(resumePosition, audio.contentLength)) await TrackPlayer.seekTo(resumePosition);
         }
+      } else {
+        // Same track tapped again. If it previously played to the end, the player is still
+        // parked at the final position — playing from there does nothing, so restart from
+        // the top (a mid-track position keeps its place as before).
+        const { position, duration } = await TrackPlayer.getProgress();
+        if (duration > 0 && !isResumableLocation(position, duration)) {
+          await TrackPlayer.seekTo(0);
+        }
       }
 
       currentAudioRef.current = audio;
