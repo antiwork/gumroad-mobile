@@ -23,7 +23,8 @@ jest.mock("expo-file-system", () => {
   return { Directory, File, Paths };
 });
 
-import { cacheFileDestination } from "@/lib/file-utils";
+import { File } from "expo-file-system";
+import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
 
 describe("cacheFileDestination", () => {
   it("neutralizes URL-significant characters that break native file URI parsing", () => {
@@ -57,5 +58,49 @@ describe("cacheFileDestination", () => {
 
     expect(destination.name).toHaveLength(200);
     expect(destination.name.endsWith(".pdf")).toBe(true);
+  });
+});
+
+describe("downloadFileWithRetry", () => {
+  const destination = new File("/cache/file-id", "audio.mp3");
+  let downloadMock: jest.Mock;
+
+  beforeEach(() => {
+    downloadMock = jest.fn();
+    (File as unknown as { downloadFileAsync: jest.Mock }).downloadFileAsync = downloadMock;
+  });
+
+  it("returns the file on first success without retrying", async () => {
+    downloadMock.mockResolvedValue(destination);
+
+    await expect(downloadFileWithRetry("https://example.com/f", destination)).resolves.toBe(destination);
+    expect(downloadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries once after a transient network failure", async () => {
+    downloadMock.mockRejectedValueOnce(new Error("SocketTimeoutException: timeout")).mockResolvedValue(destination);
+
+    await expect(downloadFileWithRetry("https://example.com/f", destination)).resolves.toBe(destination);
+    expect(downloadMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry HTTP status failures, which are deterministic", async () => {
+    downloadMock.mockRejectedValue(new Error("response has status: 404"));
+
+    await expect(downloadFileWithRetry("https://example.com/f", destination)).rejects.toThrow(
+      "response has status: 404",
+    );
+    expect(downloadMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces the second failure when the retry also fails", async () => {
+    downloadMock
+      .mockRejectedValueOnce(new Error("Network request failed"))
+      .mockRejectedValueOnce(new Error("Network request failed again"));
+
+    await expect(downloadFileWithRetry("https://example.com/f", destination)).rejects.toThrow(
+      "Network request failed again",
+    );
+    expect(downloadMock).toHaveBeenCalledTimes(2);
   });
 });

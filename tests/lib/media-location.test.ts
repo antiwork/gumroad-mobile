@@ -27,7 +27,7 @@ jest.mock("@/lib/auth-context", () => ({
   useAuth: jest.fn(() => ({ accessToken: "test" })),
 }));
 
-import { isMeaningfulLocation, updateMediaLocation } from "@/lib/media-location";
+import { isMeaningfulLocation, isResumableLocation, updateMediaLocation } from "@/lib/media-location";
 import { ServerError } from "@/lib/request";
 
 beforeEach(() => {
@@ -127,5 +127,26 @@ describe("isMeaningfulLocation", () => {
   it("always accepts end-of-track saves", () => {
     expect(isMeaningfulLocation(0, true)).toBe(true);
     expect(isMeaningfulLocation(1, true)).toBe(true);
+  });
+});
+
+describe("isResumableLocation", () => {
+  it("rejects missing or zero locations", () => {
+    expect(isResumableLocation(undefined, 300)).toBe(false);
+    expect(isResumableLocation(0, 300)).toBe(false);
+  });
+
+  it("accepts mid-track locations", () => {
+    expect(isResumableLocation(120, 300)).toBe(true);
+  });
+
+  it("rejects locations at or past the end so finished tracks restart instead of playing nothing", () => {
+    expect(isResumableLocation(300, 300)).toBe(false);
+    expect(isResumableLocation(301, 300)).toBe(false);
+  });
+
+  it("accepts any positive location when the track length is unknown", () => {
+    expect(isResumableLocation(120, undefined)).toBe(true);
+    expect(isResumableLocation(120, 0)).toBe(true);
   });
 });

@@ -8,10 +8,9 @@ import { useAddRecentPurchase } from "@/components/library/use-recent-products";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
-import { cacheFileDestination } from "@/lib/file-utils";
+import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
 import { buildApiUrl } from "@/lib/request";
-import { File } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -56,9 +55,7 @@ const downloadUrl = (token: string, productFileId: string) =>
   buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
 
 const downloadFile = (token: string, productFileId: string, fileName: string) =>
-  File.downloadFileAsync(downloadUrl(token, productFileId), cacheFileDestination(productFileId, fileName), {
-    idempotent: true,
-  });
+  downloadFileWithRetry(downloadUrl(token, productFileId), cacheFileDestination(productFileId, fileName));
 
 const shareFile = async (uri: string) => {
   const isAvailable = await Sharing.isAvailableAsync();
@@ -166,6 +163,7 @@ export default function DownloadScreen() {
             urlRedirectId: purchase?.url_redirect_external_id,
             purchaseId: purchase?.purchase_id,
             resumeAt: fileData.latest_media_location?.location,
+            contentLength: fileData.content_length,
           }));
           await playAudio({
             resourceId: message.payload.resourceId,
@@ -198,11 +196,7 @@ export default function DownloadScreen() {
       const fallbackName = message.payload.extension
         ? `${message.payload.resourceId}.${message.payload.extension.toLowerCase()}`
         : message.payload.resourceId;
-      const downloadedFile = await downloadFile(
-        token,
-        message.payload.resourceId,
-        fileData?.name ?? fallbackName,
-      );
+      const downloadedFile = await downloadFile(token, message.payload.resourceId, fileData?.name ?? fallbackName);
       await shareFile(downloadedFile.uri);
     } catch (error) {
       console.error("Download failed:", error, data);
