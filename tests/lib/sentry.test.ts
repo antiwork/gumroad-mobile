@@ -24,13 +24,35 @@ describe("sentry beforeSend", () => {
 
   describe("drops non-actionable transient errors (gumroad-to issue 7336845703)", () => {
     const dropped: [string, ErrorEvent][] = [
-      ["iOS network lost", errorEvent([{ type: "Error", value: "Unable to download a file: The network connection was lost." }])],
       [
-        "stale blob after app suspension (gumroad-to issue 7376092087)",
+        "iOS network lost",
+        errorEvent([{ type: "Error", value: "Unable to download a file: The network connection was lost." }]),
+      ],
+      [
+        "stale blob after app suspension, frameless (gumroad-to issue 7376092087)",
         errorEvent([{ type: "Error", value: "Unable to resolve data for blob: 8e39a7c2-1f4b-4b6e-9a70-000000000000" }]),
       ],
+      [
+        "stale blob with only native (non-app) frames",
+        {
+          exception: {
+            values: [
+              {
+                type: "Error",
+                value: "Unable to resolve data for blob: 8e39a7c2-1f4b-4b6e-9a70-000000000000",
+                stacktrace: { frames: [{ function: "readAsText", in_app: false }] },
+              },
+            ],
+          },
+        } as ErrorEvent,
+      ],
       ["iOS timeout", errorEvent([{ type: "Error", value: "Unable to download a file: The request timed out." }])],
-      ["iOS offline", errorEvent([{ type: "Error", value: "Unable to download a file: The Internet connection appears to be offline." }])],
+      [
+        "iOS offline",
+        errorEvent([
+          { type: "Error", value: "Unable to download a file: The Internet connection appears to be offline." },
+        ]),
+      ],
       [
         "Android socket timeout in chained cause",
         errorEvent([
@@ -69,7 +91,10 @@ describe("sentry beforeSend", () => {
           },
         ]),
       ],
-      ["notifications not allowed", errorEvent([{ type: "Error", value: "Notifications are not allowed for this application" }])],
+      [
+        "notifications not allowed",
+        errorEvent([{ type: "Error", value: "Notifications are not allowed for this application" }]),
+      ],
       ["generic network failure", errorEvent([{ type: "TypeError", value: "Network request failed" }])],
       ["aborted request", errorEvent([{ type: "AbortError", value: "Aborted" }])],
       ["user interaction not allowed", errorEvent([{ type: "Error", value: "User interaction is not allowed" }])],
@@ -83,7 +108,10 @@ describe("sentry beforeSend", () => {
 
   describe("keeps actionable errors", () => {
     const kept: [string, ErrorEvent][] = [
-      ["download 404 (real missing file)", errorEvent([{ type: "Error", value: "Unable to download a file: response has status 404" }])],
+      [
+        "download 404 (real missing file)",
+        errorEvent([{ type: "Error", value: "Unable to download a file: response has status 404" }]),
+      ],
       [
         "illegal path character (real bug, not transient)",
         errorEvent([
@@ -91,7 +119,10 @@ describe("sentry beforeSend", () => {
           { type: "Error", value: "java.lang.IllegalArgumentException: Illegal character in path at index 92" },
         ]),
       ],
-      ["generic application error", errorEvent([{ type: "TypeError", value: "Cannot read property 'id' of undefined" }])],
+      [
+        "generic application error",
+        errorEvent([{ type: "TypeError", value: "Cannot read property 'id' of undefined" }]),
+      ],
       [
         "persistent TLS failure (actionable cert/config bug)",
         errorEvent([{ type: "Error", value: "javax.net.ssl.SSLException: Connection closed by peer" }]),
@@ -124,6 +155,25 @@ describe("sentry beforeSend", () => {
           { type: "TypeError", value: "Cannot read property 'x' of undefined" },
           { type: "AbortError", value: "Aborted" },
         ]),
+      ],
+      [
+        "stale blob read WITH app frames (call site outside lib/request.ts must still report)",
+        {
+          exception: {
+            values: [
+              {
+                type: "Error",
+                value: "Unable to resolve data for blob: 8e39a7c2-1f4b-4b6e-9a70-000000000000",
+                stacktrace: {
+                  frames: [
+                    { function: "readAsText", in_app: false },
+                    { function: "loadReceipt", in_app: true },
+                  ],
+                },
+              },
+            ],
+          },
+        } as ErrorEvent,
       ],
     ];
 
