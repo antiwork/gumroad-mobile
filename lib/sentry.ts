@@ -39,9 +39,14 @@ const DOWNLOAD_CONTEXT_MARKERS = ["downloadFileAsync", "ExpoAsset.downloadAsync"
 // response storage while the app is suspended, and something later tries to read that body.
 // Reads that go through lib/request.ts are converted to StaleResponseError and retried; what
 // reaches Sentry is the frameless leftover surfaced via onunhandledrejection from native code
-// (no app frames, nothing to fix, the rejection is already handled by RN). 4,771 events / 0
-// crashes as of 2026-07: https://gumroad-to.sentry.io/issues/7376092087/
+// (no app frames, nothing to fix, the rejection is already handled by RN). Only those frameless
+// leftovers are dropped — a stale-blob read that carries app stack frames points at a call site
+// outside lib/request.ts and must still report. 4,771 events / 0 crashes as of 2026-07:
+// https://gumroad-to.sentry.io/issues/7376092087/
 const STALE_BLOB_MARKER = "Unable to resolve data for blob";
+
+const hasAppFrames = (event: ErrorEvent) =>
+  (event.exception?.values ?? []).some((value) => (value.stacktrace?.frames ?? []).some((frame) => frame.in_app));
 
 const isNonActionableError = (event: ErrorEvent) => {
   const values = event.exception?.values;
@@ -50,7 +55,7 @@ const isNonActionableError = (event: ErrorEvent) => {
   if (primaryType === "AbortError" || primaryType === "UnauthorizedError") return true;
   const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
   if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
-  if (text.includes(STALE_BLOB_MARKER)) return true;
+  if (text.includes(STALE_BLOB_MARKER) && !hasAppFrames(event)) return true;
   return (
     DOWNLOAD_CONTEXT_MARKERS.some((marker) => text.includes(marker)) &&
     NATIVE_NETWORK_MARKERS.some((marker) => text.includes(marker))
