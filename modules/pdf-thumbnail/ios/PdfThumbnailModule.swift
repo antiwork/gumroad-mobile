@@ -17,12 +17,20 @@ public class PdfThumbnailModule: Module {
       }
 
       let pageRect = pdfPage.bounds(for: .mediaBox)
-      let renderer = UIGraphicsImageRenderer(size: pageRect.size)
+      // Thumbnails render at roughly a third of the screen width, so drawing each page at
+      // full size and screen scale wastes tens of megabytes per page and can get the app
+      // killed by the OS for memory overuse on large documents.
+      let maxThumbnailDimension: CGFloat = 480
+      let scale = min(1, maxThumbnailDimension / max(pageRect.width, pageRect.height))
+      let renderSize = CGSize(width: pageRect.width * scale, height: pageRect.height * scale)
+      let format = UIGraphicsImageRendererFormat()
+      format.scale = 1
+      let renderer = UIGraphicsImageRenderer(size: renderSize, format: format)
       let image = renderer.image { ctx in
         UIColor.white.setFill()
-        ctx.fill(pageRect)
-        ctx.cgContext.translateBy(x: 0, y: pageRect.height)
-        ctx.cgContext.scaleBy(x: 1, y: -1)
+        ctx.fill(CGRect(origin: .zero, size: renderSize))
+        ctx.cgContext.translateBy(x: 0, y: renderSize.height)
+        ctx.cgContext.scaleBy(x: scale, y: -scale)
         pdfPage.draw(with: .mediaBox, to: ctx.cgContext)
       }
 

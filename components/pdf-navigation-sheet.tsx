@@ -92,6 +92,7 @@ export const PdfNavigationSheet = ({
 }) => {
   const hasToc = tableOfContents.length > 0;
   const [activeTab, setActiveTab] = useState<"contents" | "pages">("pages");
+  const [hasOpened, setHasOpened] = useState(open);
   const [cachedUri, setCachedUri] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -104,6 +105,10 @@ export const PdfNavigationSheet = ({
   useEffect(() => {
     if (hasToc) setActiveTab("contents");
   }, [hasToc]);
+
+  useEffect(() => {
+    if (open) setHasOpened(true);
+  }, [open]);
 
   const downloadPdf = useCallback(() => {
     let cancelled = false;
@@ -135,10 +140,15 @@ export const PdfNavigationSheet = ({
     };
   }, [isLocalFile, uri]);
 
-  useEffect(downloadPdf, [downloadPdf]);
+  // Generating thumbnails for every page of a large PDF is memory-heavy, so nothing runs
+  // until the seller actually opens this sheet (it is always mounted alongside the viewer).
+  useEffect(() => {
+    if (!hasOpened) return;
+    return downloadPdf();
+  }, [hasOpened, downloadPdf]);
 
   useEffect(() => {
-    if (!cachedUri) return;
+    if (!hasOpened || !cachedUri) return;
     let cancelled = false;
     const results = new Map<number, string>();
     const failed = new Set<number>();
@@ -171,7 +181,7 @@ export const PdfNavigationSheet = ({
     return () => {
       cancelled = true;
     };
-  }, [cachedUri, totalPages]);
+  }, [hasOpened, cachedUri, totalPages]);
 
   const handlePagePress = useCallback(
     (page: number) => {
