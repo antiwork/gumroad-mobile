@@ -1,5 +1,5 @@
 import { LineIcon } from "@/components/icon";
-import { useInstallment, usePurchase } from "@/components/library/use-purchases";
+import { fetchPurchaseDetail, useInstallment, usePurchase } from "@/components/library/use-purchases";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledImage } from "@/components/styled";
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,11 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
-import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
+import { assertDefined } from "@/lib/assert";
+import { useAuth } from "@/lib/auth-context";
+import { productFileDownloadUrl } from "@/lib/download-url";
+import { cacheFileDestination, downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
-import { buildApiUrl } from "@/lib/request";
 import * as Sentry from "@sentry/react-native";
 import { File } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -69,12 +71,6 @@ const fileIconName = (mediaType: FileMediaType) => {
   }
 };
 
-const downloadUrl = (urlRedirectToken: string, productFileId: string) =>
-  buildApiUrl(`/mobile/url_redirects/download/${urlRedirectToken}/${productFileId}`);
-
-const downloadFile = (urlRedirectToken: string, productFileId: string, fileName: string) =>
-  downloadFileWithRetry(downloadUrl(urlRedirectToken, productFileId), cacheFileDestination(productFileId, fileName));
-
 const fontDataPromise = Promise.all(
   [
     { module: require("@/assets/fonts/ABCFavorit-Regular-custom.ttf"), weight: 400, style: "normal" },
@@ -100,6 +96,7 @@ export default function PostScreen() {
   const router = useRouter();
   const post = useInstallment(id, { purchaseId, subscriptionId, followerId });
   const purchase = usePurchase(post?.url_redirect_external_id);
+  const { accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
   const { playAudio, pauseAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
@@ -152,12 +149,23 @@ export default function PostScreen() {
         throw new Error("Missing URL redirect token");
       const file = post.files_data?.find((f) => f.id === fileId);
       if (!file) throw new Error("File metadata not found");
-      const downloadedFile = await downloadFile(purchase.url_redirect_token, fileId, file.name);
+      const urlRedirectExternalId = post.url_redirect_external_id;
+      const downloadedFile = await downloadFileWithRetry(
+        productFileDownloadUrl(purchase.url_redirect_token, fileId),
+        cacheFileDestination(fileId, file.name),
+        {
+          // A stale url_redirect token 404s; refetching the purchase yields a current one.
+          refreshUrl: async () => {
+            const detail = await fetchPurchaseDetail(urlRedirectExternalId, assertDefined(accessToken));
+            return productFileDownloadUrl(detail.product.url_redirect_token, fileId);
+          },
+        },
+      );
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) throw new Error("Sharing is not available on this device");
       await Sharing.shareAsync(downloadedFile.uri);
     } catch (error) {
-      Sentry.captureException(error);
+      if (!(error instanceof FileUnavailableError)) Sentry.captureException(error);
       Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
     } finally {
       setDownloadingFileId(null);
@@ -173,7 +181,7 @@ export default function PostScreen() {
       if (!post?.url_redirect_external_id || !purchase?.url_redirect_token) return;
       const allAudioFiles = post.files_data?.filter(isAudioFile) ?? [];
       const tracks = allAudioFiles.map((f) => ({
-        uri: downloadUrl(purchase.url_redirect_token, f.id),
+        uri: productFileDownloadUrl(purchase.url_redirect_token, f.id),
         resourceId: f.id,
         title: f.name ?? post.name,
         urlRedirectId: post.url_redirect_external_id,
@@ -201,7 +209,7 @@ export default function PostScreen() {
     router.push({
       pathname: "/video-player",
       params: {
-        uri: downloadUrl(purchase.url_redirect_token, fileId),
+        uri: productFileDownloadUrl(purchase.url_redirect_token, fileId),
         streamingUrl: file?.streaming_url,
         title: post.name,
         urlRedirectId: post.url_redirect_external_id,
@@ -218,7 +226,7 @@ export default function PostScreen() {
     router.push({
       pathname: "/pdf-viewer",
       params: {
-        uri: downloadUrl(purchase.url_redirect_token, fileId),
+        uri: productFileDownloadUrl(purchase.url_redirect_token, fileId),
         title: post.name,
         fileName: file?.name,
         urlRedirectId: post.url_redirect_external_id,

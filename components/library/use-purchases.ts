@@ -88,6 +88,11 @@ interface PurchaseDetailResponse {
 
 const PER_PAGE = 24;
 
+export const fetchPurchaseDetail = (urlRedirectExternalId: string, accessToken: string) =>
+  requestAPI<PurchaseDetailResponse>(`mobile/url_redirects/get_url_redirect_attributes/${urlRedirectExternalId}`, {
+    accessToken,
+  });
+
 export const buildSearchPath = (page: number, filters: ApiFilters) => {
   const params = new URLSearchParams();
   params.set("items", String(PER_PAGE));
@@ -191,11 +196,7 @@ export const usePurchase = (url_redirect_external_id: string | undefined): Purch
 
   const detailQuery = useQuery<PurchaseDetailResponse>({
     queryKey: ["purchase", url_redirect_external_id],
-    queryFn: () =>
-      requestAPI<PurchaseDetailResponse>(
-        `mobile/url_redirects/get_url_redirect_attributes/${url_redirect_external_id}`,
-        { accessToken: assertDefined(accessToken) },
-      ),
+    queryFn: () => fetchPurchaseDetail(assertDefined(url_redirect_external_id), assertDefined(accessToken)),
     enabled: !!accessToken && !!url_redirect_external_id,
     placeholderData: cachedPurchase ? { success: true, product: cachedPurchase, purchase_valid: true } : undefined,
   });

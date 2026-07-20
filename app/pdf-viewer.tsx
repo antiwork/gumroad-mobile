@@ -6,10 +6,11 @@ import { Screen } from "@/components/ui/screen";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
+import { fetchPurchaseDetail } from "@/components/library/use-purchases";
 import { useAuth } from "@/lib/auth-context";
-import { cacheFileDestination } from "@/lib/file-utils";
+import { productFileDownloadUrl } from "@/lib/download-url";
+import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
 import { updateMediaLocation } from "@/lib/media-location";
-import { File } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
@@ -58,12 +59,33 @@ export default function PdfViewerScreen() {
     [productFileId, fileName],
   );
 
+  // The uri param embeds a url_redirect token that can be stale by the time this screen
+  // downloads (for example when the app was backgrounded on the purchase screen). When we know
+  // which purchase and file this is, a fresh purchase fetch yields a current token to rebuild
+  // the URL from; otherwise the helper retries the original URL once.
+  const downloadPdfFile = useCallback(
+    () =>
+      downloadFileWithRetry(
+        uri,
+        downloadDestination(),
+        urlRedirectId && productFileId && accessToken
+          ? {
+              refreshUrl: async () => {
+                const detail = await fetchPurchaseDetail(urlRedirectId, accessToken);
+                return productFileDownloadUrl(detail.product.url_redirect_token, productFileId);
+              },
+            }
+          : undefined,
+      ),
+    [uri, downloadDestination, urlRedirectId, productFileId, accessToken],
+  );
+
   const downloadPdf = useCallback(() => {
     let cancelled = false;
     setDownloadError(false);
     setCachedUri(null);
     setIsDownloading(true);
-    File.downloadFileAsync(uri, downloadDestination(), { idempotent: true })
+    downloadPdfFile()
       .then((result) => {
         if (!cancelled) setCachedUri(result.uri);
       })
@@ -80,7 +102,7 @@ export default function PdfViewerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [uri, downloadDestination]);
+  }, [downloadPdfFile]);
 
   useEffect(() => {
     cancelDownloadRef.current = downloadPdf();
@@ -150,8 +172,7 @@ export default function PdfViewerScreen() {
                   try {
                     const isAvailable = await Sharing.isAvailableAsync();
                     if (!isAvailable) return;
-                    const sharedUri =
-                      cachedUri ?? (await File.downloadFileAsync(uri, downloadDestination(), { idempotent: true })).uri;
+                    const sharedUri = cachedUri ?? (await downloadPdfFile()).uri;
                     await Sharing.shareAsync(sharedUri);
                   } finally {
                     setIsSharing(false);

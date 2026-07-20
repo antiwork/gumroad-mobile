@@ -1,16 +1,17 @@
 import { ContentPageNav, TocPage } from "@/components/content-page-nav";
-import { usePurchase } from "@/components/library/use-purchases";
+import { fetchPurchaseDetail, usePurchase } from "@/components/library/use-purchases";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { useAddRecentPurchase } from "@/components/library/use-recent-products";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
+import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
+import { productFileDownloadUrl } from "@/lib/download-url";
 import { env } from "@/lib/env";
-import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
+import { cacheFileDestination, downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
-import { buildApiUrl } from "@/lib/request";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -51,12 +52,6 @@ const isWebViewInternalUrl = (url: string) => {
   return webViewInternalSchemes.some((scheme) => lower.startsWith(scheme));
 };
 
-const downloadUrl = (token: string, productFileId: string) =>
-  buildApiUrl(`/mobile/url_redirects/download/${token}/${productFileId}`);
-
-const downloadFile = (token: string, productFileId: string, fileName: string) =>
-  downloadFileWithRetry(downloadUrl(token, productFileId), cacheFileDestination(productFileId, fileName));
-
 const shareFile = async (uri: string) => {
   const isAvailable = await Sharing.isAvailableAsync();
   if (!isAvailable) throw new Error("Sharing is not available on this device");
@@ -77,6 +72,22 @@ export default function DownloadScreen() {
 
   const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
+
+  // Download URLs embed the url_redirect token, which can go stale by the time the user taps a
+  // file (for example after the app sat backgrounded). Refetching the purchase yields a current
+  // token to rebuild the URL from.
+  const refreshDownloadUrl = useCallback(
+    async (productFileId: string) => {
+      const detail = await fetchPurchaseDetail(assertDefined(urlRedirectExternalId), assertDefined(accessToken));
+      return productFileDownloadUrl(detail.product.url_redirect_token, productFileId);
+    },
+    [urlRedirectExternalId, accessToken],
+  );
+
+  const downloadFile = (productFileId: string, fileName: string) =>
+    downloadFileWithRetry(productFileDownloadUrl(token, productFileId), cacheFileDestination(productFileId, fileName), {
+      refreshUrl: () => refreshDownloadUrl(productFileId),
+    });
 
   useEffect(() => {
     if (purchase) addRecentPurchase(purchase);
@@ -140,7 +151,7 @@ export default function DownloadScreen() {
         router.push({
           pathname: "/pdf-viewer",
           params: {
-            uri: downloadUrl(token, message.payload.resourceId),
+            uri: productFileDownloadUrl(token, message.payload.resourceId),
             title: purchase?.name,
             fileName: fileData?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
@@ -157,7 +168,7 @@ export default function DownloadScreen() {
         } else {
           const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
           const allAudioTracks = allAudioFiles.map((fileData) => ({
-            uri: downloadUrl(token, fileData.id),
+            uri: productFileDownloadUrl(token, fileData.id),
             resourceId: fileData.id,
             title: fileData.name ?? purchase?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
@@ -180,7 +191,7 @@ export default function DownloadScreen() {
         router.push({
           pathname: "/video-player",
           params: {
-            uri: downloadUrl(token, message.payload.resourceId),
+            uri: productFileDownloadUrl(token, message.payload.resourceId),
             streamingUrl: purchase?.file_data?.find((f) => f.id === message.payload.resourceId)?.streaming_url,
             title: purchase?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
@@ -196,11 +207,11 @@ export default function DownloadScreen() {
       const fallbackName = message.payload.extension
         ? `${message.payload.resourceId}.${message.payload.extension.toLowerCase()}`
         : message.payload.resourceId;
-      const downloadedFile = await downloadFile(token, message.payload.resourceId, fileData?.name ?? fallbackName);
+      const downloadedFile = await downloadFile(message.payload.resourceId, fileData?.name ?? fallbackName);
       await shareFile(downloadedFile.uri);
     } catch (error) {
       console.error("Download failed:", error, data);
-      Sentry.captureException(error);
+      if (!(error instanceof FileUnavailableError)) Sentry.captureException(error);
       Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");
     } finally {
       setIsDownloading(false);

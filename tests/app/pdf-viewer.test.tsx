@@ -172,7 +172,9 @@ describe("PdfViewerScreen", () => {
 
   it("shows error view when PDF download fails", async () => {
     const { File } = require("expo-file-system");
-    File.downloadFileAsync.mockRejectedValueOnce(new Error("Network error"));
+    File.downloadFileAsync
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockRejectedValueOnce(new Error("Network error"));
 
     renderWithProviders();
 
@@ -186,7 +188,7 @@ describe("PdfViewerScreen", () => {
     const slowFailure = deferred<{ uri: string }>();
     const fastSuccess = deferred<{ uri: string }>();
     File.downloadFileAsync
-      .mockRejectedValueOnce(new Error("Initial network error"))
+      .mockRejectedValueOnce(new Error("response has status: 403"))
       .mockReturnValueOnce(slowFailure.promise)
       .mockReturnValueOnce(fastSuccess.promise);
 
