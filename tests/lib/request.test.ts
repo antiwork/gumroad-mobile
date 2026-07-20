@@ -94,13 +94,34 @@ describe("request", () => {
   });
 
   it("retries a GET once after a transient 5xx and returns the second response", async () => {
-    mockFetch
-      .mockReturnValueOnce(jsonResponse({ error: "gateway" }, 504))
-      .mockReturnValueOnce(jsonResponse({ id: 7 }));
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "gateway" }, 504)).mockReturnValueOnce(jsonResponse({ id: 7 }));
     const promise = request("https://api.example.com/test");
     await jest.advanceTimersByTimeAsync(2_000);
     await expect(promise).resolves.toEqual({ id: 7 });
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry after a transient 5xx when the caller aborts during the wait", async () => {
+    const externalController = new AbortController();
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "gateway" }, 504));
+    const promise = request("https://api.example.com/test", { signal: externalController.signal }).catch((e) => e);
+    // Let the first attempt fail and the retry wait begin, then abort mid-wait.
+    await jest.advanceTimersByTimeAsync(1_000);
+    externalController.abort();
+    await jest.advanceTimersByTimeAsync(2_000);
+    const error = await promise;
+    expect((error as DOMException).name).toBe("AbortError");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry after a transient 5xx when the caller aborted before the failure surfaced", async () => {
+    const externalController = new AbortController();
+    externalController.abort();
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "gateway" }, 504));
+    await expect(request("https://api.example.com/test", { signal: externalController.signal })).rejects.toThrow(
+      "Request failed: 504",
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry non-GET requests on 5xx", async () => {

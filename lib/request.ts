@@ -64,7 +64,10 @@ const readBody = async <T>(read: () => Promise<T>): Promise<T> => {
   try {
     return await read();
   } catch (error) {
-    if (isStaleBlobError(error)) throw new StaleResponseError(`Response body purged while app was suspended: ${error instanceof Error ? error.message : String(error)}`);
+    if (isStaleBlobError(error))
+      throw new StaleResponseError(
+        `Response body purged while app was suspended: ${error instanceof Error ? error.message : String(error)}`,
+      );
     throw error;
   }
 };
@@ -85,6 +88,25 @@ const SERVER_ERROR_RETRY_DELAY_MS = 2_000;
 // load and delays the error.
 const TRANSIENT_STATUS_CODES = [502, 503, 504];
 
+// Waits before the automatic retry, but gives up immediately if the caller aborts — a
+// cancelled screen or query must never trigger a fresh network request.
+const retryDelay = (ms: number, signal?: AbortSignal | null) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timeoutId);
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+    };
+    const timeoutId = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
 export const request = async <T>(
   url: string,
   options?: RequestInit & { data?: any; skipResponseBody?: boolean },
@@ -96,8 +118,13 @@ export const request = async <T>(
   try {
     return await requestOnce<T>(url, options);
   } catch (error) {
-    if (method === "GET" && error instanceof ServerError && TRANSIENT_STATUS_CODES.includes(error.statusCode)) {
-      await new Promise((resolve) => setTimeout(resolve, SERVER_ERROR_RETRY_DELAY_MS));
+    if (
+      method === "GET" &&
+      !options?.signal?.aborted &&
+      error instanceof ServerError &&
+      TRANSIENT_STATUS_CODES.includes(error.statusCode)
+    ) {
+      await retryDelay(SERVER_ERROR_RETRY_DELAY_MS, options?.signal);
       return requestOnce<T>(url, options);
     }
     throw error;
@@ -112,7 +139,10 @@ const requestOnce = async <T>(
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  if (options?.signal) options.signal.addEventListener("abort", () => controller.abort());
+  if (options?.signal) {
+    if (options.signal.aborted) controller.abort();
+    else options.signal.addEventListener("abort", () => controller.abort());
+  }
 
   try {
     const response = await fetch(url, {
