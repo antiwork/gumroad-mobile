@@ -10,12 +10,13 @@ import {
   streamAgentMessage,
 } from "@/lib/agent";
 import { useAuthedRequest } from "@/lib/authed-request";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-const KEYBOARD_VERTICAL_OFFSET = 88;
+const IOS_KEYBOARD_VERTICAL_OFFSET = 88;
 
 interface DisplayMessage extends ChatMessage {
   proposedAction?: ProposedAction;
@@ -121,6 +122,7 @@ const MessageBubble = ({
 };
 
 export const AgentChat = ({ greeting, suggestions }: Props) => {
+  const headerHeight = useHeaderHeight();
   const authedRequest = useAuthedRequest();
   const [messages, setMessages] = useState<DisplayMessage[]>([{ role: "assistant", content: greeting }]);
   const [streamingReply, setStreamingReply] = useState<string | null>(null);
@@ -243,9 +245,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   return (
     <KeyboardAvoidingView
       className="flex-1"
-      // With edge-to-edge enabled, Android no longer resizes the window for the keyboard, so both platforms need explicit padding behavior.
       behavior="padding"
-      keyboardVerticalOffset={Platform.OS === "ios" ? KEYBOARD_VERTICAL_OFFSET : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? IOS_KEYBOARD_VERTICAL_OFFSET : headerHeight}
     >
       <FlatList<DisplayMessage>
         ref={listRef}
@@ -315,7 +316,11 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             onPress={() => send(input)}
             accessibilityLabel="Send"
           >
-            <LineIcon name="arrow-up-stroke" size={20} className={hasText ? "text-accent-foreground" : "text-muted"} />
+            <LineIcon
+              name="arrow-up-stroke"
+              size={20}
+              className={hasText ? "text-accent-foreground" : "text-primary-foreground"}
+            />
           </Button>
         </View>
       </View>

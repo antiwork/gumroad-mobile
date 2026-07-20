@@ -1,4 +1,5 @@
 import { AgentChat } from "@/components/agent/agent-chat";
+import { LineIcon } from "@/components/icon";
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { act } from "react";
 import { KeyboardAvoidingView, Platform } from "react-native";
@@ -6,6 +7,11 @@ import { renderWithQueryClient } from "../../render-with-query-client";
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ accessToken: "test-token" }),
+}));
+
+jest.mock("@react-navigation/elements", () => ({
+  ...jest.requireActual("@react-navigation/elements"),
+  useHeaderHeight: () => 104,
 }));
 
 jest.mock("expo/fetch", () => ({ fetch: jest.fn() }));
@@ -37,6 +43,14 @@ describe("AgentChat", () => {
     expect(screen.getByText(GREETING)).toBeTruthy();
     expect(screen.getByText("How are my sales doing?")).toBeTruthy();
     expect(screen.getByText("List my products")).toBeTruthy();
+  });
+
+  it("keeps the disabled send icon visible and uses the accent color for typed text", () => {
+    renderChat();
+
+    expect(screen.UNSAFE_getByType(LineIcon).props.className).toBe("text-primary-foreground");
+    fireEvent.changeText(screen.getByLabelText("Message"), "Hello");
+    expect(screen.UNSAFE_getByType(LineIcon).props.className).toBe("text-accent-foreground");
   });
 
   it("sends a typed message and shows the assistant reply", async () => {
@@ -332,7 +346,7 @@ describe("AgentChat", () => {
       renderChat();
       const keyboardAvoidingView = screen.UNSAFE_getByType(KeyboardAvoidingView);
       expect(keyboardAvoidingView.props.behavior).toBe("padding");
-      expect(keyboardAvoidingView.props.keyboardVerticalOffset).toBe(0);
+      expect(keyboardAvoidingView.props.keyboardVerticalOffset).toBe(104);
     } finally {
       Platform.OS = originalOS;
     }
