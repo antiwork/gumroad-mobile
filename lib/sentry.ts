@@ -41,7 +41,12 @@ const DOWNLOAD_CONTEXT_MARKERS = ["downloadFileAsync", "ExpoAsset.downloadAsync"
 // reaches Sentry is the frameless leftover surfaced via onunhandledrejection from native code
 // (no app frames, nothing to fix, the rejection is already handled by RN). 4,771 events / 0
 // crashes as of 2026-07: https://gumroad-to.sentry.io/issues/7376092087/
+// Only the frameless leftovers are dropped: a stale-blob read that DOES carry app stack
+// frames means some code path bypassed lib/request.ts and should surface for a real fix.
 const STALE_BLOB_MARKER = "Unable to resolve data for blob";
+
+const hasAppFrames = (event: ErrorEvent) =>
+  event.exception?.values?.some((value) => value.stacktrace?.frames?.some((frame) => frame.in_app)) ?? false;
 
 const isNonActionableError = (event: ErrorEvent) => {
   const values = event.exception?.values;
@@ -50,7 +55,7 @@ const isNonActionableError = (event: ErrorEvent) => {
   if (primaryType === "AbortError" || primaryType === "UnauthorizedError") return true;
   const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
   if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
-  if (text.includes(STALE_BLOB_MARKER)) return true;
+  if (text.includes(STALE_BLOB_MARKER) && !hasAppFrames(event)) return true;
   return (
     DOWNLOAD_CONTEXT_MARKERS.some((marker) => text.includes(marker)) &&
     NATIVE_NETWORK_MARKERS.some((marker) => text.includes(marker))
