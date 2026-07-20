@@ -42,6 +42,33 @@ export class RequestError extends Error {
   }
 }
 
+// On iOS, React Native's fetch backs response bodies with native Blob storage. If the app is
+// suspended between the response arriving and the body being read, iOS can purge that storage,
+// and reading the body then rejects with "Unable to resolve data for blob: <uuid>". The response
+// is gone for good, but the request itself is perfectly retryable — so we surface it as this
+// dedicated error and let the react-query retry policy refetch instead of failing the screen.
+export class StaleResponseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StaleResponseError";
+  }
+}
+
+const STALE_BLOB_MESSAGE = "Unable to resolve data for blob";
+
+export const isStaleBlobError = (error: unknown): boolean =>
+  error instanceof Error && error.message.includes(STALE_BLOB_MESSAGE);
+
+// Reads a response body, converting a purged-blob read failure into StaleResponseError.
+const readBody = async <T>(read: () => Promise<T>): Promise<T> => {
+  try {
+    return await read();
+  } catch (error) {
+    if (isStaleBlobError(error)) throw new StaleResponseError(`Response body purged while app was suspended: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
+};
+
 // A 400 with "invalid_grant" from the OAuth token endpoint means the grant (refresh token or
 // authorization code) is expired or revoked — an expected end-of-session state, not a bug.
 export const isInvalidGrantError = (error: unknown): boolean =>
@@ -93,13 +120,13 @@ export const request = async <T>(
           ? "Access denied"
           : response.status === 404
             ? "Not found"
-            : (await response.text()).slice(0, 10000);
+            : (await readBody(() => response.text())).slice(0, 10000);
       console.info("HTTP request", { ...details, error });
       throw new RequestError(response.status, `Request failed: ${response.status} ${error}`);
     }
     console.info("HTTP request", details);
     if (options?.skipResponseBody) return undefined as T;
-    return response.json();
+    return readBody(() => response.json());
   } finally {
     clearTimeout(timeoutId);
   }
@@ -151,6 +178,9 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
     retry: (failureCount, error) => {
       if (error instanceof UnauthorizedError) return false;
       if (error.name === "AbortError") return false;
+      // A purged response body (app suspended mid-request) is always worth one fresh retry,
+      // even for queries that opted out of retries — the data was never received at all.
+      if (error instanceof StaleResponseError) return failureCount < 2;
       const callerRetry = options.retry;
       if (callerRetry === undefined) return failureCount < 2;
       if (typeof callerRetry === "boolean") return callerRetry;

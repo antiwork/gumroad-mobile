@@ -1,4 +1,4 @@
-import { request, ServerError, UnauthorizedError } from "@/lib/request";
+import { request, ServerError, StaleResponseError, UnauthorizedError } from "@/lib/request";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -44,6 +44,30 @@ describe("request", () => {
     const result = await request("https://api.example.com/test");
     expect(result).toEqual({ id: 1 });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws StaleResponseError when the response body's blob was purged (app suspended)", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.reject(new Error("Unable to resolve data for blob: 8e39a7c2-1f4b-4b6e-9a70-000000000000")),
+        text: () => Promise.resolve(""),
+      }),
+    );
+    await expect(request("https://api.example.com/test")).rejects.toThrow(StaleResponseError);
+  });
+
+  it("leaves non-blob body read failures untouched", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.reject(new SyntaxError("Unexpected token < in JSON")),
+        text: () => Promise.resolve(""),
+      }),
+    );
+    await expect(request("https://api.example.com/test")).rejects.toThrow(SyntaxError);
   });
 
   it("throws UnauthorizedError on 401", async () => {

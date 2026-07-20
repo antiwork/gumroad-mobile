@@ -35,6 +35,14 @@ const NATIVE_NETWORK_MARKERS = [
 
 const DOWNLOAD_CONTEXT_MARKERS = ["downloadFileAsync", "ExpoAsset.downloadAsync", "Unable to download"];
 
+// "Unable to resolve data for blob: <uuid>" fires when iOS purges React Native's blob-backed
+// response storage while the app is suspended, and something later tries to read that body.
+// Reads that go through lib/request.ts are converted to StaleResponseError and retried; what
+// reaches Sentry is the frameless leftover surfaced via onunhandledrejection from native code
+// (no app frames, nothing to fix, the rejection is already handled by RN). 4,771 events / 0
+// crashes as of 2026-07: https://gumroad-to.sentry.io/issues/7376092087/
+const STALE_BLOB_MARKER = "Unable to resolve data for blob";
+
 const isNonActionableError = (event: ErrorEvent) => {
   const values = event.exception?.values;
   if (!values) return false;
@@ -42,6 +50,7 @@ const isNonActionableError = (event: ErrorEvent) => {
   if (primaryType === "AbortError" || primaryType === "UnauthorizedError") return true;
   const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
   if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
+  if (text.includes(STALE_BLOB_MARKER)) return true;
   return (
     DOWNLOAD_CONTEXT_MARKERS.some((marker) => text.includes(marker)) &&
     NATIVE_NETWORK_MARKERS.some((marker) => text.includes(marker))
