@@ -17,6 +17,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       UIBackgroundModes: ["audio", "remote-notification", "fetch"],
       ITSAppUsesNonExemptEncryption: false,
       UIDesignRequiresCompatibility: true,
+      NSCameraUsageDescription:
+        "Gumroad needs access to your camera when you choose to take a photo or video to upload.",
+      NSMicrophoneUsageDescription:
+        "Gumroad needs access to your microphone when you choose to record a video to upload.",
       NSPhotoLibraryAddUsageDescription:
         "Gumroad needs access to save files to your photo library when you choose to download content.",
     },
