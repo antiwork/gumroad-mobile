@@ -135,6 +135,43 @@ describe("request", () => {
     await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 404 Not found");
   });
 
+  it("retries a GET once after a transient 5xx and returns the second response", async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "gateway" }, 504)).mockReturnValueOnce(jsonResponse({ id: 7 }));
+    const promise = request("https://api.example.com/test");
+    await jest.advanceTimersByTimeAsync(2_000);
+    await expect(promise).resolves.toEqual({ id: 7 });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry after a transient 5xx when the caller aborts during the wait", async () => {
+    const externalController = new AbortController();
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "gateway" }, 504));
+    const promise = request("https://api.example.com/test", { signal: externalController.signal }).catch((e) => e);
+    // Let the first attempt fail and the retry wait begin, then abort mid-wait.
+    await jest.advanceTimersByTimeAsync(1_000);
+    externalController.abort();
+    await jest.advanceTimersByTimeAsync(2_000);
+    const error = await promise;
+    expect((error as DOMException).name).toBe("AbortError");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry after a transient 5xx when the caller aborted before the failure surfaced", async () => {
+    const externalController = new AbortController();
+    externalController.abort();
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "gateway" }, 504));
+    await expect(request("https://api.example.com/test", { signal: externalController.signal })).rejects.toThrow(
+      "Request failed: 504",
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry non-GET requests on 5xx", async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse({ error: "gateway" }, 504));
+    await expect(request("https://api.example.com/test", { method: "POST" })).rejects.toThrow(ServerError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   it("throws ServerError on 5xx responses", async () => {
     mockFetch.mockReturnValueOnce(jsonResponse({ error: "bad" }, 500));
     const thrown = (await request("https://api.example.com/test").catch((e) => e)) as ServerError;
@@ -145,15 +182,18 @@ describe("request", () => {
 
   it("throws ServerError on 502 with HTML body without including the body in the message", async () => {
     const cloudflareHtml = "<html><body>Ran out of time — we weren't able to render the page in time</body></html>";
-    mockFetch.mockReturnValueOnce(
+    const badGateway = () =>
       Promise.resolve({
         ok: false,
         status: 502,
         json: () => Promise.resolve({}),
         text: () => Promise.resolve(cloudflareHtml),
-      }),
-    );
-    const thrown = (await request("https://api.example.com/test").catch((e) => e)) as ServerError;
+      });
+    // 502 is transient-class, so the GET is retried once — serve the failure twice.
+    mockFetch.mockReturnValueOnce(badGateway()).mockReturnValueOnce(badGateway());
+    const pending = request("https://api.example.com/test").catch((e) => e);
+    await jest.advanceTimersByTimeAsync(2_000);
+    const thrown = (await pending) as ServerError;
     expect(thrown).toBeInstanceOf(ServerError);
     expect(thrown.statusCode).toBe(502);
     expect(thrown.message).toBe("Request failed: 502");

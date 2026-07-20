@@ -335,6 +335,8 @@ describe("useAPIRequest", () => {
 
   it("applies exponential backoff delay for ServerError retries", async () => {
     jest.useFakeTimers();
+    // Transient 5xx GETs are now retried once INSIDE request() (2s apart) before the error
+    // ever reaches react-query, so the first query attempt consumes two fetches.
     mockFetch
       .mockResolvedValueOnce(jsonResponse({}, 502))
       .mockResolvedValueOnce(jsonResponse({}, 502))
@@ -344,10 +346,13 @@ describe("useAPIRequest", () => {
 
     await jest.advanceTimersByTimeAsync(500);
     expect(result.current.isSuccess).toBe(false);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
 
-    await jest.advanceTimersByTimeAsync(1_000);
+    // request-level retry fires 2s after the first 502
+    await jest.advanceTimersByTimeAsync(2_000);
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
+    // both attempts failed → react-query backoff (1s) schedules query attempt 2 → success
     await jest.advanceTimersByTimeAsync(2_000);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockFetch).toHaveBeenCalledTimes(3);

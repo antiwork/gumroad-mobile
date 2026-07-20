@@ -94,8 +94,58 @@ const isRedirectToLogin = (requestedUrl: string, finalUrl: string | undefined): 
 export const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 30_000;
+const SERVER_ERROR_RETRY_DELAY_MS = 2_000;
+
+// Gateway-class failures (502 bad gateway, 503 unavailable, 504 gateway timeout) are
+// transient by nature and usually succeed on a fresh attempt. A plain 500 is excluded: it
+// tends to be deterministic (a bug on one side or the other), so retrying only doubles the
+// load and delays the error.
+const TRANSIENT_STATUS_CODES = [502, 503, 504];
+
+// Waits before the automatic retry, but gives up immediately if the caller aborts — a
+// cancelled screen or query must never trigger a fresh network request.
+const retryDelay = (ms: number, signal?: AbortSignal | null) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timeoutId);
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+    };
+    const timeoutId = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 
 export const request = async <T>(
+  url: string,
+  options?: RequestInit & { data?: any; skipResponseBody?: boolean },
+): Promise<T> => {
+  // GET requests are safe to repeat, so give them one automatic retry before surfacing the
+  // error; non-GET requests are not repeated here because they may have side effects —
+  // their callers decide (react-query retries queries, mutations opt in).
+  const method = (options?.method ?? "GET").toUpperCase();
+  try {
+    return await requestOnce<T>(url, options);
+  } catch (error) {
+    if (
+      method === "GET" &&
+      !options?.signal?.aborted &&
+      error instanceof ServerError &&
+      TRANSIENT_STATUS_CODES.includes(error.statusCode)
+    ) {
+      await retryDelay(SERVER_ERROR_RETRY_DELAY_MS, options?.signal);
+      return requestOnce<T>(url, options);
+    }
+    throw error;
+  }
+};
+
+const requestOnce = async <T>(
   url: string,
   options?: RequestInit & { data?: any; skipResponseBody?: boolean },
 ): Promise<T> => {
@@ -103,7 +153,10 @@ export const request = async <T>(
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  if (options?.signal) options.signal.addEventListener("abort", () => controller.abort());
+  if (options?.signal) {
+    if (options.signal.aborted) controller.abort();
+    else options.signal.addEventListener("abort", () => controller.abort());
+  }
 
   try {
     const response = await fetch(url, {
