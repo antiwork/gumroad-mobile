@@ -64,7 +64,10 @@ const readBody = async <T>(read: () => Promise<T>): Promise<T> => {
   try {
     return await read();
   } catch (error) {
-    if (isStaleBlobError(error)) throw new StaleResponseError(`Response body purged while app was suspended: ${error instanceof Error ? error.message : String(error)}`);
+    if (isStaleBlobError(error))
+      throw new StaleResponseError(
+        `Response body purged while app was suspended: ${error instanceof Error ? error.message : String(error)}`,
+      );
     throw error;
   }
 };
@@ -73,6 +76,20 @@ const readBody = async <T>(read: () => Promise<T>): Promise<T> => {
 // authorization code) is expired or revoked — an expected end-of-session state, not a bug.
 export const isInvalidGrantError = (error: unknown): boolean =>
   error instanceof RequestError && error.statusCode === 400 && error.message.includes('"invalid_grant"');
+
+// The Gumroad API responds to requests with an invalid or expired session by redirecting to the
+// login page instead of returning 401. fetch follows that redirect transparently, and /login
+// doesn't exist on the API host, so the caller ends up with a 404 for a page it never asked for.
+// Detecting the redirect lets us surface the real condition (unauthorized) so the token-refresh
+// path can run, instead of failing the screen with a misleading "404 Not found".
+const isRedirectToLogin = (requestedUrl: string, finalUrl: string | undefined): boolean => {
+  if (!finalUrl) return false;
+  try {
+    return new URL(finalUrl).pathname === "/login" && new URL(requestedUrl).pathname !== "/login";
+  } catch {
+    return false;
+  }
+};
 
 export const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
@@ -106,7 +123,7 @@ export const request = async <T>(
       method: options?.method ?? "GET",
       status: response.status,
     };
-    if (response.status === 401) {
+    if (response.status === 401 || isRedirectToLogin(url, response.redirected ? response.url : undefined)) {
       console.info("HTTP request", details);
       throw new UnauthorizedError("Unauthorized");
     }
