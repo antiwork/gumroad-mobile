@@ -36,18 +36,30 @@ const SALES_CSV_FILE_NAME = "sales.csv";
 const HTML_TAG_OPEN_BYTE = "<".charCodeAt(0);
 const LARGE_EXPORT_MESSAGE = "Large exports arrive by email.";
 
+const readFirstByte = (file: File) => {
+  const handle = file.open();
+  try {
+    return handle.readBytes(1)[0];
+  } finally {
+    handle.close();
+  }
+};
+
 const downloadSalesExportFile = async (url: string) => {
   const file = new File(Paths.cache, SALES_CSV_FILE_NAME);
   // The export URL is derived from the access token, so there is no fresher URL to fetch on a
   // 404 — the helper retries the same URL once.
   await downloadFileWithRetry(url, file);
+  let firstByte = readFirstByte(file);
 
-  const handle = file.open();
-  let firstByte: number | undefined;
-  try {
-    firstByte = handle.readBytes(1)[0];
-  } finally {
-    handle.close();
+  if (firstByte === undefined) {
+    // A zero-byte file means the transfer was cut off even though the download reported
+    // success; a second attempt usually completes, so retry once before giving up.
+    try {
+      file.delete();
+    } catch {}
+    await downloadFileWithRetry(url, file);
+    firstByte = readFirstByte(file);
   }
 
   const failureMessage =

@@ -143,9 +143,27 @@ describe("SalesExportScreen", () => {
     expect(mockShareAsync).not.toHaveBeenCalled();
   });
 
-  it("treats a zero-byte download as a failure and deletes the file", async () => {
-    jest.spyOn(NativeAlert, "alert");
+  it("retries once when the download produces an empty file and shares the successful retry", async () => {
     mockReadBytes.mockReturnValueOnce(new Uint8Array([]));
+
+    render(<SalesExportScreen />);
+
+    fireEvent.press(screen.getByText("Download CSV"));
+
+    await waitFor(() => {
+      expect(mockShareAsync).toHaveBeenCalledWith("file:///cache/sales.csv", {
+        UTI: "public.comma-separated-values-text",
+        mimeType: "text/csv",
+        dialogTitle: "Export all sales",
+      });
+    });
+    expect(mockDownloadFileAsync).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it("treats a download that stays empty after the retry as a failure and deletes the file", async () => {
+    jest.spyOn(NativeAlert, "alert");
+    mockReadBytes.mockReturnValueOnce(new Uint8Array([])).mockReturnValueOnce(new Uint8Array([]));
 
     render(<SalesExportScreen />);
 
@@ -154,6 +172,7 @@ describe("SalesExportScreen", () => {
     await waitFor(() => {
       expect(NativeAlert.alert).toHaveBeenCalledWith("Download failed", "Failed to download file");
     });
+    expect(mockDownloadFileAsync).toHaveBeenCalledTimes(2);
     expect(mockCaptureException).toHaveBeenCalled();
     expect(mockDelete).toHaveBeenCalled();
     expect(mockShareAsync).not.toHaveBeenCalled();
