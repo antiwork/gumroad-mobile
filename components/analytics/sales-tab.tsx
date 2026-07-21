@@ -6,16 +6,18 @@ import {
   CHART_HEIGHT,
   formatCurrency,
   formatNumber,
+  ProjectionOverlay,
   SelectionOverlay,
   useChartColors,
   useChartDimensions,
 } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { ChartGestureHandler } from "./chart-gesture-handler";
+import { fractionOfDayElapsed, projectedEndOfDayTotal } from "./projected-end-of-day-total";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
 export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
-  const { processedData, isLoading } = useAnalyticsByDate(timeRange);
+  const { processedData, isLoading, sellerTimeZone } = useAnalyticsByDate(timeRange);
   const colors = useChartColors();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const { dates, totals, sales, views } = processedData;
@@ -30,6 +32,16 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const totalRevenue = totals.reduce((sum, val) => sum + val, 0);
   const totalSales = sales.reduce((sum, val) => sum + val, 0);
   const totalViews = views.reduce((sum, val) => sum + val, 0);
+
+  // Every range except "1y" ends on the seller's current day, so the last day bucket
+  // (or the whole hourly range for "1d") is today. Project today's revenue to an
+  // end-of-day total from the run rate so far, matching the web analytics chart.
+  const todaysRevenue = timeRange === "1d" ? totalRevenue : (totals[totals.length - 1] ?? 0);
+  const projectedRevenue =
+    timeRange !== "1y" && sellerTimeZone
+      ? projectedEndOfDayTotal(todaysRevenue, fractionOfDayElapsed(sellerTimeZone))
+      : null;
+  const projection = projectedRevenue !== null && projectedRevenue > todaysRevenue ? projectedRevenue : null;
 
   const selectedRevenue = activeIndex !== null ? totals[activeIndex] : 0;
   const selectedSales = activeIndex !== null ? sales[activeIndex] : 0;
@@ -64,6 +76,16 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const showSalesChart = hasData && totalSales > 0;
   const showViewsChart = hasData && totalViews > 0;
 
+  // The projection bar sits behind today's bar (the last bucket of a day-grouped
+  // range) and shares the chart's value scale, so the chart max must account for the
+  // projection possibly exceeding every actual bar. The hourly "Today" view skips the
+  // bar (a whole-day projection has no single hourly bar to sit behind) and shows the
+  // projected total as text only.
+  const projectionIndex = totals.length - 1;
+  const maxRevenueBar = totals.reduce((max, val) => Math.max(max, val), 0);
+  const revenueChartMax = Math.max(maxRevenueBar, projection ?? 0);
+  const showProjectionBar = projection !== null && timeRange !== "1d" && showRevenueChart;
+
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
       <View className="p-4 pt-0" onLayout={handleLayout}>
@@ -75,9 +97,23 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
         >
           <View className="mb-1 flex-row items-baseline justify-between">
             <Text className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</Text>
-            {activeIndex !== null && <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>}
+            {activeIndex !== null ? (
+              <Text className="text-lg text-accent">{formatCurrency(selectedRevenue)}</Text>
+            ) : projection !== null ? (
+              <Text className="text-sm text-muted">{formatCurrency(projection)} projected today</Text>
+            ) : null}
           </View>
           <View className="mt-4">
+            {showProjectionBar && (
+              <ProjectionOverlay
+                projectedValue={projection}
+                maxValue={revenueChartMax}
+                barWidth={barWidth}
+                spacing={spacing}
+                index={projectionIndex}
+                color={colors.accent}
+              />
+            )}
             {activeIndex !== null && (
               <SelectionOverlay activeIndex={activeIndex} barWidth={barWidth} spacing={spacing} />
             )}
@@ -90,6 +126,7 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
               <BarChart
                 data={revenueData}
                 height={CHART_HEIGHT}
+                maxValue={showProjectionBar ? revenueChartMax : undefined}
                 barWidth={barWidth}
                 spacing={spacing}
                 initialSpacing={0}

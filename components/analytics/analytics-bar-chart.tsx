@@ -114,3 +114,42 @@ export const SelectionOverlay = ({
     />
   );
 };
+
+// Faint accent bar rendered behind today's actual revenue bar, rising from the
+// baseline to the projected end-of-day total — mirrors the web sales chart's
+// projection treatment. Rendered before the BarChart so the real bar paints on top.
+export const ProjectionOverlay = ({
+  projectedValue,
+  maxValue,
+  barWidth,
+  spacing,
+  index,
+  color,
+}: {
+  projectedValue: number;
+  maxValue: number;
+  barWidth: number;
+  spacing: number;
+  index: number;
+  color: string;
+}) => {
+  if (maxValue <= 0 || projectedValue <= 0) return null;
+  const height = Math.min(CHART_HEIGHT, (projectedValue / maxValue) * CHART_HEIGHT);
+  return (
+    <View
+      testID="projection-overlay"
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: 4 + CHART_HEIGHT - height,
+        height,
+        left: index * (barWidth + spacing),
+        width: barWidth,
+        backgroundColor: color,
+        opacity: 0.2,
+        borderTopLeftRadius: 4,
+        borderTopRightRadius: 4,
+      }}
+    />
+  );
+};

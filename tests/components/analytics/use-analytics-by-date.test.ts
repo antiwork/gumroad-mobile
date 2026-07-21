@@ -6,6 +6,10 @@ import {
 } from "@/components/analytics/use-analytics-by-date";
 
 describe("getGroupBy", () => {
+  it('returns "hour" for "1d"', () => {
+    expect(getGroupBy("1d")).toBe("hour");
+  });
+
   it('returns "day" for "1w"', () => {
     expect(getGroupBy("1w")).toBe("day");
   });
