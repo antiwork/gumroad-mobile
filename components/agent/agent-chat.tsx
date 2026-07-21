@@ -286,7 +286,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
       />
 
       {messages.length <= 1 ? (
-        <View className="flex-row flex-wrap gap-2 px-4">
+        <View testID="suggested-actions" className="flex-row flex-wrap gap-2 px-4 pb-1">
           {suggestions.map((suggestion) => (
             <Button key={suggestion} variant="outline" size="sm" disabled={isSending} onPress={() => send(suggestion)}>
               <Text>{suggestion}</Text>

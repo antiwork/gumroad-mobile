@@ -43,6 +43,7 @@ describe("AgentChat", () => {
     expect(screen.getByText(GREETING)).toBeTruthy();
     expect(screen.getByText("How are my sales doing?")).toBeTruthy();
     expect(screen.getByText("List my products")).toBeTruthy();
+    expect(screen.getByTestId("suggested-actions").props.className).toContain("pb-1");
   });
 
   it("keeps the disabled send icon visible and uses the accent color for typed text", () => {
@@ -356,6 +357,6 @@ describe("AgentChat", () => {
     renderChat();
     const keyboardAvoidingView = screen.UNSAFE_getByType(KeyboardAvoidingView);
     expect(keyboardAvoidingView.props.behavior).toBe("padding");
-    expect(keyboardAvoidingView.props.keyboardVerticalOffset).toBeGreaterThan(0);
+    expect(keyboardAvoidingView.props.keyboardVerticalOffset).toBe(88);
   });
 });
