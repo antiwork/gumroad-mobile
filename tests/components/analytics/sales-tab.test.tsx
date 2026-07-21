@@ -26,7 +26,7 @@ jest.mock("@/components/analytics/chart-gesture-handler", () => ({
 }));
 
 import { SalesTab } from "@/components/analytics/sales-tab";
-import { fractionOfDayElapsed } from "@/components/analytics/projected-end-of-day-total";
+import { dayProgress } from "@/components/analytics/projected-end-of-day-total";
 
 const analyticsResult = (overrides: Record<string, unknown> = {}) => ({
   isLoading: false,
@@ -54,8 +54,21 @@ describe("SalesTab projection", () => {
     render(<SalesTab timeRange="1w" />);
 
     expect(screen.getByTestId("projection-overlay")).toBeTruthy();
-    const projected = Math.round(5000 / (fractionOfDayElapsed("UTC", new Date()) ?? 1));
+    const projected = Math.round(5000 / (dayProgress("UTC", new Date())?.fraction ?? 1));
     expect(screen.getByText(`$${projected / 100} projected today`)).toBeTruthy();
+    jest.useRealTimers();
+  });
+
+  it("renders no projection when no bucket matches today's date", () => {
+    // The response ends the day before "now" (e.g. a stale or incomplete range), so
+    // the last bucket's revenue must not be projected as today's.
+    jest.useFakeTimers().setSystemTime(new Date("2026-07-21T18:00:00Z"));
+    mockUseAnalyticsByDate.mockReturnValue(analyticsResult());
+
+    render(<SalesTab timeRange="1w" />);
+
+    expect(screen.queryByTestId("projection-overlay")).toBeNull();
+    expect(screen.queryByText(/projected today/u)).toBeNull();
     jest.useRealTimers();
   });
 

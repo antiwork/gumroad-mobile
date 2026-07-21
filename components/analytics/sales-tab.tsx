@@ -13,7 +13,7 @@ import {
 } from "./analytics-bar-chart";
 import { ChartContainer } from "./chart-container";
 import { ChartGestureHandler } from "./chart-gesture-handler";
-import { fractionOfDayElapsed, projectedEndOfDayTotal } from "./projected-end-of-day-total";
+import { dayProgress, projectedEndOfDayTotal, todaysBucketLabel } from "./projected-end-of-day-total";
 import { AnalyticsTimeRange, useAnalyticsByDate } from "./use-analytics-by-date";
 
 export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
@@ -33,15 +33,20 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const totalSales = sales.reduce((sum, val) => sum + val, 0);
   const totalViews = views.reduce((sum, val) => sum + val, 0);
 
-  // Every range except "1y" ends on the seller's current day, so the last day bucket
-  // (or the whole hourly range for "1d") is today. Project today's revenue to an
-  // end-of-day total from the run rate so far, matching the web analytics chart.
-  const todaysRevenue = timeRange === "1d" ? totalRevenue : (totals[totals.length - 1] ?? 0);
-  const projectedRevenue =
-    timeRange !== "1y" && sellerTimeZone
-      ? projectedEndOfDayTotal(todaysRevenue, fractionOfDayElapsed(sellerTimeZone))
-      : null;
-  const projection = projectedRevenue !== null && projectedRevenue > todaysRevenue ? projectedRevenue : null;
+  // Every range except "1y" can end on the seller's current day. For "1d" the whole
+  // hourly range is today; for day-grouped ranges, locate today's bucket by matching
+  // the backend's day label (e.g. "Monday, July 20th") instead of assuming it is the
+  // last bucket, so an omitted, incomplete, or reordered response never projects
+  // another day's revenue. Project today's revenue to an end-of-day total from the
+  // run rate so far, matching the web analytics chart.
+  const progress = timeRange !== "1y" && sellerTimeZone ? dayProgress(sellerTimeZone) : null;
+  const todayLabel = sellerTimeZone ? todaysBucketLabel(sellerTimeZone) : null;
+  const todaysBucketIndex = timeRange === "1d" || todayLabel === null ? -1 : dates.indexOf(todayLabel);
+  const todaysRevenue =
+    timeRange === "1d" ? totalRevenue : todaysBucketIndex >= 0 ? (totals[todaysBucketIndex] ?? 0) : null;
+  const projectedRevenue = todaysRevenue !== null ? projectedEndOfDayTotal(todaysRevenue, progress) : null;
+  const projection =
+    projectedRevenue !== null && todaysRevenue !== null && projectedRevenue > todaysRevenue ? projectedRevenue : null;
 
   const selectedRevenue = activeIndex !== null ? totals[activeIndex] : 0;
   const selectedSales = activeIndex !== null ? sales[activeIndex] : 0;
@@ -76,15 +81,15 @@ export const SalesTab = ({ timeRange }: { timeRange: AnalyticsTimeRange }) => {
   const showSalesChart = hasData && totalSales > 0;
   const showViewsChart = hasData && totalViews > 0;
 
-  // The projection bar sits behind today's bar (the last bucket of a day-grouped
-  // range) and shares the chart's value scale, so the chart max must account for the
-  // projection possibly exceeding every actual bar. The hourly "Today" view skips the
-  // bar (a whole-day projection has no single hourly bar to sit behind) and shows the
-  // projected total as text only.
-  const projectionIndex = totals.length - 1;
+  // The projection bar sits behind today's bar (the bucket matching today's label in
+  // a day-grouped range) and shares the chart's value scale, so the chart max must
+  // account for the projection possibly exceeding every actual bar. The hourly "Today"
+  // view skips the bar (a whole-day projection has no single hourly bar to sit behind)
+  // and shows the projected total as text only.
+  const projectionIndex = todaysBucketIndex;
   const maxRevenueBar = totals.reduce((max, val) => Math.max(max, val), 0);
   const revenueChartMax = Math.max(maxRevenueBar, projection ?? 0);
-  const showProjectionBar = projection !== null && timeRange !== "1d" && showRevenueChart;
+  const showProjectionBar = projection !== null && timeRange !== "1d" && projectionIndex >= 0 && showRevenueChart;
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
