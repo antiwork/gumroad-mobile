@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: Agent
+# The tab renders the chat composer when the assistant is enabled, or the unavailable
+# message when the account doesn't have access — either proves the screen loads cleanly
+- extendedWaitUntil:
+    visible: "Ask about your store.*|Store assistant.*"
+    timeout: 15000

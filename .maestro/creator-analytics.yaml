@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: Analytics
+- extendedWaitUntil:
+    visible: Referrers
+    timeout: 15000
+- assertVisible: 1W
+- assertVisible: Export all sales
+- tapOn: Referrers
+- assertVisible: 1W

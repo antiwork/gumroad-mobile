@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: Dashboard
+# Revenue header plus the time range selector confirm the sales dashboard rendered with data
+- extendedWaitUntil:
+    visible: "from .* sale.*"
+    timeout: 15000
+- assertVisible: Today
+- assertVisible: Month
+- assertVisible: Year

@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_buyer_do_not_edit@gumroad.com
+      PASSWORD: password
+# All tabs are visible for every account (PR #295); a buyer with no products sees empty states
+- tapOn: Dashboard
+- extendedWaitUntil:
+    visible: "You're just getting started."
+    timeout: 15000
+- tapOn: Analytics
+- extendedWaitUntil:
+    visible: "You're just getting started."
+    timeout: 15000
+# The Agent tab renders the chat composer or the unavailable message depending on account access
+- tapOn: Agent
+- extendedWaitUntil:
+    visible: "Ask about your store.*|Store assistant.*"
+    timeout: 15000
+- tapOn: Library
+- extendedWaitUntil:
+    visible: Mobile Test Product 1
+    timeout: 15000
