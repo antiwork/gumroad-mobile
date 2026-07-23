@@ -30,15 +30,29 @@ jest.mock("expo-sharing", () => ({
 }));
 
 jest.mock("@/components/library/use-purchases", () => ({
-  usePurchase: () => undefined,
+  usePurchase: () => mockUsePurchase(),
+  fetchPurchaseDetail: jest.fn(),
 }));
 
 jest.mock("@/components/library/use-recent-products", () => ({
   useAddRecentPurchase: () => jest.fn(),
 }));
 
+const mockPauseAudio = jest.fn();
+const mockPlayAudio = jest.fn();
+const mockUsePurchase = jest.fn();
+let mockPlayerState: { activeResourceId: string | null; isPlaying: boolean } = {
+  activeResourceId: null,
+  isPlaying: false,
+};
+
 jest.mock("@/components/use-audio-player-sync", () => ({
-  useAudioPlayerSync: () => ({ pauseAudio: jest.fn(), playAudio: jest.fn() }),
+  useAudioPlayerSync: () => ({
+    pauseAudio: mockPauseAudio,
+    playAudio: mockPlayAudio,
+    activeResourceId: mockPlayerState.activeResourceId,
+    isPlaying: mockPlayerState.isPlaying,
+  }),
 }));
 
 jest.mock("@/components/mini-audio-player", () => ({
@@ -76,6 +90,8 @@ describe("DownloadScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue({ isLoading: false, accessToken: "test-access-token" });
+    mockUsePurchase.mockReturnValue(undefined);
+    mockPlayerState = { activeResourceId: null, isPlaying: false };
   });
 
   it("keeps Gumroad navigation and WebView-internal schemes in the WebView", () => {
@@ -116,5 +132,61 @@ describe("DownloadScreen", () => {
     render(<DownloadScreen />);
 
     expect(screen.getByTestId("purchase-webview").props.allowsFullscreenVideo).toBe(true);
+  });
+
+  const purchaseWithAudio = {
+    purchase_id: "purchase-1",
+    url_redirect_external_id: "redirect-1",
+    file_data: [
+      { id: "ep1", filegroup: "audio", name: "Episode 1", content_length: 223 },
+      { id: "ep2", filegroup: "audio", name: "Episode 2", content_length: 223 },
+    ],
+  };
+
+  const sendAudioTap = async (resourceId: string, claimedIsPlaying: string) => {
+    const onMessage = screen.getByTestId("purchase-webview").props.onMessage as (event: {
+      nativeEvent: { data: string };
+    }) => Promise<void>;
+    await onMessage({
+      nativeEvent: {
+        data: JSON.stringify({
+          type: "click",
+          payload: { type: "audio", resourceId, isPlaying: claimedIsPlaying, isDownload: false },
+        }),
+      },
+    });
+  };
+
+  it("pauses when the tapped audio row is the actively playing track", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    mockPlayerState = { activeResourceId: "ep1", isPlaying: true };
+    render(<DownloadScreen />);
+
+    await sendAudioTap("ep1", "true");
+
+    expect(mockPauseAudio).toHaveBeenCalled();
+    expect(mockPlayAudio).not.toHaveBeenCalled();
+  });
+
+  it("plays the tapped audio row when its stale isPlaying claim does not match the native player", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    mockPlayerState = { activeResourceId: "ep2", isPlaying: true };
+    render(<DownloadScreen />);
+
+    await sendAudioTap("ep1", "true");
+
+    expect(mockPauseAudio).not.toHaveBeenCalled();
+    expect(mockPlayAudio).toHaveBeenCalledWith(expect.objectContaining({ resourceId: "ep1" }));
+  });
+
+  it("plays the tapped audio row when nothing is playing even if the row claims to be playing", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    mockPlayerState = { activeResourceId: "ep1", isPlaying: false };
+    render(<DownloadScreen />);
+
+    await sendAudioTap("ep1", "true");
+
+    expect(mockPauseAudio).not.toHaveBeenCalled();
+    expect(mockPlayAudio).toHaveBeenCalledWith(expect.objectContaining({ resourceId: "ep1" }));
   });
 });
