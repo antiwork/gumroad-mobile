@@ -12,8 +12,8 @@ import { productFileDownloadUrl } from "@/lib/download-url";
 import { env } from "@/lib/env";
 import { cacheFileDestination, downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
+import { shareFile } from "@/lib/share";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
 import { Alert, View } from "react-native";
@@ -50,12 +50,6 @@ const webViewInternalSchemes = ["about:", "data:", "blob:", "javascript:"];
 const isWebViewInternalUrl = (url: string) => {
   const lower = url.toLowerCase();
   return webViewInternalSchemes.some((scheme) => lower.startsWith(scheme));
-};
-
-const shareFile = async (uri: string) => {
-  const isAvailable = await Sharing.isAvailableAsync();
-  if (!isAvailable) throw new Error("Sharing is not available on this device");
-  await Sharing.shareAsync(uri);
 };
 
 export default function DownloadScreen() {

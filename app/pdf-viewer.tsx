@@ -13,6 +13,7 @@ import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
 import { updateMediaLocation } from "@/lib/media-location";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
+import { shareFile } from "@/lib/share";
 import { useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -173,7 +174,7 @@ export default function PdfViewerScreen() {
                     const isAvailable = await Sharing.isAvailableAsync();
                     if (!isAvailable) return;
                     const sharedUri = cachedUri ?? (await downloadPdfFile()).uri;
-                    await Sharing.shareAsync(sharedUri);
+                    await shareFile(sharedUri);
                   } finally {
                     setIsSharing(false);
                   }

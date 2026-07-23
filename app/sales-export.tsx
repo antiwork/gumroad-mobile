@@ -11,7 +11,7 @@ import { getExportAllSalesUrl } from "@/lib/sales-export";
 import * as Sentry from "@sentry/react-native";
 import { File, Paths } from "expo-file-system";
 import { Stack } from "expo-router";
-import * as Sharing from "expo-sharing";
+import { shareFile } from "@/lib/share";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, View } from "react-native";
 
@@ -96,10 +96,8 @@ export default function SalesExportScreen() {
   const downloadSalesExport = useCallback(async () => {
     setIsDownloading(true);
     try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) throw new Error("Sharing is not available on this device");
       const downloaded = await downloadSalesExportFile(url);
-      await Sharing.shareAsync(downloaded.uri, {
+      await shareFile(downloaded.uri, {
         UTI: "public.comma-separated-values-text",
         mimeType: "text/csv",
         dialogTitle: "Export all sales",
