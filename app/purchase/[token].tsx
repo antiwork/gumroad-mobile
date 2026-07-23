@@ -64,7 +64,7 @@ export default function DownloadScreen() {
   const webViewRef = useRef<BaseWebView>(null);
   const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${token}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
 
-  const { pauseAudio, playAudio } = useAudioPlayerSync(webViewRef);
+  const { pauseAudio, playAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
 
   // Download URLs embed the url_redirect token, which can go stale by the time the user taps a
@@ -157,7 +157,10 @@ export default function DownloadScreen() {
         return;
       }
       if (message.payload.type === "audio" && !message.payload.isDownload) {
-        if (message.payload.isPlaying === "true") {
+        // The web row's isPlaying claim can go stale (it only receives player-info messages for
+        // the current track, so a row left behind by auto-advance or track end still claims to
+        // be playing). Trust the native player's state instead of the row's.
+        if (message.payload.resourceId === activeResourceId && isPlaying) {
           await pauseAudio();
         } else {
           const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
