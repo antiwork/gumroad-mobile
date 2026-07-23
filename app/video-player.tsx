@@ -77,6 +77,9 @@ export default function VideoPlayerScreen() {
   const [currentCueText, setCurrentCueText] = useState<string | null>(null);
   const [captionSheetOpen, setCaptionSheetOpen] = useState(false);
   const cueCacheRef = useRef<Map<string, SubtitleCue[]>>(new Map());
+  // Incremented on every caption selection so an in-flight subtitle fetch can tell whether the
+  // buyer has since picked something else; a stale fetch must not apply its cues.
+  const captionRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -175,6 +178,7 @@ export default function VideoPlayerScreen() {
       "subtitleTrackChange",
       ({ subtitleTrack }: { subtitleTrack: SubtitleTrack | null }) => {
         if (subtitleTrack) {
+          captionRequestIdRef.current += 1;
           setSelection({ type: "embedded", track: subtitleTrack });
           setExternalCues([]);
           setCurrentCueText(null);
@@ -234,6 +238,7 @@ export default function VideoPlayerScreen() {
   const selectCaptionTrack = async (nextSelection: CaptionSelection) => {
     setCaptionSheetOpen(false);
     setSelection(nextSelection);
+    const requestId = ++captionRequestIdRef.current;
 
     if (nextSelection.type !== "external") {
       setExternalCues([]);
@@ -250,13 +255,19 @@ export default function VideoPlayerScreen() {
     const track = externalTracks[nextSelection.index];
     if (!track) return;
     try {
-      const cached = cueCacheRef.current.get(track.url);
-      const cues = cached ?? parseSubtitles(await (await fetch(track.url)).text());
-      cueCacheRef.current.set(track.url, cues);
+      let cues = cueCacheRef.current.get(track.url);
+      if (!cues) {
+        const response = await fetch(track.url);
+        if (!response.ok) throw new Error(`Subtitle fetch failed with status ${response.status}`);
+        cues = parseSubtitles(await response.text());
+        cueCacheRef.current.set(track.url, cues);
+      }
+      if (captionRequestIdRef.current !== requestId) return;
       setExternalCues(cues);
       setCurrentCueText(activeCueText(cues, player.currentTime));
     } catch (error) {
       Sentry.captureException(error);
+      if (captionRequestIdRef.current !== requestId) return;
       setSelection({ type: "off" });
     }
   };

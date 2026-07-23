@@ -287,7 +287,9 @@ External caption text
     };
 
     beforeEach(() => {
-      global.fetch = jest.fn().mockResolvedValue({ text: () => Promise.resolve(SRT) }) as unknown as typeof fetch;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue({ ok: true, text: () => Promise.resolve(SRT) }) as unknown as typeof fetch;
     });
 
     it("shows the captions button when the stream has external subtitle tracks", async () => {
@@ -388,6 +390,92 @@ External caption text
 
       expect(queryByTestId("subtitle-overlay")).toBeNull();
       expect(Sentry.captureException).toHaveBeenCalled();
+    });
+
+    it("treats a non-success subtitle response as a failure and does not cache it", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: () => Promise.resolve("<Error>Access Denied</Error>"),
+      }) as unknown as typeof fetch;
+      const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+
+      expect(queryByTestId("subtitle-overlay")).toBeNull();
+      expect(Sentry.captureException).toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("ignores a stale subtitle fetch when the buyer selects Off before it resolves", async () => {
+      let resolveFetch: (value: { ok: boolean; text: () => Promise<string> }) => void;
+      global.fetch = jest.fn().mockReturnValue(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      ) as unknown as typeof fetch;
+      const { getByTestId, getByText, queryByTestId, queryByText } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("Off"));
+      });
+
+      await act(async () => {
+        resolveFetch!({ ok: true, text: () => Promise.resolve(SRT) });
+      });
+
+      expect(queryByTestId("subtitle-overlay")).toBeNull();
+      expect(queryByText("External caption text")).toBeNull();
+    });
+
+    it("ignores a stale subtitle fetch when the native controls enable an embedded track before it resolves", async () => {
+      let resolveFetch: (value: { ok: boolean; text: () => Promise<string> }) => void;
+      global.fetch = jest.fn().mockReturnValue(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      ) as unknown as typeof fetch;
+      const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+
+      act(() => {
+        subtitleTrackChangeListener!({ subtitleTrack: { language: "en", label: "Embedded English" } });
+      });
+
+      await act(async () => {
+        resolveFetch!({ ok: true, text: () => Promise.resolve(SRT) });
+      });
+
+      expect(queryByTestId("subtitle-overlay")).toBeNull();
     });
   });
 });
