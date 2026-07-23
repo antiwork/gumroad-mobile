@@ -10,6 +10,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView, type VideoPlayerStatus } from "expo-video";
 import { useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const fetchStreamingPlaylistUrl = async (streamingUrl: string, accessToken: string): Promise<string> =>
   (await requestAPI<{ playlist_url: string }>(streamingUrl, { accessToken })).playlist_url;
@@ -42,6 +43,7 @@ export default function VideoPlayerScreen() {
   }>();
 
   const queryClient = useQueryClient();
+  const { bottom } = useSafeAreaInsets();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -193,7 +195,7 @@ export default function VideoPlayerScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: bottom }]} testID="video-player-container">
       <Stack.Screen
         options={{
           title: title ?? "Video",

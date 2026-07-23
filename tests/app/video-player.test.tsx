@@ -1,4 +1,4 @@
-import { AppState } from "react-native";
+import { AppState, StyleSheet } from "react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
 type StatusChangePayload = { status: string; error?: { message: string } };
@@ -40,6 +40,10 @@ jest.mock("@/lib/auth-context", () => ({
 
 jest.mock("@/lib/media-location", () => ({
   updateMediaLocation: jest.fn(),
+}));
+
+jest.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 48, left: 0, right: 0 }),
 }));
 
 import VideoPlayerScreen from "@/app/video-player";
@@ -237,5 +241,15 @@ describe("VideoPlayerScreen", () => {
       statusChangeListener!({ status: "readyToPlay" });
     });
     expect(queryByText("This video failed to load")).toBeNull();
+  });
+
+  it("pads the video container above the system navigation bar", async () => {
+    const { getByTestId } = renderScreen();
+
+    await act(async () => {});
+
+    const container = getByTestId("video-player-container");
+    const style = StyleSheet.flatten(container.props.style);
+    expect(style.paddingBottom).toBe(48);
   });
 });
