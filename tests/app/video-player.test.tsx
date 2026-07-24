@@ -2,7 +2,9 @@ import { AppState } from "react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
 type StatusChangePayload = { status: string; error?: { message: string } };
+type TimeUpdatePayload = { currentTime: number };
 let statusChangeListener: ((payload: StatusChangePayload) => void) | null = null;
+let timeUpdateListener: ((payload: TimeUpdatePayload) => void) | null = null;
 const mockSubscriptionRemove = jest.fn();
 
 const mockPlayer = {
@@ -10,10 +12,15 @@ const mockPlayer = {
   staysActiveInBackground: true,
   playing: true,
   currentTime: 0,
+  timeUpdateEventInterval: 0,
   play: jest.fn(),
   pause: jest.fn(),
-  addListener: jest.fn((eventName: string, listener: (payload: StatusChangePayload) => void) => {
-    if (eventName === "statusChange") statusChangeListener = listener;
+  addListener: jest.fn((eventName: string, listener: (payload: never) => void) => {
+    if (eventName === "statusChange") {
+      statusChangeListener = listener as (payload: StatusChangePayload) => void;
+    } else if (eventName === "timeUpdate") {
+      timeUpdateListener = listener as (payload: TimeUpdatePayload) => void;
+    }
     return { remove: mockSubscriptionRemove };
   }),
 };
@@ -58,8 +65,10 @@ describe("VideoPlayerScreen", () => {
     mockPlayer.staysActiveInBackground = true;
     mockPlayer.loop = false;
     mockPlayer.currentTime = 0;
+    mockPlayer.timeUpdateEventInterval = 0;
     appStateCallback = null;
     statusChangeListener = null;
+    timeUpdateListener = null;
 
     jest.spyOn(AppState, "addEventListener").mockImplementation((_type, callback) => {
       appStateCallback = callback as (state: string) => void;
@@ -74,6 +83,18 @@ describe("VideoPlayerScreen", () => {
   it("sets staysActiveInBackground to false on player setup", () => {
     renderScreen();
     expect(mockPlayer.staysActiveInBackground).toBe(false);
+  });
+
+  it("exposes when playback advances", () => {
+    const { getByLabelText } = renderScreen();
+
+    expect(getByLabelText("Video playback waiting")).toBeTruthy();
+
+    act(() => {
+      timeUpdateListener!({ currentTime: 0.25 });
+    });
+
+    expect(getByLabelText("Video playback started")).toBeTruthy();
   });
 
   it("pauses the player when app goes to background", () => {

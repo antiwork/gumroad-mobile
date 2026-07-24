@@ -78,6 +78,8 @@ describe("SalesExportScreen", () => {
     expect(screen.getByTestId("sales-export-webview").props.source).toEqual({
       uri: "https://example.com/purchases/export?access_token=test-access-token&mobile_token=test-mobile-token",
     });
+    expect(screen.getByTestId("sales-export-webview").props.incognito).toBe(true);
+    expect(screen.getByTestId("sales-export-webview").props.sharedCookiesEnabled).toBeUndefined();
   });
 
   it("keeps Gumroad navigation in the WebView and opens external links outside it", () => {

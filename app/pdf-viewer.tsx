@@ -167,6 +167,8 @@ export default function PdfViewerScreen() {
             <View className="flex-row items-center gap-1">
               <TouchableOpacity
                 testID="share-pdf-button"
+                accessibilityRole="button"
+                accessibilityLabel="Share PDF"
                 disabled={isSharing}
                 onPress={async () => {
                   setIsSharing(true);
@@ -187,10 +189,20 @@ export default function PdfViewerScreen() {
                   className={cn("text-accent", Platform.OS === "ios" && "-rotate-90")}
                 />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowTocModal(true)} className="p-2">
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Page navigation"
+                onPress={() => setShowTocModal(true)}
+                className="p-2"
+              >
                 <SolidIcon name="book-content" size={24} className="text-accent" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowViewModeModal(true)} className="p-2">
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="View mode"
+                onPress={() => setShowViewModeModal(true)}
+                className="p-2"
+              >
                 {viewMode === "continuous" ? (
                   <LineIcon name="move-vertical" size={24} className="text-accent" />
                 ) : (

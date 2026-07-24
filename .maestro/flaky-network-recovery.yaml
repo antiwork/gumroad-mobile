@@ -1,0 +1,55 @@
+appId: ${APP_ID}
+tags:
+  - android-only
+onFlowStart:
+  - runFlow:
+      when:
+        platform: Android
+      commands:
+        - setAirplaneMode: disabled
+onFlowComplete:
+  - runFlow:
+      when:
+        platform: Android
+      commands:
+        - setAirplaneMode: disabled
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertTrue:
+          condition: ${false}
+          label: flaky-network-recovery is Android-only; run it with npm run e2e:android
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - runFlow:
+          file: utils/sign-in.yaml
+          env:
+            EMAIL: mobile_buyer_do_not_edit@gumroad.com
+            PASSWORD: password
+      - tapOn:
+          text: ".*Mobile Test Product 1.*"
+          waitToSettleTimeoutMs: 0
+      - setAirplaneMode: enabled
+      - tapOn:
+          point: "1%,1%"
+          repeat: 2
+          delay: 4000
+      - setAirplaneMode: disabled
+      # Android WebViews do not support pull-to-refresh. Reopen the purchase
+      # after connectivity returns so this makes a new document request.
+      - runFlow:
+          file: utils/back.yaml
+      - extendedWaitUntil:
+          visible: ".*Mobile Test Product 1.*"
+          timeout: 15000
+      - tapOn: ".*Mobile Test Product 1.*"
+      - extendedWaitUntil:
+          visible: ".*Mobile Test Audio.*"
+          timeout: 45000
+      - assertVisible: Mobile Test Video
+      - assertVisible: Mobile Test PDF
+      - assertNotVisible: "net::ERR_UNKNOWN_URL_SCHEME|Something went wrong"

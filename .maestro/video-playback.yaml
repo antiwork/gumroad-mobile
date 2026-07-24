@@ -1,0 +1,38 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_buyer_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: ".*Mobile Test Product 1.*"
+- extendedWaitUntil:
+    visible: Mobile Test Video
+    timeout: 30000
+- tapOn: "Watch|Watch again"
+- extendedWaitUntil:
+    visible:
+      id: video-player
+    timeout: 20000
+- extendedWaitUntil:
+    visible: Video playback started
+    timeout: 20000
+- assertNotVisible: This video failed to load
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: video-player
+      - tapOn: "Enter fullscreen"
+      - extendedWaitUntil:
+          visible:
+            id: "${APP_ID}:id/player_view"
+          timeout: 10000
+      - runFlow:
+          when:
+            visible: "Got it"
+          commands:
+            - tapOn: "Got it"
+      - assertVisible:
+          id: "${APP_ID}:id/player_view"

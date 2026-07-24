@@ -149,8 +149,8 @@ export default function PayoutSettingsScreen() {
         source={{ uri: url }}
         className="flex-1 bg-transparent"
         webviewDebuggingEnabled={__DEV__}
+        incognito
         pullToRefreshEnabled
-        sharedCookiesEnabled
         thirdPartyCookiesEnabled
         setSupportMultipleWindows
         javaScriptCanOpenWindowsAutomatically
