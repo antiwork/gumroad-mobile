@@ -87,7 +87,7 @@ const useSettingsSheet = () => useContext(SettingsSheetContext);
 const SettingsButton = () => {
   const { setSettingsOpen } = useSettingsSheet();
   return (
-    <TouchableOpacity onPress={() => setSettingsOpen(true)}>
+    <TouchableOpacity accessibilityLabel="Settings" onPress={() => setSettingsOpen(true)}>
       <SolidIcon name="cog" size={24} className="text-white" />
     </TouchableOpacity>
   );

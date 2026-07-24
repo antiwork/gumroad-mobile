@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_buyer_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: Library
+- tapOn: Settings
+- extendedWaitUntil:
+    visible: Logout
+    timeout: 10000
+- tapOn: Logout
+- extendedWaitUntil:
+    visible: Sign in with Gumroad
+    timeout: 15000

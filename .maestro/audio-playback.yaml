@@ -1,0 +1,43 @@
+appId: ${APP_ID}
+# Covers the "podcast on a commute" release-checklist item: start audio from a purchase,
+# pause/resume from the mini player, skip controls in the full player, and confirm playback
+# survives backgrounding. Requires the audio seed data from db/seeds/030_development/mobile_app_test_data.rb.
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_buyer_do_not_edit@gumroad.com
+      PASSWORD: password
+# Open the purchased product that has the seeded audio file
+- tapOn: Mobile Test Product 1
+# The purchase page is a WebView; the play control comes from the web content
+- extendedWaitUntil:
+    visible: Play
+    timeout: 20000
+- tapOn: Play
+# Native playback started: the mini player renders with a Pause control
+- extendedWaitUntil:
+    visible: Pause
+    timeout: 15000
+# Pause from the mini player, then resume
+- tapOn: Pause
+- assertVisible: Play
+- tapOn: Play
+- assertVisible: Pause
+# Open the full player and exercise skip controls
+- tapOn: Mobile Test Audio
+- assertVisible: Skip back 15 seconds
+- tapOn: Skip forward 30 seconds
+- tapOn: Skip back 15 seconds
+- assertVisible: Pause
+# Background the app, then come back: playback must still be running (background audio)
+- pressKey: home
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible: Pause
+    timeout: 10000
+# Minimize the full player; the mini player should still show the active track
+- tapOn: Minimize player
+- assertVisible: Mobile Test Audio
+- assertVisible: Pause

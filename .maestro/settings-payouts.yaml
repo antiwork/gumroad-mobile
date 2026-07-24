@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: Library
+- tapOn: Settings
+- extendedWaitUntil:
+    visible: Payout settings
+    timeout: 10000
+- tapOn: Payout settings
+# The payouts screen embeds the web payout settings in a WebView; the screen title
+# renders natively so it confirms navigation even if the WebView is still loading
+- extendedWaitUntil:
+    visible: Payouts
+    timeout: 15000
+- back

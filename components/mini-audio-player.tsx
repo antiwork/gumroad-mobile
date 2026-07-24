@@ -66,6 +66,8 @@ const MiniAudioPlayerBase = () => {
             <TouchableOpacity
               onPress={handlePlayPause}
               disabled={isBuffering}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? "Pause" : "Play"}
               className="size-7 items-center justify-center rounded-full bg-primary"
             >
               <SolidIcon name={isPlaying ? "pause" : "play"} size={24} className="text-primary-foreground" />
@@ -73,6 +75,8 @@ const MiniAudioPlayerBase = () => {
 
             <TouchableOpacity
               onPress={handleSkipForward}
+              accessibilityRole="button"
+              accessibilityLabel="Skip forward 30 seconds"
               className="size-7 items-center justify-center rounded-full border-2 border-foreground"
             >
               <Text className="text-xs font-bold">+30</Text>

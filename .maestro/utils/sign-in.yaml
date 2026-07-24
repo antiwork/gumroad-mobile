@@ -1,0 +1,42 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: launch.yaml
+- tapOn: Sign in with Gumroad
+# Tap through the iOS "Sign in with gumroad.dev?" prompt
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+# The browser state isn't cleared when the app cache is cleared, so we may still be logged in from a previous session
+- runFlow:
+    when:
+      visible: Logout
+    commands:
+      - tapOn: Logout
+- scrollUntilVisible:
+    element: Login
+- tapOn: Email
+- inputText: ${EMAIL}
+- pressKey: enter # Form validation auto-focuses the password field
+- inputText: ${PASSWORD}
+- pressKey: enter
+# Tap through the iOS password manager prompt
+- runFlow:
+    when:
+      visible: Not Now
+    commands:
+      - tapOn: Not Now
+# 2FA prompt will trigger if it hasn't already been completed
+- runFlow:
+    when:
+      visible: Authentication Token
+    commands:
+      - tapOn: Login
+- assertVisible: Authorize
+- tapOn: Authorize
+# All four tab labels are always visible after login, regardless of which tab the app lands on
+- extendedWaitUntil:
+    visible: Library
+    timeout: 15000
