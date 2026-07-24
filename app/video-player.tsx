@@ -265,6 +265,8 @@ export default function VideoPlayerScreen() {
     withReleasedPlayerGuard(() => {
       player.subtitleTrack = null;
     });
+    setExternalCues([]);
+    setCurrentCueText(null);
     const track = externalTracks[nextSelection.index];
     if (!track) return;
     try {

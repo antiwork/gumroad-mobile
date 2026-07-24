@@ -468,6 +468,59 @@ External caption text
       expect(queryByText("External caption text")).toBeNull();
     });
 
+    it("clears the previous track's captions while a newly selected external track is still loading", async () => {
+      const firstSrt = SRT;
+      const secondSrt = `1
+00:00:00,000 --> 00:01:00,000
+Second track caption text
+`;
+      let resolveSecondFetch: (value: { ok: boolean; text: () => Promise<string> }) => void;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(firstSrt) })
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolveSecondFetch = resolve;
+          }),
+        ) as unknown as typeof fetch;
+      mockSearchParams = {
+        uri: "https://example.com/video.mp4",
+        streamingUrl: "mobile/url_redirects/stream/token/file",
+        title: "Test Video",
+      };
+      mockRequestAPI.mockResolvedValue({
+        playlist_url: "https://example.com/index.m3u8",
+        subtitles: [
+          { url: "https://example.com/captions-en.srt", language: "English" },
+          { url: "https://example.com/captions-fr.srt", language: "French" },
+        ],
+      });
+      const { getByTestId, getByText, queryByText } = renderScreen();
+      await act(async () => {});
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      expect(getByText("External caption text")).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("French"));
+      });
+
+      expect(queryByText("External caption text")).toBeNull();
+
+      await act(async () => {
+        resolveSecondFetch!({ ok: true, text: () => Promise.resolve(secondSrt) });
+      });
+      expect(getByText("Second track caption text")).toBeTruthy();
+    });
+
     it("ignores a stale subtitle fetch when the native controls enable an embedded track before it resolves", async () => {
       let resolveFetch: (value: { ok: boolean; text: () => Promise<string> }) => void;
       global.fetch = jest.fn().mockReturnValue(
