@@ -1,0 +1,82 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_buyer_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: ".*Mobile Test Product 1.*"
+- extendedWaitUntil:
+    visible: ".*Mobile Test Audio.*"
+    timeout: 45000
+- tapOn:
+    text: ".*Mobile Test Audio.*"
+    above: Mobile Test Video
+- extendedWaitUntil:
+    visible:
+      id: open-audio-player
+    timeout: 15000
+- tapOn:
+    id: open-audio-player
+- extendedWaitUntil:
+    visible: "Toggle loop, (On|Off)"
+    timeout: 10000
+- runFlow:
+    when:
+      visible: "Toggle loop, On"
+    commands:
+      - tapOn: "Toggle loop, On"
+- assertVisible: "Toggle loop, Off"
+- tapOn:
+    text: Skip back 15 seconds
+    repeat: 4
+    delay: 100
+- tapOn: Skip forward 30 seconds
+- tapOn:
+    id: full-audio-play-pause
+- assertVisible: "0:(2[5-9]|3[0-9])"
+- tapOn:
+    point: "1%,1%"
+    repeat: 2
+    delay: 3000
+- runFlow:
+    file: utils/relaunch.yaml
+- tapOn: Library
+- tapOn: ".*Mobile Test Product 1.*"
+- extendedWaitUntil:
+    visible: ".*Mobile Test Audio.*"
+    timeout: 45000
+- tapOn:
+    text: ".*Mobile Test Audio.*"
+    above: Mobile Test Video
+- extendedWaitUntil:
+    visible:
+      id: open-audio-player
+    timeout: 15000
+- tapOn:
+    id: open-audio-player
+- assertVisible: "0:(2[5-9]|3[0-9])"
+- tapOn:
+    text: Skip forward 30 seconds
+    repeat: 2
+    delay: 200
+- extendedWaitUntil:
+    visible:
+      id: full-audio-play-pause
+      text: Play
+    timeout: 15000
+- assertVisible: "0:46"
+- tapOn: Minimize player
+- tapOn:
+    text: ".*Mobile Test Audio.*"
+    above: Mobile Test Video
+- extendedWaitUntil:
+    visible:
+      id: mini-audio-play-pause
+      text: Pause
+    timeout: 15000
+- tapOn:
+    id: mini-audio-play-pause
+- tapOn:
+    id: open-audio-player
+- assertVisible: "Playback position, 0:(0[0-9]|1[0-5]) of 0:46"

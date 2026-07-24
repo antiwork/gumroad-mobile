@@ -104,13 +104,43 @@ E2E tests use [Maestro](https://maestro.dev). To run the tests:
 
 3. Ensure you have Gumroad running locally with the latest seed data (`rails db:seed`).
 
-4. Run a test file:
+4. For Android, route the local API and object storage ports through the emulator:
+
+   ```bash
+   adb reverse tcp:3000 tcp:3000
+   adb reverse tcp:9000 tcp:9000
+   ```
+
+5. Run a test file:
 
    ```bash
    npm run e2e:ios .maestro/<test>.yaml
    npm run e2e:android .maestro/<test>.yaml
    ```
 
+   The iOS suite excludes flows tagged `android-only`, such as `flaky-network-recovery.yaml`. Directly targeting one with the iOS command fails with an Android-only error.
+
 ### Unit tests
 
 Unit tests use [Jest](https://jestjs.io). To run the tests, use `npm run test`.
+
+## Release QA
+
+Jest gates every PR, but it mocks the native layer (`expo-av`, PDF viewer, WebViews), so release candidates get a Maestro pass over the flows in `.maestro/` — they cover the standing release checklist: audio playback (play, pause/resume, skip, background audio), tab navigation with buyer empty states, library purchased content, creator dashboard, creator analytics, Agent tab, payouts WebView, login, and logout.
+
+### Baseline (every release candidate, no spend)
+
+Run the full `.maestro/` suite on an iOS simulator and an Android emulator against a local Gumroad backend with seed data loaded (see [E2E tests](#e2e-tests) above). Maestro records a video of each run — keep the recordings as the release's evidence trail.
+
+### Big releases: on-demand real devices, pay per use
+
+No standing device-cloud subscription. For big releases and releases carrying promised bug fixes:
+
+- **Android real hardware**: [AWS Device Farm](https://aws.amazon.com/device-farm/) pay-as-you-go ($0.17/device-minute) — a full flow pass costs a few dollars. Upload the release build plus the `.maestro/` flows and run on a Samsung device.
+- **iOS real device or a manual recorded session**: BrowserStack App Live, single month ($39), cancel after.
+
+**Is it a big release?** Yes if any of: a native-layer change (playback, PDF viewer, navigation shell, WebView bridge), a store-listing or build-config change, or the release carries a bug fix that was promised to a user. Routine dependency bumps and web-only changes ship on the emulator baseline alone.
+
+### Still manual
+
+Lock screen controls, biometrics prompts, and anything needing a physical sensor stay manual on a device in hand.

@@ -57,6 +57,8 @@ describe("PayoutSettingsScreen", () => {
     expect(source.uri).toBe(expectedUrl);
 
     const props = screen.getByTestId("payments-webview").props;
+    expect(props.incognito).toBe(true);
+    expect(props.sharedCookiesEnabled).toBeUndefined();
     expect(props.setSupportMultipleWindows).toBe(true);
     expect(props.javaScriptCanOpenWindowsAutomatically).toBe(true);
   });

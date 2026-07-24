@@ -2,9 +2,10 @@ import { AppState } from "react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
 type StatusChangePayload = { status: string; error?: { message: string } };
+type TimeUpdatePayload = { currentTime: number };
 let statusChangeListener: ((payload: StatusChangePayload) => void) | null = null;
 let subtitleTrackChangeListener: ((payload: { subtitleTrack: unknown }) => void) | null = null;
-let timeUpdateListener: ((payload: { currentTime: number }) => void) | null = null;
+let timeUpdateListener: ((payload: TimeUpdatePayload) => void) | null = null;
 const mockSubscriptionRemove = jest.fn();
 
 const mockPlayer = {
@@ -18,10 +19,13 @@ const mockPlayer = {
   play: jest.fn(),
   pause: jest.fn(),
   addListener: jest.fn((eventName: string, listener: (payload: never) => void) => {
-    if (eventName === "statusChange") statusChangeListener = listener as typeof statusChangeListener;
-    if (eventName === "subtitleTrackChange")
+    if (eventName === "statusChange") {
+      statusChangeListener = listener as (payload: StatusChangePayload) => void;
+    } else if (eventName === "subtitleTrackChange") {
       subtitleTrackChangeListener = listener as typeof subtitleTrackChangeListener;
-    if (eventName === "timeUpdate") timeUpdateListener = listener as typeof timeUpdateListener;
+    } else if (eventName === "timeUpdate") {
+      timeUpdateListener = listener as (payload: TimeUpdatePayload) => void;
+    }
     return { remove: mockSubscriptionRemove };
   }),
 };
@@ -78,6 +82,7 @@ describe("VideoPlayerScreen", () => {
     mockPlayer.staysActiveInBackground = true;
     mockPlayer.loop = false;
     mockPlayer.currentTime = 0;
+    mockPlayer.timeUpdateEventInterval = 0;
     mockPlayer.subtitleTrack = null;
     mockPlayer.availableSubtitleTracks = [];
     appStateCallback = null;
@@ -100,6 +105,18 @@ describe("VideoPlayerScreen", () => {
   it("sets staysActiveInBackground to false on player setup", () => {
     renderScreen();
     expect(mockPlayer.staysActiveInBackground).toBe(false);
+  });
+
+  it("exposes when playback advances", () => {
+    const { getByLabelText } = renderScreen();
+
+    expect(getByLabelText("Video playback waiting")).toBeTruthy();
+
+    act(() => {
+      timeUpdateListener!({ currentTime: 0.25 });
+    });
+
+    expect(getByLabelText("Video playback started")).toBeTruthy();
   });
 
   it("pauses the player when app goes to background", () => {

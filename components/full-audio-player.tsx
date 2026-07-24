@@ -190,10 +190,20 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
       <View className="flex-1 bg-background" style={{ paddingTop: top, paddingBottom: bottom }}>
         <View className="flex-row items-center justify-between px-4 py-2">
-          <TouchableOpacity onPress={onClose} className="size-10 items-center justify-center">
+          <TouchableOpacity
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Minimize player"
+            className="size-10 items-center justify-center"
+          >
             <LineIcon name="chevron-down" size={28} className="text-foreground" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleClose} className="size-10 items-center justify-center">
+          <TouchableOpacity
+            onPress={handleClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close player"
+            className="size-10 items-center justify-center"
+          >
             <LineIcon name="x" size={28} className="text-foreground" />
           </TouchableOpacity>
         </View>
@@ -230,6 +240,11 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
         <View className="px-8 pb-8">
           <GestureDetector gesture={seekBarGesture}>
             <View
+              accessibilityLabel="Playback position"
+              accessibilityRole="progressbar"
+              accessibilityValue={{
+                text: `${formatTime(seekProgress != null ? (seekProgress / 100) * duration : position)} of ${formatTime(duration)}`,
+              }}
               className="mb-2 justify-center py-2"
               onLayout={(e) => {
                 barWidthRef.current = e.nativeEvent.layout.width;
@@ -256,6 +271,8 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             <TouchableOpacity
               onPress={handlePreviousTrack}
               disabled={!hasPrevious}
+              accessibilityRole="button"
+              accessibilityLabel="Previous track"
               className="size-10 items-center justify-center"
               style={{ opacity: hasPrevious ? 1 : 0.3 }}
             >
@@ -264,14 +281,19 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
 
             <TouchableOpacity
               onPress={handleSkipBack}
+              accessibilityRole="button"
+              accessibilityLabel="Skip back 15 seconds"
               className="size-14 items-center justify-center rounded-full border-2 border-foreground"
             >
               <Text className="text-sm font-bold text-foreground">-15</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              testID="full-audio-play-pause"
               onPress={handlePlayPause}
               disabled={isBuffering}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? "Pause" : "Play"}
               className="size-16 items-center justify-center rounded-full bg-primary"
             >
               <SolidIcon name={isPlaying ? "pause" : "play"} size={48} className="text-primary-foreground" />
@@ -279,6 +301,8 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
 
             <TouchableOpacity
               onPress={handleSkipForward}
+              accessibilityRole="button"
+              accessibilityLabel="Skip forward 30 seconds"
               className="size-14 items-center justify-center rounded-full border-2 border-foreground"
             >
               <Text className="text-sm font-bold text-foreground">+30</Text>
@@ -287,6 +311,8 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             <TouchableOpacity
               onPress={handleNextTrack}
               disabled={!hasNext}
+              accessibilityRole="button"
+              accessibilityLabel="Next track"
               className="size-10 items-center justify-center"
               style={{ opacity: hasNext ? 1 : 0.3 }}
             >
@@ -295,11 +321,19 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
           </View>
 
           <View className="flex-row items-center justify-center gap-6">
-            <TouchableOpacity onPress={handleCycleSpeed} className="h-10 min-w-16 items-center justify-center px-3">
+            <TouchableOpacity
+              onPress={handleCycleSpeed}
+              accessibilityRole="button"
+              accessibilityLabel="Playback speed"
+              className="h-10 min-w-16 items-center justify-center px-3"
+            >
               <Text className="font-bold text-foreground">{playbackSpeed}x</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleToggleLoop}
+              accessibilityRole="button"
+              accessibilityLabel="Toggle loop"
+              accessibilityValue={{ text: loopEnabled ? "On" : "Off" }}
               className="h-10 min-w-16 flex-row items-center justify-center gap-2 px-3"
             >
               <LineIcon name="repeat-alt-2" size={22} className={loopEnabled ? "text-accent" : "text-foreground"} />

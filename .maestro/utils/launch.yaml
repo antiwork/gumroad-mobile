@@ -1,7 +1,11 @@
 appId: ${APP_ID}
 ---
 - killApp
-- clearState
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - clearState
 - clearKeychain
 # Open the development client directly, skipping the prompt to choose the URL
 - runFlow:
@@ -16,7 +20,39 @@ appId: ${APP_ID}
     commands:
       - openLink:
           link: "gumroadmobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8082"
-# Skip past the development menu prompt
+# Disable password saving for the disposable localhost test account.
+- runFlow:
+    when:
+      visible: Never for This Website
+    commands:
+      - tapOn: Never for This Website
+# Dismiss any older password prompt left over from an interrupted iOS OAuth session.
+- runFlow:
+    when:
+      visible: Not Now
+    commands:
+      - tapOn: Not Now
+# A failed OAuth browser session can outlive the app process on iOS.
+- runFlow:
+    when:
+      visible: Cancel
+    commands:
+      - tapOn: Cancel
+# Tap through the iOS confirmation shown the first time a development-client link opens.
+- runFlow:
+    when:
+      visible: Open
+    commands:
+      - tapOn: Open
+# Retain Android development-client state to avoid replaying its first-run
+# onboarding sheet. The sign-in helper logs out any existing app session.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - waitForAnimationToEnd:
+          timeout: 10000
+# Skip past the development-menu prompt when it appears.
 - runFlow:
     when:
       visible: "Continue"
@@ -26,6 +62,49 @@ appId: ${APP_ID}
     when:
       visible: "Toggle performance monitor"
     commands:
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - tapOn:
+                point: "86%,96%"
+            - tapOn:
+                id: xmark
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - pressKey: back
+- runFlow:
+    when:
+      visible: "Don.t allow"
+    commands:
+      - tapOn: "Don.t allow"
+- extendedWaitUntil:
+    visible: "Sign in with Gumroad|.*Library.*|Logout|Navigate up"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: Navigate up
+    commands:
+      - tapOn: Navigate up
+- runFlow:
+    when:
+      visible: Navigate up
+    commands:
+      - tapOn: Navigate up
+- extendedWaitUntil:
+    visible: "Sign in with Gumroad|.*Library.*|Logout"
+    timeout: 30000
+- runFlow:
+    when:
+      platform: Android
+      visible: Tools
+    commands:
       - tapOn:
-          point: 50%,10%
-- assertVisible: "Sign in with Gumroad"
+          point: "94%,9%"
+      - extendedWaitUntil:
+          visible: Tools button
+          timeout: 10000
+      - tapOn: Tools button
+      - pressKey: back

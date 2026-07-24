@@ -1,10 +1,11 @@
 import { useAPIRequest } from "@/lib/request";
 
-export type AnalyticsTimeRange = "1w" | "1m" | "1y";
+export type AnalyticsTimeRange = "1d" | "1w" | "1m" | "1y";
 
 export interface AnalyticsByDateResponse {
   success: boolean;
   dates: string[];
+  seller_time_zone?: string;
   by_date: {
     totals: Record<string, number[]>;
     sales: Record<string, number[]>;
@@ -19,7 +20,10 @@ export interface ProcessedDateData {
   views: number[];
 }
 
-export const getGroupBy = (range: AnalyticsTimeRange): string => (range === "1w" || range === "1m" ? "day" : "month");
+export const getGroupBy = (range: AnalyticsTimeRange): string => {
+  if (range === "1d") return "hour";
+  return range === "1w" || range === "1m" ? "day" : "month";
+};
 
 export const sumByDateIndex = (dataByProduct: Record<string, number[]>, dateCount: number): number[] => {
   const productArrays = Object.values(dataByProduct);
@@ -57,5 +61,6 @@ export const useAnalyticsByDate = (timeRange: AnalyticsTimeRange) => {
   return {
     ...query,
     processedData,
+    sellerTimeZone: query.data?.seller_time_zone ?? null,
   };
 };

@@ -44,7 +44,12 @@ const PageThumbnail = memo(
     failed: boolean;
     onPress: (page: number) => void;
   }) => (
-    <TouchableOpacity onPress={() => onPress(page)} style={{ width: thumbnailWidth }}>
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`Page ${page}`}
+      onPress={() => onPress(page)}
+      style={{ width: thumbnailWidth }}
+    >
       <View
         className={cn("overflow-hidden rounded-lg border-2", isCurrent ? "border-accent" : "border-border")}
         style={{ width: thumbnailWidth, height: thumbnailHeight }}

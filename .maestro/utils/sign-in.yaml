@@ -1,0 +1,84 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: launch.yaml
+- runFlow:
+    when:
+      visible: Logout
+    commands:
+      - tapOn: Logout
+      - extendedWaitUntil:
+          visible: Sign in with Gumroad
+          timeout: 15000
+- runFlow:
+    when:
+      visible: ".*Library.*"
+    commands:
+      - tapOn: ".*Library.*"
+      - tapOn:
+          id: settings-button
+      - extendedWaitUntil:
+          visible: Logout
+          timeout: 10000
+      - tapOn: Logout
+      - extendedWaitUntil:
+          visible: Sign in with Gumroad
+          timeout: 15000
+- runFlow:
+    when:
+      visible: Sign in with Gumroad
+    commands:
+      - tapOn: Sign in with Gumroad
+# Tap through the iOS "Sign in with gumroad.dev?" prompt
+- runFlow:
+    when:
+      platform: iOS
+      visible: Continue
+    commands:
+      - tapOn: Continue
+# The browser state isn't cleared when the app cache is cleared, so we may still be logged in from a previous session
+- runFlow:
+    when:
+      visible: Logout
+    commands:
+      - tapOn: Logout
+- extendedWaitUntil:
+    visible: "Use a different account|Sign up|Authorize|.*Library.*"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: ${EMAIL}
+    commands:
+      - tapOn: Continue
+- runFlow:
+    when:
+      visible: Use a different account
+    commands:
+      - tapOn: Use a different account
+- runFlow:
+    when:
+      visible: Sign up
+    file: login-with-password.yaml
+# 2FA prompt will trigger if it hasn't already been completed
+- runFlow:
+    when:
+      visible: Authentication Token
+    commands:
+      - tapOn: Login
+- runFlow:
+    when:
+      visible: "Don.t allow"
+    commands:
+      - tapOn: "Don.t allow"
+- extendedWaitUntil:
+    visible: "Authorize|.*Library.*"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: Authorize
+    commands:
+      - tapOn: Authorize
+# All four tab labels are always visible after login, regardless of which tab the app lands on
+- extendedWaitUntil:
+    visible: ".*Library.*"
+    timeout: 30000

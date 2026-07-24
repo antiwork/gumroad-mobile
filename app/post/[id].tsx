@@ -15,7 +15,7 @@ import { safeOpenURL } from "@/lib/open-url";
 import * as Sentry from "@sentry/react-native";
 import { File } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import * as Sharing from "expo-sharing";
+import { shareFile } from "@/lib/share";
 import { Asset } from "expo-asset";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
@@ -161,9 +161,7 @@ export default function PostScreen() {
           },
         },
       );
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) throw new Error("Sharing is not available on this device");
-      await Sharing.shareAsync(downloadedFile.uri);
+      await shareFile(downloadedFile.uri);
     } catch (error) {
       if (!(error instanceof FileUnavailableError)) Sentry.captureException(error);
       Alert.alert("Download Failed", error instanceof Error ? error.message : "Failed to download file");

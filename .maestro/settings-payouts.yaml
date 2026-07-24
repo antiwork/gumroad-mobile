@@ -1,0 +1,42 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: ".*Library.*"
+- tapOn:
+    id: settings-button
+- extendedWaitUntil:
+    visible: ".*Edit profile.*"
+    timeout: 10000
+- tapOn: ".*Edit profile.*"
+- extendedWaitUntil:
+    visible: Profile settings
+    timeout: 20000
+- assertVisible: Mobile Seller 1
+- assertNotVisible: Something went wrong
+- runFlow:
+    file: utils/back.yaml
+- tapOn:
+    id: settings-button
+- tapOn: ".*Payout settings.*"
+- extendedWaitUntil:
+    visible: "Payout schedule|Where are you located.*"
+    timeout: 20000
+- assertNotVisible: Something went wrong
+- runFlow:
+    file: utils/back.yaml
+- tapOn: ".*Analytics.*"
+- extendedWaitUntil:
+    visible: ".*Export all sales.*"
+    timeout: 15000
+- tapOn: ".*Export all sales.*"
+- tapOn: Export
+- extendedWaitUntil:
+    visible: Download CSV
+    timeout: 20000
+- assertNotVisible: "net::ERR_UNKNOWN_URL_SCHEME|Something went wrong"
+- runFlow:
+    file: utils/back.yaml

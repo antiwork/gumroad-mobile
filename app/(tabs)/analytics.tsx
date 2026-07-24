@@ -55,6 +55,7 @@ export default function Analytics() {
 
       <View className="gap-3 p-4">
         <View className="flex-row justify-center gap-2">
+          <TabButton<AnalyticsTimeRange> label="1D" value="1d" selected={timeRange === "1d"} onSelect={setTimeRange} />
           <TabButton<AnalyticsTimeRange> label="1W" value="1w" selected={timeRange === "1w"} onSelect={setTimeRange} />
           <TabButton<AnalyticsTimeRange> label="1M" value="1m" selected={timeRange === "1m"} onSelect={setTimeRange} />
           <TabButton<AnalyticsTimeRange> label="1Y" value="1y" selected={timeRange === "1y"} onSelect={setTimeRange} />

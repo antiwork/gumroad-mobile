@@ -13,6 +13,7 @@ import { cacheFileDestination, downloadFileWithRetry } from "@/lib/file-utils";
 import { updateMediaLocation } from "@/lib/media-location";
 import * as Sharing from "expo-sharing";
 import * as Sentry from "@sentry/react-native";
+import { shareFile } from "@/lib/share";
 import { useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -166,6 +167,8 @@ export default function PdfViewerScreen() {
             <View className="flex-row items-center gap-1">
               <TouchableOpacity
                 testID="share-pdf-button"
+                accessibilityRole="button"
+                accessibilityLabel="Share PDF"
                 disabled={isSharing}
                 onPress={async () => {
                   setIsSharing(true);
@@ -173,7 +176,7 @@ export default function PdfViewerScreen() {
                     const isAvailable = await Sharing.isAvailableAsync();
                     if (!isAvailable) return;
                     const sharedUri = cachedUri ?? (await downloadPdfFile()).uri;
-                    await Sharing.shareAsync(sharedUri);
+                    await shareFile(sharedUri);
                   } finally {
                     setIsSharing(false);
                   }
@@ -186,10 +189,20 @@ export default function PdfViewerScreen() {
                   className={cn("text-accent", Platform.OS === "ios" && "-rotate-90")}
                 />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowTocModal(true)} className="p-2">
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Page navigation"
+                onPress={() => setShowTocModal(true)}
+                className="p-2"
+              >
                 <SolidIcon name="book-content" size={24} className="text-accent" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowViewModeModal(true)} className="p-2">
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="View mode"
+                onPress={() => setShowViewModeModal(true)}
+                className="p-2"
+              >
                 {viewMode === "continuous" ? (
                   <LineIcon name="move-vertical" size={24} className="text-accent" />
                 ) : (

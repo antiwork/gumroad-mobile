@@ -115,6 +115,8 @@ describe("DownloadScreen", () => {
   it("allows fullscreen video for content playing inline in the WebView", () => {
     render(<DownloadScreen />);
 
+    expect(screen.getByTestId("purchase-webview").props.incognito).toBe(true);
+    expect(screen.getByTestId("purchase-webview").props.sharedCookiesEnabled).toBeUndefined();
     expect(screen.getByTestId("purchase-webview").props.allowsFullscreenVideo).toBe(true);
   });
 });

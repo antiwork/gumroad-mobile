@@ -38,7 +38,9 @@ export const formatReferrerName = (name: string): string => {
   return name;
 };
 
-const getGroupBy = (range: AnalyticsTimeRange): string => (range === "1w" || range === "1m" ? "day" : "month");
+// The mobile by_referral endpoint only serves day/month buckets, so the "Today"
+// range charts referrers as a single day bucket rather than hourly.
+const getGroupBy = (range: AnalyticsTimeRange): string => (range === "1y" ? "month" : "day");
 
 export const aggregateByReferrer = (
   metricData: Record<string, Record<string, number[]>>,
