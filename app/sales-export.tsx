@@ -130,8 +130,8 @@ export default function SalesExportScreen() {
         source={{ uri: url }}
         className="flex-1 bg-transparent"
         webviewDebuggingEnabled
+        incognito
         pullToRefreshEnabled
-        sharedCookiesEnabled
         thirdPartyCookiesEnabled
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}

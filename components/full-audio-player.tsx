@@ -240,6 +240,11 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
         <View className="px-8 pb-8">
           <GestureDetector gesture={seekBarGesture}>
             <View
+              accessibilityLabel="Playback position"
+              accessibilityRole="progressbar"
+              accessibilityValue={{
+                text: `${formatTime(seekProgress != null ? (seekProgress / 100) * duration : position)} of ${formatTime(duration)}`,
+              }}
               className="mb-2 justify-center py-2"
               onLayout={(e) => {
                 barWidthRef.current = e.nativeEvent.layout.width;
@@ -284,6 +289,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             </TouchableOpacity>
 
             <TouchableOpacity
+              testID="full-audio-play-pause"
               onPress={handlePlayPause}
               disabled={isBuffering}
               accessibilityRole="button"
@@ -327,6 +333,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               onPress={handleToggleLoop}
               accessibilityRole="button"
               accessibilityLabel="Toggle loop"
+              accessibilityValue={{ text: loopEnabled ? "On" : "Off" }}
               className="h-10 min-w-16 flex-row items-center justify-center gap-2 px-3"
             >
               <LineIcon name="repeat-alt-2" size={22} className={loopEnabled ? "text-accent" : "text-foreground"} />

@@ -9,7 +9,7 @@ appId: ${APP_ID}
       EMAIL: mobile_buyer_do_not_edit@gumroad.com
       PASSWORD: password
 # Open the purchased product that has the seeded audio file
-- tapOn: Mobile Test Product 1
+- tapOn: ".*Mobile Test Product 1.*"
 # The purchase page is a WebView; the play control comes from the web content
 - extendedWaitUntil:
     visible: Play

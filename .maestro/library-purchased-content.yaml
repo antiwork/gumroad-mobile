@@ -7,13 +7,13 @@ appId: ${APP_ID}
       PASSWORD: password
 - tapOn: Library
 - extendedWaitUntil:
-    visible: Mobile Test Product 1
+    visible: ".*Mobile Test Product 1.*"
     timeout: 15000
 - assertVisible: Mobile Test Product 2
-- tapOn: Mobile Test Product 1
+- tapOn: ".*Mobile Test Product 1.*"
 # The purchase content screen uses the product name as its header title
 - extendedWaitUntil:
-    visible: Mobile Test Product 1
+    visible: ".*Mobile Test Product 1.*"
     timeout: 15000
 - back
 - assertVisible: Mobile Test Product 2

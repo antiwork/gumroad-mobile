@@ -45,7 +45,7 @@ const MiniAudioPlayerBase = () => {
 
   return (
     <>
-      <Pressable onPress={() => setFullPlayerVisible(true)}>
+      <Pressable testID="open-audio-player" onPress={() => setFullPlayerVisible(true)}>
         <View className="h-1 border-t border-border bg-background">
           <View className="h-1 bg-primary" style={{ width: `${progress}%` }} />
         </View>
@@ -64,6 +64,7 @@ const MiniAudioPlayerBase = () => {
 
           <View className="flex-row items-center gap-2">
             <TouchableOpacity
+              testID="mini-audio-play-pause"
               onPress={handlePlayPause}
               disabled={isBuffering}
               accessibilityRole="button"

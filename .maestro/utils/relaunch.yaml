@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+---
+- stopApp
+# A development build returns to Expo's launcher after the process is killed. Reopen the
+# same Metro URL without clearing app or keychain state, which matches a production relaunch.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - openLink:
+          link: "gumroadmobile://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8082"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - openLink:
+          link: "gumroadmobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8082"
+- runFlow:
+    when:
+      visible: Open
+    commands:
+      - tapOn: Open
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+- runFlow:
+    when:
+      visible: Toggle performance monitor
+    commands:
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - tapOn:
+                point: "86%,96%"
+            - tapOn:
+                id: xmark
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - pressKey: back
+- extendedWaitUntil:
+    visible: Library
+    timeout: 30000

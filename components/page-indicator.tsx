@@ -54,6 +54,8 @@ export const PageIndicator = ({
       }}
     >
       <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={`Page ${currentPage} of ${totalPages}`}
         activeOpacity={0.7}
         onPress={() => {
           if (isEditing) {

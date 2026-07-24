@@ -229,8 +229,8 @@ export default function DownloadScreen() {
         source={{ uri: url }}
         className="flex-1 bg-transparent"
         webviewDebuggingEnabled
+        incognito
         pullToRefreshEnabled
-        sharedCookiesEnabled
         thirdPartyCookiesEnabled
         mediaPlaybackRequiresUserAction={false}
         // Android blocks the HTML5 fullscreen API in WebViews unless this is enabled, so videos playing inline (like embedded players in rich content) would have a fullscreen button that does nothing. iOS ignores this prop.

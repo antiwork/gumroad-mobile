@@ -104,12 +104,21 @@ E2E tests use [Maestro](https://maestro.dev). To run the tests:
 
 3. Ensure you have Gumroad running locally with the latest seed data (`rails db:seed`).
 
-4. Run a test file:
+4. For Android, route the local API and object storage ports through the emulator:
+
+   ```bash
+   adb reverse tcp:3000 tcp:3000
+   adb reverse tcp:9000 tcp:9000
+   ```
+
+5. Run a test file:
 
    ```bash
    npm run e2e:ios .maestro/<test>.yaml
    npm run e2e:android .maestro/<test>.yaml
    ```
+
+   The iOS suite excludes flows tagged `android-only`, such as `flaky-network-recovery.yaml`. Directly targeting one with the iOS command fails with an Android-only error.
 
 ### Unit tests
 

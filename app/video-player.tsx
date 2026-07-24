@@ -46,6 +46,8 @@ export default function VideoPlayerScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [currentPosition, setCurrentPosition] = useState(initialPosition ? Number(initialPosition) : 0);
+  const [playbackStarted, setPlaybackStarted] = useState(false);
+  const playbackStartedRef = useRef(false);
   const currentPositionRef = useRefToLatest(currentPosition);
 
   useEffect(() => {
@@ -75,6 +77,7 @@ export default function VideoPlayerScreen() {
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
     player.staysActiveInBackground = false;
+    player.timeUpdateEventInterval = 0.25;
     if (initialPosition) {
       player.currentTime = Number(initialPosition);
     }
@@ -123,6 +126,17 @@ export default function VideoPlayerScreen() {
     );
     return () => subscription.remove();
   }, [player]);
+
+  useEffect(() => {
+    const startingPosition = initialPosition ? Number(initialPosition) : 0;
+    const subscription = player.addListener("timeUpdate", ({ currentTime }) => {
+      if (!playbackStartedRef.current && currentTime > startingPosition + 0.1) {
+        playbackStartedRef.current = true;
+        setPlaybackStarted(true);
+      }
+    });
+    return () => subscription.remove();
+  }, [initialPosition, player]);
 
   useEffect(
     () => () => {
@@ -202,6 +216,8 @@ export default function VideoPlayerScreen() {
         }}
       />
       <VideoView
+        testID="video-player"
+        accessibilityLabel={playbackStarted ? "Video playback started" : "Video playback waiting"}
         style={styles.video}
         player={player}
         allowsPictureInPicture
