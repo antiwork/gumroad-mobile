@@ -184,6 +184,21 @@ jobs:
           echo "value=$app_id" >> "$GITHUB_OUTPUT"
           echo "Built application id: $app_id"
 
+      # The smoke flow needs a RELEASE build, and a release build has to be signed. This
+      # generates a throwaway keystore rather than carrying one as a secret: nothing here is
+      # published, and the flow only cares that the APK installs and launches. Real store
+      # builds sign with the upload keystore from the release workflow's secrets.
+      #
+      # This has to run AFTER `expo prebuild --clean`, which deletes and regenerates the whole
+      # android/ directory -- a keystore written before it silently disappears.
+      - name: Generate a throwaway signing key for the release build
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/app/upload-keystore.jks \
+            -alias ci-smoke -keyalg RSA -keysize 2048 -validity 30 \
+            -storepass ci-smoke-throwaway -keypass ci-smoke-throwaway \
+            -dname "CN=gumroad-mobile CI smoke, O=Gumroad, C=US"
+
       - name: Run the launch smoke flow
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -198,6 +213,11 @@ jobs:
           IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
           EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
           EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
+          # Read by the release signingConfig in android/app/build.gradle. Throwaway values
+          # matching the keystore generated in the previous step.
+          ANDROID_KEYSTORE_PASSWORD: ci-smoke-throwaway
+          ANDROID_KEY_ALIAS: ci-smoke
+          ANDROID_KEY_PASSWORD: ci-smoke-throwaway
         with:
           api-level: 34
           target: google_apis
@@ -210,18 +230,28 @@ jobs:
           script: |
             # prebuild generates the Gradle wrapper inside android/, not at the repo root.
             chmod +x android/gradlew
+            # RELEASE, not debug. This project depends on expo-dev-client, which makes
+            # DevLauncherActivity the launcher activity of every DEBUG build, and React
+            # Native's default `debuggableVariants = ["debug"]` means a debug APK embeds no JS
+            # bundle at all. So a debug APK cannot run the app standalone by design: it boots
+            # the "Development Build / DEVELOPMENT SERVERS / npx expo start" launcher and waits
+            # for a Metro server that no CI runner has. A release build embeds the Hermes
+            # bundle and launches MainActivity directly, which is what the flow asserts on.
+            #
             # Build native code for the emulator's ABI only. The default in
-            # android/gradle.properties is all four (armeabi-v7a, arm64-v8a, x86, x86_64),
-            # which is right for a release build but means CMake compiles reanimated,
-            # expo-modules-core and the app three extra times for architectures this job can
-            # never run. That was 28 of the job's 45 minutes, and it left too little room for
-            # the flow itself.
-            ./android/gradlew -p android assembleDebug -PreactNativeArchitectures=x86_64
+            # android/gradle.properties is all four (armeabi-v7a, arm64-v8a, x86, x86_64), so
+            # CMake was compiling reanimated, expo-modules-core and the app three extra times
+            # for architectures this job can never run -- 28 of the job's 45 minutes.
+            ./android/gradlew -p android assembleRelease -PreactNativeArchitectures=x86_64
+            # Assert the JS bundle really is inside the APK. Without this, a variant or
+            # bundling regression reappears as the confusing "the app launched but the login
+            # screen never rendered" failure, 15 minutes into the job.
+            unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q assets/index.android.bundle || { echo "::error::app-release.apk carries no assets/index.android.bundle, so the app cannot run without a Metro server. Check react.debuggableVariants and that this is a release variant."; exit 1; }
             # Hand the emulator back the RAM and cores the build was using. The daemon
             # otherwise stays resident for the rest of the job, and adb operations against a
             # starved emulator can stall indefinitely rather than fail.
             ./android/gradlew -p android --stop
-            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r android/app/build/outputs/apk/release/app-release.apk
             # Every line in this block is run as its own separate shell by
             # android-emulator-runner, so multi-line shell constructs (if/then/fi, loops,
             # heredocs) are not possible here and variables do not carry between lines.
