@@ -52,7 +52,15 @@ jobs:
     # The Android emulator needs nested virtualisation (KVM), which the Ubuntu runners
     # provide and the macOS runners do not.
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # A release build costs noticeably more than the debug build this job used to make: it
+    # compiles the Hermes bundle and runs the release-only packaging tasks on top of the same
+    # native compile. Locally, x86_64-only, that was 2m for assembleDebug against 9m for
+    # assembleRelease. The old 45-minute ceiling was sized for the debug build and was already
+    # being hit, and hitting it is the worst outcome available: a cancelled job discards the
+    # artifact upload, so you lose the report and the recording and learn nothing but "The
+    # operation was canceled". The `timeout` wrapped around the flow itself is the guard that
+    # is supposed to fire, because it fails the step and keeps the evidence.
+    timeout-minutes: 60
 
     # These have to be job-level, not per-step. app.config.ts reads them from the environment,
     # and it is evaluated twice: once by `expo prebuild`, and again during the Gradle build by
