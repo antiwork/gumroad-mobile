@@ -79,6 +79,15 @@ jobs:
       # independent of repository secrets, which is what lets it run on forks and every PR.
       EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
       EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
+      # lib/env.ts asserts these two are defined and throws at import time if either is
+      # missing, which kills the app before the first frame renders. Expo inlines every
+      # EXPO_PUBLIC_* value into the JS bundle at BUILD time, so they have to be present when
+      # the bundle is built, not merely when the app runs. Locally the gitignored .env supplies
+      # them, so a missing value is invisible until CI builds without it. These placeholders
+      # are only ever used to get past that assertion: the smoke flow stops at the login
+      # screen and never starts an OAuth exchange, so no real client id or token is involved.
+      EXPO_PUBLIC_GUMROAD_CLIENT_ID: ci-smoke-placeholder-client-id
+      EXPO_PUBLIC_MOBILE_TOKEN: ci-smoke-placeholder-mobile-token
 
     steps:
       - uses: actions/checkout@v4
@@ -221,6 +230,11 @@ jobs:
           IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
           EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
           EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
+          # Required by lib/env.ts, and inlined into the bundle by the Gradle build that runs
+          # inside this step -- so they must be here, not only on the job. See the job-level
+          # env block for why these are placeholders.
+          EXPO_PUBLIC_GUMROAD_CLIENT_ID: ci-smoke-placeholder-client-id
+          EXPO_PUBLIC_MOBILE_TOKEN: ci-smoke-placeholder-mobile-token
           # Read by the release signingConfig in android/app/build.gradle. Throwaway values
           # matching the keystore generated in the previous step.
           ANDROID_KEYSTORE_PASSWORD: ci-smoke-throwaway
