@@ -17,6 +17,10 @@ import { FlatList, KeyboardAvoidingView, Platform, TextInput, View } from "react
 import { useCSSVariable } from "uniwind";
 
 const IOS_KEYBOARD_VERTICAL_OFFSET = 88;
+// How close to the bottom still counts as "reading the newest message". A few pixels of
+// slack absorbs rounding in the scroll metrics and the momentum of a fling that lands
+// just short of the end.
+const AUTOSCROLL_BOTTOM_THRESHOLD = 24;
 
 interface DisplayMessage extends ChatMessage {
   proposedAction?: ProposedAction;
@@ -132,6 +136,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const hasSentMessageRef = useRef(false);
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
+  // Starts true because a fresh conversation is scrolled to its (empty) end.
+  const isAtBottomRef = useRef(true);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
   // resolves, their new chat wins and we skip hydration.
@@ -209,6 +215,9 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     if (trimmed.length === 0 || isSending) return;
 
     hasSentMessageRef.current = true;
+    // Sending is an explicit request to follow the conversation again, so re-pin to the
+    // bottom even if the reader had scrolled up to check something first.
+    isAtBottomRef.current = true;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -257,7 +266,18 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         keyExtractor={(_, index) => String(index)}
         keyboardShouldPersistTaps="handled"
         // Scrolling on content growth keeps up with streaming tokens, which arrive faster than a debounce would fire.
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        // Only auto-scroll while the reader is already at the bottom: a reply can stream for many
+        // seconds, and scrolling them back down on every token makes reading earlier messages
+        // impossible mid-conversation.
+        onContentSizeChange={() => {
+          if (isAtBottomRef.current) listRef.current?.scrollToEnd({ animated: true });
+        }}
+        onScroll={({ nativeEvent }) => {
+          const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+          const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+          isAtBottomRef.current = distanceFromBottom <= AUTOSCROLL_BOTTOM_THRESHOLD;
+        }}
+        scrollEventThrottle={16}
         renderItem={({ item, index }) => (
           <MessageBubble
             message={item}

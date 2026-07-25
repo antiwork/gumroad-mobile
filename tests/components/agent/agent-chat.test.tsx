@@ -2,7 +2,7 @@ import { AgentChat } from "@/components/agent/agent-chat";
 import { LineIcon } from "@/components/icon";
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { act } from "react";
-import { KeyboardAvoidingView, Platform } from "react-native";
+import { FlatList, KeyboardAvoidingView, Platform } from "react-native";
 import { renderWithQueryClient } from "../../render-with-query-client";
 
 jest.mock("@/lib/auth-context", () => ({
@@ -338,6 +338,56 @@ describe("AgentChat", () => {
     await waitFor(() => expect(mockFetchLatestAgentConversation).toHaveBeenCalled());
     expect(screen.getByText(GREETING)).toBeTruthy();
     expect(screen.getByText("How are my sales doing?")).toBeTruthy();
+  });
+
+  it("does not scroll back to the newest message while the reader has scrolled up", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    // Spy on the REAL FlatList instance the component holds a ref to, so the assertion
+    // exercises the component's own scroll decision rather than a stand-in.
+    const scrollToEnd = jest
+      .spyOn(FlatList.prototype, "scrollToEnd")
+      .mockImplementation(() => {});
+
+    // The reader scrolls a long way up to re-read something.
+    act(() => {
+      list.props.onScroll({
+        nativeEvent: { contentOffset: { y: 0 }, contentSize: { height: 2000 }, layoutMeasurement: { height: 600 } },
+      });
+    });
+    scrollToEnd.mockClear();
+
+    // A streaming reply keeps growing the list; that must not drag the reader back down.
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("follows new content while the reader is already at the newest message", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+
+    act(() => {
+      list.props.onScroll({
+        nativeEvent: { contentOffset: { y: 1400 }, contentSize: { height: 2000 }, layoutMeasurement: { height: 600 } },
+      });
+    });
+
+    expect(() => act(() => list.props.onContentSizeChange(0, 2400))).not.toThrow();
   });
 
   it("keeps keyboard avoidance active on Android", () => {

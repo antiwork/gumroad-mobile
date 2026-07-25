@@ -1,0 +1,55 @@
+appId: ${APP_ID}
+---
+# Guards antiwork/gumroad-mobile#328: a streaming agent reply used to drag the reader back to
+# the newest message on every token, so scrolling up to re-read something mid-conversation was
+# impossible. The app now only follows new content while the reader is already at the bottom.
+#
+# utils/sign-in.yaml runs launch.yaml itself, so this flow does not run it separately.
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+
+- tapOn: Agent
+# The tab is either-state: a configured assistant shows the composer, an account without
+# access shows an unavailable notice. Only the configured case can exercise scrolling.
+- extendedWaitUntil:
+    visible: "Ask about your store.*|Store assistant.*"
+    timeout: 15000
+
+- runFlow:
+    when:
+      visible: "Ask about your store.*"
+    commands:
+      # Two turns, so the conversation is taller than the viewport and there is history to
+      # scroll back through.
+      - tapOn: "Message"
+      - inputText: "List my products"
+      - tapOn: "Send"
+      - extendedWaitUntil:
+          visible: "Working on it|Assistant"
+          timeout: 30000
+      - tapOn: "Message"
+      - inputText: "How are my sales doing?"
+      - tapOn: "Send"
+      - extendedWaitUntil:
+          visible: "Working on it|Assistant"
+          timeout: 30000
+
+      # Scroll back up and confirm the earliest message stays put. Before the fix the list
+      # re-pinned itself to the bottom, so this assertion is what a regression breaks.
+      - scrollUntilVisible:
+          element: "List my products"
+          direction: UP
+          timeout: 20000
+      - assertVisible: "List my products"
+
+      # Sending again is an explicit request to follow the conversation, so the composer
+      # stays usable and the newest turn is accepted.
+      - tapOn: "Message"
+      - inputText: "Thanks"
+      - tapOn: "Send"
+      - extendedWaitUntil:
+          visible: "Working on it|Assistant"
+          timeout: 30000
