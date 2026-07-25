@@ -173,7 +173,9 @@ jobs:
           emulator-options: -no-window -no-snapshot-save -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            ./gradlew -p android assembleDebug
+            # prebuild generates the Gradle wrapper inside android/, not at the repo root.
+            chmod +x android/gradlew
+            ./android/gradlew -p android assembleDebug
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             maestro test --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
 
