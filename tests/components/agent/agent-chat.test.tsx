@@ -352,12 +352,11 @@ describe("AgentChat", () => {
     const list = screen.getByLabelText("Conversation");
     // Spy on the REAL FlatList instance the component holds a ref to, so the assertion
     // exercises the component's own scroll decision rather than a stand-in.
-    const scrollToEnd = jest
-      .spyOn(FlatList.prototype, "scrollToEnd")
-      .mockImplementation(() => {});
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
 
-    // The reader scrolls a long way up to re-read something.
+    // The reader drags a long way up to re-read something.
     act(() => {
+      list.props.onScrollBeginDrag();
       list.props.onScroll({
         nativeEvent: { contentOffset: { y: 0 }, contentSize: { height: 2000 }, layoutMeasurement: { height: 600 } },
       });
@@ -380,14 +379,51 @@ describe("AgentChat", () => {
     await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
 
     const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
 
+    // The reader drags, but ends up at the bottom: 1400 + 600 is the whole 2000 of content.
     act(() => {
+      list.props.onScrollBeginDrag();
       list.props.onScroll({
         nativeEvent: { contentOffset: { y: 1400 }, contentSize: { height: 2000 }, layoutMeasurement: { height: 600 } },
       });
     });
+    scrollToEnd.mockClear();
 
-    expect(() => act(() => list.props.onContentSizeChange(0, 2400))).not.toThrow();
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("keeps following when its own animated scroll reports a position short of the growing end", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    // Streamed content grows, so the list starts an animated scroll of its own.
+    act(() => list.props.onContentSizeChange(0, 2000));
+    expect(scrollToEnd).toHaveBeenCalled();
+    scrollToEnd.mockClear();
+
+    // That animation reports positions that lag well behind the end. The reader never touched
+    // the list, so following has to survive them.
+    act(() => {
+      list.props.onScroll({
+        nativeEvent: { contentOffset: { y: 1050 }, contentSize: { height: 2000 }, layoutMeasurement: { height: 600 } },
+      });
+    });
+
+    // The next token arrives and still has to be followed.
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
   });
 
   it("keeps keyboard avoidance active on Android", () => {

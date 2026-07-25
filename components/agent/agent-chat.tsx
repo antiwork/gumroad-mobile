@@ -138,6 +138,11 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const listRef = useRef<FlatList<DisplayMessage>>(null);
   // Starts true because a fresh conversation is scrolled to its (empty) end.
   const isAtBottomRef = useRef(true);
+  // True while a scroll this component started is still animating. Such a scroll reports
+  // intermediate positions that lag behind content which is still growing, and reading those
+  // as "the reader moved away from the bottom" would make streaming switch its own following
+  // off. Only touching the list clears this.
+  const isProgrammaticScrollRef = useRef(false);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
   // resolves, their new chat wins and we skip hydration.
@@ -270,9 +275,16 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         // seconds, and scrolling them back down on every token makes reading earlier messages
         // impossible mid-conversation.
         onContentSizeChange={() => {
-          if (isAtBottomRef.current) listRef.current?.scrollToEnd({ animated: true });
+          if (!isAtBottomRef.current) return;
+          isProgrammaticScrollRef.current = true;
+          listRef.current?.scrollToEnd({ animated: true });
+        }}
+        // Touching the list is the only thing that hands scroll control back to the reader.
+        onScrollBeginDrag={() => {
+          isProgrammaticScrollRef.current = false;
         }}
         onScroll={({ nativeEvent }) => {
+          if (isProgrammaticScrollRef.current) return;
           const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
           const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
           isAtBottomRef.current = distanceFromBottom <= AUTOSCROLL_BOTTOM_THRESHOLD;
