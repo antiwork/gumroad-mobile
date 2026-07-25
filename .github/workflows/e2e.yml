@@ -54,6 +54,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
+    # These have to be job-level, not per-step. app.config.ts reads them from the environment,
+    # and it is evaluated twice: once by `expo prebuild`, and again during the Gradle build by
+    # expo-constants' createExpoConfig task. Locally the second read still works because Expo
+    # loads the gitignored .env, but a CI checkout has no .env, so the config came back with
+    # ios.bundleIdentifier undefined and the expo-widgets plugin aborted the Gradle build with
+    # "iOS bundle identifier is required". Setting them for the whole job means every read of
+    # app.config.ts sees the same values, so the built APK and the package Maestro drives
+    # cannot drift apart either. These are the dev ids from .env, not the store ids in
+    # .env.build.local.
+    env:
+      ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
+      IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
+      # The smoke flow never reaches the API, so the backend URL only has to be well-formed.
+      # 10.0.2.2 is the emulator's alias for the host. Using a literal keeps this job
+      # independent of repository secrets, which is what lets it run on forks and every PR.
+      EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
+      EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
+
     steps:
       - uses: actions/checkout@v4
 
@@ -105,8 +123,6 @@ jobs:
       # placeholder with obviously-fake ids is enough to get through prebuild. Anything that
       # actually exercises Firebase needs the real file supplied as a secret.
       - name: Write a placeholder google-services.json
-        env:
-          ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
         run: |
           cat > google-services.json <<JSON
           {
@@ -131,17 +147,27 @@ jobs:
           JSON
           node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8')); console.log('placeholder google-services.json is valid JSON')"
 
-      # app.config.ts reads the package name from ANDROID_BUNDLE_NAME, so the same value has
-      # to reach both prebuild and Maestro's APP_ID. Setting it once here keeps the installed
-      # APK and the flow's target from drifting apart. This is the dev id from .env, not the
-      # store id in .env.build.local.
       - name: Generate the native Android project
-        env:
-          ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
-          IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
-          EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
-          EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
         run: npx expo prebuild --platform android --clean
+
+      # The Gradle build re-evaluates app.config.ts, and a missing bundle id only surfaces
+      # there, several minutes into the emulator step. Fail here instead, with a message that
+      # names the cause.
+      - name: Confirm the config resolves the same way Gradle will read it
+        run: |
+          npx expo config --type prebuild --json > /tmp/expo-config.json
+          node -e "
+            const c = require('/tmp/expo-config.json');
+            const missing = [
+              !c.android?.package && 'android.package (ANDROID_BUNDLE_NAME)',
+              !c.ios?.bundleIdentifier && 'ios.bundleIdentifier (IOS_BUNDLE_NAME)',
+            ].filter(Boolean);
+            if (missing.length) {
+              console.error('::error::app.config.ts resolved without ' + missing.join(', ') + '. The Gradle createExpoConfig task reads the same config, and expo-widgets aborts the build when the iOS bundle identifier is absent.');
+              process.exit(1);
+            }
+            console.log('Config resolves with android.package ' + c.android.package + ' and ios.bundleIdentifier ' + c.ios.bundleIdentifier);
+          "
 
       # Read the id back out of the generated Gradle config rather than trusting the variable
       # above: if prebuild ever resolves it differently, installing and driving the wrong
@@ -163,6 +189,15 @@ jobs:
         env:
           # Every flow declares `appId: ${APP_ID}`, so the suite cannot run without it.
           APP_ID: ${{ steps.app_id.outputs.value }}
+          # The Gradle build re-evaluates app.config.ts through expo-constants'
+          # createExpoConfig task, so these have to be present here too, not just for
+          # prebuild. Without IOS_BUNDLE_NAME that task fails the Android build with
+          # "iOS bundle identifier is required" — confusing, because nothing about this
+          # job touches iOS.
+          ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
+          IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
+          EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
+          EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
         with:
           api-level: 34
           target: google_apis
