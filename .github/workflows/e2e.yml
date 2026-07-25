@@ -98,6 +98,39 @@ jobs:
       # The smoke flow never reaches the API, so the backend URL only has to be well-formed.
       # A placeholder keeps this job independent of repository secrets, which is what lets it
       # run on forks and on every PR.
+      # app.config.ts sets googleServicesFile: "./google-services.json" unconditionally, and
+      # that file is gitignored (it carries the real Firebase project's keys), so prebuild
+      # fails on a fresh checkout with "Cannot copy google-services.json". The smoke flow
+      # never signs in for push notifications or reports analytics, so a structurally valid
+      # placeholder with obviously-fake ids is enough to get through prebuild. Anything that
+      # actually exercises Firebase needs the real file supplied as a secret.
+      - name: Write a placeholder google-services.json
+        env:
+          ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
+        run: |
+          cat > google-services.json <<JSON
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "gumroad-mobile-ci-placeholder",
+              "storage_bucket": "gumroad-mobile-ci-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                  "android_client_info": { "package_name": "${ANDROID_BUNDLE_NAME}" }
+                },
+                "oauth_client": [],
+                "api_key": [{ "current_key": "AIzaSyCI0000000000000000000000000000000" }],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+          node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8')); console.log('placeholder google-services.json is valid JSON')"
+
       # app.config.ts reads the package name from ANDROID_BUNDLE_NAME, so the same value has
       # to reach both prebuild and Maestro's APP_ID. Setting it once here keeps the installed
       # APK and the flow's target from drifting apart. This is the dev id from .env, not the
