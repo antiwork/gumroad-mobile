@@ -212,15 +212,15 @@ jobs:
             chmod +x android/gradlew
             ./android/gradlew -p android assembleDebug
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            # Every line in this block is run as its own separate shell by
+            # android-emulator-runner, so multi-line shell constructs (if/then/fi, loops,
+            # heredocs) are not possible here and variables do not carry between lines.
+            #
             # Maestro does not read APP_ID out of the surrounding shell environment; a flow
             # variable has to be handed to it with -e, which is how this repo's own
             # e2e:android:run script invokes it. Without -e, Maestro substitutes the literal
             # string "undefined" and the run dies with the misleading "Package undefined is
             # not installed" -- minutes in, after a clean build and install have succeeded.
-            if [ -z "$APP_ID" ]; then
-              echo "::error::APP_ID is empty, so Maestro would drive a package named 'undefined'."
-              exit 1
-            fi
             maestro test -p android -e APP_ID="$APP_ID" --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
 
       # A failed flow is unreadable without its recording, so upload evidence either way.
