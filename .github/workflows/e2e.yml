@@ -1,0 +1,183 @@
+name: e2e
+
+# Maestro flows drive the real app on an Android emulator. There are two jobs because the
+# flows have two very different requirements:
+#
+#   smoke  — .maestro/launch-smoke.yaml only. Installs a standalone build, launches it, and
+#            asserts the signed-out cold start lands on the login screen. It touches no
+#            backend, so it can gate every pull request. It catches the failures that matter
+#            most and are invisible to jest: a build that will not boot, a crash on launch, a
+#            broken root layout, a routing change that blanks the screen for a signed-out user.
+#
+#   suite  — the whole .maestro directory. Those flows sign in as a real seller and open real
+#            purchases, so they need a reachable Gumroad backend with seeded data (.env points
+#            at http://localhost:3000). No GitHub runner has one, so this job is manual and
+#            expects a self-hosted runner, or the Rails app booted as a service here, before it
+#            can be trusted. Wiring it to pull_request today would paint every PR red and teach
+#            everyone to ignore the check.
+on:
+  pull_request:
+    paths:
+      - ".maestro/**"
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "modules/**"
+      - "patches/**"
+      - "app.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_full_suite:
+        description: "Also run the flows that need a seeded backend"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Each run boots an emulator and builds the app, so overlapping runs on one branch just
+# compete for the runner. A newer push makes an in-flight run obsolete.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: launch smoke (no backend)
+    # The Android emulator needs nested virtualisation (KVM), which the Ubuntu runners
+    # provide and the macOS runners do not.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # --ignore-scripts skips the postinstall that applies patch-package, so run it
+      # explicitly: the repo carries patches/ that the app depends on at runtime.
+      - run: npm ci --ignore-scripts
+      - run: npx patch-package
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'package-lock.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # The smoke flow never reaches the API, so the backend URL only has to be well-formed.
+      # A placeholder keeps this job independent of repository secrets, which is what lets it
+      # run on forks and on every PR.
+      # app.config.ts reads the package name from ANDROID_BUNDLE_NAME, so the same value has
+      # to reach both prebuild and Maestro's APP_ID. Setting it once here keeps the installed
+      # APK and the flow's target from drifting apart. This is the dev id from .env, not the
+      # store id in .env.build.local.
+      - name: Generate the native Android project
+        env:
+          ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
+          IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
+          EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
+          EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
+        run: npx expo prebuild --platform android --clean
+
+      # Read the id back out of the generated Gradle config rather than trusting the variable
+      # above: if prebuild ever resolves it differently, installing and driving the wrong
+      # package would fail in a confusing way.
+      - name: Confirm the built application id
+        id: app_id
+        run: |
+          app_id=$(grep -m1 -oE 'applicationId .[^"'"'"']+' android/app/build.gradle \
+            | sed -E 's/applicationId .//')
+          if [ -z "$app_id" ]; then
+            echo "::error::Could not read applicationId from android/app/build.gradle"
+            exit 1
+          fi
+          echo "value=$app_id" >> "$GITHUB_OUTPUT"
+          echo "Built application id: $app_id"
+
+      - name: Run the launch smoke flow
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # Every flow declares `appId: ${APP_ID}`, so the suite cannot run without it.
+          APP_ID: ${{ steps.app_id.outputs.value }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          # Headless, no boot animation, no audio: nothing here needs a visible window and the
+          # emulator boots noticeably faster without them.
+          emulator-options: -no-window -no-snapshot-save -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            ./gradlew -p android assembleDebug
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            maestro test --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
+
+      # A failed flow is unreadable without its recording, so upload evidence either way.
+      - name: Upload the report and recordings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-smoke-results
+          path: |
+            maestro-report.xml
+            ~/.maestro/tests/**
+          retention-days: 14
+          if-no-files-found: warn
+
+  suite:
+    name: full suite (needs a seeded backend)
+    needs: smoke
+    if: inputs.run_full_suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deliberately fails fast and loudly rather than running flows that cannot pass. The
+      # flows sign in as mobile_seller1_do_not_edit@gumroad.com and open real purchases, so
+      # without a seeded backend every one of them fails on the login step and the output
+      # tells you nothing about the app.
+      - name: Check a seeded backend was provided
+        env:
+          BACKEND_URL: ${{ secrets.E2E_GUMROAD_URL }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::error::The full Maestro suite needs a seeded Gumroad backend, but the"
+            echo "::error::E2E_GUMROAD_URL secret is not set. See .github/workflows/e2e.yml"
+            echo "::error::for what this job still needs. The launch smoke flow runs without it."
+            exit 1
+          fi
+          echo "Using backend $BACKEND_URL"

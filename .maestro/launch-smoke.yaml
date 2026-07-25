@@ -1,0 +1,27 @@
+appId: ${APP_ID}
+---
+# Cold-start smoke test for a STANDALONE build, deliberately backend-free.
+#
+# Every other flow in this directory signs in and then reads real data, so they need a
+# seeded Gumroad backend the emulator can reach. This one asserts only what the app can do
+# on its own: install, launch, survive the unauthenticated cold-start path in app/index.tsx,
+# and land on the login screen (which renders no network data). That makes it the one flow
+# that can gate a pull request today, and it still catches the failures that matter most --
+# a build that will not boot, a crash on launch, a broken root layout, or a routing change
+# that leaves a signed-out user staring at a blank screen.
+#
+# Do NOT add assertions here that need a signed-in session or seeded products. Those belong
+# in the flows that run behind the seeded-backend job.
+- killApp
+- clearState
+- clearKeychain
+- launchApp
+
+# app/index.tsx sends a signed-out user to /login. It caps its first-launch network probe so
+# a cold start cannot hang, so the redirect must land even with no backend reachable at all.
+- extendedWaitUntil:
+    visible: "Sign in with Gumroad"
+    timeout: 45000
+
+# The button being tappable proves the screen is interactive, not a frozen first frame.
+- assertVisible: "Sign in with Gumroad"
