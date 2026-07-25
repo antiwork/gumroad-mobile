@@ -226,6 +226,20 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ci-smoke-throwaway
           ANDROID_KEY_ALIAS: ci-smoke
           ANDROID_KEY_PASSWORD: ci-smoke-throwaway
+          # A release build uploads its JavaScript source maps to Sentry, and that upload is a
+          # hard failure of the Gradle build when it cannot authenticate. android/ is
+          # gitignored, so `expo prebuild` regenerates android/sentry.properties from the
+          # @sentry/react-native config plugin, which fills in the organization from SENTRY_ORG
+          # and SENTRY_PROJECT. Those are unset here, because this job deliberately depends on
+          # no repository secrets so it can run on forks. The regenerated file therefore has no
+          # organization and sentry-cli exits 1 with "An organization ID or slug is required",
+          # failing the build after eleven minutes. Locally this is invisible: the gitignored
+          # .env sets SENTRY_ALLOW_FAILURE, which downgrades the same error to a warning.
+          #
+          # Nothing about a throwaway smoke build belongs in Sentry, so skip the upload
+          # entirely rather than tolerate its failure. The JS bundle is still built and
+          # embedded in the APK, which is all the flow needs.
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
         with:
           api-level: 34
           target: google_apis
