@@ -210,7 +210,17 @@ jobs:
           script: |
             # prebuild generates the Gradle wrapper inside android/, not at the repo root.
             chmod +x android/gradlew
-            ./android/gradlew -p android assembleDebug
+            # Build native code for the emulator's ABI only. The default in
+            # android/gradle.properties is all four (armeabi-v7a, arm64-v8a, x86, x86_64),
+            # which is right for a release build but means CMake compiles reanimated,
+            # expo-modules-core and the app three extra times for architectures this job can
+            # never run. That was 28 of the job's 45 minutes, and it left too little room for
+            # the flow itself.
+            ./android/gradlew -p android assembleDebug -PreactNativeArchitectures=x86_64
+            # Hand the emulator back the RAM and cores the build was using. The daemon
+            # otherwise stays resident for the rest of the job, and adb operations against a
+            # starved emulator can stall indefinitely rather than fail.
+            ./android/gradlew -p android --stop
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             # Every line in this block is run as its own separate shell by
             # android-emulator-runner, so multi-line shell constructs (if/then/fi, loops,
@@ -221,7 +231,14 @@ jobs:
             # e2e:android:run script invokes it. Without -e, Maestro substitutes the literal
             # string "undefined" and the run dies with the misleading "Package undefined is
             # not installed" -- minutes in, after a clean build and install have succeeded.
-            maestro test -p android -e APP_ID="$APP_ID" --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
+            #
+            # The outer `timeout` is what makes a stuck flow diagnosable. The flow's own
+            # extendedWaitUntil only bounds the wait for a view, not the adb calls before it,
+            # so a wedged emulator leaves Maestro hanging on "Clear state" until the job-level
+            # timeout cancels everything -- and a cancelled job discards the artifact upload,
+            # so you get no report and no recording, only "The operation was canceled". Failing
+            # the step ourselves keeps the evidence.
+            timeout --signal=TERM --kill-after=60s 12m maestro test -p android -e APP_ID="$APP_ID" --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
 
       # A failed flow is unreadable without its recording, so upload evidence either way.
       - name: Upload the report and recordings
