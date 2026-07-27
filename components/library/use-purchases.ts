@@ -44,7 +44,6 @@ export interface Purchase {
   content_updated_at?: string;
   purchased_at?: string;
   file_data?: PostFile[];
-  product_updates_data?: Post[];
 }
 
 export interface Seller {
@@ -143,14 +142,6 @@ export const usePurchases = (filters: ApiFilters = {}) => {
 export const useSellers = ({ seller, ...filtersWithoutSeller }: ApiFilters = {}) => {
   const { sellers } = usePurchases(filtersWithoutSeller);
   return sellers;
-};
-
-export const usePost = (urlRedirectToken: string, postExternalId: string): Post | undefined => {
-  const purchase = usePurchase(urlRedirectToken);
-  return useMemo(
-    () => purchase?.product_updates_data?.find((p) => p.external_id === postExternalId),
-    [purchase, postExternalId],
-  );
 };
 
 interface InstallmentResponse {
