@@ -1,47 +1,13 @@
 name: e2e
 
-# Maestro flows drive the real app on an Android emulator. There are two jobs because the
-# flows have two very different requirements:
-#
-#   smoke  — .maestro/launch-smoke.yaml only. Installs a standalone build, launches it, and
-#            asserts the signed-out cold start lands on the login screen. It touches no
-#            backend, so it can gate every pull request. It catches the failures that matter
-#            most and are invisible to jest: a build that will not boot, a crash on launch, a
-#            broken root layout, a routing change that blanks the screen for a signed-out user.
-#
-#   suite  — the whole .maestro directory. Those flows sign in as a real seller and open real
-#            purchases, so they need a reachable Gumroad backend with seeded data (.env points
-#            at http://localhost:3000). No GitHub runner has one, so this job is manual and
-#            expects a self-hosted runner, or the Rails app booted as a service here, before it
-#            can be trusted. Wiring it to pull_request today would paint every PR red and teach
-#            everyone to ignore the check.
 on:
   pull_request:
-    paths:
-      - ".maestro/**"
-      - "app/**"
-      - "components/**"
-      - "lib/**"
-      - "modules/**"
-      - "patches/**"
-      - "app.config.ts"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/e2e.yml"
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      run_full_suite:
-        description: "Also run the flows that need a seeded backend"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
-# Each run boots an emulator and builds the app, so overlapping runs on one branch just
-# compete for the runner. A newer push makes an in-flight run obsolete.
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
@@ -49,45 +15,21 @@ concurrency:
 jobs:
   smoke:
     name: launch smoke (no backend)
-    # The Android emulator needs nested virtualisation (KVM), which the Ubuntu runners
-    # provide and the macOS runners do not.
     runs-on: ubuntu-latest
-    # A release build costs noticeably more than the debug build this job used to make: it
-    # compiles the Hermes bundle and runs the release-only packaging tasks on top of the same
-    # native compile. Locally, x86_64-only, that was 2m for assembleDebug against 9m for
-    # assembleRelease. The old 45-minute ceiling was sized for the debug build and was already
-    # being hit, and hitting it is the worst outcome available: a cancelled job discards the
-    # artifact upload, so you lose the report and the recording and learn nothing but "The
-    # operation was canceled". The `timeout` wrapped around the flow itself is the guard that
-    # is supposed to fire, because it fails the step and keeps the evidence.
     timeout-minutes: 60
-
-    # These have to be job-level, not per-step. app.config.ts reads them from the environment,
-    # and it is evaluated twice: once by `expo prebuild`, and again during the Gradle build by
-    # expo-constants' createExpoConfig task. Locally the second read still works because Expo
-    # loads the gitignored .env, but a CI checkout has no .env, so the config came back with
-    # ios.bundleIdentifier undefined and the expo-widgets plugin aborted the Gradle build with
-    # "iOS bundle identifier is required". Setting them for the whole job means every read of
-    # app.config.ts sees the same values, so the built APK and the package Maestro drives
-    # cannot drift apart either. These are the dev ids from .env, not the store ids in
-    # .env.build.local.
     env:
       ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
       IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
-      # The smoke flow never reaches the API, so the backend URL only has to be well-formed.
-      # 10.0.2.2 is the emulator's alias for the host. Using a literal keeps this job
-      # independent of repository secrets, which is what lets it run on forks and every PR.
       EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
       EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
-      # lib/env.ts asserts these two are defined and throws at import time if either is
-      # missing, which kills the app before the first frame renders. Expo inlines every
-      # EXPO_PUBLIC_* value into the JS bundle at BUILD time, so they have to be present when
-      # the bundle is built, not merely when the app runs. Locally the gitignored .env supplies
-      # them, so a missing value is invisible until CI builds without it. These placeholders
-      # are only ever used to get past that assertion: the smoke flow stops at the login
-      # screen and never starts an OAuth exchange, so no real client id or token is involved.
       EXPO_PUBLIC_GUMROAD_CLIENT_ID: ci-smoke-placeholder-client-id
       EXPO_PUBLIC_MOBILE_TOKEN: ci-smoke-placeholder-mobile-token
+      ANDROID_KEYSTORE_PASSWORD: ci-smoke-throwaway
+      ANDROID_KEY_ALIAS: ci-smoke
+      ANDROID_KEY_PASSWORD: ci-smoke-throwaway
+      SENTRY_DISABLE_AUTO_UPLOAD: "true"
+      MAESTRO_VERSION: "2.7.0"
+      MAESTRO_CLI_NO_ANALYTICS: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -98,8 +40,6 @@ jobs:
           node-version: 20
           cache: npm
 
-      # --ignore-scripts skips the postinstall that applies patch-package, so run it
-      # explicitly: the repo carries patches/ that the app depends on at runtime.
       - run: npm ci --ignore-scripts
       - run: npx patch-package
 
@@ -120,6 +60,7 @@ jobs:
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -127,19 +68,10 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'package-lock.json') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: gradle-${{ runner.os }}-
 
-      # The smoke flow never reaches the API, so the backend URL only has to be well-formed.
-      # A placeholder keeps this job independent of repository secrets, which is what lets it
-      # run on forks and on every PR.
-      # app.config.ts sets googleServicesFile: "./google-services.json" unconditionally, and
-      # that file is gitignored (it carries the real Firebase project's keys), so prebuild
-      # fails on a fresh checkout with "Cannot copy google-services.json". The smoke flow
-      # never signs in for push notifications or reports analytics, so a structurally valid
-      # placeholder with obviously-fake ids is enough to get through prebuild. Anything that
-      # actually exercises Firebase needs the real file supplied as a secret.
-      - name: Write a placeholder google-services.json
+      - name: Write placeholder Firebase config
         run: |
           cat > google-services.json <<JSON
           {
@@ -162,34 +94,22 @@ jobs:
             "configuration_version": "1"
           }
           JSON
-          node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8')); console.log('placeholder google-services.json is valid JSON')"
+          node -e "JSON.parse(require('fs').readFileSync('google-services.json', 'utf8'))"
 
-      - name: Generate the native Android project
+      - name: Generate Android project
         run: npx expo prebuild --platform android --clean
 
-      # The Gradle build re-evaluates app.config.ts, and a missing bundle id only surfaces
-      # there, several minutes into the emulator step. Fail here instead, with a message that
-      # names the cause.
-      - name: Confirm the config resolves the same way Gradle will read it
+      - name: Validate generated config
         run: |
           npx expo config --type prebuild --json > /tmp/expo-config.json
           node -e "
-            const c = require('/tmp/expo-config.json');
-            const missing = [
-              !c.android?.package && 'android.package (ANDROID_BUNDLE_NAME)',
-              !c.ios?.bundleIdentifier && 'ios.bundleIdentifier (IOS_BUNDLE_NAME)',
-            ].filter(Boolean);
-            if (missing.length) {
-              console.error('::error::app.config.ts resolved without ' + missing.join(', ') + '. The Gradle createExpoConfig task reads the same config, and expo-widgets aborts the build when the iOS bundle identifier is absent.');
-              process.exit(1);
+            const config = require('/tmp/expo-config.json');
+            if (!config.android?.package || !config.ios?.bundleIdentifier) {
+              throw new Error('app.config.ts must resolve Android and iOS bundle identifiers');
             }
-            console.log('Config resolves with android.package ' + c.android.package + ' and ios.bundleIdentifier ' + c.ios.bundleIdentifier);
           "
 
-      # Read the id back out of the generated Gradle config rather than trusting the variable
-      # above: if prebuild ever resolves it differently, installing and driving the wrong
-      # package would fail in a confusing way.
-      - name: Confirm the built application id
+      - name: Read application ID
         id: app_id
         run: |
           app_id=$(grep -m1 -oE 'applicationId .[^"'"'"']+' android/app/build.gradle \
@@ -199,115 +119,35 @@ jobs:
             exit 1
           fi
           echo "value=$app_id" >> "$GITHUB_OUTPUT"
-          echo "Built application id: $app_id"
 
-      # The smoke flow needs a RELEASE build, and a release build has to be signed. This
-      # generates a throwaway keystore rather than carrying one as a secret: nothing here is
-      # published, and the flow only cares that the APK installs and launches. Real store
-      # builds sign with the upload keystore from the release workflow's secrets.
-      #
-      # This has to run AFTER `expo prebuild --clean`, which deletes and regenerates the whole
-      # android/ directory -- a keystore written before it silently disappears.
-      - name: Generate a throwaway signing key for the release build
+      - name: Generate signing key
         run: |
           keytool -genkeypair -v \
             -keystore android/app/upload-keystore.jks \
-            -alias ci-smoke -keyalg RSA -keysize 2048 -validity 30 \
-            -storepass ci-smoke-throwaway -keypass ci-smoke-throwaway \
+            -alias "$ANDROID_KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 30 \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" \
             -dname "CN=gumroad-mobile CI smoke, O=Gumroad, C=US"
 
-      - name: Run the launch smoke flow
+      - name: Run launch smoke
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          # Every flow declares `appId: ${APP_ID}`, so the suite cannot run without it.
           APP_ID: ${{ steps.app_id.outputs.value }}
-          # The Gradle build re-evaluates app.config.ts through expo-constants'
-          # createExpoConfig task, so these have to be present here too, not just for
-          # prebuild. Without IOS_BUNDLE_NAME that task fails the Android build with
-          # "iOS bundle identifier is required" — confusing, because nothing about this
-          # job touches iOS.
-          ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
-          IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
-          EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
-          EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
-          # Required by lib/env.ts, and inlined into the bundle by the Gradle build that runs
-          # inside this step -- so they must be here, not only on the job. See the job-level
-          # env block for why these are placeholders.
-          EXPO_PUBLIC_GUMROAD_CLIENT_ID: ci-smoke-placeholder-client-id
-          EXPO_PUBLIC_MOBILE_TOKEN: ci-smoke-placeholder-mobile-token
-          # Read by the release signingConfig in android/app/build.gradle. Throwaway values
-          # matching the keystore generated in the previous step.
-          ANDROID_KEYSTORE_PASSWORD: ci-smoke-throwaway
-          ANDROID_KEY_ALIAS: ci-smoke
-          ANDROID_KEY_PASSWORD: ci-smoke-throwaway
-          # A release build uploads its JavaScript source maps to Sentry, and that upload is a
-          # hard failure of the Gradle build when it cannot authenticate. android/ is
-          # gitignored, so `expo prebuild` regenerates android/sentry.properties from the
-          # @sentry/react-native config plugin, which fills in the organization from SENTRY_ORG
-          # and SENTRY_PROJECT. Those are unset here, because this job deliberately depends on
-          # no repository secrets so it can run on forks. The regenerated file therefore has no
-          # organization and sentry-cli exits 1 with "An organization ID or slug is required",
-          # failing the build after eleven minutes. Locally this is invisible: the gitignored
-          # .env sets SENTRY_ALLOW_FAILURE, which downgrades the same error to a warning.
-          #
-          # Nothing about a throwaway smoke build belongs in Sentry, so skip the upload
-          # entirely rather than tolerate its failure. The JS bundle is still built and
-          # embedded in the APK, which is all the flow needs.
-          SENTRY_DISABLE_AUTO_UPLOAD: "true"
         with:
           api-level: 34
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          # Headless, no boot animation, no audio: nothing here needs a visible window and the
-          # emulator boots noticeably faster without them.
           emulator-options: -no-window -no-snapshot-save -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            # prebuild generates the Gradle wrapper inside android/, not at the repo root.
             chmod +x android/gradlew
-            # RELEASE, not debug. This project depends on expo-dev-client, which makes
-            # DevLauncherActivity the launcher activity of every DEBUG build, and React
-            # Native's default `debuggableVariants = ["debug"]` means a debug APK embeds no JS
-            # bundle at all. So a debug APK cannot run the app standalone by design: it boots
-            # the "Development Build / DEVELOPMENT SERVERS / npx expo start" launcher and waits
-            # for a Metro server that no CI runner has. A release build embeds the Hermes
-            # bundle and launches MainActivity directly, which is what the flow asserts on.
-            #
-            # Build native code for the emulator's ABI only. The default in
-            # android/gradle.properties is all four (armeabi-v7a, arm64-v8a, x86, x86_64), so
-            # CMake was compiling reanimated, expo-modules-core and the app three extra times
-            # for architectures this job can never run -- 28 of the job's 45 minutes.
             ./android/gradlew -p android assembleRelease -PreactNativeArchitectures=x86_64
-            # Assert the JS bundle really is inside the APK. Without this, a variant or
-            # bundling regression reappears as the confusing "the app launched but the login
-            # screen never rendered" failure, 15 minutes into the job.
-            unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q assets/index.android.bundle || { echo "::error::app-release.apk carries no assets/index.android.bundle, so the app cannot run without a Metro server. Check react.debuggableVariants and that this is a release variant."; exit 1; }
-            # Hand the emulator back the RAM and cores the build was using. The daemon
-            # otherwise stays resident for the rest of the job, and adb operations against a
-            # starved emulator can stall indefinitely rather than fail.
+            unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q assets/index.android.bundle
             ./android/gradlew -p android --stop
             adb install -r android/app/build/outputs/apk/release/app-release.apk
-            # Every line in this block is run as its own separate shell by
-            # android-emulator-runner, so multi-line shell constructs (if/then/fi, loops,
-            # heredocs) are not possible here and variables do not carry between lines.
-            #
-            # Maestro does not read APP_ID out of the surrounding shell environment; a flow
-            # variable has to be handed to it with -e, which is how this repo's own
-            # e2e:android:run script invokes it. Without -e, Maestro substitutes the literal
-            # string "undefined" and the run dies with the misleading "Package undefined is
-            # not installed" -- minutes in, after a clean build and install have succeeded.
-            #
-            # The outer `timeout` is what makes a stuck flow diagnosable. The flow's own
-            # extendedWaitUntil only bounds the wait for a view, not the adb calls before it,
-            # so a wedged emulator leaves Maestro hanging on "Clear state" until the job-level
-            # timeout cancels everything -- and a cancelled job discards the artifact upload,
-            # so you get no report and no recording, only "The operation was canceled". Failing
-            # the step ourselves keeps the evidence.
             timeout --signal=TERM --kill-after=60s 12m maestro test -p android -e APP_ID="$APP_ID" --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
 
-      # A failed flow is unreadable without its recording, so upload evidence either way.
-      - name: Upload the report and recordings
+      - name: Upload smoke artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -317,29 +157,3 @@ jobs:
             ~/.maestro/tests/**
           retention-days: 14
           if-no-files-found: warn
-
-  suite:
-    name: full suite (needs a seeded backend)
-    needs: smoke
-    if: inputs.run_full_suite
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # Deliberately fails fast and loudly rather than running flows that cannot pass. The
-      # flows sign in as mobile_seller1_do_not_edit@gumroad.com and open real purchases, so
-      # without a seeded backend every one of them fails on the login step and the output
-      # tells you nothing about the app.
-      - name: Check a seeded backend was provided
-        env:
-          BACKEND_URL: ${{ secrets.E2E_GUMROAD_URL }}
-        run: |
-          if [ -z "$BACKEND_URL" ]; then
-            echo "::error::The full Maestro suite needs a seeded Gumroad backend, but the"
-            echo "::error::E2E_GUMROAD_URL secret is not set. See .github/workflows/e2e.yml"
-            echo "::error::for what this job still needs. The launch smoke flow runs without it."
-            exit 1
-          fi
-          echo "Using backend $BACKEND_URL"
