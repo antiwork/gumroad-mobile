@@ -2,9 +2,10 @@ import { ForceUpdateScreen } from "@/components/force-update-screen";
 import { useMinimumVersion } from "@/components/use-minimum-version";
 import { PortalHost } from "@rn-primitives/portal";
 import { useNavigationContainerRef, Stack } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useCSSVariable } from "uniwind";
 import { setupPlayer } from "../components/use-audio-player-sync";
@@ -48,6 +49,16 @@ const RootLayout = () => {
   useEffect(() => {
     setupPlayer().catch((error) => {
       console.error("Failed to setup player:", error);
+    });
+  }, []);
+
+  useEffect(() => {
+    const orientationRequest =
+      Platform.OS === "ios" && Platform.isPad
+        ? ScreenOrientation.unlockAsync()
+        : ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    orientationRequest.catch((error) => {
+      console.error("Failed to lock app orientation:", error);
     });
   }, []);
 

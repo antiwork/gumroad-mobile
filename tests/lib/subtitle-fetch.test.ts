@@ -1,0 +1,132 @@
+const mockStreamingFetch = jest.fn();
+
+jest.mock("expo/fetch", () => ({
+  fetch: (...args: unknown[]) => mockStreamingFetch(...args),
+}));
+
+import { fetchSubtitleText, MAX_SUBTITLE_BYTES } from "@/lib/subtitle-fetch";
+
+const encodeUtf16 = (text: string, littleEndian: boolean): Uint8Array => {
+  const bytes = new Uint8Array(2 + text.length * 2);
+  bytes[0] = littleEndian ? 0xff : 0xfe;
+  bytes[1] = littleEndian ? 0xfe : 0xff;
+  for (let index = 0; index < text.length; index += 1) {
+    const codeUnit = text.charCodeAt(index);
+    bytes[2 + index * 2] = littleEndian ? codeUnit & 0xff : codeUnit >> 8;
+    bytes[3 + index * 2] = littleEndian ? codeUnit >> 8 : codeUnit & 0xff;
+  }
+  return bytes;
+};
+
+const makeResponse = ({
+  chunks = [],
+  contentLength,
+  ok = true,
+  status = 200,
+}: {
+  chunks?: Uint8Array[];
+  contentLength?: number;
+  ok?: boolean;
+  status?: number;
+}) => {
+  let index = 0;
+  const cancel = jest.fn().mockResolvedValue(undefined);
+  const read = jest.fn(async () =>
+    index < chunks.length ? { value: chunks[index++], done: false } : { value: undefined, done: true },
+  );
+
+  return {
+    response: {
+      ok,
+      status,
+      headers: {
+        get: (name: string) =>
+          name === "content-length" && contentLength !== undefined ? String(contentLength) : null,
+      },
+      body: {
+        getReader: () => ({ read, cancel }),
+      },
+    },
+    cancel,
+    read,
+  };
+};
+
+describe("fetchSubtitleText", () => {
+  beforeEach(() => {
+    mockStreamingFetch.mockReset();
+  });
+
+  it("decodes a streamed subtitle response", async () => {
+    const encoder = new TextEncoder();
+    const { response, cancel } = makeResponse({
+      chunks: [encoder.encode("caption "), encoder.encode("text")],
+      contentLength: 12,
+    });
+    mockStreamingFetch.mockResolvedValue(response);
+
+    await expect(fetchSubtitleText("https://example.com/captions.srt")).resolves.toBe("caption text");
+    expect(cancel).toHaveBeenCalled();
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
+
+  it.each([
+    ["UTF-16LE", true],
+    ["UTF-16BE", false],
+  ])("decodes a BOM-marked %s response across chunk boundaries", async (_encoding, littleEndian) => {
+    const bytes = encodeUtf16("Caption ✓", littleEndian);
+    const { response } = makeResponse({
+      chunks: [bytes.slice(0, 1), bytes.slice(1, 5), bytes.slice(5)],
+      contentLength: bytes.byteLength,
+    });
+    mockStreamingFetch.mockResolvedValue(response);
+
+    await expect(fetchSubtitleText("https://example.com/captions.srt")).resolves.toBe("Caption ✓");
+  });
+
+  it("rejects a declared file size over the limit before reading the body", async () => {
+    const { response, read } = makeResponse({ contentLength: MAX_SUBTITLE_BYTES + 1 });
+    mockStreamingFetch.mockResolvedValue(response);
+
+    await expect(fetchSubtitleText("https://example.com/captions.srt")).rejects.toThrow("exceeds");
+    expect(read).not.toHaveBeenCalled();
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
+
+  it("cancels an undeclared stream as soon as it exceeds the limit", async () => {
+    const { response, cancel } = makeResponse({ chunks: [new Uint8Array(MAX_SUBTITLE_BYTES + 1)] });
+    mockStreamingFetch.mockResolvedValue(response);
+
+    await expect(fetchSubtitleText("https://example.com/captions.srt")).rejects.toThrow("exceeds");
+    expect(cancel).toHaveBeenCalled();
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
+
+  it("rejects a non-success response", async () => {
+    const { response } = makeResponse({ ok: false, status: 403 });
+    mockStreamingFetch.mockResolvedValue(response);
+
+    await expect(fetchSubtitleText("https://example.com/captions.srt")).rejects.toThrow("status 403");
+  });
+
+  it("aborts a stalled request when the caller cancels it", async () => {
+    const controller = new AbortController();
+    mockStreamingFetch.mockReturnValue(new Promise(() => {}));
+
+    const request = fetchSubtitleText("https://example.com/captions.srt", { signal: controller.signal });
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError", message: "Subtitle request aborted" });
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
+
+  it("times out a stalled response", async () => {
+    mockStreamingFetch.mockReturnValue(new Promise(() => {}));
+
+    await expect(fetchSubtitleText("https://example.com/captions.srt", { timeoutMs: 1 })).rejects.toMatchObject({
+      name: "AbortError",
+      message: "Subtitle request timed out",
+    });
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
+});
