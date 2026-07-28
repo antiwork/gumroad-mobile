@@ -18,6 +18,8 @@ const SBV_TIMING_LINE = new RegExp(`^\\s*(${TIMESTAMP.source})\\s*,\\s*(${TIMEST
 
 const MICRODVD_TIMING_LINE = /^\{(\d+)\}\{(\d*)\}(.*)$/u;
 
+const MICRODVD_STYLE_TAG = /\{(?:[yY]:[bius]+|[fF]:[^}]+|[sS]:\d+|[cC]:\$?[0-9a-f]{6})\}/giu;
+
 const DEFAULT_MICRODVD_FRAMES_PER_SECOND = 25;
 
 const parseTimestamp = (raw: string): number | null => {
@@ -28,12 +30,7 @@ const parseTimestamp = (raw: string): number | null => {
 };
 
 const stripMarkup = (text: string): string =>
-  decodeHTMLStrict(
-    text
-      .replace(/<[^>]*>/gu, "")
-      .replace(/\{[^}]*\}/gu, "")
-      .replace(/\[br\]/giu, "\n"),
-  );
+  decodeHTMLStrict(text.replace(/<[^>]*>/gu, "").replace(/\[br\]/giu, "\n"));
 
 const normalize = (raw: string): string => raw.replace(/^\uFEFF/u, "").replace(/\r\n?/gu, "\n");
 
@@ -55,7 +52,7 @@ const parseMicroDvd = (content: string): SubtitleCue[] => {
     }
     if (!endFrameRaw || endFrame <= startFrame) continue;
 
-    const text = stripMarkup(rawText.replace(/\|/gu, "\n")).trim();
+    const text = stripMarkup(rawText.replace(MICRODVD_STYLE_TAG, "").replace(/\|/gu, "\n")).trim();
     if (!text) continue;
     if (cues.length >= MAX_SUBTITLE_CUES) throw new Error(`Subtitle track exceeds the ${MAX_SUBTITLE_CUES}-cue limit`);
     cues.push({ start: startFrame / framesPerSecond, end: endFrame / framesPerSecond, text });

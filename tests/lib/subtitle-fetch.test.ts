@@ -6,6 +6,18 @@ jest.mock("expo/fetch", () => ({
 
 import { fetchSubtitleText, MAX_SUBTITLE_BYTES } from "@/lib/subtitle-fetch";
 
+const encodeUtf16 = (text: string, littleEndian: boolean): Uint8Array => {
+  const bytes = new Uint8Array(2 + text.length * 2);
+  bytes[0] = littleEndian ? 0xff : 0xfe;
+  bytes[1] = littleEndian ? 0xfe : 0xff;
+  for (let index = 0; index < text.length; index += 1) {
+    const codeUnit = text.charCodeAt(index);
+    bytes[2 + index * 2] = littleEndian ? codeUnit & 0xff : codeUnit >> 8;
+    bytes[3 + index * 2] = littleEndian ? codeUnit >> 8 : codeUnit & 0xff;
+  }
+  return bytes;
+};
+
 const makeResponse = ({
   chunks = [],
   contentLength,
@@ -56,6 +68,20 @@ describe("fetchSubtitleText", () => {
     await expect(fetchSubtitleText("https://example.com/captions.srt")).resolves.toBe("caption text");
     expect(cancel).toHaveBeenCalled();
     expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
+
+  it.each([
+    ["UTF-16LE", true],
+    ["UTF-16BE", false],
+  ])("decodes a BOM-marked %s response across chunk boundaries", async (_encoding, littleEndian) => {
+    const bytes = encodeUtf16("Caption ✓", littleEndian);
+    const { response } = makeResponse({
+      chunks: [bytes.slice(0, 1), bytes.slice(1, 5), bytes.slice(5)],
+      contentLength: bytes.byteLength,
+    });
+    mockStreamingFetch.mockResolvedValue(response);
+
+    await expect(fetchSubtitleText("https://example.com/captions.srt")).resolves.toBe("Caption ✓");
   });
 
   it("rejects a declared file size over the limit before reading the body", async () => {

@@ -517,15 +517,17 @@ export default function VideoPlayerScreen() {
     restoreAppOrientation();
   };
 
+  const videoSurfaceType = externalTracks.length > 0 ? "textureView" : "surfaceView";
   const renderVideoSurface = (fullscreen: boolean) => (
     <View style={styles.videoSurface}>
       <VideoView
+        key={videoSurfaceType}
         testID={fullscreen ? "fullscreen-video-player" : "video-player"}
         accessibilityLabel={playbackStarted ? "Video playback started" : "Video playback waiting"}
         style={styles.video}
         player={player}
         allowsPictureInPicture={!externalCaptionSelected}
-        surfaceType="textureView"
+        surfaceType={videoSurfaceType}
         onFullscreenEnter={handleNativeFullscreenEnter}
         onFullscreenExit={handleNativeFullscreenExit}
         fullscreenOptions={{

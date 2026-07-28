@@ -14,6 +14,33 @@ const abortError = (timedOut: boolean) => {
   return error;
 };
 
+const decodeUtf16 = (bytes: Uint8Array, littleEndian: boolean): string => {
+  const parts: string[] = [];
+  const codeUnits: number[] = [];
+  for (let index = 2; index + 1 < bytes.byteLength; index += 2) {
+    codeUnits.push(littleEndian ? bytes[index] | (bytes[index + 1] << 8) : (bytes[index] << 8) | bytes[index + 1]);
+    if (codeUnits.length === 8_192) {
+      parts.push(String.fromCharCode(...codeUnits));
+      codeUnits.length = 0;
+    }
+  }
+  if (codeUnits.length > 0) parts.push(String.fromCharCode(...codeUnits));
+  if ((bytes.byteLength - 2) % 2 !== 0) parts.push("\uFFFD");
+  return parts.join("");
+};
+
+const decodeSubtitleBytes = (chunks: Uint8Array[], byteLength: number): string => {
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return decodeUtf16(bytes, true);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return decodeUtf16(bytes, false);
+  return new TextDecoder().decode(bytes);
+};
+
 export const fetchSubtitleText = async (
   url: string,
   { signal, timeoutMs = SUBTITLE_FETCH_TIMEOUT_MS }: SubtitleFetchOptions = {},
@@ -56,8 +83,7 @@ export const fetchSubtitleText = async (
     if (!response.body) throw new Error("Subtitle response has no readable body");
 
     reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    const chunks: string[] = [];
+    const chunks: Uint8Array[] = [];
     let receivedBytes = 0;
     for (;;) {
       const { value, done } = await abortable(reader.read());
@@ -66,10 +92,9 @@ export const fetchSubtitleText = async (
       if (receivedBytes > MAX_SUBTITLE_BYTES) {
         throw new Error(`Subtitle file exceeds the ${MAX_SUBTITLE_BYTES}-byte limit`);
       }
-      chunks.push(decoder.decode(value, { stream: true }));
+      chunks.push(value);
     }
-    chunks.push(decoder.decode());
-    return chunks.join("");
+    return decodeSubtitleBytes(chunks, receivedBytes);
   } finally {
     clearTimeout(timeout);
     signal?.removeEventListener("abort", forwardAbort);

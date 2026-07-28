@@ -429,6 +429,7 @@ External caption text
       const { queryByTestId } = renderScreen();
       await act(async () => {});
       expect(queryByTestId("captions-button")).toBeNull();
+      expect(queryByTestId("video-player")?.props.surfaceType).toBe("surfaceView");
     });
 
     it("fetches, parses, and renders an external subtitle track when selected", async () => {

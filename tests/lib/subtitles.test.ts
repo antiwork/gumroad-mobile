@@ -33,11 +33,11 @@ First cue
 
 intro-cue
 00:00:05.000 --> 00:00:06.000
-<v Speaker>Tagged {b}text{/b}</v>
+<v Speaker>Tagged <b>text</b> with {product}</v>
 `;
     expect(parseSubtitles(vtt)).toEqual([
       { start: 1, end: 4, text: "First cue" },
-      { start: 5, end: 6, text: "Tagged text" },
+      { start: 5, end: 6, text: "Tagged text with {product}" },
     ]);
   });
 
@@ -59,9 +59,9 @@ SBV cue text
 
   it("parses frame-based MicroDVD SUB cues", () => {
     const sub = `{1}{1}25.000
-{25}{50}{y:i}First line|Second line
+{25}{50}{y:i}First {product}|Second line
 `;
-    expect(parseSubtitles(sub)).toEqual([{ start: 1, end: 2, text: "First line\nSecond line" }]);
+    expect(parseSubtitles(sub)).toEqual([{ start: 1, end: 2, text: "First {product}\nSecond line" }]);
   });
 
   it("parses SubViewer line breaks", () => {
