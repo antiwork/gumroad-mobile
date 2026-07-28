@@ -128,11 +128,8 @@ jobs:
             -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" \
             -dname "CN=gumroad-mobile CI smoke, O=Gumroad, C=US"
 
-      # Built before the emulator starts. A long Gradle build running while the emulator
-      # is up starves the emulator of CPU, which makes Android's home screen stop
-      # responding and put an "isn't responding" dialog on top of the app. Maestro then
-      # inspects that dialog instead of our login screen and the smoke test fails even
-      # though the app started fine.
+      # Must stay ahead of the emulator step: a Gradle build competing with a running
+      # emulator starves it of CPU and the smoke test fails on an unresponsive device.
       - name: Build release APK
         run: |
           chmod +x android/gradlew
@@ -152,10 +149,8 @@ jobs:
           emulator-options: -no-window -no-snapshot-save -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            # A second line of defence: if some other process on the emulator still stops
-            # responding, keep its dialog from covering the app under test. A crash in
-            # our own app is still caught, because a crashed app is absent from the
-            # screen and the login assertion fails anyway.
+            # Stops a stalled system process from putting a dialog over the app under
+            # test. A crash in our own app still fails the launch assertion.
             adb shell settings put global hide_error_dialogs 1
             adb install -r android/app/build/outputs/apk/release/app-release.apk
             timeout --signal=TERM --kill-after=60s 12m maestro test -p android -e APP_ID="$APP_ID" --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
