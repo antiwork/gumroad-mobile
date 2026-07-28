@@ -67,7 +67,7 @@ export const parseSubtitles = (content: string): SubtitleCue[] => {
   if (microDvdCues.length > 0) return microDvdCues;
 
   const blocks = normalizedContent
-    .split(/\n{2,}/u)
+    .split(/\n(?:[^\S\n]*\n)+/u)
     .map((block) => block.trim())
     .filter(Boolean);
 

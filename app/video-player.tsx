@@ -199,6 +199,7 @@ export default function VideoPlayerScreen() {
 
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
+    player.allowsExternalPlayback = true;
     player.staysActiveInBackground = false;
     player.timeUpdateEventInterval = 0.25;
     if (initialPosition) {
@@ -235,6 +236,12 @@ export default function VideoPlayerScreen() {
   }, [player]);
 
   useEffect(() => () => withReleasedPlayerGuard(() => player.pause()), [player]);
+
+  useEffect(() => {
+    withReleasedPlayerGuard(() => {
+      player.allowsExternalPlayback = selection.type !== "external";
+    });
+  }, [player, selection.type]);
 
   useEffect(() => {
     const subscription = player.addListener(

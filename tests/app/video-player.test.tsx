@@ -17,6 +17,7 @@ const mockPlayer = {
   playing: true,
   currentTime: 0,
   timeUpdateEventInterval: 0,
+  allowsExternalPlayback: true,
   subtitleTrack: null as unknown,
   availableSubtitleTracks: [] as { language: string; label: string }[],
   play: jest.fn(),
@@ -103,6 +104,7 @@ describe("VideoPlayerScreen", () => {
     mockPlayer.loop = false;
     mockPlayer.currentTime = 0;
     mockPlayer.timeUpdateEventInterval = 0;
+    mockPlayer.allowsExternalPlayback = true;
     mockPlayer.subtitleTrack = null;
     mockPlayer.availableSubtitleTracks = [];
     appStateCallback = null;
@@ -446,7 +448,28 @@ External caption text
         signal: expect.any(AbortSignal),
       });
       expect(mockPlayer.subtitleTrack).toBeNull();
+      expect(mockPlayer.allowsExternalPlayback).toBe(false);
       expect(getByText("External caption text")).toBeTruthy();
+    });
+
+    it("restores external playback when external captions are turned off", async () => {
+      const { getByTestId, getByText } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      expect(mockPlayer.allowsExternalPlayback).toBe(false);
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("Off"));
+      });
+      expect(mockPlayer.allowsExternalPlayback).toBe(true);
     });
 
     it("disables the embedded track when an external track is selected", async () => {

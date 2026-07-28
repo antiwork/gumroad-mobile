@@ -57,6 +57,22 @@ SBV cue text
     expect(parseSubtitles(sbv)).toEqual([{ start: 1, end: 3, text: "SBV cue text" }]);
   });
 
+  it("separates cues when blank lines contain spaces or tabs", () => {
+    const blankLine = " \t ";
+    const srt = `1
+00:00:01,000 --> 00:00:02,000
+First cue
+${blankLine}
+2
+00:00:03,000 --> 00:00:04,000
+Second cue
+`;
+    expect(parseSubtitles(srt)).toEqual([
+      { start: 1, end: 2, text: "First cue" },
+      { start: 3, end: 4, text: "Second cue" },
+    ]);
+  });
+
   it("parses frame-based MicroDVD SUB cues", () => {
     const sub = `{1}{1}25.000
 {25}{50}{y:i}First {product}|Second line
