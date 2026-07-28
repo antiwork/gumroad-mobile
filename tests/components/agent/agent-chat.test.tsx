@@ -623,6 +623,31 @@ describe("AgentChat", () => {
     expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
   });
 
+  it("re-pins when sending replaces an active auto-scroll", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => list.props.onContentSizeChange(0, 2000));
+    fireEvent.changeText(screen.getByLabelText("Message"), "follow up");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    act(() => list.props.onMomentumScrollEnd(scrollEvent(1050)));
+    scrollToEnd.mockClear();
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
   it("keeps keyboard avoidance active on Android", () => {
     const originalOS = Platform.OS;
     Platform.OS = "android";

@@ -236,7 +236,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     isReaderMomentumPendingRef.current = false;
     isReaderMomentumRef.current = false;
     ignoresInterruptedReaderMomentumRef.current = interruptsReaderMomentum;
-    programmaticScrollCountRef.current = interruptsReaderMomentum ? 2 : 1;
+    programmaticScrollCountRef.current += interruptsReaderMomentum ? 2 : 1;
     setHasContentGrownSinceReaderScroll(false);
     listRef.current?.scrollToEnd({ animated: true });
 
