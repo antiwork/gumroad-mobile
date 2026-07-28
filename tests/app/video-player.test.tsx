@@ -961,6 +961,31 @@ External caption text
       expect(StatusBar.setHidden).not.toHaveBeenCalledWith(false, "fade");
     });
 
+    it("retries a failed stream lookup after the access token refreshes", async () => {
+      jest.spyOn(console, "warn").mockImplementation();
+      mockSearchParams = {
+        uri: "https://example.com/video.mp4",
+        streamingUrl: "mobile/url_redirects/stream/token/file",
+        title: "Test Video",
+      };
+      mockRequestAPI.mockRejectedValueOnce(new Error("Unauthorized")).mockResolvedValueOnce({
+        playlist_url: "https://example.com/index.m3u8",
+        subtitles: [{ url: "https://example.com/captions.srt", language: "English" }],
+      });
+      const { getByTestId, queryByTestId } = renderScreen();
+      await act(async () => {});
+      expect(queryByTestId("captions-button")).toBeNull();
+
+      await act(async () => {
+        mockSetAccessToken!("refreshed-token");
+      });
+
+      expect(mockRequestAPI).toHaveBeenNthCalledWith(2, "mobile/url_redirects/stream/token/file", {
+        accessToken: "refreshed-token",
+      });
+      expect(getByTestId("captions-button")).toBeTruthy();
+    });
+
     it("ignores a stale subtitle fetch when the buyer selects Off before it resolves", async () => {
       let resolveFetch: (value: string) => void;
       mockFetchSubtitleText.mockReturnValue(

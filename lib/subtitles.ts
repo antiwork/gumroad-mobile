@@ -66,8 +66,10 @@ const parseMicroDvd = (content: string): SubtitleCue[] => {
 
 export const parseSubtitles = (content: string): SubtitleCue[] => {
   const normalizedContent = normalize(content);
-  const microDvdCues = parseMicroDvd(normalizedContent);
-  if (microDvdCues.length > 0) return microDvdCues;
+  const hasTimeBasedTimingLine = normalizedContent
+    .split("\n")
+    .some((line) => SRT_VTT_TIMING_LINE.test(line) || SBV_TIMING_LINE.test(line));
+  if (!hasTimeBasedTimingLine) return parseMicroDvd(normalizedContent);
 
   const blocks = normalizedContent
     .split(/\n(?:[^\S\n]*\n)+/u)

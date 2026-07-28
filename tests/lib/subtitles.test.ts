@@ -88,6 +88,14 @@ Second cue
     expect(parseSubtitles(sub)).toEqual([{ start: 1, end: 2, text: "First {product}\nSecond line" }]);
   });
 
+  it("does not treat MicroDVD-shaped SRT cue text as frame timings", () => {
+    const srt = `1
+00:00:01,000 --> 00:00:04,000
+{25}{50}example
+`;
+    expect(parseSubtitles(srt)).toEqual([{ start: 1, end: 4, text: "{25}{50}example" }]);
+  });
+
   it("parses SubViewer line breaks", () => {
     const sub = `0:00:01.000,0:00:03.000
 First line[br]Second line

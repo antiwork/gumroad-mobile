@@ -228,7 +228,6 @@ export default function VideoPlayerScreen() {
         if (cancelled) return;
         console.warn("Failed to fetch streaming URL, falling back to direct URL:", error);
         Sentry.captureException(error);
-        resolvedMediaIdentityRef.current = { uri, streamingUrl };
         setVideoUrl(uri);
       } finally {
         if (!cancelled) setIsLoading(false);
