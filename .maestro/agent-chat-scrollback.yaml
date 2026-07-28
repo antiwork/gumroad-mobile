@@ -49,6 +49,8 @@ appId: ${APP_ID}
 - assertVisible:
     text: "Message"
     enabled: false
+- tapOn:
+    id: "agent-content-growth-.*"
 - assertVisible:
     id: "agent-content-growth-pending"
 - extendedWaitUntil:

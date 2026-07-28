@@ -150,6 +150,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const programmaticScrollCountRef = useRef(0);
   const ignoresInterruptedReaderMomentumRef = useRef(false);
   const lastScrollOffsetRef = useRef(0);
+  const momentumHandoffFrameRef = useRef<number | null>(null);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
   // resolves, their new chat wins and we skip hydration.
@@ -228,6 +229,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
 
     hasSentMessageRef.current = true;
     isAtBottomRef.current = true;
+    if (momentumHandoffFrameRef.current !== null) cancelAnimationFrame(momentumHandoffFrameRef.current);
+    momentumHandoffFrameRef.current = null;
     const interruptsReaderMomentum = isReaderMomentumPendingRef.current || isReaderMomentumRef.current;
     isReaderDraggingRef.current = false;
     isReaderMomentumPendingRef.current = false;
@@ -298,6 +301,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           listRef.current?.scrollToEnd({ animated: true });
         }}
         onScrollBeginDrag={() => {
+          if (momentumHandoffFrameRef.current !== null) cancelAnimationFrame(momentumHandoffFrameRef.current);
+          momentumHandoffFrameRef.current = null;
           programmaticScrollCountRef.current = 0;
           ignoresInterruptedReaderMomentumRef.current = false;
           setHasContentGrownSinceReaderScroll(false);
@@ -325,10 +330,16 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         onScrollEndDrag={({ nativeEvent }) => {
           isAtBottomRef.current = isNearBottom(nativeEvent);
           isReaderDraggingRef.current = false;
-          isReaderMomentumPendingRef.current = Boolean(nativeEvent.velocity?.y);
+          isReaderMomentumPendingRef.current = true;
+          momentumHandoffFrameRef.current = requestAnimationFrame(() => {
+            isReaderMomentumPendingRef.current = false;
+            momentumHandoffFrameRef.current = null;
+          });
         }}
         onMomentumScrollBegin={() => {
           if (!isReaderMomentumPendingRef.current) return;
+          if (momentumHandoffFrameRef.current !== null) cancelAnimationFrame(momentumHandoffFrameRef.current);
+          momentumHandoffFrameRef.current = null;
           isReaderMomentumPendingRef.current = false;
           isReaderMomentumRef.current = true;
         }}
@@ -392,6 +403,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
       <View className="border-t border-border p-4">
         <View
           className="relative rounded border border-border bg-background"
+          onTouchEnd={() => setHasContentGrownSinceReaderScroll(false)}
           testID={hasContentGrownSinceReaderScroll ? "agent-content-growth-observed" : "agent-content-growth-pending"}
         >
           <TextInput

@@ -393,8 +393,9 @@ describe("AgentChat", () => {
     act(() => {
       list.props.onScrollBeginDrag();
       list.props.onScroll(scrollEvent(1400));
-      list.props.onScrollEndDrag(scrollEvent(1400));
+      list.props.onScrollEndDrag(scrollEvent(1400, 2000, 600, -1));
     });
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
     scrollToEnd.mockClear();
 
     act(() => list.props.onContentSizeChange(0, 2400));
