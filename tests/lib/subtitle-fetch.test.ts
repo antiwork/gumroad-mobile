@@ -55,6 +55,7 @@ describe("fetchSubtitleText", () => {
 
     await expect(fetchSubtitleText("https://example.com/captions.srt")).resolves.toBe("caption text");
     expect(cancel).toHaveBeenCalled();
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
   });
 
   it("rejects a declared file size over the limit before reading the body", async () => {
@@ -63,6 +64,7 @@ describe("fetchSubtitleText", () => {
 
     await expect(fetchSubtitleText("https://example.com/captions.srt")).rejects.toThrow("exceeds");
     expect(read).not.toHaveBeenCalled();
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
   });
 
   it("cancels an undeclared stream as soon as it exceeds the limit", async () => {
@@ -71,6 +73,7 @@ describe("fetchSubtitleText", () => {
 
     await expect(fetchSubtitleText("https://example.com/captions.srt")).rejects.toThrow("exceeds");
     expect(cancel).toHaveBeenCalled();
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
   });
 
   it("rejects a non-success response", async () => {

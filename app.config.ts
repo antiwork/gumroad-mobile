@@ -12,7 +12,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     buildNumber: "1",
     supportsTablet: true,
-    requireFullScreen: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
       UIBackgroundModes: ["audio", "remote-notification", "fetch"],

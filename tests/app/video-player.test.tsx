@@ -1,4 +1,4 @@
-import { AppState, StyleSheet } from "react-native";
+import { AppState, Modal, StyleSheet } from "react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
 type StatusChangePayload = { status: string; error?: { message: string } };
@@ -8,6 +8,7 @@ let subtitleTrackChangeListener: ((payload: { subtitleTrack: unknown }) => void)
 let timeUpdateListener: ((payload: TimeUpdatePayload) => void) | null = null;
 const mockSubscriptionRemove = jest.fn();
 const mockLockAsync = jest.fn().mockResolvedValue(undefined);
+const mockUnlockAsync = jest.fn().mockResolvedValue(undefined);
 const mockFetchSubtitleText = jest.fn();
 
 const mockPlayer = {
@@ -45,6 +46,7 @@ jest.mock("expo-video", () => {
 
 jest.mock("expo-screen-orientation", () => ({
   lockAsync: (...args: unknown[]) => mockLockAsync(...args),
+  unlockAsync: (...args: unknown[]) => mockUnlockAsync(...args),
   OrientationLock: {
     PORTRAIT_UP: "portrait-up",
     LANDSCAPE: "landscape",
@@ -110,6 +112,7 @@ describe("VideoPlayerScreen", () => {
     mockSearchParams = { uri: "https://example.com/video.mp4", title: "Test Video" };
     mockRequestAPI.mockReset();
     mockLockAsync.mockResolvedValue(undefined);
+    mockUnlockAsync.mockResolvedValue(undefined);
     mockFetchSubtitleText.mockReset();
 
     jest.spyOn(AppState, "addEventListener").mockImplementation((_type, callback) => {
@@ -424,7 +427,8 @@ External caption text
     });
 
     it("keeps external captions selected when disabling the embedded track emits a native event", async () => {
-      const { getByLabelText, getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
+      const { getByLabelText, getByTestId, getByText, queryByTestId, UNSAFE_getAllByType } =
+        await renderWithExternalTrack();
 
       await act(async () => {
         fireEvent.press(getByTestId("captions-button"));
@@ -450,10 +454,16 @@ External caption text
       expect(getByTestId("fullscreen-video-player")).toBeTruthy();
       expect(queryByTestId("subtitle-overlay")).toBeTruthy();
       expect(mockLockAsync).toHaveBeenCalledWith("landscape");
+      const dismissFullscreen = UNSAFE_getAllByType(Modal).find(
+        (modal) => modal.props.testID === "external-caption-fullscreen",
+      )?.props.onDismiss;
+      expect(dismissFullscreen).toEqual(expect.any(Function));
 
       await act(async () => {
         fireEvent.press(getByLabelText("Exit fullscreen"));
       });
+      expect(mockLockAsync).not.toHaveBeenCalledWith("portrait-up");
+      act(() => dismissFullscreen?.());
       expect(getByTestId("video-player")).toBeTruthy();
       expect(queryByTestId("fullscreen-video-player")).toBeNull();
       expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
@@ -483,8 +493,37 @@ External caption text
       expect(getByTestId("fullscreen-video-player")).toBeTruthy();
     });
 
-    it("exits external-caption fullscreen and restores portrait when playback fails", async () => {
+    it("does not mount the fullscreen modal until the landscape lock finishes", async () => {
+      let resolveLock: () => void;
+      mockLockAsync.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveLock = resolve;
+        }),
+      );
       const { getByLabelText, getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      act(() => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
+
+      expect(queryByTestId("fullscreen-video-player")).toBeNull();
+
+      await act(async () => {
+        resolveLock!();
+      });
+
+      expect(getByTestId("fullscreen-video-player")).toBeTruthy();
+    });
+
+    it("exits external-caption fullscreen and restores portrait when playback fails", async () => {
+      const { getByLabelText, getByTestId, getByText, queryByTestId, UNSAFE_getAllByType } =
+        await renderWithExternalTrack();
 
       await act(async () => {
         fireEvent.press(getByTestId("captions-button"));
@@ -500,6 +539,11 @@ External caption text
       await act(async () => {
         statusChangeListener!({ status: "error", error: { message: "Playback failed" } });
       });
+      const dismissFullscreen = UNSAFE_getAllByType(Modal).find(
+        (modal) => modal.props.testID === "external-caption-fullscreen",
+      )?.props.onDismiss;
+      expect(dismissFullscreen).toEqual(expect.any(Function));
+      act(() => dismissFullscreen?.());
 
       expect(queryByTestId("fullscreen-video-player")).toBeNull();
       expect(getByText("This video failed to load")).toBeTruthy();

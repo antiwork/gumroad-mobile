@@ -15,7 +15,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useVideoPlayer, VideoView, type SubtitleTrack, type VideoPlayerStatus } from "expo-video";
 import { useEffect, useRef, useState } from "react";
-import { AppState, type AppStateStatus, FlatList, Modal, Pressable, StyleSheet, View } from "react-native";
+import { AppState, type AppStateStatus, FlatList, Modal, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ExternalSubtitleTrack = {
@@ -90,6 +90,7 @@ export default function VideoPlayerScreen() {
   const [captionSheetOpen, setCaptionSheetOpen] = useState(false);
   const [externalFullscreenOpen, setExternalFullscreenOpen] = useState(false);
   const [fullscreenCaptionPickerOpen, setFullscreenCaptionPickerOpen] = useState(false);
+  const [pendingPlaybackError, setPendingPlaybackError] = useState<string | null>(null);
   const cueCacheRef = useRef<Map<string, SubtitleCue[]>>(new Map());
   const captionRequestIdRef = useRef(0);
   const selectionRef = useRef<CaptionSelection>({ type: "off" });
@@ -107,6 +108,7 @@ export default function VideoPlayerScreen() {
     setCaptionSheetOpen(false);
     setExternalFullscreenOpen(false);
     setFullscreenCaptionPickerOpen(false);
+    setPendingPlaybackError(null);
 
     const resolveVideoUrl = async () => {
       if (!accessToken) return;
@@ -184,7 +186,17 @@ export default function VideoPlayerScreen() {
         if (status === "error") {
           setFullscreenCaptionPickerOpen(false);
           setExternalFullscreenOpen(false);
-          setPlaybackError(error?.message ?? "Unknown playback error");
+          const message = error?.message ?? "Unknown playback error";
+          if (externalFullscreenOpen && Platform.OS === "ios") {
+            setPendingPlaybackError(message);
+          } else {
+            if (externalFullscreenOpen) {
+              ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((orientationError) =>
+                Sentry.captureException(orientationError),
+              );
+            }
+            setPlaybackError(message);
+          }
         } else if (status === "readyToPlay") {
           setPlaybackError(null);
           withReleasedPlayerGuard(() => {
@@ -203,7 +215,7 @@ export default function VideoPlayerScreen() {
       },
     );
     return () => subscription.remove();
-  }, [player]);
+  }, [externalFullscreenOpen, player]);
 
   useEffect(() => {
     const subscription = player.addListener(
@@ -249,26 +261,6 @@ export default function VideoPlayerScreen() {
     });
     return () => subscription.remove();
   }, [player, externalCues]);
-
-  useEffect(() => {
-    if (!externalFullscreenOpen) return;
-
-    let active = true;
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
-      .then(() => {
-        if (!active) {
-          return ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-        }
-      })
-      .catch((error) => Sentry.captureException(error));
-
-    return () => {
-      active = false;
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
-        Sentry.captureException(error),
-      );
-    };
-  }, [externalFullscreenOpen]);
 
   useEffect(() => {
     const startingPosition = initialPosition ? Number(initialPosition) : 0;
@@ -393,6 +385,39 @@ export default function VideoPlayerScreen() {
     </Pressable>
   );
 
+  const enterExternalFullscreen = async () => {
+    try {
+      if (Platform.OS === "ios" && Platform.isPad) {
+        await ScreenOrientation.unlockAsync();
+      } else {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      }
+    } catch (error) {
+      Sentry.captureException(error);
+    }
+    setExternalFullscreenOpen(true);
+  };
+
+  const exitExternalFullscreen = () => {
+    setFullscreenCaptionPickerOpen(false);
+    setExternalFullscreenOpen(false);
+    if (Platform.OS !== "ios") {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
+        Sentry.captureException(error),
+      );
+    }
+  };
+
+  const handleExternalFullscreenDismiss = () => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
+      Sentry.captureException(error),
+    );
+    if (pendingPlaybackError) {
+      setPlaybackError(pendingPlaybackError);
+      setPendingPlaybackError(null);
+    }
+  };
+
   const renderVideoSurface = (fullscreen: boolean) => (
     <View style={styles.videoSurface}>
       <VideoView
@@ -439,10 +464,7 @@ export default function VideoPlayerScreen() {
           testID="fullscreen-header"
         >
           <Pressable
-            onPress={() => {
-              setFullscreenCaptionPickerOpen(false);
-              setExternalFullscreenOpen(false);
-            }}
+            onPress={exitExternalFullscreen}
             accessibilityRole="button"
             accessibilityLabel="Exit fullscreen"
             style={styles.fullscreenAction}
@@ -543,7 +565,7 @@ export default function VideoPlayerScreen() {
                 <View className="flex-row items-center">
                   {externalCaptionSelected ? (
                     <Pressable
-                      onPress={() => setExternalFullscreenOpen(true)}
+                      onPress={enterExternalFullscreen}
                       accessibilityRole="button"
                       accessibilityLabel="Enter fullscreen"
                       className="p-2"
@@ -568,13 +590,12 @@ export default function VideoPlayerScreen() {
       {externalFullscreenOpen ? null : renderVideoSurface(false)}
       <Modal
         visible={externalFullscreenOpen}
+        testID="external-caption-fullscreen"
         animationType="fade"
         presentationStyle="fullScreen"
-        supportedOrientations={["landscape", "landscape-left", "landscape-right"]}
-        onRequestClose={() => {
-          setFullscreenCaptionPickerOpen(false);
-          setExternalFullscreenOpen(false);
-        }}
+        supportedOrientations={["portrait", "landscape", "landscape-left", "landscape-right"]}
+        onRequestClose={exitExternalFullscreen}
+        onDismiss={handleExternalFullscreenDismiss}
       >
         <View style={styles.container}>{renderVideoSurface(true)}</View>
       </Modal>
