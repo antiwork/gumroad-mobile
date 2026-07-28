@@ -109,7 +109,9 @@ const MessageBubble = ({
       <View className={isUser ? "max-w-[85%]" : "w-full"}>
         {isUser ? (
           <View className="rounded-2xl rounded-br-md bg-accent px-4 py-2">
-            <Text className="text-accent-foreground">{message.content}</Text>
+            <Text className="text-accent-foreground" testID="agent-user-message-content">
+              {message.content}
+            </Text>
           </View>
         ) : (
           <Text className="text-foreground" testID="agent-assistant-message-content">
@@ -407,6 +409,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           testID={hasContentGrownSinceReaderScroll ? "agent-content-growth-observed" : "agent-content-growth-pending"}
         >
           <TextInput
+            testID={isSending ? "agent-message-input-sending" : "agent-message-input-ready"}
             className="max-h-32 py-3 pr-16 pl-3 font-sans text-base text-foreground"
             placeholder="Ask about your store or describe a change..."
             placeholderTextColor={mutedColor}

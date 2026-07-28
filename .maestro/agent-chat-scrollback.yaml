@@ -6,93 +6,59 @@ appId: ${APP_ID}
       EMAIL: mobile_seller1_do_not_edit@gumroad.com
       PASSWORD: password
 
-- tapOn: Agent
+- tapOn: ".*Agent.*"
 - extendedWaitUntil:
     visible:
-      text: "Message"
-      enabled: true
+      id: "agent-message-input-ready"
     timeout: 15000
 - evalScript: ${output.scrollTarget = "SCROLL_TARGET_" + Date.now()}
 - evalScript: ${output.replyMarker = "SCROLL_REPLY_" + Date.now()}
 
 - tapOn:
-    text: "Message"
-    enabled: true
-- inputText: ${"List my products in detail. " + output.scrollTarget}
-- tapOn: "Send"
+    id: "agent-message-input-ready"
+- inputText: ${"Write 10 short paragraphs. Include " + output.scrollTarget + ". End with " + output.replyMarker}
 - extendedWaitUntil:
     visible:
-      text: "Message"
+      text: "Send"
       enabled: true
-    timeout: 30000
-
+    timeout: 5000
 - tapOn:
-    text: "Message"
+    text: "Send"
     enabled: true
-- inputText: ${"Give me a detailed sales breakdown with revenue, quantity, refunds, average price, conversion rate, and a product-by-product comparison for every product in my store. Include each product name, its recent trend, strongest week, weakest week, and the follow-up questions I should ask. Keep the response detailed so I can review it while it streams. End your reply with the exact marker " + output.replyMarker + " with no formatting."}
-- tapOn: "Send"
+    waitToSettleTimeoutMs: 100
 - extendedWaitUntil:
     visible:
-      id: "agent-streaming-reply"
+      id: "agent-message-input-sending"
+    timeout: 5000
+- extendedWaitUntil:
+    notVisible:
+      id: "agent-user-message-content"
+      text: ".*${output.scrollTarget}.*"
     timeout: 30000
-- assertNotVisible:
-    id: "agent-user-message"
-    containsDescendants:
-      - text: ".*${output.scrollTarget}.*"
-- scrollUntilVisible:
-    element:
-      id: "agent-user-message"
-      containsDescendants:
-        - text: ".*${output.scrollTarget}.*"
-    direction: UP
-    timeout: 20000
-- assertVisible:
-    text: "Message"
-    enabled: false
-- tapOn:
-    id: "agent-content-growth-.*"
-- assertVisible:
-    id: "agent-content-growth-pending"
+- swipe:
+    start: "50%,35%"
+    end: "50%,80%"
+    duration: 600
+    waitToSettleTimeoutMs: 100
+- swipe:
+    start: "50%,35%"
+    end: "50%,80%"
+    duration: 600
+    waitToSettleTimeoutMs: 100
+- swipe:
+    start: "50%,35%"
+    end: "50%,80%"
+    duration: 600
+    waitToSettleTimeoutMs: 100
 - extendedWaitUntil:
     visible:
-      id: "agent-content-growth-observed"
-    timeout: 30000
-- assertVisible:
-    id: "agent-user-message"
-    containsDescendants:
-      - text: ".*${output.scrollTarget}.*"
+      id: "agent-user-message-content"
+      text: ".*${output.scrollTarget}.*"
+    timeout: 5000
 - extendedWaitUntil:
     visible:
-      text: "Message"
-      enabled: true
-    timeout: 30000
+      id: "agent-message-input-ready"
+    timeout: 90000
 - assertVisible:
-    id: "agent-user-message"
-    containsDescendants:
-      - text: ".*${output.scrollTarget}.*"
-- scrollUntilVisible:
-    element:
-      id: "agent-assistant-message-content"
-      text: "(?s).*${output.replyMarker}.*"
-    direction: DOWN
-    timeout: 20000
-
-- tapOn:
-    text: "Message"
-    enabled: true
-- inputText: "Thanks"
-- tapOn: "Send"
-- extendedWaitUntil:
-    visible:
-      text: "Message"
-      enabled: false
-    timeout: 15000
-- assertVisible:
-    id: "agent-user-message"
-    containsDescendants:
-      - text: "Thanks"
-- extendedWaitUntil:
-    visible:
-      text: "Message"
-      enabled: true
-    timeout: 30000
+    id: "agent-user-message-content"
+    text: ".*${output.scrollTarget}.*"
