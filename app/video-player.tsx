@@ -6,16 +6,27 @@ import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
-import { fetchSubtitleText } from "@/lib/subtitle-fetch";
+import { fetchSubtitleText, SubtitleFetchError } from "@/lib/subtitle-fetch";
 import { activeCueText, parseSubtitles, type SubtitleCue } from "@/lib/subtitles";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
+import * as NavigationBar from "expo-navigation-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useVideoPlayer, VideoView, type SubtitleTrack, type VideoPlayerStatus } from "expo-video";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, type AppStateStatus, FlatList, Modal, Platform, Pressable, StyleSheet, View } from "react-native";
+import {
+  AppState,
+  type AppStateStatus,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ExternalSubtitleTrack = {
@@ -65,6 +76,25 @@ const prepareFullscreenOrientation = async (): Promise<boolean> => {
   } catch (error) {
     Sentry.captureException(error);
     return false;
+  }
+};
+
+const hideFullscreenSystemBars = async (): Promise<boolean> => {
+  try {
+    StatusBar.setHidden(true, "fade");
+    if (Platform.OS === "android") await NavigationBar.setVisibilityAsync("hidden");
+    return true;
+  } catch (error) {
+    StatusBar.setHidden(false, "fade");
+    Sentry.captureException(error);
+    return false;
+  }
+};
+
+const restoreFullscreenSystemBars = () => {
+  StatusBar.setHidden(false, "fade");
+  if (Platform.OS === "android") {
+    NavigationBar.setVisibilityAsync("visible").catch((error) => Sentry.captureException(error));
   }
 };
 
@@ -138,6 +168,7 @@ export default function VideoPlayerScreen() {
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
       cancelCaptionRequest();
+      restoreFullscreenSystemBars();
       restoreAppOrientation();
     };
   }, [cancelCaptionRequest]);
@@ -151,6 +182,7 @@ export default function VideoPlayerScreen() {
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
       setFullscreenTransitionPending(false);
+      restoreFullscreenSystemBars();
       restoreAppOrientation();
     } else if (Platform.OS === "ios" && fullscreenOrientationActiveRef.current) {
       fullscreenTransitionPendingRef.current = true;
@@ -261,6 +293,7 @@ export default function VideoPlayerScreen() {
               fullscreenOrientationActiveRef.current = false;
               fullscreenTransitionPendingRef.current = false;
               setFullscreenTransitionPending(false);
+              restoreFullscreenSystemBars();
               restoreAppOrientation();
             }
             setPlaybackError(message);
@@ -398,20 +431,46 @@ export default function VideoPlayerScreen() {
     });
     setExternalCues([]);
     setCurrentCueText(null);
-    const track = externalTracks[nextSelection.index];
+    let track = externalTracks[nextSelection.index];
     if (!track) return;
+
+    const loadCues = async (subtitleTrack: ExternalSubtitleTrack) => {
+      const cachedCues = cueCacheRef.current.get(subtitleTrack.url);
+      if (cachedCues) return cachedCues;
+
+      const controller = new AbortController();
+      captionAbortControllerRef.current = controller;
+      try {
+        const parsedCues = parseSubtitles(await fetchSubtitleText(subtitleTrack.url, { signal: controller.signal }));
+        if (parsedCues.length === 0) throw new Error("Subtitle track contains no valid cues");
+        cueCacheRef.current.set(subtitleTrack.url, parsedCues);
+        return parsedCues;
+      } finally {
+        if (captionAbortControllerRef.current === controller) captionAbortControllerRef.current = null;
+      }
+    };
+
     try {
-      let cues = cueCacheRef.current.get(track.url);
-      if (!cues) {
-        const controller = new AbortController();
-        captionAbortControllerRef.current = controller;
-        try {
-          cues = parseSubtitles(await fetchSubtitleText(track.url, { signal: controller.signal }));
-        } finally {
-          if (captionAbortControllerRef.current === controller) captionAbortControllerRef.current = null;
+      let cues: SubtitleCue[];
+      try {
+        cues = await loadCues(track);
+      } catch (error) {
+        if (
+          !(error instanceof SubtitleFetchError) ||
+          (error.status !== 401 && error.status !== 403) ||
+          !streamingUrl ||
+          !accessToken
+        ) {
+          throw error;
         }
-        if (cues.length === 0) throw new Error("Subtitle track contains no valid cues");
-        cueCacheRef.current.set(track.url, cues);
+
+        const refreshedStream = await fetchStreamData(streamingUrl, accessToken);
+        if (captionRequestIdRef.current !== requestId) return;
+        const refreshedTracks = refreshedStream.subtitles ?? [];
+        track = refreshedTracks[nextSelection.index];
+        if (!track) throw error;
+        setExternalTracks(refreshedTracks);
+        cues = await loadCues(track);
       }
       if (captionRequestIdRef.current !== requestId) return;
       setExternalCues(cues);
@@ -466,12 +525,20 @@ export default function VideoPlayerScreen() {
     setFullscreenTransitionPending(true);
     const requestId = ++fullscreenRequestIdRef.current;
     const orientationApplied = await prepareFullscreenOrientation();
+    const systemBarsHidden = orientationApplied ? await hideFullscreenSystemBars() : false;
     if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
       if (orientationApplied) restoreAppOrientation();
+      if (systemBarsHidden) restoreFullscreenSystemBars();
       if (mountedRef.current) {
         fullscreenTransitionPendingRef.current = false;
         setFullscreenTransitionPending(false);
       }
+      return;
+    }
+    if (!orientationApplied || !systemBarsHidden) {
+      if (orientationApplied) restoreAppOrientation();
+      fullscreenTransitionPendingRef.current = false;
+      setFullscreenTransitionPending(false);
       return;
     }
     fullscreenOrientationActiveRef.current = orientationApplied;
@@ -491,6 +558,7 @@ export default function VideoPlayerScreen() {
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
       setFullscreenTransitionPending(false);
+      restoreFullscreenSystemBars();
       restoreAppOrientation();
     }
   };
@@ -499,6 +567,7 @@ export default function VideoPlayerScreen() {
     fullscreenOrientationActiveRef.current = false;
     fullscreenTransitionPendingRef.current = false;
     setFullscreenTransitionPending(false);
+    restoreFullscreenSystemBars();
     restoreAppOrientation();
     if (pendingPlaybackError) {
       setPlaybackError(pendingPlaybackError);

@@ -8,6 +8,13 @@ type SubtitleFetchOptions = {
   timeoutMs?: number;
 };
 
+export class SubtitleFetchError extends Error {
+  constructor(readonly status: number) {
+    super(`Subtitle fetch failed with status ${status}`);
+    this.name = "SubtitleFetchError";
+  }
+}
+
 const abortError = (timedOut: boolean) => {
   const error = new Error(timedOut ? "Subtitle request timed out" : "Subtitle request aborted");
   error.name = "AbortError";
@@ -73,7 +80,7 @@ export const fetchSubtitleText = async (
 
   try {
     const response = await abortable(streamingFetch(url, { signal: controller.signal }));
-    if (!response.ok) throw new Error(`Subtitle fetch failed with status ${response.status}`);
+    if (!response.ok) throw new SubtitleFetchError(response.status);
 
     const contentLength = Number(response.headers.get("content-length"));
     if (Number.isFinite(contentLength) && contentLength > MAX_SUBTITLE_BYTES) {

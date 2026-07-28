@@ -20,6 +20,9 @@ const MICRODVD_TIMING_LINE = /^\{(\d+)\}\{(\d*)\}(.*)$/u;
 
 const MICRODVD_STYLE_TAG = /\{(?:[yY]:[bius]+|[fF]:[^}]+|[sS]:\d+|[cC]:\$?[0-9a-f]{6})\}/giu;
 
+const SUBTITLE_MARKUP_TAG =
+  /<\/?(?:b|i|u|s|font|ruby|rt|v|lang|c(?:\.[^\s>.]+)*)(?:\s+[^>]*)?>|<(?:\d{1,2}:)?\d{2}:\d{2}\.\d{3}>/giu;
+
 const DEFAULT_MICRODVD_FRAMES_PER_SECOND = 25;
 
 const parseTimestamp = (raw: string): number | null => {
@@ -30,7 +33,7 @@ const parseTimestamp = (raw: string): number | null => {
 };
 
 const stripMarkup = (text: string): string =>
-  decodeHTMLStrict(text.replace(/<[^>]*>/gu, "").replace(/\[br\]/giu, "\n"));
+  decodeHTMLStrict(text.replace(SUBTITLE_MARKUP_TAG, "").replace(/\[br\]/giu, "\n"));
 
 const normalize = (raw: string): string => raw.replace(/^\uFEFF/u, "").replace(/\r\n?/gu, "\n");
 

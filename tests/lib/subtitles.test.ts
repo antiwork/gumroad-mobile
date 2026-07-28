@@ -50,6 +50,14 @@ intro-cue
     expect(parseSubtitles(vtt)).toEqual([{ start: 1, end: 4, text: "Olá & Ria<3\u00A0'today'" }]);
   });
 
+  it("preserves literal and unknown angle-bracket text", () => {
+    const srt = `1
+00:00:01,000 --> 00:00:04,000
+if (x < limit && y > 0), return Array<T>
+`;
+    expect(parseSubtitles(srt)).toEqual([{ start: 1, end: 4, text: "if (x < limit && y > 0), return Array<T>" }]);
+  });
+
   it("parses SBV cues", () => {
     const sbv = `0:00:01.000,0:00:03.000
 SBV cue text

@@ -1,4 +1,4 @@
-import { AppState, Modal, StyleSheet } from "react-native";
+import { AppState, Modal, Platform, StatusBar, StyleSheet } from "react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
 type StatusChangePayload = { status: string; error?: { message: string } };
@@ -10,6 +10,11 @@ const mockSubscriptionRemove = jest.fn();
 const mockLockAsync = jest.fn().mockResolvedValue(undefined);
 const mockUnlockAsync = jest.fn().mockResolvedValue(undefined);
 const mockFetchSubtitleText = jest.fn();
+const mockSetNavigationBarVisibilityAsync = jest.fn().mockResolvedValue(undefined);
+
+jest.mock("expo-navigation-bar", () => ({
+  setVisibilityAsync: (...args: unknown[]) => mockSetNavigationBarVisibilityAsync(...args),
+}));
 
 const mockPlayer = {
   loop: false,
@@ -54,9 +59,21 @@ jest.mock("expo-screen-orientation", () => ({
   },
 }));
 
-jest.mock("@/lib/subtitle-fetch", () => ({
-  fetchSubtitleText: (...args: unknown[]) => mockFetchSubtitleText(...args),
-}));
+jest.mock("@/lib/subtitle-fetch", () => {
+  class SubtitleFetchError extends Error {
+    readonly status: number;
+
+    constructor(mockStatus: number) {
+      super(`Subtitle fetch failed with status ${mockStatus}`);
+      this.name = "SubtitleFetchError";
+      this.status = mockStatus;
+    }
+  }
+  return {
+    fetchSubtitleText: (...args: unknown[]) => mockFetchSubtitleText(...args),
+    SubtitleFetchError,
+  };
+});
 
 let mockSearchParams: Record<string, string> = { uri: "https://example.com/video.mp4", title: "Test Video" };
 
@@ -116,11 +133,13 @@ describe("VideoPlayerScreen", () => {
     mockLockAsync.mockResolvedValue(undefined);
     mockUnlockAsync.mockResolvedValue(undefined);
     mockFetchSubtitleText.mockReset();
+    mockSetNavigationBarVisibilityAsync.mockResolvedValue(undefined);
 
     jest.spyOn(AppState, "addEventListener").mockImplementation((_type, callback) => {
       appStateCallback = callback as (state: string) => void;
       return { remove: mockRemove } as ReturnType<typeof AppState.addEventListener>;
     });
+    jest.spyOn(StatusBar, "setHidden").mockImplementation();
   });
 
   afterEach(() => {
@@ -550,6 +569,7 @@ External caption text
       await act(async () => {
         fireEvent.press(getByLabelText("Enter fullscreen"));
       });
+      expect(StatusBar.setHidden).toHaveBeenCalledWith(true, "fade");
       expect(queryByTestId("video-player")).toBeNull();
       expect(getByTestId("fullscreen-video-player")).toBeTruthy();
       expect(queryByTestId("subtitle-overlay")).toBeTruthy();
@@ -564,9 +584,39 @@ External caption text
       });
       expect(mockLockAsync).not.toHaveBeenCalledWith("portrait-up");
       act(() => dismissFullscreen?.());
+      expect(StatusBar.setHidden).toHaveBeenCalledWith(false, "fade");
       expect(getByTestId("video-player")).toBeTruthy();
       expect(queryByTestId("fullscreen-video-player")).toBeNull();
       expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+    });
+
+    it("hides and restores Android system bars around external-caption fullscreen", async () => {
+      const originalPlatform = Platform.OS;
+      Object.defineProperty(Platform, "OS", { configurable: true, value: "android" });
+      try {
+        const { getByLabelText, getByTestId, getByText } = await renderWithExternalTrack();
+
+        await act(async () => {
+          fireEvent.press(getByTestId("captions-button"));
+        });
+        await act(async () => {
+          fireEvent.press(getByText("English"));
+        });
+        await act(async () => {
+          fireEvent.press(getByLabelText("Enter fullscreen"));
+        });
+
+        expect(StatusBar.setHidden).toHaveBeenCalledWith(true, "fade");
+        expect(mockSetNavigationBarVisibilityAsync).toHaveBeenCalledWith("hidden");
+
+        await act(async () => {
+          fireEvent.press(getByLabelText("Exit fullscreen"));
+        });
+        expect(StatusBar.setHidden).toHaveBeenCalledWith(false, "fade");
+        expect(mockSetNavigationBarVisibilityAsync).toHaveBeenCalledWith("visible");
+      } finally {
+        Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform });
+      }
     });
 
     it("opens the caption picker inside external-caption fullscreen", async () => {
@@ -855,6 +905,29 @@ External caption text
       });
 
       expect(mockFetchSubtitleText).toHaveBeenCalledTimes(2);
+    });
+
+    it("refreshes an expired subtitle URL and retries once", async () => {
+      const MockedSubtitleFetchError = jest.requireMock("@/lib/subtitle-fetch").SubtitleFetchError;
+      mockFetchSubtitleText.mockRejectedValueOnce(new MockedSubtitleFetchError(403)).mockResolvedValueOnce(SRT);
+      const { getByTestId, getByText } = await renderWithExternalTrack();
+      mockRequestAPI.mockResolvedValueOnce({
+        playlist_url: "https://example.com/index.m3u8",
+        subtitles: [{ url: "https://example.com/fresh-captions.srt", language: "English" }],
+      });
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+
+      expect(mockRequestAPI).toHaveBeenCalledTimes(2);
+      expect(mockFetchSubtitleText).toHaveBeenNthCalledWith(2, "https://example.com/fresh-captions.srt", {
+        signal: expect.any(AbortSignal),
+      });
+      expect(getByText("External caption text")).toBeTruthy();
     });
 
     it("ignores a stale subtitle fetch when the buyer selects Off before it resolves", async () => {

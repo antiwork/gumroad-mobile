@@ -4549,6 +4549,14 @@ expo-modules-core@55.0.18:
   dependencies:
     invariant "^2.2.4"
 
+expo-navigation-bar@~55.0.15:
+  version "55.0.15"
+  resolved "https://registry.yarnpkg.com/expo-navigation-bar/-/expo-navigation-bar-55.0.15.tgz#aed85610984efb6e9ed22ecdf8728d8faa2707d2"
+  integrity sha512-NZmgT8tf4keaYf3bNK4ZyRIyutwXrhlz2NBfMegJO1mRTyV1YUjblmqUY0NY4ZFLb1fEUYCt6tZLnKxlYiEO7Q==
+  dependencies:
+    debug "^4.3.2"
+    react-native-is-edge-to-edge "^1.2.1"
+
 expo-notifications@~55.0.14:
   version "55.0.14"
   resolved "https://registry.npmjs.org/expo-notifications/-/expo-notifications-55.0.14.tgz"
