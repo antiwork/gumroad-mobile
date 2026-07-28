@@ -154,7 +154,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const lastScrollOffsetRef = useRef(0);
   const momentumHandoffFrameRef = useRef<number | null>(null);
   const hasDeferredBottomGrowthRef = useRef(false);
-  const shouldFollowAfterMomentumRef = useRef(false);
+  const shouldFollowAfterGestureRef = useRef(false);
   const isBottomBounceRef = useRef(false);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
@@ -241,7 +241,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     isReaderMomentumPendingRef.current = false;
     isReaderMomentumRef.current = false;
     hasDeferredBottomGrowthRef.current = false;
-    shouldFollowAfterMomentumRef.current = false;
+    shouldFollowAfterGestureRef.current = false;
     isBottomBounceRef.current = false;
     ignoresInterruptedReaderMomentumRef.current = interruptsReaderMomentum;
     programmaticScrollCountRef.current += interruptsReaderMomentum ? 2 : 1;
@@ -303,8 +303,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             !isAtBottomRef.current;
           if (readerOwnsScroll) {
             if (
-              (isReaderMomentumPendingRef.current || isReaderMomentumRef.current) &&
-              shouldFollowAfterMomentumRef.current
+              (isReaderDraggingRef.current || isReaderMomentumPendingRef.current || isReaderMomentumRef.current) &&
+              shouldFollowAfterGestureRef.current
             )
               hasDeferredBottomGrowthRef.current = true;
             setHasContentGrownSinceReaderScroll(true);
@@ -314,6 +314,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           listRef.current?.scrollToEnd({ animated: true });
         }}
         onScrollBeginDrag={() => {
+          const startedAtBottom = isAtBottomRef.current;
           if (momentumHandoffFrameRef.current !== null) cancelAnimationFrame(momentumHandoffFrameRef.current);
           momentumHandoffFrameRef.current = null;
           programmaticScrollCountRef.current = 0;
@@ -323,7 +324,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           isReaderMomentumPendingRef.current = false;
           isReaderMomentumRef.current = false;
           hasDeferredBottomGrowthRef.current = false;
-          shouldFollowAfterMomentumRef.current = false;
+          shouldFollowAfterGestureRef.current = startedAtBottom;
           isBottomBounceRef.current = false;
           isAtBottomRef.current = false;
         }}
@@ -333,7 +334,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           lastScrollOffsetRef.current = currentOffset;
           const maximumOffset = Math.max(0, nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height);
           const isPastBottom = currentOffset > maximumOffset;
-          const isBottomBounceBack = isBottomBounceRef.current && movedUp;
+          const isBottomBounceBack = isBottomBounceRef.current && movedUp && !isReaderDraggingRef.current;
           if (isPastBottom) isBottomBounceRef.current = true;
           if (ignoresInterruptedReaderMomentumRef.current) return;
           if (
@@ -350,25 +351,30 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             if (
               !isBottomBounceBack &&
               !isAtBottom &&
-              (isReaderMomentumPendingRef.current || isReaderMomentumRef.current)
+              (isReaderDraggingRef.current || isReaderMomentumPendingRef.current || isReaderMomentumRef.current)
             )
-              shouldFollowAfterMomentumRef.current = false;
+              shouldFollowAfterGestureRef.current = false;
+            if (isReaderDraggingRef.current && !isAtBottom) isBottomBounceRef.current = false;
           }
-          if (isReaderMomentumRef.current && !movedUp && isAtBottom) shouldFollowAfterMomentumRef.current = true;
+          if ((isReaderDraggingRef.current && isAtBottom) || (isReaderMomentumRef.current && !movedUp && isAtBottom))
+            shouldFollowAfterGestureRef.current = true;
           isAtBottomRef.current = isAtBottom;
         }}
         onScrollEndDrag={({ nativeEvent }) => {
+          const movedUpAtRelease = nativeEvent.contentOffset.y < lastScrollOffsetRef.current;
+          lastScrollOffsetRef.current = nativeEvent.contentOffset.y;
           isAtBottomRef.current = isNearBottom(nativeEvent);
+          if (movedUpAtRelease && !isAtBottomRef.current) shouldFollowAfterGestureRef.current = false;
           isReaderDraggingRef.current = false;
           isReaderMomentumPendingRef.current = true;
-          hasDeferredBottomGrowthRef.current = false;
-          shouldFollowAfterMomentumRef.current = isAtBottomRef.current;
+          shouldFollowAfterGestureRef.current =
+            isAtBottomRef.current || (hasDeferredBottomGrowthRef.current && shouldFollowAfterGestureRef.current);
           momentumHandoffFrameRef.current = requestAnimationFrame(() => {
             isReaderMomentumPendingRef.current = false;
             momentumHandoffFrameRef.current = null;
-            const shouldCatchUp = hasDeferredBottomGrowthRef.current && shouldFollowAfterMomentumRef.current;
+            const shouldCatchUp = hasDeferredBottomGrowthRef.current && shouldFollowAfterGestureRef.current;
             hasDeferredBottomGrowthRef.current = false;
-            shouldFollowAfterMomentumRef.current = false;
+            shouldFollowAfterGestureRef.current = false;
             isBottomBounceRef.current = false;
             if (!shouldCatchUp) return;
             programmaticScrollCountRef.current += 1;
@@ -391,9 +397,9 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             return;
           }
           if (isReaderMomentumRef.current) {
-            const shouldCatchUp = hasDeferredBottomGrowthRef.current && shouldFollowAfterMomentumRef.current;
+            const shouldCatchUp = hasDeferredBottomGrowthRef.current && shouldFollowAfterGestureRef.current;
             hasDeferredBottomGrowthRef.current = false;
-            shouldFollowAfterMomentumRef.current = false;
+            shouldFollowAfterGestureRef.current = false;
             if (shouldCatchUp) {
               isAtBottomRef.current = true;
               isReaderMomentumRef.current = false;
