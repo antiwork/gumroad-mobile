@@ -147,7 +147,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const isReaderDraggingRef = useRef(false);
   const isReaderMomentumPendingRef = useRef(false);
   const isReaderMomentumRef = useRef(false);
-  const isProgrammaticScrollRef = useRef(false);
+  const programmaticScrollCountRef = useRef(0);
+  const ignoresInterruptedReaderMomentumRef = useRef(false);
   const lastScrollOffsetRef = useRef(0);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
@@ -227,11 +228,14 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
 
     hasSentMessageRef.current = true;
     isAtBottomRef.current = true;
+    const interruptsReaderMomentum = isReaderMomentumPendingRef.current || isReaderMomentumRef.current;
     isReaderDraggingRef.current = false;
     isReaderMomentumPendingRef.current = false;
     isReaderMomentumRef.current = false;
-    isProgrammaticScrollRef.current = false;
+    ignoresInterruptedReaderMomentumRef.current = interruptsReaderMomentum;
+    programmaticScrollCountRef.current = interruptsReaderMomentum ? 2 : 1;
     setHasContentGrownSinceReaderScroll(false);
+    listRef.current?.scrollToEnd({ animated: true });
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -290,11 +294,12 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             setHasContentGrownSinceReaderScroll(true);
             return;
           }
-          isProgrammaticScrollRef.current = true;
+          programmaticScrollCountRef.current += 1;
           listRef.current?.scrollToEnd({ animated: true });
         }}
         onScrollBeginDrag={() => {
-          isProgrammaticScrollRef.current = false;
+          programmaticScrollCountRef.current = 0;
+          ignoresInterruptedReaderMomentumRef.current = false;
           setHasContentGrownSinceReaderScroll(false);
           isReaderDraggingRef.current = true;
           isReaderMomentumPendingRef.current = false;
@@ -305,15 +310,16 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           const currentOffset = nativeEvent.contentOffset.y;
           const movedUp = currentOffset < lastScrollOffsetRef.current;
           lastScrollOffsetRef.current = currentOffset;
+          if (ignoresInterruptedReaderMomentumRef.current) return;
           if (
-            isProgrammaticScrollRef.current &&
+            programmaticScrollCountRef.current > 0 &&
             !movedUp &&
             !isReaderDraggingRef.current &&
             !isReaderMomentumPendingRef.current &&
             !isReaderMomentumRef.current
           )
             return;
-          if (movedUp) isProgrammaticScrollRef.current = false;
+          if (movedUp) programmaticScrollCountRef.current = 0;
           isAtBottomRef.current = isNearBottom(nativeEvent);
         }}
         onScrollEndDrag={({ nativeEvent }) => {
@@ -328,10 +334,20 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         }}
         onMomentumScrollEnd={({ nativeEvent }) => {
           if (isReaderDraggingRef.current || isReaderMomentumPendingRef.current) return;
-          if (!isReaderMomentumRef.current && !isProgrammaticScrollRef.current) return;
+          if (ignoresInterruptedReaderMomentumRef.current) {
+            ignoresInterruptedReaderMomentumRef.current = false;
+            programmaticScrollCountRef.current = Math.max(0, programmaticScrollCountRef.current - 1);
+            return;
+          }
+          if (isReaderMomentumRef.current) {
+            isAtBottomRef.current = isNearBottom(nativeEvent);
+            isReaderMomentumRef.current = false;
+            return;
+          }
+          if (programmaticScrollCountRef.current === 0) return;
+          programmaticScrollCountRef.current -= 1;
+          if (programmaticScrollCountRef.current > 0) return;
           isAtBottomRef.current = isNearBottom(nativeEvent);
-          isReaderMomentumRef.current = false;
-          isProgrammaticScrollRef.current = false;
         }}
         scrollEventThrottle={16}
         renderItem={({ item, index }) => (
