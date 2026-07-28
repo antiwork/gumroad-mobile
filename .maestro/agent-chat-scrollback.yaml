@@ -12,11 +12,13 @@ appId: ${APP_ID}
       text: "Message"
       enabled: true
     timeout: 15000
+- evalScript: ${output.scrollTarget = "SCROLL_TARGET_" + Date.now()}
+- evalScript: ${output.replyMarker = "SCROLL_REPLY_" + Date.now()}
 
 - tapOn:
     text: "Message"
     enabled: true
-- inputText: "List my products in detail"
+- inputText: ${"List my products in detail. " + output.scrollTarget}
 - tapOn: "Send"
 - extendedWaitUntil:
     visible:
@@ -27,15 +29,21 @@ appId: ${APP_ID}
 - tapOn:
     text: "Message"
     enabled: true
-- inputText: "Give me a detailed sales breakdown with revenue, quantity, refunds, average price, conversion rate, and a product-by-product comparison for every product in my store. Include each product name, its recent trend, strongest week, weakest week, and the follow-up questions I should ask. Keep the response detailed so I can review it while it streams."
+- inputText: ${"Give me a detailed sales breakdown with revenue, quantity, refunds, average price, conversion rate, and a product-by-product comparison for every product in my store. Include each product name, its recent trend, strongest week, weakest week, and the follow-up questions I should ask. Keep the response detailed so I can review it while it streams. End your reply with the exact marker " + output.replyMarker + " with no formatting."}
 - tapOn: "Send"
 - extendedWaitUntil:
     visible:
       id: "agent-streaming-reply"
     timeout: 30000
-- assertNotVisible: "List my products in detail"
+- assertNotVisible:
+    id: "agent-user-message"
+    containsDescendants:
+      - text: ".*${output.scrollTarget}.*"
 - scrollUntilVisible:
-    element: "List my products in detail"
+    element:
+      id: "agent-user-message"
+      containsDescendants:
+        - text: ".*${output.scrollTarget}.*"
     direction: UP
     timeout: 20000
 - assertVisible:
@@ -49,10 +57,13 @@ appId: ${APP_ID}
       text: "Message"
       enabled: true
     timeout: 30000
-- assertVisible: "List my products in detail"
+- assertVisible:
+    id: "agent-user-message"
+    containsDescendants:
+      - text: ".*${output.scrollTarget}.*"
 - copyTextFrom:
     id: "agent-assistant-message-content"
-    index: 2
+    text: "(?s).*${output.replyMarker}.*"
 - evalScript: ${output.completedReply = maestro.copiedText}
 - assertTrue:
     condition: ${output.completedReply.length > output.replyAfterScroll.length}
