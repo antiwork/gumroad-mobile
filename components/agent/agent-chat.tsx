@@ -13,10 +13,14 @@ import { useAuthedRequest } from "@/lib/authed-request";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, TextInput, View } from "react-native";
+import { FlatList, KeyboardAvoidingView, type NativeScrollEvent, Platform, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 const IOS_KEYBOARD_VERTICAL_OFFSET = 88;
+const AUTOSCROLL_BOTTOM_THRESHOLD = 24;
+
+const isNearBottom = ({ contentOffset, contentSize, layoutMeasurement }: NativeScrollEvent) =>
+  contentSize.height - contentOffset.y - layoutMeasurement.height <= AUTOSCROLL_BOTTOM_THRESHOLD;
 
 interface DisplayMessage extends ChatMessage {
   proposedAction?: ProposedAction;
@@ -97,14 +101,22 @@ const MessageBubble = ({
 }) => {
   const isUser = message.role === "user";
   return (
-    <View className={isUser ? "items-end" : "items-start"} accessibilityLabel={isUser ? "You" : "Assistant"}>
+    <View
+      className={isUser ? "items-end" : "items-start"}
+      accessibilityLabel={isUser ? "You" : "Assistant"}
+      testID={isUser ? "agent-user-message" : "agent-assistant-message"}
+    >
       <View className={isUser ? "max-w-[85%]" : "w-full"}>
         {isUser ? (
           <View className="rounded-2xl rounded-br-md bg-accent px-4 py-2">
-            <Text className="text-accent-foreground">{message.content}</Text>
+            <Text className="text-accent-foreground" testID="agent-user-message-content">
+              {message.content}
+            </Text>
           </View>
         ) : (
-          <Text className="text-foreground">{message.content}</Text>
+          <Text className="text-foreground" testID="agent-assistant-message-content">
+            {message.content}
+          </Text>
         )}
         {message.proposedAction ? (
           <ProposedActionCard
@@ -128,10 +140,22 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const [streamingReply, setStreamingReply] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [pendingActionIndex, setPendingActionIndex] = useState<number | null>(null);
+  const [hasContentGrownSinceReaderScroll, setHasContentGrownSinceReaderScroll] = useState(false);
   const conversationIdRef = useRef<string | null>(null);
   const hasSentMessageRef = useRef(false);
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
+  const isAtBottomRef = useRef(true);
+  const isReaderDraggingRef = useRef(false);
+  const isReaderMomentumPendingRef = useRef(false);
+  const isReaderMomentumRef = useRef(false);
+  const programmaticScrollCountRef = useRef(0);
+  const ignoresInterruptedReaderMomentumRef = useRef(false);
+  const lastScrollOffsetRef = useRef(0);
+  const momentumHandoffFrameRef = useRef<number | null>(null);
+  const hasDeferredBottomGrowthRef = useRef(false);
+  const shouldFollowAfterGestureRef = useRef(false);
+  const isBottomBounceRef = useRef(false);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
   // resolves, their new chat wins and we skip hydration.
@@ -209,6 +233,20 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     if (trimmed.length === 0 || isSending) return;
 
     hasSentMessageRef.current = true;
+    isAtBottomRef.current = true;
+    if (momentumHandoffFrameRef.current !== null) cancelAnimationFrame(momentumHandoffFrameRef.current);
+    momentumHandoffFrameRef.current = null;
+    const interruptsReaderMomentum = isReaderMomentumPendingRef.current || isReaderMomentumRef.current;
+    isReaderDraggingRef.current = false;
+    isReaderMomentumPendingRef.current = false;
+    isReaderMomentumRef.current = false;
+    hasDeferredBottomGrowthRef.current = false;
+    shouldFollowAfterGestureRef.current = false;
+    isBottomBounceRef.current = false;
+    ignoresInterruptedReaderMomentumRef.current = interruptsReaderMomentum;
+    programmaticScrollCountRef.current += interruptsReaderMomentum ? 2 : 1;
+    setHasContentGrownSinceReaderScroll(false);
+    listRef.current?.scrollToEnd({ animated: true });
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -257,7 +295,128 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         keyExtractor={(_, index) => String(index)}
         keyboardShouldPersistTaps="handled"
         // Scrolling on content growth keeps up with streaming tokens, which arrive faster than a debounce would fire.
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={() => {
+          const readerOwnsScroll =
+            isReaderDraggingRef.current ||
+            isReaderMomentumPendingRef.current ||
+            isReaderMomentumRef.current ||
+            !isAtBottomRef.current;
+          if (readerOwnsScroll) {
+            if (
+              (isReaderDraggingRef.current || isReaderMomentumPendingRef.current || isReaderMomentumRef.current) &&
+              shouldFollowAfterGestureRef.current
+            )
+              hasDeferredBottomGrowthRef.current = true;
+            setHasContentGrownSinceReaderScroll(true);
+            return;
+          }
+          programmaticScrollCountRef.current += 1;
+          listRef.current?.scrollToEnd({ animated: true });
+        }}
+        onScrollBeginDrag={() => {
+          const startedAtBottom = isAtBottomRef.current;
+          if (momentumHandoffFrameRef.current !== null) cancelAnimationFrame(momentumHandoffFrameRef.current);
+          momentumHandoffFrameRef.current = null;
+          programmaticScrollCountRef.current = 0;
+          ignoresInterruptedReaderMomentumRef.current = false;
+          setHasContentGrownSinceReaderScroll(false);
+          isReaderDraggingRef.current = true;
+          isReaderMomentumPendingRef.current = false;
+          isReaderMomentumRef.current = false;
+          hasDeferredBottomGrowthRef.current = false;
+          shouldFollowAfterGestureRef.current = startedAtBottom;
+          isBottomBounceRef.current = false;
+          isAtBottomRef.current = false;
+        }}
+        onScroll={({ nativeEvent }) => {
+          const currentOffset = nativeEvent.contentOffset.y;
+          const movedUp = currentOffset < lastScrollOffsetRef.current;
+          lastScrollOffsetRef.current = currentOffset;
+          const maximumOffset = Math.max(0, nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height);
+          const isPastBottom = currentOffset > maximumOffset;
+          const isBottomBounceBack = isBottomBounceRef.current && movedUp && !isReaderDraggingRef.current;
+          if (isPastBottom) isBottomBounceRef.current = true;
+          if (ignoresInterruptedReaderMomentumRef.current) return;
+          if (
+            programmaticScrollCountRef.current > 0 &&
+            !movedUp &&
+            !isReaderDraggingRef.current &&
+            !isReaderMomentumPendingRef.current &&
+            !isReaderMomentumRef.current
+          )
+            return;
+          const isAtBottom = isNearBottom(nativeEvent);
+          if (movedUp) {
+            programmaticScrollCountRef.current = 0;
+            if (
+              !isBottomBounceBack &&
+              !isAtBottom &&
+              (isReaderDraggingRef.current || isReaderMomentumPendingRef.current || isReaderMomentumRef.current)
+            )
+              shouldFollowAfterGestureRef.current = false;
+            if (isReaderDraggingRef.current && !isAtBottom) isBottomBounceRef.current = false;
+          }
+          if ((isReaderDraggingRef.current && isAtBottom) || (isReaderMomentumRef.current && !movedUp && isAtBottom))
+            shouldFollowAfterGestureRef.current = true;
+          isAtBottomRef.current = isAtBottom;
+        }}
+        onScrollEndDrag={({ nativeEvent }) => {
+          const movedUpAtRelease = nativeEvent.contentOffset.y < lastScrollOffsetRef.current;
+          lastScrollOffsetRef.current = nativeEvent.contentOffset.y;
+          isAtBottomRef.current = isNearBottom(nativeEvent);
+          if (movedUpAtRelease && !isAtBottomRef.current) shouldFollowAfterGestureRef.current = false;
+          isReaderDraggingRef.current = false;
+          isReaderMomentumPendingRef.current = true;
+          shouldFollowAfterGestureRef.current =
+            isAtBottomRef.current || (hasDeferredBottomGrowthRef.current && shouldFollowAfterGestureRef.current);
+          momentumHandoffFrameRef.current = requestAnimationFrame(() => {
+            isReaderMomentumPendingRef.current = false;
+            momentumHandoffFrameRef.current = null;
+            const shouldCatchUp = hasDeferredBottomGrowthRef.current && shouldFollowAfterGestureRef.current;
+            hasDeferredBottomGrowthRef.current = false;
+            shouldFollowAfterGestureRef.current = false;
+            isBottomBounceRef.current = false;
+            if (!shouldCatchUp) return;
+            programmaticScrollCountRef.current += 1;
+            listRef.current?.scrollToEnd({ animated: true });
+          });
+        }}
+        onMomentumScrollBegin={() => {
+          if (!isReaderMomentumPendingRef.current) return;
+          if (momentumHandoffFrameRef.current !== null) cancelAnimationFrame(momentumHandoffFrameRef.current);
+          momentumHandoffFrameRef.current = null;
+          isReaderMomentumPendingRef.current = false;
+          isReaderMomentumRef.current = true;
+        }}
+        onMomentumScrollEnd={({ nativeEvent }) => {
+          if (isReaderDraggingRef.current || isReaderMomentumPendingRef.current) return;
+          isBottomBounceRef.current = false;
+          if (ignoresInterruptedReaderMomentumRef.current) {
+            ignoresInterruptedReaderMomentumRef.current = false;
+            programmaticScrollCountRef.current = Math.max(0, programmaticScrollCountRef.current - 1);
+            return;
+          }
+          if (isReaderMomentumRef.current) {
+            const shouldCatchUp = hasDeferredBottomGrowthRef.current && shouldFollowAfterGestureRef.current;
+            hasDeferredBottomGrowthRef.current = false;
+            shouldFollowAfterGestureRef.current = false;
+            if (shouldCatchUp) {
+              isAtBottomRef.current = true;
+              isReaderMomentumRef.current = false;
+              programmaticScrollCountRef.current += 1;
+              listRef.current?.scrollToEnd({ animated: true });
+              return;
+            }
+            isAtBottomRef.current = isNearBottom(nativeEvent);
+            isReaderMomentumRef.current = false;
+            return;
+          }
+          if (programmaticScrollCountRef.current === 0) return;
+          programmaticScrollCountRef.current -= 1;
+          if (programmaticScrollCountRef.current > 0) return;
+          isAtBottomRef.current = isNearBottom(nativeEvent);
+        }}
+        scrollEventThrottle={16}
         renderItem={({ item, index }) => (
           <MessageBubble
             message={item}
@@ -272,7 +431,9 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             streamingReply ? (
               <View className="items-start">
                 <View className="w-full">
-                  <Text className="text-foreground">{streamingReply}</Text>
+                  <Text className="text-foreground" testID="agent-streaming-reply">
+                    {streamingReply}
+                  </Text>
                 </View>
               </View>
             ) : (
@@ -296,8 +457,13 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
       ) : null}
 
       <View className="border-t border-border p-4">
-        <View className="relative rounded border border-border bg-background">
+        <View
+          className="relative rounded border border-border bg-background"
+          onTouchEnd={() => setHasContentGrownSinceReaderScroll(false)}
+          testID={hasContentGrownSinceReaderScroll ? "agent-content-growth-observed" : "agent-content-growth-pending"}
+        >
           <TextInput
+            testID={isSending ? "agent-message-input-sending" : "agent-message-input-ready"}
             className="max-h-32 py-3 pr-16 pl-3 font-sans text-base text-foreground"
             placeholder="Ask about your store or describe a change..."
             placeholderTextColor={mutedColor}

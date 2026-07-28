@@ -1,0 +1,77 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+
+- tapOn: ".*Agent.*"
+- extendedWaitUntil:
+    visible:
+      id: "agent-message-input-ready"
+    timeout: 15000
+- evalScript: ${output.scrollTarget = "SCROLL_TARGET_" + Date.now()}
+
+- tapOn:
+    id: "agent-message-input-ready"
+- inputText: ${"Write 10 short paragraphs. Include " + output.scrollTarget}
+- extendedWaitUntil:
+    visible:
+      text: "Send"
+      enabled: true
+    timeout: 5000
+- tapOn:
+    text: "Send"
+    enabled: true
+    waitToSettleTimeoutMs: 100
+- extendedWaitUntil:
+    visible:
+      id: "agent-message-input-sending"
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "agent-streaming-reply"
+      text: "(?s).{400,}"
+    timeout: 30000
+- swipe:
+    start: "50%,20%"
+    end: "50%,90%"
+    duration: 800
+    waitToSettleTimeoutMs: 100
+- swipe:
+    start: "50%,20%"
+    end: "50%,80%"
+    duration: 600
+    waitToSettleTimeoutMs: 100
+- extendedWaitUntil:
+    visible:
+      id: "agent-user-message-content"
+      text: ".*${output.scrollTarget}.*"
+      below: "Agent"
+      above:
+        id: "agent-message-input-sending"
+    timeout: 5000
+- assertVisible:
+    id: "agent-message-input-sending"
+- extendedWaitUntil:
+    visible:
+      id: "agent-streaming-reply"
+      text: "(?s).{700,}"
+    timeout: 30000
+- assertVisible:
+    id: "agent-user-message-content"
+    text: ".*${output.scrollTarget}.*"
+    below: "Agent"
+    above:
+      id: "agent-message-input-sending"
+- extendedWaitUntil:
+    visible:
+      id: "agent-message-input-ready"
+    timeout: 90000
+- assertVisible:
+    id: "agent-user-message-content"
+    text: ".*${output.scrollTarget}.*"
+    below: "Agent"
+    above:
+      id: "agent-message-input-ready"

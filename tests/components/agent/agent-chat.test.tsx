@@ -2,7 +2,7 @@ import { AgentChat } from "@/components/agent/agent-chat";
 import { LineIcon } from "@/components/icon";
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { act } from "react";
-import { KeyboardAvoidingView, Platform } from "react-native";
+import { FlatList, KeyboardAvoidingView, Platform } from "react-native";
 import { renderWithQueryClient } from "../../render-with-query-client";
 
 jest.mock("@/lib/auth-context", () => ({
@@ -30,11 +30,23 @@ const GREETING = "Hi! I'm your store assistant.";
 const SUGGESTIONS = ["How are my sales doing?", "List my products"];
 
 const renderChat = () => renderWithQueryClient(<AgentChat greeting={GREETING} suggestions={SUGGESTIONS} />);
+const scrollEvent = (y: number, contentHeight = 2000, viewportHeight = 600, velocityY = 0) => ({
+  nativeEvent: {
+    contentOffset: { x: 0, y },
+    contentSize: { width: 400, height: contentHeight },
+    layoutMeasurement: { width: 400, height: viewportHeight },
+    velocity: { x: 0, y: velocityY },
+  },
+});
 
 describe("AgentChat", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetchLatestAgentConversation.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it("renders the greeting and starter suggestions", () => {
@@ -338,6 +350,502 @@ describe("AgentChat", () => {
     await waitFor(() => expect(mockFetchLatestAgentConversation).toHaveBeenCalled());
     expect(screen.getByText(GREETING)).toBeTruthy();
     expect(screen.getByText("How are my sales doing?")).toBeTruthy();
+  });
+
+  it("does not scroll back to the newest message while the reader has scrolled up", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(0));
+      list.props.onScrollEndDrag(scrollEvent(0));
+    });
+    scrollToEnd.mockClear();
+    expect(screen.getByTestId("agent-content-growth-pending")).toBeTruthy();
+
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+    expect(screen.getByTestId("agent-content-growth-observed")).toBeTruthy();
+  });
+
+  it("follows new content while the reader is already at the newest message", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(1400));
+      list.props.onScrollEndDrag(scrollEvent(1400, 2000, 600, -1));
+    });
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+    scrollToEnd.mockClear();
+
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("catches up when content grows during the momentum handoff at the bottom", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScrollEndDrag(scrollEvent(1400));
+      list.props.onContentSizeChange(0, 2100);
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("catches up when content grows during a drag held at the bottom", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(1400));
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onScrollEndDrag(scrollEvent(1400, 2100));
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("keeps reader control when a bottom drag reverses after content grows", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(1450));
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onScrollEndDrag(scrollEvent(1200, 2100));
+    });
+
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("catches up when content grows during momentum after reaching the bottom", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(1400));
+      list.props.onScrollEndDrag(scrollEvent(1400));
+      list.props.onMomentumScrollBegin();
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onMomentumScrollEnd(scrollEvent(1400, 2100));
+    });
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("keeps reader control when upward momentum starts at the bottom", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(1400));
+      list.props.onScrollEndDrag(scrollEvent(1400));
+      list.props.onMomentumScrollBegin();
+      list.props.onScroll(scrollEvent(1200));
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onMomentumScrollEnd(scrollEvent(1000, 2100));
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("catches up when downward momentum reaches the bottom before content grows", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(800));
+      list.props.onScrollEndDrag(scrollEvent(800));
+      list.props.onMomentumScrollBegin();
+      list.props.onScroll(scrollEvent(1400));
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onMomentumScrollEnd(scrollEvent(1400, 2100));
+    });
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("keeps bottom intent when content grows during an iOS bounce", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(1400));
+      list.props.onScrollEndDrag(scrollEvent(1400));
+      list.props.onMomentumScrollBegin();
+      list.props.onScroll(scrollEvent(1450));
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onScroll(scrollEvent(1440, 2100));
+      list.props.onScroll(scrollEvent(1420, 2100));
+      list.props.onScroll(scrollEvent(1400, 2100));
+      list.props.onMomentumScrollEnd(scrollEvent(1400, 2100));
+    });
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("keeps following when its own animated scroll reports a position short of the growing end", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => list.props.onContentSizeChange(0, 2000));
+    expect(scrollToEnd).toHaveBeenCalled();
+    scrollToEnd.mockClear();
+
+    act(() => list.props.onScroll(scrollEvent(1050)));
+
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("keeps the replacement animation after the previous auto-scroll is canceled", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onContentSizeChange(0, 2000);
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onMomentumScrollEnd(scrollEvent(1050, 2100));
+    });
+    scrollToEnd.mockClear();
+
+    act(() => list.props.onContentSizeChange(0, 2200));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("keeps reader control when content grows before the first drag update", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => list.props.onContentSizeChange(0, 2000));
+    scrollToEnd.mockClear();
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onContentSizeChange(0, 2100);
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("catches up after growth before the first drag update when the drag stays at the bottom", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onScrollEndDrag(scrollEvent(1400, 2100));
+    });
+
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("hands control to a non-touch scroll that moves against its animation", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onContentSizeChange(0, 2000);
+      list.props.onScroll(scrollEvent(1000));
+      list.props.onScroll(scrollEvent(600));
+    });
+    scrollToEnd.mockClear();
+
+    act(() => list.props.onContentSizeChange(0, 2200));
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("ignores a canceled programmatic fling ending during a new reader drag", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => list.props.onContentSizeChange(0, 2000));
+    scrollToEnd.mockClear();
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScrollEndDrag(scrollEvent(1400, 2000, 600, -500));
+      list.props.onMomentumScrollEnd(scrollEvent(1400));
+      list.props.onContentSizeChange(0, 2100);
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    act(() => {
+      list.props.onMomentumScrollBegin();
+      list.props.onScroll(scrollEvent(400));
+      list.props.onContentSizeChange(0, 2200);
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("keeps reader control through momentum scrolling", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(800));
+      list.props.onScrollEndDrag(scrollEvent(800, 2000, 600, -500));
+      list.props.onMomentumScrollBegin();
+      list.props.onContentSizeChange(0, 2200);
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    act(() => {
+      list.props.onMomentumScrollEnd(scrollEvent(400, 2200));
+      list.props.onContentSizeChange(0, 2400);
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("re-pins after sending from earlier in the conversation", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(0));
+      list.props.onScrollEndDrag(scrollEvent(0));
+    });
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "follow up");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    scrollToEnd.mockClear();
+
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("re-pins when sending interrupts reader momentum", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(800));
+      list.props.onScrollEndDrag(scrollEvent(800, 2000, 600, -500));
+      list.props.onMomentumScrollBegin();
+    });
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "follow up");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    scrollToEnd.mockClear();
+
+    act(() => {
+      list.props.onScroll(scrollEvent(400));
+      list.props.onMomentumScrollEnd(scrollEvent(400));
+      list.props.onContentSizeChange(0, 2400);
+    });
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
+  it("re-pins when sending replaces an active auto-scroll", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => list.props.onContentSizeChange(0, 2000));
+    fireEvent.changeText(screen.getByLabelText("Message"), "follow up");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    act(() => list.props.onMomentumScrollEnd(scrollEvent(1050)));
+    scrollToEnd.mockClear();
+    act(() => list.props.onContentSizeChange(0, 2400));
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
   });
 
   it("keeps keyboard avoidance active on Android", () => {
