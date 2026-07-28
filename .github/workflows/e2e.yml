@@ -1,0 +1,159 @@
+name: e2e
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: launch smoke (no backend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ANDROID_BUNDLE_NAME: com.antiwork.gumroadmobile
+      IOS_BUNDLE_NAME: com.antiwork.gumroadmobile
+      EXPO_PUBLIC_GUMROAD_URL: http://10.0.2.2:3000
+      EXPO_PUBLIC_GUMROAD_API_URL: http://10.0.2.2:3000
+      EXPO_PUBLIC_GUMROAD_CLIENT_ID: ci-smoke-placeholder-client-id
+      EXPO_PUBLIC_MOBILE_TOKEN: ci-smoke-placeholder-mobile-token
+      ANDROID_KEYSTORE_PASSWORD: ci-smoke-throwaway
+      ANDROID_KEY_ALIAS: ci-smoke
+      ANDROID_KEY_PASSWORD: ci-smoke-throwaway
+      SENTRY_DISABLE_AUTO_UPLOAD: "true"
+      MAESTRO_VERSION: "2.7.0"
+      MAESTRO_CLI_NO_ANALYTICS: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+      - run: npx patch-package
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Write placeholder Firebase config
+        run: |
+          cat > google-services.json <<JSON
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "gumroad-mobile-ci-placeholder",
+              "storage_bucket": "gumroad-mobile-ci-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                  "android_client_info": { "package_name": "${ANDROID_BUNDLE_NAME}" }
+                },
+                "oauth_client": [],
+                "api_key": [{ "current_key": "AIzaSyCI0000000000000000000000000000000" }],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+          node -e "JSON.parse(require('fs').readFileSync('google-services.json', 'utf8'))"
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean
+
+      - name: Validate generated config
+        run: |
+          npx expo config --type prebuild --json > /tmp/expo-config.json
+          node -e "
+            const config = require('/tmp/expo-config.json');
+            if (!config.android?.package || !config.ios?.bundleIdentifier) {
+              throw new Error('app.config.ts must resolve Android and iOS bundle identifiers');
+            }
+          "
+
+      - name: Read application ID
+        id: app_id
+        run: |
+          app_id=$(grep -m1 -oE 'applicationId .[^"'"'"']+' android/app/build.gradle \
+            | sed -E 's/applicationId .//')
+          if [ -z "$app_id" ]; then
+            echo "::error::Could not read applicationId from android/app/build.gradle"
+            exit 1
+          fi
+          echo "value=$app_id" >> "$GITHUB_OUTPUT"
+
+      - name: Generate signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/app/upload-keystore.jks \
+            -alias "$ANDROID_KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 30 \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" \
+            -dname "CN=gumroad-mobile CI smoke, O=Gumroad, C=US"
+
+      - name: Run launch smoke
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APP_ID: ${{ steps.app_id.outputs.value }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-snapshot-save -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            chmod +x android/gradlew
+            ./android/gradlew -p android assembleRelease -PreactNativeArchitectures=x86_64
+            unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q assets/index.android.bundle
+            ./android/gradlew -p android --stop
+            adb install -r android/app/build/outputs/apk/release/app-release.apk
+            timeout --signal=TERM --kill-after=60s 12m maestro test -p android -e APP_ID="$APP_ID" --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-smoke-results
+          path: |
+            maestro-report.xml
+            ~/.maestro/tests/**
+          retention-days: 14
+          if-no-files-found: warn
