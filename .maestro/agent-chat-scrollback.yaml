@@ -27,13 +27,14 @@ appId: ${APP_ID}
 - tapOn:
     text: "Message"
     enabled: true
-- inputText: "Give me a detailed sales breakdown"
+- inputText: "Give me a detailed sales breakdown with revenue, quantity, refunds, average price, conversion rate, and a product-by-product comparison for every product in my store. Include each product name, its recent trend, strongest week, weakest week, and the follow-up questions I should ask. Keep the response detailed so I can review it while it streams."
 - tapOn: "Send"
 - extendedWaitUntil:
     visible:
       text: "Message"
       enabled: false
     timeout: 15000
+- assertNotVisible: "List my products in detail"
 - scrollUntilVisible:
     element: "List my products in detail"
     direction: UP
@@ -53,7 +54,15 @@ appId: ${APP_ID}
     enabled: true
 - inputText: "Thanks"
 - tapOn: "Send"
-- assertVisible: "Thanks"
+- extendedWaitUntil:
+    visible:
+      text: "Message"
+      enabled: false
+    timeout: 15000
+- assertVisible:
+    id: "agent-user-message"
+    containsDescendants:
+      - text: "Thanks"
 - extendedWaitUntil:
     visible:
       text: "Message"

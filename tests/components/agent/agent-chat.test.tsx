@@ -446,6 +446,38 @@ describe("AgentChat", () => {
     expect(scrollToEnd).not.toHaveBeenCalled();
   });
 
+  it("ignores a canceled programmatic fling ending during a new reader drag", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => list.props.onContentSizeChange(0, 2000));
+    scrollToEnd.mockClear();
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onMomentumScrollEnd(scrollEvent(1400));
+      list.props.onContentSizeChange(0, 2100);
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+
+    act(() => {
+      list.props.onScroll(scrollEvent(400));
+      list.props.onScrollEndDrag(scrollEvent(400));
+      list.props.onContentSizeChange(0, 2200);
+    });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
   it("keeps reader control through momentum scrolling", async () => {
     mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
     renderChat();

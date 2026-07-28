@@ -101,7 +101,11 @@ const MessageBubble = ({
 }) => {
   const isUser = message.role === "user";
   return (
-    <View className={isUser ? "items-end" : "items-start"} accessibilityLabel={isUser ? "You" : "Assistant"}>
+    <View
+      className={isUser ? "items-end" : "items-start"}
+      accessibilityLabel={isUser ? "You" : "Assistant"}
+      testID={isUser ? "agent-user-message" : "agent-assistant-message"}
+    >
       <View className={isUser ? "max-w-[85%]" : "w-full"}>
         {isUser ? (
           <View className="rounded-2xl rounded-br-md bg-accent px-4 py-2">
@@ -137,7 +141,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
   const isAtBottomRef = useRef(true);
-  const isReaderScrollingRef = useRef(false);
+  const isReaderDraggingRef = useRef(false);
+  const isReaderMomentumRef = useRef(false);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
   // resolves, their new chat wins and we skip hydration.
@@ -216,7 +221,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
 
     hasSentMessageRef.current = true;
     isAtBottomRef.current = true;
-    isReaderScrollingRef.current = false;
+    isReaderDraggingRef.current = false;
+    isReaderMomentumRef.current = false;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -266,27 +272,27 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         keyboardShouldPersistTaps="handled"
         // Scrolling on content growth keeps up with streaming tokens, which arrive faster than a debounce would fire.
         onContentSizeChange={() => {
-          if (isReaderScrollingRef.current || !isAtBottomRef.current) return;
+          if (isReaderDraggingRef.current || isReaderMomentumRef.current || !isAtBottomRef.current) return;
           listRef.current?.scrollToEnd({ animated: true });
         }}
         onScrollBeginDrag={() => {
-          isReaderScrollingRef.current = true;
+          isReaderDraggingRef.current = true;
+          isReaderMomentumRef.current = false;
           isAtBottomRef.current = false;
         }}
         onScroll={({ nativeEvent }) => {
-          if (!isReaderScrollingRef.current) return;
+          if (!isReaderDraggingRef.current && !isReaderMomentumRef.current) return;
           isAtBottomRef.current = isNearBottom(nativeEvent);
         }}
         onScrollEndDrag={({ nativeEvent }) => {
           isAtBottomRef.current = isNearBottom(nativeEvent);
-          if (!nativeEvent.velocity || nativeEvent.velocity.y === 0) {
-            isReaderScrollingRef.current = false;
-          }
+          isReaderDraggingRef.current = false;
+          isReaderMomentumRef.current = Boolean(nativeEvent.velocity?.y);
         }}
         onMomentumScrollEnd={({ nativeEvent }) => {
-          if (!isReaderScrollingRef.current) return;
+          if (isReaderDraggingRef.current || !isReaderMomentumRef.current) return;
           isAtBottomRef.current = isNearBottom(nativeEvent);
-          isReaderScrollingRef.current = false;
+          isReaderMomentumRef.current = false;
         }}
         scrollEventThrottle={16}
         renderItem={({ item, index }) => (
