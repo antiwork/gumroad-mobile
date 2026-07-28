@@ -330,6 +330,49 @@ describe("VideoPlayerScreen", () => {
     expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
   });
 
+  it("clears a source-refresh transition when native fullscreen exits", async () => {
+    mockSearchParams = {
+      uri: "https://example.com/video.mp4",
+      streamingUrl: "mobile/url_redirects/stream/token/file",
+      title: "Test Video",
+    };
+    mockRequestAPI.mockResolvedValue({
+      playlist_url: "https://example.com/index.m3u8",
+      subtitles: [{ url: "https://example.com/captions.srt", language: "English" }],
+    });
+    mockFetchSubtitleText.mockResolvedValue(`1
+00:00:00,000 --> 00:01:00,000
+External caption text
+`);
+    const { getByTestId, getByText } = renderScreen();
+    await act(async () => {});
+
+    await act(async () => {
+      await getByTestId("video-player").props.onFullscreenEnter();
+    });
+
+    mockSearchParams = {
+      ...mockSearchParams,
+      streamingUrl: "mobile/url_redirects/stream/replacement/file",
+    };
+    act(() => {
+      statusChangeListener!({ status: "readyToPlay" });
+    });
+    await act(async () => {});
+
+    act(() => {
+      getByTestId("video-player").props.onFullscreenExit();
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId("captions-button"));
+    });
+    await act(async () => {
+      fireEvent.press(getByText("English"));
+    });
+
+    expect(getByTestId("enter-fullscreen-button").props.accessibilityState).toEqual({ disabled: false });
+  });
+
   describe("captions", () => {
     const SRT = `1
 00:00:00,000 --> 00:01:00,000

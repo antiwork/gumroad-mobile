@@ -46,10 +46,12 @@ const withReleasedPlayerGuard = (operation: () => void) => {
   }
 };
 
-const restorePortraitOrientation = () => {
-  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
-    Sentry.captureException(error),
-  );
+const restoreAppOrientation = () => {
+  const request =
+    Platform.OS === "ios" && Platform.isPad
+      ? ScreenOrientation.unlockAsync()
+      : ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  request.catch((error) => Sentry.captureException(error));
 };
 
 const prepareFullscreenOrientation = async (): Promise<boolean> => {
@@ -127,7 +129,7 @@ export default function VideoPlayerScreen() {
       fullscreenRequestIdRef.current += 1;
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
-      restorePortraitOrientation();
+      restoreAppOrientation();
     };
   }, []);
 
@@ -140,7 +142,7 @@ export default function VideoPlayerScreen() {
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
       setFullscreenTransitionPending(false);
-      restorePortraitOrientation();
+      restoreAppOrientation();
     } else if (Platform.OS === "ios" && fullscreenOrientationActiveRef.current) {
       fullscreenTransitionPendingRef.current = true;
       setFullscreenTransitionPending(true);
@@ -243,7 +245,7 @@ export default function VideoPlayerScreen() {
               fullscreenOrientationActiveRef.current = false;
               fullscreenTransitionPendingRef.current = false;
               setFullscreenTransitionPending(false);
-              restorePortraitOrientation();
+              restoreAppOrientation();
             }
             setPlaybackError(message);
           }
@@ -443,7 +445,7 @@ export default function VideoPlayerScreen() {
     const requestId = ++fullscreenRequestIdRef.current;
     const orientationApplied = await prepareFullscreenOrientation();
     if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
-      if (orientationApplied) restorePortraitOrientation();
+      if (orientationApplied) restoreAppOrientation();
       if (mountedRef.current) {
         fullscreenTransitionPendingRef.current = false;
         setFullscreenTransitionPending(false);
@@ -467,7 +469,7 @@ export default function VideoPlayerScreen() {
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
       setFullscreenTransitionPending(false);
-      restorePortraitOrientation();
+      restoreAppOrientation();
     }
   };
 
@@ -475,7 +477,7 @@ export default function VideoPlayerScreen() {
     fullscreenOrientationActiveRef.current = false;
     fullscreenTransitionPendingRef.current = false;
     setFullscreenTransitionPending(false);
-    restorePortraitOrientation();
+    restoreAppOrientation();
     if (pendingPlaybackError) {
       setPlaybackError(pendingPlaybackError);
       setPendingPlaybackError(null);
@@ -486,7 +488,7 @@ export default function VideoPlayerScreen() {
     const requestId = ++fullscreenRequestIdRef.current;
     const orientationApplied = await prepareFullscreenOrientation();
     if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
-      if (orientationApplied) restorePortraitOrientation();
+      if (orientationApplied) restoreAppOrientation();
       return;
     }
     fullscreenOrientationActiveRef.current = orientationApplied;
@@ -495,7 +497,9 @@ export default function VideoPlayerScreen() {
   const handleNativeFullscreenExit = () => {
     fullscreenRequestIdRef.current += 1;
     fullscreenOrientationActiveRef.current = false;
-    restorePortraitOrientation();
+    fullscreenTransitionPendingRef.current = false;
+    setFullscreenTransitionPending(false);
+    restoreAppOrientation();
   };
 
   const renderVideoSurface = (fullscreen: boolean) => (
