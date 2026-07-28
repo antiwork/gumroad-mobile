@@ -7,6 +7,8 @@ export type SubtitleCue = {
 };
 
 export const MAX_SUBTITLE_CUES = 20_000;
+export const MAX_ACTIVE_SUBTITLE_CUES = 4;
+export const MAX_ACTIVE_SUBTITLE_CHARACTERS = 2_000;
 
 const TIMESTAMP = /(?:(\d{1,2}):)?(\d{1,2}):(\d{1,2})[.,](\d{1,3})/;
 
@@ -100,7 +102,19 @@ export const parseSubtitles = (content: string): SubtitleCue[] => {
 };
 
 export const activeCueText = (cues: SubtitleCue[], time: number): string | null => {
-  const active = cues.filter((cue) => time >= cue.start && time < cue.end);
-  if (active.length === 0) return null;
-  return active.map((cue) => cue.text).join("\n");
+  const active: string[] = [];
+  let characters = 0;
+
+  for (const cue of cues) {
+    if (time < cue.start || time >= cue.end) continue;
+    const separatorLength = active.length > 0 ? 1 : 0;
+    const remainingCharacters = MAX_ACTIVE_SUBTITLE_CHARACTERS - characters - separatorLength;
+    if (remainingCharacters <= 0 || active.length >= MAX_ACTIVE_SUBTITLE_CUES) break;
+    const text = cue.text.slice(0, remainingCharacters);
+    if (!text) continue;
+    active.push(text);
+    characters += text.length + separatorLength;
+  }
+
+  return active.length > 0 ? active.join("\n") : null;
 };

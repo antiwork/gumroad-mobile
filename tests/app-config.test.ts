@@ -15,6 +15,7 @@ describe("app.config", () => {
   it("allows fullscreen video to rotate while the rest of the app starts in portrait", () => {
     expect(config.orientation).toBe("default");
     expect(config.ios?.requireFullScreen).toBeUndefined();
+    expect(config.plugins).toContain("./plugins/android-portrait-orientation");
     expect(config.plugins).toContainEqual([
       "expo-screen-orientation",
       {

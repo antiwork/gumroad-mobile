@@ -1,4 +1,10 @@
-import { activeCueText, MAX_SUBTITLE_CUES, parseSubtitles } from "@/lib/subtitles";
+import {
+  activeCueText,
+  MAX_ACTIVE_SUBTITLE_CHARACTERS,
+  MAX_ACTIVE_SUBTITLE_CUES,
+  MAX_SUBTITLE_CUES,
+  parseSubtitles,
+} from "@/lib/subtitles";
 
 describe("parseSubtitles", () => {
   it("parses SRT cues", () => {
@@ -147,5 +153,17 @@ describe("activeCueText", () => {
   it("returns null when no cue is active", () => {
     expect(activeCueText(cues, 8)).toBeNull();
     expect(activeCueText([], 2)).toBeNull();
+  });
+
+  it("bounds simultaneous cues and rendered text", () => {
+    const overlappingCues = Array.from({ length: MAX_ACTIVE_SUBTITLE_CUES + 2 }, (_, index) => ({
+      start: 0,
+      end: 10,
+      text: `Cue ${index}`,
+    }));
+    expect(activeCueText(overlappingCues, 1)?.split("\n")).toHaveLength(MAX_ACTIVE_SUBTITLE_CUES);
+
+    const longText = "x".repeat(MAX_ACTIVE_SUBTITLE_CHARACTERS + 1_000);
+    expect(activeCueText([{ start: 0, end: 10, text: longText }], 1)).toHaveLength(MAX_ACTIVE_SUBTITLE_CHARACTERS);
   });
 });

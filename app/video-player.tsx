@@ -110,11 +110,13 @@ export default function VideoPlayerScreen() {
   const [captionSheetOpen, setCaptionSheetOpen] = useState(false);
   const [externalFullscreenOpen, setExternalFullscreenOpen] = useState(false);
   const [fullscreenCaptionPickerOpen, setFullscreenCaptionPickerOpen] = useState(false);
+  const [fullscreenTransitionPending, setFullscreenTransitionPending] = useState(false);
   const [pendingPlaybackError, setPendingPlaybackError] = useState<string | null>(null);
   const cueCacheRef = useRef<Map<string, SubtitleCue[]>>(new Map());
   const captionRequestIdRef = useRef(0);
   const fullscreenRequestIdRef = useRef(0);
   const fullscreenOrientationActiveRef = useRef(false);
+  const fullscreenTransitionPendingRef = useRef(false);
   const mountedRef = useRef(true);
   const selectionRef = useRef<CaptionSelection>({ type: "off" });
 
@@ -124,6 +126,7 @@ export default function VideoPlayerScreen() {
       mountedRef.current = false;
       fullscreenRequestIdRef.current += 1;
       fullscreenOrientationActiveRef.current = false;
+      fullscreenTransitionPendingRef.current = false;
       restorePortraitOrientation();
     };
   }, []);
@@ -135,7 +138,12 @@ export default function VideoPlayerScreen() {
     fullscreenRequestIdRef.current += 1;
     if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
       fullscreenOrientationActiveRef.current = false;
+      fullscreenTransitionPendingRef.current = false;
+      setFullscreenTransitionPending(false);
       restorePortraitOrientation();
+    } else if (Platform.OS === "ios" && fullscreenOrientationActiveRef.current) {
+      fullscreenTransitionPendingRef.current = true;
+      setFullscreenTransitionPending(true);
     }
     selectionRef.current = offSelection;
     setSelection(offSelection);
@@ -227,10 +235,14 @@ export default function VideoPlayerScreen() {
           setExternalFullscreenOpen(false);
           const message = error?.message ?? "Unknown playback error";
           if (externalFullscreenOpen && Platform.OS === "ios") {
+            fullscreenTransitionPendingRef.current = true;
+            setFullscreenTransitionPending(true);
             setPendingPlaybackError(message);
           } else {
             if (externalFullscreenOpen) {
               fullscreenOrientationActiveRef.current = false;
+              fullscreenTransitionPendingRef.current = false;
+              setFullscreenTransitionPending(false);
               restorePortraitOrientation();
             }
             setPlaybackError(message);
@@ -374,6 +386,7 @@ export default function VideoPlayerScreen() {
       let cues = cueCacheRef.current.get(track.url);
       if (!cues) {
         cues = parseSubtitles(await fetchSubtitleText(track.url));
+        if (cues.length === 0) throw new Error("Subtitle track contains no valid cues");
         cueCacheRef.current.set(track.url, cues);
       }
       if (captionRequestIdRef.current !== requestId) return;
@@ -424,28 +437,44 @@ export default function VideoPlayerScreen() {
   );
 
   const enterExternalFullscreen = async () => {
+    if (fullscreenTransitionPendingRef.current) return;
+    fullscreenTransitionPendingRef.current = true;
+    setFullscreenTransitionPending(true);
     const requestId = ++fullscreenRequestIdRef.current;
     const orientationApplied = await prepareFullscreenOrientation();
     if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
       if (orientationApplied) restorePortraitOrientation();
+      if (mountedRef.current) {
+        fullscreenTransitionPendingRef.current = false;
+        setFullscreenTransitionPending(false);
+      }
       return;
     }
     fullscreenOrientationActiveRef.current = orientationApplied;
     setExternalFullscreenOpen(true);
+    fullscreenTransitionPendingRef.current = false;
+    setFullscreenTransitionPending(false);
   };
 
   const exitExternalFullscreen = () => {
     fullscreenRequestIdRef.current += 1;
     setFullscreenCaptionPickerOpen(false);
     setExternalFullscreenOpen(false);
-    if (Platform.OS !== "ios") {
+    if (Platform.OS === "ios") {
+      fullscreenTransitionPendingRef.current = true;
+      setFullscreenTransitionPending(true);
+    } else {
       fullscreenOrientationActiveRef.current = false;
+      fullscreenTransitionPendingRef.current = false;
+      setFullscreenTransitionPending(false);
       restorePortraitOrientation();
     }
   };
 
   const handleExternalFullscreenDismiss = () => {
     fullscreenOrientationActiveRef.current = false;
+    fullscreenTransitionPendingRef.current = false;
+    setFullscreenTransitionPending(false);
     restorePortraitOrientation();
     if (pendingPlaybackError) {
       setPlaybackError(pendingPlaybackError);
@@ -640,8 +669,11 @@ export default function VideoPlayerScreen() {
                     {externalCaptionSelected ? (
                       <Pressable
                         onPress={enterExternalFullscreen}
+                        disabled={fullscreenTransitionPending}
                         accessibilityRole="button"
                         accessibilityLabel="Enter fullscreen"
+                        accessibilityState={{ disabled: fullscreenTransitionPending }}
+                        testID="enter-fullscreen-button"
                         className="p-2"
                       >
                         <LineIcon name="fullscreen" size={24} className="text-white" />

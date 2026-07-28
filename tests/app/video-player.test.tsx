@@ -536,6 +536,37 @@ External caption text
       expect(getByTestId("fullscreen-video-player")).toBeTruthy();
     });
 
+    it("serializes repeated external fullscreen requests", async () => {
+      let resolveLock: () => void;
+      mockLockAsync.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveLock = resolve;
+        }),
+      );
+      const { getByLabelText, getByTestId, getByText } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      act(() => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
+
+      expect(mockLockAsync).toHaveBeenCalledTimes(1);
+      expect(getByTestId("enter-fullscreen-button").props.accessibilityState).toEqual({ disabled: true });
+
+      await act(async () => {
+        resolveLock!();
+      });
+
+      expect(getByTestId("fullscreen-video-player")).toBeTruthy();
+      expect(mockLockAsync).not.toHaveBeenCalledWith("portrait-up");
+    });
+
     it("restores portrait when a pending fullscreen entry finishes after unmount", async () => {
       let resolveLock: () => void;
       mockLockAsync.mockReturnValueOnce(
@@ -697,6 +728,23 @@ External caption text
       });
 
       expect(queryByTestId("subtitle-overlay")).toBeNull();
+      expect(Sentry.captureException).toHaveBeenCalled();
+    });
+
+    it("turns captions off when an external track has no valid cues", async () => {
+      mockFetchSubtitleText.mockResolvedValue("not a subtitle file");
+      const { getByRole, getByTestId, getByText } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      fireEvent.press(getByTestId("captions-button"));
+
+      expect(getByRole("radio", { name: "Off" }).props.accessibilityState).toEqual({ checked: true });
+      expect(getByTestId("video-player").props.allowsPictureInPicture).toBe(true);
       expect(Sentry.captureException).toHaveBeenCalled();
     });
 
