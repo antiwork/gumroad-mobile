@@ -342,7 +342,9 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             if (isReaderMomentumPendingRef.current || isReaderMomentumRef.current)
               shouldFollowAfterMomentumRef.current = false;
           }
-          isAtBottomRef.current = isNearBottom(nativeEvent);
+          const isAtBottom = isNearBottom(nativeEvent);
+          if (isReaderMomentumRef.current && !movedUp && isAtBottom) shouldFollowAfterMomentumRef.current = true;
+          isAtBottomRef.current = isAtBottom;
         }}
         onScrollEndDrag={({ nativeEvent }) => {
           isAtBottomRef.current = isNearBottom(nativeEvent);
