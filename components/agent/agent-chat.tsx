@@ -311,9 +311,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             streamingReply ? (
               <View className="items-start">
                 <View className="w-full">
-                  <Text className="text-foreground" testID="agent-streaming-reply">
-                    {streamingReply}
-                  </Text>
+                  <Text className="text-foreground">{streamingReply}</Text>
                 </View>
               </View>
             ) : (
@@ -355,7 +353,10 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             className="absolute right-1.5 bottom-1.5 size-11 rounded-full"
             disabled={isSending || !hasText}
             onPress={() => send(input)}
-            accessibilityLabel="Send"
+            accessibilityLabel={
+              isSending ? `Send unavailable, assistant response ${streamingReply?.length ?? 0} characters` : "Send"
+            }
+            testID="agent-send-progress"
           >
             <LineIcon
               name="arrow-up-stroke"

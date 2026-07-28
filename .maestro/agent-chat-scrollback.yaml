@@ -33,7 +33,8 @@ appId: ${APP_ID}
 - tapOn: "Send"
 - extendedWaitUntil:
     visible:
-      id: "agent-streaming-reply"
+      id: "agent-send-progress"
+      text: "Send unavailable, assistant response [1-9][0-9]* characters"
     timeout: 30000
 - assertNotVisible:
     id: "agent-user-message"
@@ -50,8 +51,23 @@ appId: ${APP_ID}
     text: "Message"
     enabled: false
 - copyTextFrom:
-    id: "agent-streaming-reply"
-- evalScript: ${output.replyAfterScroll = maestro.copiedText}
+    id: "agent-send-progress"
+- evalScript: ${output.replyLengthAfterScroll = Number(maestro.copiedText.match(/[0-9]+/)[0])}
+- extendedWaitUntil:
+    visible:
+      id: "agent-send-progress"
+      text: ${"Send unavailable, assistant response (?!" + output.replyLengthAfterScroll + " characters)[0-9]+ characters"}
+    timeout: 30000
+- copyTextFrom:
+    id: "agent-send-progress"
+- evalScript: ${output.replyLengthAfterGrowth = Number(maestro.copiedText.match(/[0-9]+/)[0])}
+- assertTrue:
+    condition: ${output.replyLengthAfterGrowth > output.replyLengthAfterScroll}
+    label: "Assistant reply grows after the reader scrolls up"
+- assertVisible:
+    id: "agent-user-message"
+    containsDescendants:
+      - text: ".*${output.scrollTarget}.*"
 - extendedWaitUntil:
     visible:
       text: "Message"
@@ -61,13 +77,12 @@ appId: ${APP_ID}
     id: "agent-user-message"
     containsDescendants:
       - text: ".*${output.scrollTarget}.*"
-- copyTextFrom:
-    id: "agent-assistant-message-content"
-    text: "(?s).*${output.replyMarker}.*"
-- evalScript: ${output.completedReply = maestro.copiedText}
-- assertTrue:
-    condition: ${output.completedReply.length > output.replyAfterScroll.length}
-    label: "Assistant reply grows after the reader scrolls up"
+- scrollUntilVisible:
+    element:
+      id: "agent-assistant-message-content"
+      text: "(?s).*${output.replyMarker}.*"
+    direction: DOWN
+    timeout: 20000
 
 - tapOn:
     text: "Message"

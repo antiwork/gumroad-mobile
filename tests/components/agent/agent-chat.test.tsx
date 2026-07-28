@@ -264,6 +264,9 @@ describe("AgentChat", () => {
 
     await waitFor(() => expect(screen.getByText("Checking your store...")).toBeTruthy());
     expect(screen.queryByText("Working on it...")).toBeNull();
+    expect(screen.getByTestId("agent-send-progress").props.accessibilityLabel).toBe(
+      `Send unavailable, assistant response ${"Checking your store...".length} characters`,
+    );
 
     const { handlers } = mockStreamAgentMessage.mock.calls[0][0] as {
       handlers: { onToken: (text: string) => void; onReset: () => void };
@@ -279,6 +282,9 @@ describe("AgentChat", () => {
       handlers.onToken("up 20%.");
     });
     await waitFor(() => expect(screen.getByText("Sales are up 20%.")).toBeTruthy());
+    expect(screen.getByTestId("agent-send-progress").props.accessibilityLabel).toBe(
+      `Send unavailable, assistant response ${"Sales are up 20%.".length} characters`,
+    );
 
     await act(async () => {
       resolveTurn({ reply: "Sales are up 20% this week.", proposedAction: null, conversationId: "conv-123" });
