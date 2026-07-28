@@ -12,11 +12,10 @@ appId: ${APP_ID}
       id: "agent-message-input-ready"
     timeout: 15000
 - evalScript: ${output.scrollTarget = "SCROLL_TARGET_" + Date.now()}
-- evalScript: ${output.replyMarker = "SCROLL_REPLY_" + Date.now()}
 
 - tapOn:
     id: "agent-message-input-ready"
-- inputText: ${"Write 10 short paragraphs. Include " + output.scrollTarget + ". End with " + output.replyMarker}
+- inputText: ${"Write 10 short paragraphs. Include " + output.scrollTarget}
 - extendedWaitUntil:
     visible:
       text: "Send"
@@ -31,30 +30,30 @@ appId: ${APP_ID}
       id: "agent-message-input-sending"
     timeout: 5000
 - extendedWaitUntil:
-    notVisible:
-      id: "agent-user-message-content"
-      text: ".*${output.scrollTarget}.*"
+    visible:
+      id: "agent-streaming-reply"
+      text: "(?s).{400,}"
     timeout: 30000
 - swipe:
-    start: "50%,35%"
-    end: "50%,80%"
-    duration: 600
-    waitToSettleTimeoutMs: 100
-- swipe:
-    start: "50%,35%"
-    end: "50%,80%"
-    duration: 600
-    waitToSettleTimeoutMs: 100
-- swipe:
-    start: "50%,35%"
-    end: "50%,80%"
-    duration: 600
+    start: "50%,20%"
+    end: "50%,90%"
+    duration: 800
     waitToSettleTimeoutMs: 100
 - extendedWaitUntil:
     visible:
       id: "agent-user-message-content"
       text: ".*${output.scrollTarget}.*"
     timeout: 5000
+- assertVisible:
+    id: "agent-message-input-sending"
+- extendedWaitUntil:
+    visible:
+      id: "agent-streaming-reply"
+      text: "(?s).{700,}"
+    timeout: 30000
+- assertVisible:
+    id: "agent-user-message-content"
+    text: ".*${output.scrollTarget}.*"
 - extendedWaitUntil:
     visible:
       id: "agent-message-input-ready"
