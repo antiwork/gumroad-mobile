@@ -35,6 +35,15 @@ intro-cue
     ]);
   });
 
+  it("decodes WebVTT entities after removing caption markup", () => {
+    const vtt = `WEBVTT
+
+00:01.000 --> 00:04.000
+<v Speaker>Tom &amp; Ria&lt;3&nbsp;today</v>
+`;
+    expect(parseSubtitles(vtt)).toEqual([{ start: 1, end: 4, text: "Tom & Ria<3\u00A0today" }]);
+  });
+
   it("parses SBV cues", () => {
     const sbv = `0:00:01.000,0:00:03.000
 SBV cue text
@@ -98,6 +107,18 @@ describe("activeCueText", () => {
 
   it("joins overlapping cues with a newline", () => {
     expect(activeCueText(cues, 3.5)).toBe("First\nOverlap");
+  });
+
+  it("treats cue end times as exclusive", () => {
+    expect(
+      activeCueText(
+        [
+          { start: 1, end: 2, text: "First" },
+          { start: 2, end: 3, text: "Second" },
+        ],
+        2,
+      ),
+    ).toBe("Second");
   });
 
   it("returns null when no cue is active", () => {

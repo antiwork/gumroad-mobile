@@ -49,7 +49,6 @@ type CaptionSelection =
   | { type: "embedded"; track: SubtitleTrack }
   | { type: "external"; index: number };
 
-// SubtitleTrack.id is Android-only, so fall back to the label + language pair to tell tracks apart on iOS.
 const subtitleTrackKey = (track: SubtitleTrack): string => track.id ?? `${track.label}|${track.language}`;
 
 export default function VideoPlayerScreen() {
@@ -81,33 +80,49 @@ export default function VideoPlayerScreen() {
   const [currentCueText, setCurrentCueText] = useState<string | null>(null);
   const [captionSheetOpen, setCaptionSheetOpen] = useState(false);
   const cueCacheRef = useRef<Map<string, SubtitleCue[]>>(new Map());
-  // Incremented on every caption selection so an in-flight subtitle fetch can tell whether the
-  // buyer has since picked something else; a stale fetch must not apply its cues.
   const captionRequestIdRef = useRef(0);
+  const selectionRef = useRef<CaptionSelection>({ type: "off" });
 
   useEffect(() => {
-    if (!accessToken) return;
+    let cancelled = false;
+    const offSelection = { type: "off" } as const;
+    captionRequestIdRef.current += 1;
+    selectionRef.current = offSelection;
+    setSelection(offSelection);
+    setExternalTracks([]);
+    setEmbeddedTracks([]);
+    setExternalCues([]);
+    setCurrentCueText(null);
+    setCaptionSheetOpen(false);
 
     const resolveVideoUrl = async () => {
+      if (!accessToken) return;
       setIsLoading(true);
       try {
         if (streamingUrl) {
           const streamData = await fetchStreamData(streamingUrl, accessToken);
+          if (cancelled) return;
           setVideoUrl(streamData.playlist_url);
           setExternalTracks(streamData.subtitles ?? []);
         } else {
           setVideoUrl(uri);
         }
       } catch (error) {
+        if (cancelled) return;
         console.warn("Failed to fetch streaming URL, falling back to direct URL:", error);
         Sentry.captureException(error);
         setVideoUrl(uri);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     resolveVideoUrl();
+
+    return () => {
+      cancelled = true;
+      captionRequestIdRef.current += 1;
+    };
   }, [accessToken, streamingUrl, uri]);
 
   const player = useVideoPlayer(videoUrl, (player) => {
@@ -157,7 +172,18 @@ export default function VideoPlayerScreen() {
           setPlaybackError(error?.message ?? "Unknown playback error");
         } else if (status === "readyToPlay") {
           setPlaybackError(null);
-          withReleasedPlayerGuard(() => setEmbeddedTracks(player.availableSubtitleTracks));
+          withReleasedPlayerGuard(() => {
+            setEmbeddedTracks(player.availableSubtitleTracks);
+            const subtitleTrack = player.subtitleTrack;
+            if (subtitleTrack && selectionRef.current.type !== "external") {
+              const embeddedSelection = { type: "embedded", track: subtitleTrack } as const;
+              captionRequestIdRef.current += 1;
+              selectionRef.current = embeddedSelection;
+              setSelection(embeddedSelection);
+              setExternalCues([]);
+              setCurrentCueText(null);
+            }
+          });
         }
       },
     );
@@ -174,16 +200,22 @@ export default function VideoPlayerScreen() {
     return () => subscription.remove();
   }, [player]);
 
-  // The native controls expose their own subtitle menu for embedded tracks. If the buyer enables
-  // an embedded track there while an external track is displayed, drop the external overlay so the
-  // two caption sources never render on top of each other.
   useEffect(() => {
     const subscription = player.addListener(
       "subtitleTrackChange",
       ({ subtitleTrack }: { subtitleTrack: SubtitleTrack | null }) => {
         if (subtitleTrack) {
+          const embeddedSelection = { type: "embedded", track: subtitleTrack } as const;
           captionRequestIdRef.current += 1;
-          setSelection({ type: "embedded", track: subtitleTrack });
+          selectionRef.current = embeddedSelection;
+          setSelection(embeddedSelection);
+          setExternalCues([]);
+          setCurrentCueText(null);
+        } else if (selectionRef.current.type !== "external") {
+          const offSelection = { type: "off" } as const;
+          captionRequestIdRef.current += 1;
+          selectionRef.current = offSelection;
+          setSelection(offSelection);
           setExternalCues([]);
           setCurrentCueText(null);
         }
@@ -252,6 +284,7 @@ export default function VideoPlayerScreen() {
 
   const selectCaptionTrack = async (nextSelection: CaptionSelection) => {
     setCaptionSheetOpen(false);
+    selectionRef.current = nextSelection;
     setSelection(nextSelection);
     const requestId = ++captionRequestIdRef.current;
 
@@ -283,9 +316,11 @@ export default function VideoPlayerScreen() {
       setExternalCues(cues);
       setCurrentCueText(activeCueText(cues, player.currentTime));
     } catch (error) {
-      Sentry.captureException(error);
       if (captionRequestIdRef.current !== requestId) return;
-      setSelection({ type: "off" });
+      Sentry.captureException(error);
+      const offSelection = { type: "off" } as const;
+      selectionRef.current = offSelection;
+      setSelection(offSelection);
     }
   };
 
@@ -383,6 +418,8 @@ export default function VideoPlayerScreen() {
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => selectCaptionTrack(item.select)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: item.isSelected }}
                 className={cn("flex-row items-center justify-between px-4 py-3", item.isSelected && "bg-muted/20")}
               >
                 <Text className={cn("flex-1", item.isSelected && "font-bold")}>{item.label}</Text>

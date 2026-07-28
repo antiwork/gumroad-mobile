@@ -387,6 +387,45 @@ External caption text
       expect(queryByTestId("subtitle-overlay")).toBeNull();
     });
 
+    it("syncs the selector when the native controls turn embedded captions off", async () => {
+      const embeddedTrack = { language: "en", label: "Embedded English" };
+      mockPlayer.availableSubtitleTracks = [embeddedTrack];
+      mockPlayer.subtitleTrack = embeddedTrack;
+      const { getByTestId, getByRole } = renderScreen();
+
+      await act(async () => {});
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+      fireEvent.press(getByTestId("captions-button"));
+
+      expect(getByRole("radio", { name: "Embedded English" }).props.accessibilityState).toEqual({ checked: true });
+
+      act(() => {
+        mockPlayer.subtitleTrack = null;
+        subtitleTrackChangeListener!({ subtitleTrack: null });
+      });
+
+      expect(getByRole("radio", { name: "Off" }).props.accessibilityState).toEqual({ checked: true });
+    });
+
+    it("keeps external captions selected when disabling the embedded track emits a native event", async () => {
+      const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+
+      act(() => {
+        subtitleTrackChangeListener!({ subtitleTrack: null });
+      });
+
+      expect(queryByTestId("subtitle-overlay")).toBeTruthy();
+    });
+
     it("updates the overlay text as playback progresses", async () => {
       const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
 
