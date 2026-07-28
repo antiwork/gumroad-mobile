@@ -68,8 +68,16 @@ export default function DownloadScreen() {
       buildAuthenticatedWebViewUrl(`/d/${encodeURIComponent(token)}`, accessToken, { display: "mobile_app" }),
     [token],
   );
-  const { accessToken, handleAuthenticationHttpError, handleAuthenticationNavigation, isLoading, url, webViewKey } =
-    useWebViewSession(buildPurchaseUrl);
+  const {
+    accessToken,
+    handleAuthenticationHttpError,
+    handleAuthenticationNavigation,
+    handleSessionLoad,
+    handleSessionLoadError,
+    isLoading,
+    url,
+    webViewKey,
+  } = useWebViewSession(buildPurchaseUrl);
 
   const { pauseAudio, playAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
@@ -248,6 +256,12 @@ export default function DownloadScreen() {
         allowsFullscreenVideo
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onLoad={(event) => {
+          handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
+        }}
+        onError={() => {
+          handleSessionLoadError({ token: accessToken });
+        }}
         onHttpError={(event: WebViewHttpErrorEvent) => {
           handleAuthenticationHttpError(event.nativeEvent);
         }}

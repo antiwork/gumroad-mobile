@@ -81,8 +81,16 @@ const downloadSalesExportFile = async (url: string) => {
 
 export default function SalesExportScreen() {
   const [isDownloading, setIsDownloading] = useState(false);
-  const { handleAuthenticationHttpError, handleAuthenticationNavigation, isLoading, url, webViewKey } =
-    useWebViewSession(getExportAllSalesUrl);
+  const {
+    accessToken,
+    handleAuthenticationHttpError,
+    handleAuthenticationNavigation,
+    handleSessionLoad,
+    handleSessionLoadError,
+    isLoading,
+    url,
+    webViewKey,
+  } = useWebViewSession(getExportAllSalesUrl);
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; mainDocumentURL?: string }) => {
@@ -138,6 +146,12 @@ export default function SalesExportScreen() {
         thirdPartyCookiesEnabled
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onLoad={(event) => {
+          handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
+        }}
+        onError={() => {
+          handleSessionLoadError({ token: accessToken });
+        }}
         onHttpError={(event: WebViewHttpErrorEvent) => {
           handleAuthenticationHttpError(event.nativeEvent);
         }}

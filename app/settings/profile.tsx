@@ -54,8 +54,16 @@ export default function ProfileSettingsScreen() {
   const [canSave, setCanSave] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const { handleAuthenticationHttpError, handleAuthenticationNavigation, isLoading, url, webViewKey } =
-    useWebViewSession(buildProfileUrl, { syncExternalToken: false });
+  const {
+    accessToken,
+    handleAuthenticationHttpError,
+    handleAuthenticationNavigation,
+    handleSessionLoad,
+    handleSessionLoadError,
+    isLoading,
+    url,
+    webViewKey,
+  } = useWebViewSession(buildProfileUrl, { syncExternalToken: false });
 
   const mainUrlRef = useRef(url);
 
@@ -97,12 +105,16 @@ export default function ProfileSettingsScreen() {
     setReloadKey((k) => k + 1);
   }, [url]);
 
-  const handleError = useCallback((event: WebViewErrorEvent) => {
-    if (event.nativeEvent.url !== mainUrlRef.current) return;
-    setCanSave(false);
-    setHasError(true);
-    Sentry.captureException(new Error(`Profile WebView load error: ${event.nativeEvent.description}`));
-  }, []);
+  const handleError = useCallback(
+    (event: WebViewErrorEvent) => {
+      handleSessionLoadError({ token: accessToken });
+      if (event.nativeEvent.url !== mainUrlRef.current) return;
+      setCanSave(false);
+      setHasError(true);
+      Sentry.captureException(new Error(`Profile WebView load error: ${event.nativeEvent.description}`));
+    },
+    [accessToken, handleSessionLoadError],
+  );
 
   const handleHttpError = useCallback(
     (event: WebViewHttpErrorEvent) => {
@@ -160,6 +172,9 @@ export default function ProfileSettingsScreen() {
         onOpenWindow={handleOpenWindow}
         onNavigationStateChange={(navState) => {
           mainUrlRef.current = navState.url;
+        }}
+        onLoad={(event) => {
+          handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
         }}
         onError={handleError}
         onHttpError={handleHttpError}

@@ -34,17 +34,37 @@ export const useWebViewSession = (
   const pendingExternalTokenRef = useRef<string | null>(null);
   const refreshStartedRef = useRef(false);
   const refreshAttemptedRef = useRef(false);
+  const awaitingSuccessfulTokenRef = useRef<string | null>(null);
+  const pendingSuccessfulLoadRef = useRef<{
+    timeout: ReturnType<typeof setTimeout>;
+    token: string;
+    url: string;
+  } | null>(null);
 
-  const updateSessionToken = useCallback((token: string | null) => {
-    sessionTokenRef.current = token;
-    setSessionToken(token);
+  const cancelPendingSuccessfulLoad = useCallback((token?: string | null) => {
+    const pendingLoad = pendingSuccessfulLoadRef.current;
+    if (pendingLoad === null || (token !== undefined && token !== pendingLoad.token)) return;
+    clearTimeout(pendingLoad.timeout);
+    pendingSuccessfulLoadRef.current = null;
   }, []);
+
+  const updateSessionToken = useCallback(
+    (token: string | null) => {
+      cancelPendingSuccessfulLoad();
+      sessionTokenRef.current = token;
+      setSessionToken(token);
+    },
+    [cancelPendingSuccessfulLoad],
+  );
+
+  useEffect(() => cancelPendingSuccessfulLoad, [cancelPendingSuccessfulLoad]);
 
   useEffect(() => {
     if (accessToken === observedAccessTokenRef.current) return;
     observedAccessTokenRef.current = accessToken;
     if (accessToken === null) {
       pendingExternalTokenRef.current = null;
+      awaitingSuccessfulTokenRef.current = null;
       updateSessionToken(null);
       refreshAttemptedRef.current = false;
       return;
@@ -55,6 +75,7 @@ export const useWebViewSession = (
       pendingExternalTokenRef.current = accessToken;
       return;
     }
+    awaitingSuccessfulTokenRef.current = null;
     updateSessionToken(accessToken);
     refreshAttemptedRef.current = false;
   }, [accessToken, syncExternalToken, updateSessionToken]);
@@ -66,6 +87,7 @@ export const useWebViewSession = (
       } else if (error !== undefined) {
         Sentry.captureException(error, { tags: { auth_path: "webview_refresh_failed" } });
       }
+      awaitingSuccessfulTokenRef.current = null;
       updateSessionToken(null);
       await logout();
     },
@@ -73,11 +95,13 @@ export const useWebViewSession = (
   );
 
   const refreshSession = useCallback(() => {
+    cancelPendingSuccessfulLoad();
     if (refreshStartedRef.current) return true;
 
     const pendingExternalToken = pendingExternalTokenRef.current;
     if (pendingExternalToken !== null && pendingExternalToken !== sessionTokenRef.current) {
       pendingExternalTokenRef.current = null;
+      awaitingSuccessfulTokenRef.current = null;
       updateSessionToken(pendingExternalToken);
       refreshAttemptedRef.current = false;
       return true;
@@ -94,7 +118,10 @@ export const useWebViewSession = (
 
     refreshAttemptedRef.current = true;
     void refreshToken()
-      .then(updateSessionToken)
+      .then((token) => {
+        awaitingSuccessfulTokenRef.current = token;
+        updateSessionToken(token);
+      })
       .catch((error: unknown) => {
         if (error instanceof KeychainUnavailableError) {
           refreshAttemptedRef.current = false;
@@ -106,7 +133,46 @@ export const useWebViewSession = (
         refreshStartedRef.current = false;
       });
     return true;
-  }, [endSession, refreshToken, updateSessionToken]);
+  }, [cancelPendingSuccessfulLoad, endSession, refreshToken, updateSessionToken]);
+
+  const handleSessionLoad = useCallback(
+    ({ token, url }: { token: string | null; url: string }) => {
+      if (
+        token === null ||
+        token !== sessionTokenRef.current ||
+        token !== awaitingSuccessfulTokenRef.current ||
+        !isGumroadUrl(url) ||
+        isLoginUrl(url)
+      )
+        return;
+
+      cancelPendingSuccessfulLoad();
+      const timeout = setTimeout(() => {
+        const pendingLoad = pendingSuccessfulLoadRef.current;
+        if (
+          pendingLoad?.token !== token ||
+          pendingLoad.url !== url ||
+          token !== sessionTokenRef.current ||
+          token !== awaitingSuccessfulTokenRef.current
+        )
+          return;
+        pendingSuccessfulLoadRef.current = null;
+        awaitingSuccessfulTokenRef.current = null;
+        refreshAttemptedRef.current = false;
+      }, 0);
+      pendingSuccessfulLoadRef.current = { timeout, token, url };
+    },
+    [cancelPendingSuccessfulLoad],
+  );
+
+  const handleSessionLoadError = useCallback(
+    ({ token }: { token: string | null }) => {
+      // Android emits onLoad immediately before onError for failed main-frame
+      // navigations, so cancel the deferred success acknowledgement.
+      cancelPendingSuccessfulLoad(token);
+    },
+    [cancelPendingSuccessfulLoad],
+  );
 
   const handleAuthenticationNavigation = useCallback(
     (url: string) => {
@@ -118,16 +184,19 @@ export const useWebViewSession = (
 
   const handleAuthenticationHttpError = useCallback(
     ({ statusCode, url }: { statusCode: number; url: string }) => {
+      cancelPendingSuccessfulLoad();
       if (statusCode !== 401 || !isGumroadUrl(url)) return false;
       return refreshSession();
     },
-    [refreshSession],
+    [cancelPendingSuccessfulLoad, refreshSession],
   );
 
   return {
     accessToken: sessionToken,
     handleAuthenticationHttpError,
     handleAuthenticationNavigation,
+    handleSessionLoad,
+    handleSessionLoadError,
     isLoading: isAuthLoading || sessionToken === null,
     url: sessionToken === null ? null : buildUrl(sessionToken),
     webViewKey: sessionToken ?? "anonymous",

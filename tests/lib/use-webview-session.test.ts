@@ -115,6 +115,68 @@ describe("useWebViewSession", () => {
     expect(mockRefreshToken).toHaveBeenCalledTimes(1);
   });
 
+  it("allows another refresh after the refreshed WebView loads successfully", async () => {
+    mockRefreshToken.mockResolvedValueOnce("first-refreshed-token").mockResolvedValueOnce("second-refreshed-token");
+    const { result } = renderHook(() => useWebViewSession(buildUrl));
+
+    act(() => {
+      result.current.handleAuthenticationNavigation("https://example.com/login");
+    });
+    await waitFor(() => {
+      expect(result.current.accessToken).toBe("first-refreshed-token");
+    });
+
+    act(() => {
+      result.current.handleSessionLoad({
+        token: "first-refreshed-token",
+        url: "https://example.com/settings/profile",
+      });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    act(() => {
+      result.current.handleAuthenticationNavigation("https://example.com/login");
+    });
+
+    await waitFor(() => {
+      expect(result.current.accessToken).toBe("second-refreshed-token");
+    });
+    expect(mockRefreshToken).toHaveBeenCalledTimes(2);
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("preserves the one-refresh guard when Android reports an error after onLoad", async () => {
+    const { result } = renderHook(() => useWebViewSession(buildUrl));
+
+    act(() => {
+      result.current.handleAuthenticationNavigation("https://example.com/login");
+    });
+    await waitFor(() => {
+      expect(result.current.accessToken).toBe("refreshed-token");
+    });
+
+    act(() => {
+      result.current.handleSessionLoad({
+        token: "refreshed-token",
+        url: "https://example.com/settings/profile",
+      });
+      result.current.handleSessionLoadError({ token: "refreshed-token" });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    act(() => {
+      result.current.handleAuthenticationNavigation("https://example.com/login");
+    });
+
+    await waitFor(() => {
+      expect(mockLogout).toHaveBeenCalledTimes(1);
+    });
+    expect(mockRefreshToken).toHaveBeenCalledTimes(1);
+  });
+
   it("preserves the one-refresh guard when auth context publishes the refreshed token first", async () => {
     const auth = {
       isLoading: false,
