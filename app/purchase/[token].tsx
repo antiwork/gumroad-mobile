@@ -7,18 +7,20 @@ import { Screen } from "@/components/ui/screen";
 import { useAddRecentPurchase } from "@/components/library/use-recent-products";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { assertDefined } from "@/lib/assert";
-import { useAuth } from "@/lib/auth-context";
 import { productFileDownloadUrl } from "@/lib/download-url";
 import { env } from "@/lib/env";
 import { cacheFileDestination, downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
 import { shareFile } from "@/lib/share";
+import { useWebViewSession } from "@/lib/use-webview-session";
+import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
+import type { WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
 
 // See antiwork/gumroad:app/javascript/components/Download/Interactions.tsx
 type ClickPayload = {
@@ -60,9 +62,14 @@ export default function DownloadScreen() {
   const purchase = usePurchase(urlRedirectExternalId);
   const addRecentPurchase = useAddRecentPurchase();
   const router = useRouter();
-  const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
-  const url = `${env.EXPO_PUBLIC_GUMROAD_URL}/d/${token}?display=mobile_app&access_token=${accessToken}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
+  const buildPurchaseUrl = useCallback(
+    (accessToken: string) =>
+      buildAuthenticatedWebViewUrl(`/d/${encodeURIComponent(token)}`, accessToken, { display: "mobile_app" }),
+    [token],
+  );
+  const { accessToken, handleAuthenticationHttpError, handleAuthenticationNavigation, isLoading, url, webViewKey } =
+    useWebViewSession(buildPurchaseUrl);
 
   const { pauseAudio, playAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
@@ -92,6 +99,7 @@ export default function DownloadScreen() {
     (request: { url: string; navigationType: string; mainDocumentURL?: string }) => {
       // Allow loading iframes, e.g. video embeds
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
+      if (handleAuthenticationNavigation(request.url)) return false;
       if (
         request.url === url ||
         request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL) ||
@@ -103,7 +111,7 @@ export default function DownloadScreen() {
       safeOpenURL(request.url);
       return false;
     },
-    [url],
+    [handleAuthenticationNavigation, url],
   );
 
   const handleNativePageChange = useCallback((pageIndex: number) => {
@@ -215,7 +223,7 @@ export default function DownloadScreen() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || url === null) {
     return (
       <View className="flex-1 items-center justify-center bg-body-bg">
         <LoadingSpinner size="large" />
@@ -227,7 +235,7 @@ export default function DownloadScreen() {
     <Screen>
       <Stack.Screen options={{ title: purchase?.name ?? "" }} />
       <StyledWebView
-        key={accessToken ?? "anonymous"}
+        key={webViewKey}
         ref={webViewRef}
         source={{ uri: url }}
         className="flex-1 bg-transparent"
@@ -240,6 +248,9 @@ export default function DownloadScreen() {
         allowsFullscreenVideo
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onHttpError={(event: WebViewHttpErrorEvent) => {
+          handleAuthenticationHttpError(event.nativeEvent);
+        }}
         onMessage={handleMessage}
       />
       {isDownloading && (

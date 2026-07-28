@@ -16,6 +16,8 @@ appId: ${APP_ID}
     visible: Profile settings
     timeout: 20000
 - assertVisible: Mobile Seller 1
+- assertNotVisible: Log in
+- assertNotVisible: Dashboard
 - assertNotVisible: Something went wrong
 - runFlow:
     file: utils/back.yaml
@@ -25,7 +27,20 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Payout schedule|Where are you located.*"
     timeout: 20000
+- assertNotVisible: Log in
+- assertNotVisible: Dashboard
 - assertNotVisible: Something went wrong
+- runFlow:
+    file: utils/back.yaml
+- tapOn:
+    id: settings-button
+- tapOn: ".*Edit profile.*"
+- extendedWaitUntil:
+    visible: Profile settings
+    timeout: 20000
+- assertVisible: Mobile Seller 1
+- assertNotVisible: Log in
+- assertNotVisible: Dashboard
 - runFlow:
     file: utils/back.yaml
 - tapOn: ".*Analytics.*"
@@ -37,6 +52,8 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: Download CSV
     timeout: 20000
+- assertNotVisible: Log in
+- assertNotVisible: Dashboard
 - assertNotVisible: "net::ERR_UNKNOWN_URL_SCHEME|Something went wrong"
 - runFlow:
     file: utils/back.yaml
