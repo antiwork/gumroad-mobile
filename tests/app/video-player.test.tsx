@@ -963,18 +963,23 @@ External caption text
 
     it("retries a failed stream lookup after the access token refreshes", async () => {
       jest.spyOn(console, "warn").mockImplementation();
+      let resolveRetry: (stream: { playlist_url: string; subtitles: { url: string; language: string }[] }) => void;
       mockSearchParams = {
         uri: "https://example.com/video.mp4",
         streamingUrl: "mobile/url_redirects/stream/token/file",
         title: "Test Video",
       };
-      mockRequestAPI.mockRejectedValueOnce(new Error("Unauthorized")).mockResolvedValueOnce({
-        playlist_url: "https://example.com/index.m3u8",
-        subtitles: [{ url: "https://example.com/captions.srt", language: "English" }],
-      });
+      mockRequestAPI.mockRejectedValueOnce(new Error("Unauthorized")).mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveRetry = resolve;
+        }),
+      );
       const { getByTestId, queryByTestId } = renderScreen();
       await act(async () => {});
       expect(queryByTestId("captions-button")).toBeNull();
+      mockPlayer.currentTime = 137;
+      mockPlayer.playing = false;
+      mockPlayer.pause.mockClear();
 
       await act(async () => {
         mockSetAccessToken!("refreshed-token");
@@ -983,7 +988,18 @@ External caption text
       expect(mockRequestAPI).toHaveBeenNthCalledWith(2, "mobile/url_redirects/stream/token/file", {
         accessToken: "refreshed-token",
       });
+      expect(getByTestId("video-player")).toBeTruthy();
+
+      await act(async () => {
+        resolveRetry!({
+          playlist_url: "https://example.com/index.m3u8",
+          subtitles: [{ url: "https://example.com/captions.srt", language: "English" }],
+        });
+      });
+
       expect(getByTestId("captions-button")).toBeTruthy();
+      expect(mockPlayer.currentTime).toBe(137);
+      expect(mockPlayer.pause).toHaveBeenCalled();
     });
 
     it("ignores a stale subtitle fetch when the buyer selects Off before it resolves", async () => {

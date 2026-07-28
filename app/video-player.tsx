@@ -154,6 +154,9 @@ export default function VideoPlayerScreen() {
   const selectionRef = useRef<CaptionSelection>({ type: "off" });
   const mediaIdentityRef = useRef<{ streamingUrl?: string; uri: string } | null>(null);
   const resolvedMediaIdentityRef = useRef<{ streamingUrl?: string; uri: string } | null>(null);
+  const fallbackMediaIdentityRef = useRef<{ streamingUrl?: string; uri: string } | null>(null);
+  const playerRef = useRef<ReturnType<typeof useVideoPlayer> | null>(null);
+  const pendingSourceResumeRef = useRef<{ position: number; wasPlaying: boolean } | null>(null);
 
   const cancelCaptionRequest = useCallback(() => {
     captionRequestIdRef.current += 1;
@@ -183,6 +186,8 @@ export default function VideoPlayerScreen() {
 
     if (mediaChanged) {
       const offSelection = { type: "off" } as const;
+      fallbackMediaIdentityRef.current = null;
+      pendingSourceResumeRef.current = null;
       cancelCaptionRequest();
       fullscreenRequestIdRef.current += 1;
       if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
@@ -212,22 +217,38 @@ export default function VideoPlayerScreen() {
 
     const resolveVideoUrl = async () => {
       if (!accessToken) return;
-      setIsLoading(true);
+      const fallbackMedia = fallbackMediaIdentityRef.current;
+      const upgradingFallback = fallbackMedia?.uri === uri && fallbackMedia.streamingUrl === streamingUrl;
+      if (!upgradingFallback) setIsLoading(true);
       try {
         if (streamingUrl) {
           const streamData = await fetchStreamData(streamingUrl, accessToken);
           if (cancelled) return;
+          if (upgradingFallback && streamData.playlist_url !== uri) {
+            const activePlayer = playerRef.current;
+            if (activePlayer) {
+              withReleasedPlayerGuard(() => {
+                pendingSourceResumeRef.current = {
+                  position: activePlayer.currentTime,
+                  wasPlaying: activePlayer.playing,
+                };
+              });
+            }
+          }
           resolvedMediaIdentityRef.current = { uri, streamingUrl };
+          fallbackMediaIdentityRef.current = null;
           setVideoUrl(streamData.playlist_url);
           setExternalTracks(streamData.subtitles ?? []);
         } else {
           resolvedMediaIdentityRef.current = { uri, streamingUrl };
+          fallbackMediaIdentityRef.current = null;
           setVideoUrl(uri);
         }
       } catch (error) {
         if (cancelled) return;
         console.warn("Failed to fetch streaming URL, falling back to direct URL:", error);
         Sentry.captureException(error);
+        fallbackMediaIdentityRef.current = { uri, streamingUrl };
         setVideoUrl(uri);
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -246,11 +267,20 @@ export default function VideoPlayerScreen() {
     player.allowsExternalPlayback = true;
     player.staysActiveInBackground = false;
     player.timeUpdateEventInterval = 0.25;
-    if (initialPosition) {
+    const pendingResume = pendingSourceResumeRef.current;
+    pendingSourceResumeRef.current = null;
+    if (pendingResume) {
+      player.currentTime = pendingResume.position;
+    } else if (initialPosition) {
       player.currentTime = Number(initialPosition);
     }
-    player.play();
+    if (pendingResume && !pendingResume.wasPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
   });
+  playerRef.current = player;
 
   const wasPlayingBeforeBackgroundRef = useRef(false);
   const positionBeforeBackgroundRef = useRef<number | null>(null);
