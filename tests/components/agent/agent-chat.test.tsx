@@ -264,9 +264,10 @@ describe("AgentChat", () => {
 
     await waitFor(() => expect(screen.getByText("Checking your store...")).toBeTruthy());
     expect(screen.queryByText("Working on it...")).toBeNull();
-    expect(screen.getByTestId("agent-send-progress").props.accessibilityLabel).toBe(
-      `Send unavailable, assistant response ${"Checking your store...".length} characters`,
-    );
+    expect(screen.getByTestId("agent-send-progress").props.accessibilityLabel).toBe("Send");
+    expect(screen.getByTestId("agent-send-progress").props.accessibilityValue).toEqual({
+      text: `Assistant response ${"Checking your store...".length} characters`,
+    });
 
     const { handlers } = mockStreamAgentMessage.mock.calls[0][0] as {
       handlers: { onToken: (text: string) => void; onReset: () => void };
@@ -282,9 +283,9 @@ describe("AgentChat", () => {
       handlers.onToken("up 20%.");
     });
     await waitFor(() => expect(screen.getByText("Sales are up 20%.")).toBeTruthy());
-    expect(screen.getByTestId("agent-send-progress").props.accessibilityLabel).toBe(
-      `Send unavailable, assistant response ${"Sales are up 20%.".length} characters`,
-    );
+    expect(screen.getByTestId("agent-send-progress").props.accessibilityValue).toEqual({
+      text: `Assistant response ${"Sales are up 20%.".length} characters`,
+    });
 
     await act(async () => {
       resolveTurn({ reply: "Sales are up 20% this week.", proposedAction: null, conversationId: "conv-123" });
@@ -469,6 +470,7 @@ describe("AgentChat", () => {
 
     act(() => {
       list.props.onScrollBeginDrag();
+      list.props.onScrollEndDrag(scrollEvent(1400, 2000, 600, -500));
       list.props.onMomentumScrollEnd(scrollEvent(1400));
       list.props.onContentSizeChange(0, 2100);
     });
@@ -476,8 +478,8 @@ describe("AgentChat", () => {
     expect(scrollToEnd).not.toHaveBeenCalled();
 
     act(() => {
+      list.props.onMomentumScrollBegin();
       list.props.onScroll(scrollEvent(400));
-      list.props.onScrollEndDrag(scrollEvent(400));
       list.props.onContentSizeChange(0, 2200);
     });
 
@@ -500,6 +502,7 @@ describe("AgentChat", () => {
       list.props.onScrollBeginDrag();
       list.props.onScroll(scrollEvent(800));
       list.props.onScrollEndDrag(scrollEvent(800, 2000, 600, -500));
+      list.props.onMomentumScrollBegin();
       list.props.onContentSizeChange(0, 2200);
     });
 

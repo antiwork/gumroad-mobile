@@ -144,6 +144,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const listRef = useRef<FlatList<DisplayMessage>>(null);
   const isAtBottomRef = useRef(true);
   const isReaderDraggingRef = useRef(false);
+  const isReaderMomentumPendingRef = useRef(false);
   const isReaderMomentumRef = useRef(false);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
@@ -224,6 +225,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     hasSentMessageRef.current = true;
     isAtBottomRef.current = true;
     isReaderDraggingRef.current = false;
+    isReaderMomentumPendingRef.current = false;
     isReaderMomentumRef.current = false;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
@@ -274,11 +276,18 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         keyboardShouldPersistTaps="handled"
         // Scrolling on content growth keeps up with streaming tokens, which arrive faster than a debounce would fire.
         onContentSizeChange={() => {
-          if (isReaderDraggingRef.current || isReaderMomentumRef.current || !isAtBottomRef.current) return;
+          if (
+            isReaderDraggingRef.current ||
+            isReaderMomentumPendingRef.current ||
+            isReaderMomentumRef.current ||
+            !isAtBottomRef.current
+          )
+            return;
           listRef.current?.scrollToEnd({ animated: true });
         }}
         onScrollBeginDrag={() => {
           isReaderDraggingRef.current = true;
+          isReaderMomentumPendingRef.current = false;
           isReaderMomentumRef.current = false;
           isAtBottomRef.current = false;
         }}
@@ -289,7 +298,12 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         onScrollEndDrag={({ nativeEvent }) => {
           isAtBottomRef.current = isNearBottom(nativeEvent);
           isReaderDraggingRef.current = false;
-          isReaderMomentumRef.current = Boolean(nativeEvent.velocity?.y);
+          isReaderMomentumPendingRef.current = Boolean(nativeEvent.velocity?.y);
+        }}
+        onMomentumScrollBegin={() => {
+          if (!isReaderMomentumPendingRef.current) return;
+          isReaderMomentumPendingRef.current = false;
+          isReaderMomentumRef.current = true;
         }}
         onMomentumScrollEnd={({ nativeEvent }) => {
           if (isReaderDraggingRef.current || !isReaderMomentumRef.current) return;
@@ -311,7 +325,9 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             streamingReply ? (
               <View className="items-start">
                 <View className="w-full">
-                  <Text className="text-foreground">{streamingReply}</Text>
+                  <Text className="text-foreground" testID="agent-streaming-reply">
+                    {streamingReply}
+                  </Text>
                 </View>
               </View>
             ) : (
@@ -353,9 +369,10 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             className="absolute right-1.5 bottom-1.5 size-11 rounded-full"
             disabled={isSending || !hasText}
             onPress={() => send(input)}
-            accessibilityLabel={
-              isSending ? `Send unavailable, assistant response ${streamingReply?.length ?? 0} characters` : "Send"
-            }
+            accessibilityLabel="Send"
+            accessibilityValue={{
+              text: isSending ? `Assistant response ${streamingReply?.length ?? 0} characters` : "",
+            }}
             testID="agent-send-progress"
           >
             <LineIcon
