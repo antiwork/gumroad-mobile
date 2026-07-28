@@ -46,6 +46,26 @@ const withReleasedPlayerGuard = (operation: () => void) => {
   }
 };
 
+const restorePortraitOrientation = () => {
+  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
+    Sentry.captureException(error),
+  );
+};
+
+const prepareFullscreenOrientation = async (): Promise<boolean> => {
+  try {
+    if (Platform.OS === "ios" && Platform.isPad) {
+      await ScreenOrientation.unlockAsync();
+    } else {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    }
+    return true;
+  } catch (error) {
+    Sentry.captureException(error);
+    return false;
+  }
+};
+
 type CaptionSelection =
   | { type: "off" }
   | { type: "embedded"; track: SubtitleTrack }
@@ -104,9 +124,7 @@ export default function VideoPlayerScreen() {
       mountedRef.current = false;
       fullscreenRequestIdRef.current += 1;
       fullscreenOrientationActiveRef.current = false;
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
-        Sentry.captureException(error),
-      );
+      restorePortraitOrientation();
     };
   }, []);
 
@@ -117,9 +135,7 @@ export default function VideoPlayerScreen() {
     fullscreenRequestIdRef.current += 1;
     if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
       fullscreenOrientationActiveRef.current = false;
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
-        Sentry.captureException(error),
-      );
+      restorePortraitOrientation();
     }
     selectionRef.current = offSelection;
     setSelection(offSelection);
@@ -215,9 +231,7 @@ export default function VideoPlayerScreen() {
           } else {
             if (externalFullscreenOpen) {
               fullscreenOrientationActiveRef.current = false;
-              ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((orientationError) =>
-                Sentry.captureException(orientationError),
-              );
+              restorePortraitOrientation();
             }
             setPlaybackError(message);
           }
@@ -411,23 +425,9 @@ export default function VideoPlayerScreen() {
 
   const enterExternalFullscreen = async () => {
     const requestId = ++fullscreenRequestIdRef.current;
-    let orientationApplied = false;
-    try {
-      if (Platform.OS === "ios" && Platform.isPad) {
-        await ScreenOrientation.unlockAsync();
-      } else {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-      }
-      orientationApplied = true;
-    } catch (error) {
-      Sentry.captureException(error);
-    }
+    const orientationApplied = await prepareFullscreenOrientation();
     if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
-      if (orientationApplied) {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
-          Sentry.captureException(error),
-        );
-      }
+      if (orientationApplied) restorePortraitOrientation();
       return;
     }
     fullscreenOrientationActiveRef.current = orientationApplied;
@@ -440,21 +440,33 @@ export default function VideoPlayerScreen() {
     setExternalFullscreenOpen(false);
     if (Platform.OS !== "ios") {
       fullscreenOrientationActiveRef.current = false;
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
-        Sentry.captureException(error),
-      );
+      restorePortraitOrientation();
     }
   };
 
   const handleExternalFullscreenDismiss = () => {
     fullscreenOrientationActiveRef.current = false;
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
-      Sentry.captureException(error),
-    );
+    restorePortraitOrientation();
     if (pendingPlaybackError) {
       setPlaybackError(pendingPlaybackError);
       setPendingPlaybackError(null);
     }
+  };
+
+  const handleNativeFullscreenEnter = async () => {
+    const requestId = ++fullscreenRequestIdRef.current;
+    const orientationApplied = await prepareFullscreenOrientation();
+    if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
+      if (orientationApplied) restorePortraitOrientation();
+      return;
+    }
+    fullscreenOrientationActiveRef.current = orientationApplied;
+  };
+
+  const handleNativeFullscreenExit = () => {
+    fullscreenRequestIdRef.current += 1;
+    fullscreenOrientationActiveRef.current = false;
+    restorePortraitOrientation();
   };
 
   const renderVideoSurface = (fullscreen: boolean) => (
@@ -466,6 +478,8 @@ export default function VideoPlayerScreen() {
         player={player}
         allowsPictureInPicture={!externalCaptionSelected}
         surfaceType="textureView"
+        onFullscreenEnter={handleNativeFullscreenEnter}
+        onFullscreenExit={handleNativeFullscreenExit}
         fullscreenOptions={{
           enable: !externalCaptionSelected && !fullscreen,
           orientation: "landscape",
@@ -560,93 +574,105 @@ export default function VideoPlayerScreen() {
     </View>
   );
 
+  const externalFullscreenModal = (
+    <Modal
+      visible={externalFullscreenOpen}
+      testID="external-caption-fullscreen"
+      animationType="fade"
+      presentationStyle="fullScreen"
+      supportedOrientations={["portrait", "landscape", "landscape-left", "landscape-right"]}
+      onRequestClose={exitExternalFullscreen}
+      onDismiss={handleExternalFullscreenDismiss}
+    >
+      <View style={styles.container}>{renderVideoSurface(true)}</View>
+    </Modal>
+  );
+
   if (isLoading || !videoUrl) {
     return (
-      <View style={styles.container}>
-        <Stack.Screen options={{ title: title ?? "Video" }} />
-        <View style={styles.loadingContainer}>
-          <LoadingSpinner size="large" />
+      <>
+        <View style={styles.container}>
+          <Stack.Screen options={{ title: title ?? "Video" }} />
+          <View style={styles.loadingContainer}>
+            <LoadingSpinner size="large" />
+          </View>
         </View>
-      </View>
+        {externalFullscreenModal}
+      </>
     );
   }
 
   if (playbackError) {
     return (
-      <View style={styles.container}>
+      <>
+        <View style={styles.container}>
+          <Stack.Screen
+            options={{
+              title: title ?? "Video",
+              headerStyle: { backgroundColor: "#000" },
+              headerTintColor: "#fff",
+            }}
+          />
+          <View style={styles.errorContainer}>
+            <Text className="text-center text-lg font-semibold text-white">This video failed to load</Text>
+            <Text className="mt-2 text-center text-sm text-white/70">
+              Try downloading the file from the product page instead.
+            </Text>
+            <Text className="mt-4 text-center text-xs text-white/50">{playbackError}</Text>
+          </View>
+        </View>
+        {externalFullscreenModal}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <View style={[styles.container, { paddingBottom: bottom }]} testID="video-player-container">
         <Stack.Screen
           options={{
             title: title ?? "Video",
             headerStyle: { backgroundColor: "#000" },
             headerTintColor: "#fff",
-          }}
-        />
-        <View style={styles.errorContainer}>
-          <Text className="text-center text-lg font-semibold text-white">This video failed to load</Text>
-          <Text className="mt-2 text-center text-sm text-white/70">
-            Try downloading the file from the product page instead.
-          </Text>
-          <Text className="mt-4 text-center text-xs text-white/50">{playbackError}</Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.container, { paddingBottom: bottom }]} testID="video-player-container">
-      <Stack.Screen
-        options={{
-          title: title ?? "Video",
-          headerStyle: { backgroundColor: "#000" },
-          headerTintColor: "#fff",
-          headerRight: hasCaptionOptions
-            ? () => (
-                <View className="flex-row items-center">
-                  {externalCaptionSelected ? (
+            headerRight: hasCaptionOptions
+              ? () => (
+                  <View className="flex-row items-center">
+                    {externalCaptionSelected ? (
+                      <Pressable
+                        onPress={enterExternalFullscreen}
+                        accessibilityRole="button"
+                        accessibilityLabel="Enter fullscreen"
+                        className="p-2"
+                      >
+                        <LineIcon name="fullscreen" size={24} className="text-white" />
+                      </Pressable>
+                    ) : null}
                     <Pressable
-                      onPress={enterExternalFullscreen}
+                      onPress={() => setCaptionSheetOpen(true)}
                       accessibilityRole="button"
-                      accessibilityLabel="Enter fullscreen"
+                      accessibilityLabel="Captions"
+                      testID="captions-button"
                       className="p-2"
                     >
-                      <LineIcon name="fullscreen" size={24} className="text-white" />
+                      <LineIcon name="captions" size={24} className="text-white" />
                     </Pressable>
-                  ) : null}
-                  <Pressable
-                    onPress={() => setCaptionSheetOpen(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Captions"
-                    testID="captions-button"
-                    className="p-2"
-                  >
-                    <LineIcon name="captions" size={24} className="text-white" />
-                  </Pressable>
-                </View>
-              )
-            : undefined,
-        }}
-      />
-      {externalFullscreenOpen ? null : renderVideoSurface(false)}
-      <Modal
-        visible={externalFullscreenOpen}
-        testID="external-caption-fullscreen"
-        animationType="fade"
-        presentationStyle="fullScreen"
-        supportedOrientations={["portrait", "landscape", "landscape-left", "landscape-right"]}
-        onRequestClose={exitExternalFullscreen}
-        onDismiss={handleExternalFullscreenDismiss}
-      >
-        <View style={styles.container}>{renderVideoSurface(true)}</View>
-      </Modal>
-      <Sheet open={captionSheetOpen} onOpenChange={setCaptionSheetOpen}>
-        <SheetHeader onClose={() => setCaptionSheetOpen(false)}>
-          <SheetTitle>Captions</SheetTitle>
-        </SheetHeader>
-        <SheetContent>
-          <FlatList data={captionOptions} keyExtractor={(item) => item.key} renderItem={renderCaptionOption} />
-        </SheetContent>
-      </Sheet>
-    </View>
+                  </View>
+                )
+              : undefined,
+          }}
+        />
+        {externalFullscreenOpen ? null : renderVideoSurface(false)}
+        <Sheet open={captionSheetOpen} onOpenChange={setCaptionSheetOpen}>
+          <SheetHeader onClose={() => setCaptionSheetOpen(false)}>
+            <SheetTitle>Captions</SheetTitle>
+          </SheetHeader>
+          <SheetContent>
+            <FlatList data={captionOptions} keyExtractor={(item) => item.key} renderItem={renderCaptionOption} />
+          </SheetContent>
+        </Sheet>
+      </View>
+      {externalFullscreenModal}
+    </>
   );
 }
 

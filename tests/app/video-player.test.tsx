@@ -315,6 +315,21 @@ describe("VideoPlayerScreen", () => {
     expect(style.paddingBottom).toBe(48);
   });
 
+  it("allows native fullscreen to use landscape and restores portrait on exit", async () => {
+    const { getByTestId } = renderScreen();
+    mockLockAsync.mockClear();
+
+    await act(async () => {
+      await getByTestId("video-player").props.onFullscreenEnter();
+    });
+    expect(mockLockAsync).toHaveBeenCalledWith("landscape");
+
+    act(() => {
+      getByTestId("video-player").props.onFullscreenExit();
+    });
+    expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+  });
+
   describe("captions", () => {
     const SRT = `1
 00:00:00,000 --> 00:01:00,000
@@ -547,6 +562,52 @@ External caption text
       });
 
       expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+    });
+
+    it("keeps the modal mounted through a source refresh so iOS can restore portrait on dismissal", async () => {
+      let resolveStream: (value: { playlist_url: string; subtitles: never[] }) => void;
+      const { getByLabelText, getByTestId, getByText, queryByTestId, UNSAFE_getAllByType } =
+        await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
+
+      mockSearchParams = {
+        ...mockSearchParams,
+        streamingUrl: "mobile/url_redirects/stream/replacement/file",
+      };
+      mockRequestAPI.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveStream = resolve;
+        }),
+      );
+      mockLockAsync.mockClear();
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+
+      expect(queryByTestId("fullscreen-video-player")).toBeNull();
+      const dismissFullscreen = UNSAFE_getAllByType(Modal).find(
+        (modal) => modal.props.testID === "external-caption-fullscreen",
+      )?.props.onDismiss;
+      expect(dismissFullscreen).toEqual(expect.any(Function));
+
+      act(() => dismissFullscreen?.());
+      expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+
+      await act(async () => {
+        resolveStream!({
+          playlist_url: "https://example.com/replacement.m3u8",
+          subtitles: [],
+        });
+      });
     });
 
     it("exits external-caption fullscreen and restores portrait when playback fails", async () => {
