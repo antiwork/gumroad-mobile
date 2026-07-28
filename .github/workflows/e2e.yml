@@ -144,6 +144,10 @@ jobs:
             ./android/gradlew -p android assembleRelease -PreactNativeArchitectures=x86_64
             unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q assets/index.android.bundle
             ./android/gradlew -p android --stop
+            # The emulator's Pixel Launcher intermittently ANRs while the release build
+            # installs, and its "isn't responding" dialog then covers our app, so the
+            # launch assertion inspects the dialog instead of the login screen.
+            adb shell settings put global hide_error_dialogs 1
             adb install -r android/app/build/outputs/apk/release/app-release.apk
             timeout --signal=TERM --kill-after=60s 12m maestro test -p android -e APP_ID="$APP_ID" --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
 
