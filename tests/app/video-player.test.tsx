@@ -330,6 +330,22 @@ describe("VideoPlayerScreen", () => {
     expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
   });
 
+  it("restores the app orientation when native fullscreen playback fails", async () => {
+    const { getByTestId, getByText } = renderScreen();
+
+    await act(async () => {
+      await getByTestId("video-player").props.onFullscreenEnter();
+    });
+    mockLockAsync.mockClear();
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "Playback failed" } });
+    });
+
+    expect(getByText("This video failed to load")).toBeTruthy();
+    expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+  });
+
   it("clears a source-refresh transition when native fullscreen exits", async () => {
     mockSearchParams = {
       uri: "https://example.com/video.mp4",
@@ -425,7 +441,9 @@ External caption text
         fireEvent.press(getByText("English"));
       });
 
-      expect(mockFetchSubtitleText).toHaveBeenCalledWith("https://example.com/captions.srt");
+      expect(mockFetchSubtitleText).toHaveBeenCalledWith("https://example.com/captions.srt", {
+        signal: expect.any(AbortSignal),
+      });
       expect(mockPlayer.subtitleTrack).toBeNull();
       expect(getByText("External caption text")).toBeTruthy();
     });
@@ -838,6 +856,8 @@ External caption text
         fireEvent.press(getByText("Off"));
       });
 
+      expect(mockFetchSubtitleText.mock.calls[0]?.[1].signal.aborted).toBe(true);
+
       await act(async () => {
         resolveFetch!(SRT);
       });
@@ -915,6 +935,8 @@ Second track caption text
       act(() => {
         subtitleTrackChangeListener!({ subtitleTrack: { language: "en", label: "Embedded English" } });
       });
+
+      expect(mockFetchSubtitleText.mock.calls[0]?.[1].signal.aborted).toBe(true);
 
       await act(async () => {
         resolveFetch!(SRT);

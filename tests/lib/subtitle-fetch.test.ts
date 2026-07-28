@@ -82,4 +82,25 @@ describe("fetchSubtitleText", () => {
 
     await expect(fetchSubtitleText("https://example.com/captions.srt")).rejects.toThrow("status 403");
   });
+
+  it("aborts a stalled request when the caller cancels it", async () => {
+    const controller = new AbortController();
+    mockStreamingFetch.mockReturnValue(new Promise(() => {}));
+
+    const request = fetchSubtitleText("https://example.com/captions.srt", { signal: controller.signal });
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError", message: "Subtitle request aborted" });
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
+
+  it("times out a stalled response", async () => {
+    mockStreamingFetch.mockReturnValue(new Promise(() => {}));
+
+    await expect(fetchSubtitleText("https://example.com/captions.srt", { timeoutMs: 1 })).rejects.toMatchObject({
+      name: "AbortError",
+      message: "Subtitle request timed out",
+    });
+    expect(mockStreamingFetch.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
 });

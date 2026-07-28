@@ -14,7 +14,7 @@ import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useVideoPlayer, VideoView, type SubtitleTrack, type VideoPlayerStatus } from "expo-video";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus, FlatList, Modal, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -116,11 +116,19 @@ export default function VideoPlayerScreen() {
   const [pendingPlaybackError, setPendingPlaybackError] = useState<string | null>(null);
   const cueCacheRef = useRef<Map<string, SubtitleCue[]>>(new Map());
   const captionRequestIdRef = useRef(0);
+  const captionAbortControllerRef = useRef<AbortController | null>(null);
   const fullscreenRequestIdRef = useRef(0);
   const fullscreenOrientationActiveRef = useRef(false);
   const fullscreenTransitionPendingRef = useRef(false);
   const mountedRef = useRef(true);
   const selectionRef = useRef<CaptionSelection>({ type: "off" });
+
+  const cancelCaptionRequest = useCallback(() => {
+    captionRequestIdRef.current += 1;
+    captionAbortControllerRef.current?.abort();
+    captionAbortControllerRef.current = null;
+    return captionRequestIdRef.current;
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -129,14 +137,15 @@ export default function VideoPlayerScreen() {
       fullscreenRequestIdRef.current += 1;
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
+      cancelCaptionRequest();
       restoreAppOrientation();
     };
-  }, []);
+  }, [cancelCaptionRequest]);
 
   useEffect(() => {
     let cancelled = false;
     const offSelection = { type: "off" } as const;
-    captionRequestIdRef.current += 1;
+    cancelCaptionRequest();
     fullscreenRequestIdRef.current += 1;
     if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
       fullscreenOrientationActiveRef.current = false;
@@ -184,9 +193,9 @@ export default function VideoPlayerScreen() {
 
     return () => {
       cancelled = true;
-      captionRequestIdRef.current += 1;
+      cancelCaptionRequest();
     };
-  }, [accessToken, streamingUrl, uri]);
+  }, [accessToken, cancelCaptionRequest, streamingUrl, uri]);
 
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
@@ -241,7 +250,7 @@ export default function VideoPlayerScreen() {
             setFullscreenTransitionPending(true);
             setPendingPlaybackError(message);
           } else {
-            if (externalFullscreenOpen) {
+            if (fullscreenOrientationActiveRef.current) {
               fullscreenOrientationActiveRef.current = false;
               fullscreenTransitionPendingRef.current = false;
               setFullscreenTransitionPending(false);
@@ -256,7 +265,7 @@ export default function VideoPlayerScreen() {
             const subtitleTrack = player.subtitleTrack;
             if (subtitleTrack && selectionRef.current.type !== "external") {
               const embeddedSelection = { type: "embedded", track: subtitleTrack } as const;
-              captionRequestIdRef.current += 1;
+              cancelCaptionRequest();
               selectionRef.current = embeddedSelection;
               setSelection(embeddedSelection);
               setExternalCues([]);
@@ -267,7 +276,7 @@ export default function VideoPlayerScreen() {
       },
     );
     return () => subscription.remove();
-  }, [externalFullscreenOpen, player]);
+  }, [cancelCaptionRequest, externalFullscreenOpen, player]);
 
   useEffect(() => {
     const subscription = player.addListener(
@@ -285,14 +294,14 @@ export default function VideoPlayerScreen() {
       ({ subtitleTrack }: { subtitleTrack: SubtitleTrack | null }) => {
         if (subtitleTrack) {
           const embeddedSelection = { type: "embedded", track: subtitleTrack } as const;
-          captionRequestIdRef.current += 1;
+          cancelCaptionRequest();
           selectionRef.current = embeddedSelection;
           setSelection(embeddedSelection);
           setExternalCues([]);
           setCurrentCueText(null);
         } else if (selectionRef.current.type !== "external") {
           const offSelection = { type: "off" } as const;
-          captionRequestIdRef.current += 1;
+          cancelCaptionRequest();
           selectionRef.current = offSelection;
           setSelection(offSelection);
           setExternalCues([]);
@@ -301,7 +310,7 @@ export default function VideoPlayerScreen() {
       },
     );
     return () => subscription.remove();
-  }, [player]);
+  }, [cancelCaptionRequest, player]);
 
   useEffect(() => {
     if (externalCues.length === 0) {
@@ -366,7 +375,7 @@ export default function VideoPlayerScreen() {
     setFullscreenCaptionPickerOpen(false);
     selectionRef.current = nextSelection;
     setSelection(nextSelection);
-    const requestId = ++captionRequestIdRef.current;
+    const requestId = cancelCaptionRequest();
 
     if (nextSelection.type !== "external") {
       setExternalCues([]);
@@ -387,7 +396,13 @@ export default function VideoPlayerScreen() {
     try {
       let cues = cueCacheRef.current.get(track.url);
       if (!cues) {
-        cues = parseSubtitles(await fetchSubtitleText(track.url));
+        const controller = new AbortController();
+        captionAbortControllerRef.current = controller;
+        try {
+          cues = parseSubtitles(await fetchSubtitleText(track.url, { signal: controller.signal }));
+        } finally {
+          if (captionAbortControllerRef.current === controller) captionAbortControllerRef.current = null;
+        }
         if (cues.length === 0) throw new Error("Subtitle track contains no valid cues");
         cueCacheRef.current.set(track.url, cues);
       }
