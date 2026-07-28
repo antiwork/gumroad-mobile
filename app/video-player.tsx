@@ -152,6 +152,8 @@ export default function VideoPlayerScreen() {
   const fullscreenTransitionPendingRef = useRef(false);
   const mountedRef = useRef(true);
   const selectionRef = useRef<CaptionSelection>({ type: "off" });
+  const mediaIdentityRef = useRef<{ streamingUrl?: string; uri: string } | null>(null);
+  const resolvedMediaIdentityRef = useRef<{ streamingUrl?: string; uri: string } | null>(null);
 
   const cancelCaptionRequest = useCallback(() => {
     captionRequestIdRef.current += 1;
@@ -175,29 +177,38 @@ export default function VideoPlayerScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    const offSelection = { type: "off" } as const;
-    cancelCaptionRequest();
-    fullscreenRequestIdRef.current += 1;
-    if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
-      fullscreenOrientationActiveRef.current = false;
-      fullscreenTransitionPendingRef.current = false;
-      setFullscreenTransitionPending(false);
-      restoreFullscreenSystemBars();
-      restoreAppOrientation();
-    } else if (Platform.OS === "ios" && fullscreenOrientationActiveRef.current) {
-      fullscreenTransitionPendingRef.current = true;
-      setFullscreenTransitionPending(true);
+    const previousMedia = mediaIdentityRef.current;
+    const mediaChanged = previousMedia?.uri !== uri || previousMedia.streamingUrl !== streamingUrl;
+    mediaIdentityRef.current = { uri, streamingUrl };
+
+    if (mediaChanged) {
+      const offSelection = { type: "off" } as const;
+      cancelCaptionRequest();
+      fullscreenRequestIdRef.current += 1;
+      if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
+        fullscreenOrientationActiveRef.current = false;
+        fullscreenTransitionPendingRef.current = false;
+        setFullscreenTransitionPending(false);
+        restoreFullscreenSystemBars();
+        restoreAppOrientation();
+      } else if (Platform.OS === "ios" && fullscreenOrientationActiveRef.current) {
+        fullscreenTransitionPendingRef.current = true;
+        setFullscreenTransitionPending(true);
+      }
+      selectionRef.current = offSelection;
+      setSelection(offSelection);
+      setExternalTracks([]);
+      setEmbeddedTracks([]);
+      setExternalCues([]);
+      setCurrentCueText(null);
+      setCaptionSheetOpen(false);
+      setExternalFullscreenOpen(false);
+      setFullscreenCaptionPickerOpen(false);
+      setPendingPlaybackError(null);
     }
-    selectionRef.current = offSelection;
-    setSelection(offSelection);
-    setExternalTracks([]);
-    setEmbeddedTracks([]);
-    setExternalCues([]);
-    setCurrentCueText(null);
-    setCaptionSheetOpen(false);
-    setExternalFullscreenOpen(false);
-    setFullscreenCaptionPickerOpen(false);
-    setPendingPlaybackError(null);
+
+    const resolvedMedia = resolvedMediaIdentityRef.current;
+    if (!mediaChanged && resolvedMedia?.uri === uri && resolvedMedia.streamingUrl === streamingUrl) return;
 
     const resolveVideoUrl = async () => {
       if (!accessToken) return;
@@ -206,15 +217,18 @@ export default function VideoPlayerScreen() {
         if (streamingUrl) {
           const streamData = await fetchStreamData(streamingUrl, accessToken);
           if (cancelled) return;
+          resolvedMediaIdentityRef.current = { uri, streamingUrl };
           setVideoUrl(streamData.playlist_url);
           setExternalTracks(streamData.subtitles ?? []);
         } else {
+          resolvedMediaIdentityRef.current = { uri, streamingUrl };
           setVideoUrl(uri);
         }
       } catch (error) {
         if (cancelled) return;
         console.warn("Failed to fetch streaming URL, falling back to direct URL:", error);
         Sentry.captureException(error);
+        resolvedMediaIdentityRef.current = { uri, streamingUrl };
         setVideoUrl(uri);
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -225,7 +239,6 @@ export default function VideoPlayerScreen() {
 
     return () => {
       cancelled = true;
-      cancelCaptionRequest();
     };
   }, [accessToken, cancelCaptionRequest, streamingUrl, uri]);
 

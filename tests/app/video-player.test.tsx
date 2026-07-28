@@ -11,6 +11,7 @@ const mockLockAsync = jest.fn().mockResolvedValue(undefined);
 const mockUnlockAsync = jest.fn().mockResolvedValue(undefined);
 const mockFetchSubtitleText = jest.fn();
 const mockSetNavigationBarVisibilityAsync = jest.fn().mockResolvedValue(undefined);
+let mockSetAccessToken: ((token: string) => void) | null = null;
 
 jest.mock("expo-navigation-bar", () => ({
   setVisibilityAsync: (...args: unknown[]) => mockSetNavigationBarVisibilityAsync(...args),
@@ -92,7 +93,11 @@ jest.mock("@/lib/request", () => ({
 }));
 
 jest.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ accessToken: "test-token" }),
+  useAuth: () => {
+    const [accessToken, setAccessToken] = jest.requireActual("react").useState("test-token");
+    mockSetAccessToken = setAccessToken;
+    return { accessToken };
+  },
 }));
 
 jest.mock("@/lib/media-location", () => ({
@@ -134,6 +139,7 @@ describe("VideoPlayerScreen", () => {
     mockUnlockAsync.mockResolvedValue(undefined);
     mockFetchSubtitleText.mockReset();
     mockSetNavigationBarVisibilityAsync.mockResolvedValue(undefined);
+    mockSetAccessToken = null;
 
     jest.spyOn(AppState, "addEventListener").mockImplementation((_type, callback) => {
       appStateCallback = callback as (state: string) => void;
@@ -928,6 +934,31 @@ External caption text
         signal: expect.any(AbortSignal),
       });
       expect(getByText("External caption text")).toBeTruthy();
+    });
+
+    it("preserves external captions and fullscreen when the access token refreshes", async () => {
+      const { getByLabelText, getByTestId, getByText } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
+      mockRequestAPI.mockClear();
+      jest.mocked(StatusBar.setHidden).mockClear();
+
+      await act(async () => {
+        mockSetAccessToken!("refreshed-token");
+      });
+
+      expect(mockRequestAPI).not.toHaveBeenCalled();
+      expect(getByTestId("fullscreen-video-player")).toBeTruthy();
+      expect(getByTestId("fullscreen-captions-button")).toBeTruthy();
+      expect(StatusBar.setHidden).not.toHaveBeenCalledWith(false, "fade");
     });
 
     it("ignores a stale subtitle fetch when the buyer selects Off before it resolves", async () => {
