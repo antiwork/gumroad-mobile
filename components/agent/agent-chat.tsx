@@ -335,7 +335,6 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           const isPastBottom = currentOffset > maximumOffset;
           const isBottomBounceBack = isBottomBounceRef.current && movedUp;
           if (isPastBottom) isBottomBounceRef.current = true;
-          else if (isBottomBounceBack) isBottomBounceRef.current = false;
           if (ignoresInterruptedReaderMomentumRef.current) return;
           if (
             programmaticScrollCountRef.current > 0 &&

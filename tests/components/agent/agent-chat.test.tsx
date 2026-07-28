@@ -521,6 +521,8 @@ describe("AgentChat", () => {
       list.props.onMomentumScrollBegin();
       list.props.onScroll(scrollEvent(1450));
       list.props.onContentSizeChange(0, 2100);
+      list.props.onScroll(scrollEvent(1440, 2100));
+      list.props.onScroll(scrollEvent(1420, 2100));
       list.props.onScroll(scrollEvent(1400, 2100));
       list.props.onMomentumScrollEnd(scrollEvent(1400, 2100));
     });
