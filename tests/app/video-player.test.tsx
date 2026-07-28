@@ -521,6 +521,34 @@ External caption text
       expect(getByTestId("fullscreen-video-player")).toBeTruthy();
     });
 
+    it("restores portrait when a pending fullscreen entry finishes after unmount", async () => {
+      let resolveLock: () => void;
+      mockLockAsync.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveLock = resolve;
+        }),
+      );
+      const { getByLabelText, getByTestId, getByText, queryByTestId, unmount } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      act(() => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
+      expect(queryByTestId("fullscreen-video-player")).toBeNull();
+
+      unmount();
+      await act(async () => {
+        resolveLock!();
+      });
+
+      expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+    });
+
     it("exits external-caption fullscreen and restores portrait when playback fails", async () => {
       const { getByLabelText, getByTestId, getByText, queryByTestId, UNSAFE_getAllByType } =
         await renderWithExternalTrack();

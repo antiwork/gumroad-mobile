@@ -93,12 +93,34 @@ export default function VideoPlayerScreen() {
   const [pendingPlaybackError, setPendingPlaybackError] = useState<string | null>(null);
   const cueCacheRef = useRef<Map<string, SubtitleCue[]>>(new Map());
   const captionRequestIdRef = useRef(0);
+  const fullscreenRequestIdRef = useRef(0);
+  const fullscreenOrientationActiveRef = useRef(false);
+  const mountedRef = useRef(true);
   const selectionRef = useRef<CaptionSelection>({ type: "off" });
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      fullscreenRequestIdRef.current += 1;
+      fullscreenOrientationActiveRef.current = false;
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
+        Sentry.captureException(error),
+      );
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const offSelection = { type: "off" } as const;
     captionRequestIdRef.current += 1;
+    fullscreenRequestIdRef.current += 1;
+    if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
+      fullscreenOrientationActiveRef.current = false;
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
+        Sentry.captureException(error),
+      );
+    }
     selectionRef.current = offSelection;
     setSelection(offSelection);
     setExternalTracks([]);
@@ -184,6 +206,7 @@ export default function VideoPlayerScreen() {
       "statusChange",
       ({ status, error }: { status: VideoPlayerStatus; error?: { message: string } }) => {
         if (status === "error") {
+          fullscreenRequestIdRef.current += 1;
           setFullscreenCaptionPickerOpen(false);
           setExternalFullscreenOpen(false);
           const message = error?.message ?? "Unknown playback error";
@@ -191,6 +214,7 @@ export default function VideoPlayerScreen() {
             setPendingPlaybackError(message);
           } else {
             if (externalFullscreenOpen) {
+              fullscreenOrientationActiveRef.current = false;
               ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((orientationError) =>
                 Sentry.captureException(orientationError),
               );
@@ -386,22 +410,36 @@ export default function VideoPlayerScreen() {
   );
 
   const enterExternalFullscreen = async () => {
+    const requestId = ++fullscreenRequestIdRef.current;
+    let orientationApplied = false;
     try {
       if (Platform.OS === "ios" && Platform.isPad) {
         await ScreenOrientation.unlockAsync();
       } else {
         await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
       }
+      orientationApplied = true;
     } catch (error) {
       Sentry.captureException(error);
     }
+    if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
+      if (orientationApplied) {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
+          Sentry.captureException(error),
+        );
+      }
+      return;
+    }
+    fullscreenOrientationActiveRef.current = orientationApplied;
     setExternalFullscreenOpen(true);
   };
 
   const exitExternalFullscreen = () => {
+    fullscreenRequestIdRef.current += 1;
     setFullscreenCaptionPickerOpen(false);
     setExternalFullscreenOpen(false);
     if (Platform.OS !== "ios") {
+      fullscreenOrientationActiveRef.current = false;
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
         Sentry.captureException(error),
       );
@@ -409,6 +447,7 @@ export default function VideoPlayerScreen() {
   };
 
   const handleExternalFullscreenDismiss = () => {
+    fullscreenOrientationActiveRef.current = false;
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
       Sentry.captureException(error),
     );
