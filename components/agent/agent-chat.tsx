@@ -13,14 +13,14 @@ import { useAuthedRequest } from "@/lib/authed-request";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, TextInput, View } from "react-native";
+import { FlatList, KeyboardAvoidingView, type NativeScrollEvent, Platform, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 const IOS_KEYBOARD_VERTICAL_OFFSET = 88;
-// How close to the bottom still counts as "reading the newest message". A few pixels of
-// slack absorbs rounding in the scroll metrics and the momentum of a fling that lands
-// just short of the end.
 const AUTOSCROLL_BOTTOM_THRESHOLD = 24;
+
+const isNearBottom = ({ contentOffset, contentSize, layoutMeasurement }: NativeScrollEvent) =>
+  contentSize.height - contentOffset.y - layoutMeasurement.height <= AUTOSCROLL_BOTTOM_THRESHOLD;
 
 interface DisplayMessage extends ChatMessage {
   proposedAction?: ProposedAction;
@@ -136,13 +136,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const hasSentMessageRef = useRef(false);
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
-  // Starts true because a fresh conversation is scrolled to its (empty) end.
   const isAtBottomRef = useRef(true);
-  // True while a scroll this component started is still animating. Such a scroll reports
-  // intermediate positions that lag behind content which is still growing, and reading those
-  // as "the reader moved away from the bottom" would make streaming switch its own following
-  // off. Only touching the list clears this.
-  const isProgrammaticScrollRef = useRef(false);
+  const isReaderScrollingRef = useRef(false);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
   // resolves, their new chat wins and we skip hydration.
@@ -220,9 +215,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     if (trimmed.length === 0 || isSending) return;
 
     hasSentMessageRef.current = true;
-    // Sending is an explicit request to follow the conversation again, so re-pin to the
-    // bottom even if the reader had scrolled up to check something first.
     isAtBottomRef.current = true;
+    isReaderScrollingRef.current = false;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -271,23 +265,28 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         keyExtractor={(_, index) => String(index)}
         keyboardShouldPersistTaps="handled"
         // Scrolling on content growth keeps up with streaming tokens, which arrive faster than a debounce would fire.
-        // Only auto-scroll while the reader is already at the bottom: a reply can stream for many
-        // seconds, and scrolling them back down on every token makes reading earlier messages
-        // impossible mid-conversation.
         onContentSizeChange={() => {
-          if (!isAtBottomRef.current) return;
-          isProgrammaticScrollRef.current = true;
+          if (isReaderScrollingRef.current || !isAtBottomRef.current) return;
           listRef.current?.scrollToEnd({ animated: true });
         }}
-        // Touching the list is the only thing that hands scroll control back to the reader.
         onScrollBeginDrag={() => {
-          isProgrammaticScrollRef.current = false;
+          isReaderScrollingRef.current = true;
+          isAtBottomRef.current = false;
         }}
         onScroll={({ nativeEvent }) => {
-          if (isProgrammaticScrollRef.current) return;
-          const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
-          const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
-          isAtBottomRef.current = distanceFromBottom <= AUTOSCROLL_BOTTOM_THRESHOLD;
+          if (!isReaderScrollingRef.current) return;
+          isAtBottomRef.current = isNearBottom(nativeEvent);
+        }}
+        onScrollEndDrag={({ nativeEvent }) => {
+          isAtBottomRef.current = isNearBottom(nativeEvent);
+          if (!nativeEvent.velocity || nativeEvent.velocity.y === 0) {
+            isReaderScrollingRef.current = false;
+          }
+        }}
+        onMomentumScrollEnd={({ nativeEvent }) => {
+          if (!isReaderScrollingRef.current) return;
+          isAtBottomRef.current = isNearBottom(nativeEvent);
+          isReaderScrollingRef.current = false;
         }}
         scrollEventThrottle={16}
         renderItem={({ item, index }) => (
