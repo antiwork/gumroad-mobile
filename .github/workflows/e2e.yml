@@ -128,6 +128,18 @@ jobs:
             -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" \
             -dname "CN=gumroad-mobile CI smoke, O=Gumroad, C=US"
 
+      # Built before the emulator starts. A twelve-minute Gradle build running while the
+      # emulator is up starves the emulator of CPU, which makes Android's home screen
+      # stop responding and put an "isn't responding" dialog on top of the app. Maestro
+      # then inspects that dialog instead of our login screen and the smoke test fails
+      # even though the app started fine.
+      - name: Build release APK
+        run: |
+          chmod +x android/gradlew
+          ./android/gradlew -p android assembleRelease -PreactNativeArchitectures=x86_64
+          unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q assets/index.android.bundle
+          ./android/gradlew -p android --stop
+
       - name: Run launch smoke
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -140,13 +152,10 @@ jobs:
           emulator-options: -no-window -no-snapshot-save -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            chmod +x android/gradlew
-            ./android/gradlew -p android assembleRelease -PreactNativeArchitectures=x86_64
-            unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -q assets/index.android.bundle
-            ./android/gradlew -p android --stop
-            # The emulator's Pixel Launcher intermittently ANRs while the release build
-            # installs, and its "isn't responding" dialog then covers our app, so the
-            # launch assertion inspects the dialog instead of the login screen.
+            # Belt and braces: if some other process on the emulator still stops
+            # responding, keep its dialog from covering the app under test. A crash in
+            # our own app is still caught, because a crashed app is absent from the
+            # screen and the login assertion fails anyway.
             adb shell settings put global hide_error_dialogs 1
             adb install -r android/app/build/outputs/apk/release/app-release.apk
             timeout --signal=TERM --kill-after=60s 12m maestro test -p android -e APP_ID="$APP_ID" --format junit --output maestro-report.xml .maestro/launch-smoke.yaml
