@@ -18,6 +18,7 @@ import { useCSSVariable } from "uniwind";
 
 const IOS_KEYBOARD_VERTICAL_OFFSET = 88;
 const AUTOSCROLL_BOTTOM_THRESHOLD = 24;
+const STREAMING_REPLY_GROWTH_THRESHOLD = 120;
 
 const isNearBottom = ({ contentOffset, contentSize, layoutMeasurement }: NativeScrollEvent) =>
   contentSize.height - contentOffset.y - layoutMeasurement.height <= AUTOSCROLL_BOTTOM_THRESHOLD;
@@ -146,6 +147,8 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const isReaderDraggingRef = useRef(false);
   const isReaderMomentumPendingRef = useRef(false);
   const isReaderMomentumRef = useRef(false);
+  const isProgrammaticScrollRef = useRef(false);
+  const lastScrollOffsetRef = useRef(0);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
   // resolves, their new chat wins and we skip hydration.
@@ -227,6 +230,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     isReaderDraggingRef.current = false;
     isReaderMomentumPendingRef.current = false;
     isReaderMomentumRef.current = false;
+    isProgrammaticScrollRef.current = false;
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -283,16 +287,29 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             !isAtBottomRef.current
           )
             return;
+          isProgrammaticScrollRef.current = true;
           listRef.current?.scrollToEnd({ animated: true });
         }}
         onScrollBeginDrag={() => {
+          isProgrammaticScrollRef.current = false;
           isReaderDraggingRef.current = true;
           isReaderMomentumPendingRef.current = false;
           isReaderMomentumRef.current = false;
           isAtBottomRef.current = false;
         }}
         onScroll={({ nativeEvent }) => {
-          if (!isReaderDraggingRef.current && !isReaderMomentumRef.current) return;
+          const currentOffset = nativeEvent.contentOffset.y;
+          const movedUp = currentOffset < lastScrollOffsetRef.current;
+          lastScrollOffsetRef.current = currentOffset;
+          if (
+            isProgrammaticScrollRef.current &&
+            !movedUp &&
+            !isReaderDraggingRef.current &&
+            !isReaderMomentumPendingRef.current &&
+            !isReaderMomentumRef.current
+          )
+            return;
+          if (movedUp) isProgrammaticScrollRef.current = false;
           isAtBottomRef.current = isNearBottom(nativeEvent);
         }}
         onScrollEndDrag={({ nativeEvent }) => {
@@ -306,9 +323,11 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           isReaderMomentumRef.current = true;
         }}
         onMomentumScrollEnd={({ nativeEvent }) => {
-          if (isReaderDraggingRef.current || !isReaderMomentumRef.current) return;
+          if (isReaderDraggingRef.current || isReaderMomentumPendingRef.current) return;
+          if (!isReaderMomentumRef.current && !isProgrammaticScrollRef.current) return;
           isAtBottomRef.current = isNearBottom(nativeEvent);
           isReaderMomentumRef.current = false;
+          isProgrammaticScrollRef.current = false;
         }}
         scrollEventThrottle={16}
         renderItem={({ item, index }) => (
@@ -351,7 +370,16 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
       ) : null}
 
       <View className="border-t border-border p-4">
-        <View className="relative rounded border border-border bg-background">
+        <View
+          className="relative rounded border border-border bg-background"
+          testID={
+            !streamingReply
+              ? "agent-stream-progress-idle"
+              : streamingReply.length < STREAMING_REPLY_GROWTH_THRESHOLD
+                ? "agent-stream-progress-started"
+                : "agent-stream-progress-expanded"
+          }
+        >
           <TextInput
             className="max-h-32 py-3 pr-16 pl-3 font-sans text-base text-foreground"
             placeholder="Ask about your store or describe a change..."
@@ -370,10 +398,6 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             disabled={isSending || !hasText}
             onPress={() => send(input)}
             accessibilityLabel="Send"
-            accessibilityValue={{
-              text: isSending ? `Assistant response ${streamingReply?.length ?? 0} characters` : "",
-            }}
-            testID="agent-send-progress"
           >
             <LineIcon
               name="arrow-up-stroke"

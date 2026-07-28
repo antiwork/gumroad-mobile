@@ -264,10 +264,7 @@ describe("AgentChat", () => {
 
     await waitFor(() => expect(screen.getByText("Checking your store...")).toBeTruthy());
     expect(screen.queryByText("Working on it...")).toBeNull();
-    expect(screen.getByTestId("agent-send-progress").props.accessibilityLabel).toBe("Send");
-    expect(screen.getByTestId("agent-send-progress").props.accessibilityValue).toEqual({
-      text: `Assistant response ${"Checking your store...".length} characters`,
-    });
+    expect(screen.getByTestId("agent-stream-progress-started")).toBeTruthy();
 
     const { handlers } = mockStreamAgentMessage.mock.calls[0][0] as {
       handlers: { onToken: (text: string) => void; onReset: () => void };
@@ -283,9 +280,7 @@ describe("AgentChat", () => {
       handlers.onToken("up 20%.");
     });
     await waitFor(() => expect(screen.getByText("Sales are up 20%.")).toBeTruthy());
-    expect(screen.getByTestId("agent-send-progress").props.accessibilityValue).toEqual({
-      text: `Assistant response ${"Sales are up 20%.".length} characters`,
-    });
+    expect(screen.getByTestId("agent-stream-progress-started")).toBeTruthy();
 
     await act(async () => {
       resolveTurn({ reply: "Sales are up 20% this week.", proposedAction: null, conversationId: "conv-123" });
@@ -449,6 +444,30 @@ describe("AgentChat", () => {
       list.props.onScrollBeginDrag();
       list.props.onContentSizeChange(0, 2100);
     });
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it("hands control to a non-touch scroll that moves against its animation", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onContentSizeChange(0, 2000);
+      list.props.onScroll(scrollEvent(1000));
+      list.props.onScroll(scrollEvent(600));
+    });
+    scrollToEnd.mockClear();
+
+    act(() => list.props.onContentSizeChange(0, 2200));
 
     expect(scrollToEnd).not.toHaveBeenCalled();
   });

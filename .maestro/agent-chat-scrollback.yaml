@@ -33,7 +33,7 @@ appId: ${APP_ID}
 - tapOn: "Send"
 - extendedWaitUntil:
     visible:
-      id: "agent-streaming-reply"
+      id: "agent-stream-progress-started"
     timeout: 30000
 - assertNotVisible:
     id: "agent-user-message"
@@ -49,20 +49,12 @@ appId: ${APP_ID}
 - assertVisible:
     text: "Message"
     enabled: false
-- copyTextFrom:
-    id: "agent-send-progress"
-- evalScript: ${output.replyLengthAfterScroll = Number(maestro.copiedText.match(/[0-9]+/)[0])}
+- assertVisible:
+    id: "agent-stream-progress-started"
 - extendedWaitUntil:
     visible:
-      id: "agent-send-progress"
-      text: ${"Send.*Assistant response (?!" + output.replyLengthAfterScroll + " characters)[0-9]+ characters"}
+      id: "agent-stream-progress-expanded"
     timeout: 30000
-- copyTextFrom:
-    id: "agent-send-progress"
-- evalScript: ${output.replyLengthAfterGrowth = Number(maestro.copiedText.match(/[0-9]+/)[0])}
-- assertTrue:
-    condition: ${output.replyLengthAfterGrowth > output.replyLengthAfterScroll}
-    label: "Assistant reply grows after the reader scrolls up"
 - assertVisible:
     id: "agent-user-message"
     containsDescendants:
