@@ -155,6 +155,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const momentumHandoffFrameRef = useRef<number | null>(null);
   const hasDeferredBottomGrowthRef = useRef(false);
   const shouldFollowAfterMomentumRef = useRef(false);
+  const isBottomBounceRef = useRef(false);
 
   // Resume the latest stored conversation on open. If the seller sends a message before this
   // resolves, their new chat wins and we skip hydration.
@@ -241,6 +242,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     isReaderMomentumRef.current = false;
     hasDeferredBottomGrowthRef.current = false;
     shouldFollowAfterMomentumRef.current = false;
+    isBottomBounceRef.current = false;
     ignoresInterruptedReaderMomentumRef.current = interruptsReaderMomentum;
     programmaticScrollCountRef.current += interruptsReaderMomentum ? 2 : 1;
     setHasContentGrownSinceReaderScroll(false);
@@ -322,12 +324,18 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           isReaderMomentumRef.current = false;
           hasDeferredBottomGrowthRef.current = false;
           shouldFollowAfterMomentumRef.current = false;
+          isBottomBounceRef.current = false;
           isAtBottomRef.current = false;
         }}
         onScroll={({ nativeEvent }) => {
           const currentOffset = nativeEvent.contentOffset.y;
           const movedUp = currentOffset < lastScrollOffsetRef.current;
           lastScrollOffsetRef.current = currentOffset;
+          const maximumOffset = Math.max(0, nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height);
+          const isPastBottom = currentOffset > maximumOffset;
+          const isBottomBounceBack = isBottomBounceRef.current && movedUp;
+          if (isPastBottom) isBottomBounceRef.current = true;
+          else if (isBottomBounceBack) isBottomBounceRef.current = false;
           if (ignoresInterruptedReaderMomentumRef.current) return;
           if (
             programmaticScrollCountRef.current > 0 &&
@@ -337,12 +345,16 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             !isReaderMomentumRef.current
           )
             return;
+          const isAtBottom = isNearBottom(nativeEvent);
           if (movedUp) {
             programmaticScrollCountRef.current = 0;
-            if (isReaderMomentumPendingRef.current || isReaderMomentumRef.current)
+            if (
+              !isBottomBounceBack &&
+              !isAtBottom &&
+              (isReaderMomentumPendingRef.current || isReaderMomentumRef.current)
+            )
               shouldFollowAfterMomentumRef.current = false;
           }
-          const isAtBottom = isNearBottom(nativeEvent);
           if (isReaderMomentumRef.current && !movedUp && isAtBottom) shouldFollowAfterMomentumRef.current = true;
           isAtBottomRef.current = isAtBottom;
         }}
@@ -358,6 +370,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             const shouldCatchUp = hasDeferredBottomGrowthRef.current && shouldFollowAfterMomentumRef.current;
             hasDeferredBottomGrowthRef.current = false;
             shouldFollowAfterMomentumRef.current = false;
+            isBottomBounceRef.current = false;
             if (!shouldCatchUp) return;
             programmaticScrollCountRef.current += 1;
             listRef.current?.scrollToEnd({ animated: true });
@@ -372,6 +385,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         }}
         onMomentumScrollEnd={({ nativeEvent }) => {
           if (isReaderDraggingRef.current || isReaderMomentumPendingRef.current) return;
+          isBottomBounceRef.current = false;
           if (ignoresInterruptedReaderMomentumRef.current) {
             ignoresInterruptedReaderMomentumRef.current = false;
             programmaticScrollCountRef.current = Math.max(0, programmaticScrollCountRef.current - 1);

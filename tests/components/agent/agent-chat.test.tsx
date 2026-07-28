@@ -502,6 +502,32 @@ describe("AgentChat", () => {
     expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
   });
 
+  it("keeps bottom intent when content grows during an iOS bounce", async () => {
+    mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
+    renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "hello");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("First reply")).toBeTruthy());
+
+    const list = screen.getByLabelText("Conversation");
+    const scrollToEnd = jest.spyOn(FlatList.prototype, "scrollToEnd").mockImplementation(() => {});
+
+    act(() => {
+      list.props.onScrollBeginDrag();
+      list.props.onScroll(scrollEvent(1400));
+      list.props.onScrollEndDrag(scrollEvent(1400));
+      list.props.onMomentumScrollBegin();
+      list.props.onScroll(scrollEvent(1450));
+      list.props.onContentSizeChange(0, 2100);
+      list.props.onScroll(scrollEvent(1400, 2100));
+      list.props.onMomentumScrollEnd(scrollEvent(1400, 2100));
+    });
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  });
+
   it("keeps following when its own animated scroll reports a position short of the growing end", async () => {
     mockStreamAgentMessage.mockResolvedValue({ reply: "First reply", conversationId: "c1" });
     renderChat();
