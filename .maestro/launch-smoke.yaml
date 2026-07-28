@@ -1,0 +1,10 @@
+appId: ${APP_ID}
+---
+- killApp
+- clearState
+- clearKeychain
+- launchApp
+
+- extendedWaitUntil:
+    visible: "Sign in with Gumroad"
+    timeout: 45000
