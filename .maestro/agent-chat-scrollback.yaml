@@ -31,9 +31,8 @@ appId: ${APP_ID}
 - tapOn: "Send"
 - extendedWaitUntil:
     visible:
-      text: "Message"
-      enabled: false
-    timeout: 15000
+      id: "agent-streaming-reply"
+    timeout: 30000
 - assertNotVisible: "List my products in detail"
 - scrollUntilVisible:
     element: "List my products in detail"
@@ -42,12 +41,22 @@ appId: ${APP_ID}
 - assertVisible:
     text: "Message"
     enabled: false
+- copyTextFrom:
+    id: "agent-streaming-reply"
+- evalScript: ${output.replyAfterScroll = maestro.copiedText}
 - extendedWaitUntil:
     visible:
       text: "Message"
       enabled: true
     timeout: 30000
 - assertVisible: "List my products in detail"
+- copyTextFrom:
+    id: "agent-assistant-message-content"
+    index: 2
+- evalScript: ${output.completedReply = maestro.copiedText}
+- assertTrue:
+    condition: ${output.completedReply.length > output.replyAfterScroll.length}
+    label: "Assistant reply grows after the reader scrolls up"
 
 - tapOn:
     text: "Message"

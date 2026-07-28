@@ -112,7 +112,9 @@ const MessageBubble = ({
             <Text className="text-accent-foreground">{message.content}</Text>
           </View>
         ) : (
-          <Text className="text-foreground">{message.content}</Text>
+          <Text className="text-foreground" testID="agent-assistant-message-content">
+            {message.content}
+          </Text>
         )}
         {message.proposedAction ? (
           <ProposedActionCard
@@ -309,7 +311,9 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             streamingReply ? (
               <View className="items-start">
                 <View className="w-full">
-                  <Text className="text-foreground">{streamingReply}</Text>
+                  <Text className="text-foreground" testID="agent-streaming-reply">
+                    {streamingReply}
+                  </Text>
                 </View>
               </View>
             ) : (
