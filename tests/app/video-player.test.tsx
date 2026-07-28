@@ -8,6 +8,7 @@ let subtitleTrackChangeListener: ((payload: { subtitleTrack: unknown }) => void)
 let timeUpdateListener: ((payload: TimeUpdatePayload) => void) | null = null;
 const mockSubscriptionRemove = jest.fn();
 const mockLockAsync = jest.fn().mockResolvedValue(undefined);
+const mockFetchSubtitleText = jest.fn();
 
 const mockPlayer = {
   loop: false,
@@ -50,6 +51,10 @@ jest.mock("expo-screen-orientation", () => ({
   },
 }));
 
+jest.mock("@/lib/subtitle-fetch", () => ({
+  fetchSubtitleText: (...args: unknown[]) => mockFetchSubtitleText(...args),
+}));
+
 let mockSearchParams: Record<string, string> = { uri: "https://example.com/video.mp4", title: "Test Video" };
 
 jest.mock("expo-router", () => ({
@@ -75,7 +80,7 @@ jest.mock("@/lib/media-location", () => ({
 }));
 
 jest.mock("react-native-safe-area-context", () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 48, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 48, left: 24, right: 20 }),
 }));
 
 import VideoPlayerScreen from "@/app/video-player";
@@ -105,6 +110,7 @@ describe("VideoPlayerScreen", () => {
     mockSearchParams = { uri: "https://example.com/video.mp4", title: "Test Video" };
     mockRequestAPI.mockReset();
     mockLockAsync.mockResolvedValue(undefined);
+    mockFetchSubtitleText.mockReset();
 
     jest.spyOn(AppState, "addEventListener").mockImplementation((_type, callback) => {
       appStateCallback = callback as (state: string) => void;
@@ -328,9 +334,7 @@ External caption text
     };
 
     beforeEach(() => {
-      global.fetch = jest
-        .fn()
-        .mockResolvedValue({ ok: true, text: () => Promise.resolve(SRT) }) as unknown as typeof fetch;
+      mockFetchSubtitleText.mockResolvedValue(SRT);
     });
 
     it("shows the captions button when the stream has external subtitle tracks", async () => {
@@ -360,7 +364,7 @@ External caption text
         fireEvent.press(getByText("English"));
       });
 
-      expect(global.fetch).toHaveBeenCalledWith("https://example.com/captions.srt");
+      expect(mockFetchSubtitleText).toHaveBeenCalledWith("https://example.com/captions.srt");
       expect(mockPlayer.subtitleTrack).toBeNull();
       expect(getByText("External caption text")).toBeTruthy();
     });
@@ -479,6 +483,54 @@ External caption text
       expect(getByTestId("fullscreen-video-player")).toBeTruthy();
     });
 
+    it("exits external-caption fullscreen and restores portrait when playback fails", async () => {
+      const { getByLabelText, getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
+      mockLockAsync.mockClear();
+
+      await act(async () => {
+        statusChangeListener!({ status: "error", error: { message: "Playback failed" } });
+      });
+
+      expect(queryByTestId("fullscreen-video-player")).toBeNull();
+      expect(getByText("This video failed to load")).toBeTruthy();
+      expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+    });
+
+    it("keeps fullscreen controls and captions inside landscape safe areas", async () => {
+      const { getByLabelText, getByTestId, getByText } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
+
+      expect(StyleSheet.flatten(getByTestId("fullscreen-header").props.style)).toMatchObject({
+        left: 36,
+        right: 32,
+        top: 12,
+      });
+      expect(StyleSheet.flatten(getByTestId("subtitle-overlay").props.style)).toMatchObject({
+        left: 40,
+        right: 36,
+        bottom: 144,
+      });
+    });
+
     it("updates the overlay text as playback progresses", async () => {
       const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
 
@@ -501,7 +553,7 @@ External caption text
     });
 
     it("turns captions off when fetching the external track fails", async () => {
-      global.fetch = jest.fn().mockRejectedValue(new Error("network down")) as unknown as typeof fetch;
+      mockFetchSubtitleText.mockRejectedValue(new Error("network down"));
       const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
 
       await act(async () => {
@@ -515,12 +567,8 @@ External caption text
       expect(Sentry.captureException).toHaveBeenCalled();
     });
 
-    it("treats a non-success subtitle response as a failure and does not cache it", async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        text: () => Promise.resolve("<Error>Access Denied</Error>"),
-      }) as unknown as typeof fetch;
+    it("does not cache a failed subtitle download", async () => {
+      mockFetchSubtitleText.mockRejectedValue(new Error("Subtitle fetch failed with status 403"));
       const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
 
       await act(async () => {
@@ -540,16 +588,16 @@ External caption text
         fireEvent.press(getByText("English"));
       });
 
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(mockFetchSubtitleText).toHaveBeenCalledTimes(2);
     });
 
     it("ignores a stale subtitle fetch when the buyer selects Off before it resolves", async () => {
-      let resolveFetch: (value: { ok: boolean; text: () => Promise<string> }) => void;
-      global.fetch = jest.fn().mockReturnValue(
+      let resolveFetch: (value: string) => void;
+      mockFetchSubtitleText.mockReturnValue(
         new Promise((resolve) => {
           resolveFetch = resolve;
         }),
-      ) as unknown as typeof fetch;
+      );
       const { getByTestId, getByText, queryByTestId, queryByText } = await renderWithExternalTrack();
 
       await act(async () => {
@@ -567,7 +615,7 @@ External caption text
       });
 
       await act(async () => {
-        resolveFetch!({ ok: true, text: () => Promise.resolve(SRT) });
+        resolveFetch!(SRT);
       });
 
       expect(queryByTestId("subtitle-overlay")).toBeNull();
@@ -580,15 +628,12 @@ External caption text
 00:00:00,000 --> 00:01:00,000
 Second track caption text
 `;
-      let resolveSecondFetch: (value: { ok: boolean; text: () => Promise<string> }) => void;
-      global.fetch = jest
-        .fn()
-        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve(firstSrt) })
-        .mockReturnValueOnce(
-          new Promise((resolve) => {
-            resolveSecondFetch = resolve;
-          }),
-        ) as unknown as typeof fetch;
+      let resolveSecondFetch: (value: string) => void;
+      mockFetchSubtitleText.mockResolvedValueOnce(firstSrt).mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecondFetch = resolve;
+        }),
+      );
       mockSearchParams = {
         uri: "https://example.com/video.mp4",
         streamingUrl: "mobile/url_redirects/stream/token/file",
@@ -622,18 +667,18 @@ Second track caption text
       expect(queryByText("External caption text")).toBeNull();
 
       await act(async () => {
-        resolveSecondFetch!({ ok: true, text: () => Promise.resolve(secondSrt) });
+        resolveSecondFetch!(secondSrt);
       });
       expect(getByText("Second track caption text")).toBeTruthy();
     });
 
     it("ignores a stale subtitle fetch when the native controls enable an embedded track before it resolves", async () => {
-      let resolveFetch: (value: { ok: boolean; text: () => Promise<string> }) => void;
-      global.fetch = jest.fn().mockReturnValue(
+      let resolveFetch: (value: string) => void;
+      mockFetchSubtitleText.mockReturnValue(
         new Promise((resolve) => {
           resolveFetch = resolve;
         }),
-      ) as unknown as typeof fetch;
+      );
       const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
 
       await act(async () => {
@@ -648,7 +693,7 @@ Second track caption text
       });
 
       await act(async () => {
-        resolveFetch!({ ok: true, text: () => Promise.resolve(SRT) });
+        resolveFetch!(SRT);
       });
 
       expect(queryByTestId("subtitle-overlay")).toBeNull();

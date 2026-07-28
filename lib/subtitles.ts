@@ -6,6 +6,8 @@ export type SubtitleCue = {
   text: string;
 };
 
+export const MAX_SUBTITLE_CUES = 20_000;
+
 const TIMESTAMP = /(?:(\d{1,2}):)?(\d{1,2}):(\d{1,2})[.,](\d{1,3})/;
 
 const SRT_VTT_TIMING_LINE = new RegExp(`^\\s*(${TIMESTAMP.source})\\s*-->\\s*(${TIMESTAMP.source})`);
@@ -53,6 +55,7 @@ const parseMicroDvd = (content: string): SubtitleCue[] => {
 
     const text = stripMarkup(rawText.replace(/\|/gu, "\n")).trim();
     if (!text) continue;
+    if (cues.length >= MAX_SUBTITLE_CUES) throw new Error(`Subtitle track exceeds the ${MAX_SUBTITLE_CUES}-cue limit`);
     cues.push({ start: startFrame / framesPerSecond, end: endFrame / framesPerSecond, text });
   }
 
@@ -89,6 +92,7 @@ export const parseSubtitles = (content: string): SubtitleCue[] => {
     ).trim();
     if (!text) continue;
 
+    if (cues.length >= MAX_SUBTITLE_CUES) throw new Error(`Subtitle track exceeds the ${MAX_SUBTITLE_CUES}-cue limit`);
     cues.push({ start, end, text });
   }
 

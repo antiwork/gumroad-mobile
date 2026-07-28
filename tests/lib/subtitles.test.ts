@@ -1,4 +1,4 @@
-import { activeCueText, parseSubtitles } from "@/lib/subtitles";
+import { activeCueText, MAX_SUBTITLE_CUES, parseSubtitles } from "@/lib/subtitles";
 
 describe("parseSubtitles", () => {
   it("parses SRT cues", () => {
@@ -104,6 +104,15 @@ Later
 Earlier
 `;
     expect(parseSubtitles(srt).map((cue) => cue.text)).toEqual(["Earlier", "Later"]);
+  });
+
+  it("rejects tracks with too many cues", () => {
+    const srt = Array.from(
+      { length: MAX_SUBTITLE_CUES + 1 },
+      (_, index) => `${index + 1}\n00:00:01,000 --> 00:00:02,000\nCue ${index + 1}`,
+    ).join("\n\n");
+
+    expect(() => parseSubtitles(srt)).toThrow("cue limit");
   });
 });
 

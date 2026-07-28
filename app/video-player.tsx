@@ -6,6 +6,7 @@ import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
+import { fetchSubtitleText } from "@/lib/subtitle-fetch";
 import { activeCueText, parseSubtitles, type SubtitleCue } from "@/lib/subtitles";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -72,7 +73,7 @@ export default function VideoPlayerScreen() {
   }>();
 
   const queryClient = useQueryClient();
-  const { top, bottom } = useSafeAreaInsets();
+  const { top, bottom, left, right } = useSafeAreaInsets();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -181,6 +182,8 @@ export default function VideoPlayerScreen() {
       "statusChange",
       ({ status, error }: { status: VideoPlayerStatus; error?: { message: string } }) => {
         if (status === "error") {
+          setFullscreenCaptionPickerOpen(false);
+          setExternalFullscreenOpen(false);
           setPlaybackError(error?.message ?? "Unknown playback error");
         } else if (status === "readyToPlay") {
           setPlaybackError(null);
@@ -340,9 +343,7 @@ export default function VideoPlayerScreen() {
     try {
       let cues = cueCacheRef.current.get(track.url);
       if (!cues) {
-        const response = await fetch(track.url);
-        if (!response.ok) throw new Error(`Subtitle fetch failed with status ${response.status}`);
-        cues = parseSubtitles(await response.text());
+        cues = parseSubtitles(await fetchSubtitleText(track.url));
         cueCacheRef.current.set(track.url, cues);
       }
       if (captionRequestIdRef.current !== requestId) return;
@@ -408,12 +409,35 @@ export default function VideoPlayerScreen() {
         }}
       />
       {currentCueText ? (
-        <View pointerEvents="none" style={styles.subtitleOverlay} testID="subtitle-overlay">
+        <View
+          pointerEvents="none"
+          style={[
+            styles.subtitleOverlay,
+            fullscreen
+              ? {
+                  left: left + 16,
+                  right: right + 16,
+                  bottom: bottom + 96,
+                }
+              : undefined,
+          ]}
+          testID="subtitle-overlay"
+        >
           <Text style={styles.subtitleText}>{currentCueText}</Text>
         </View>
       ) : null}
       {fullscreen ? (
-        <View style={styles.fullscreenHeader}>
+        <View
+          style={[
+            styles.fullscreenHeader,
+            {
+              top: top + 12,
+              left: left + 12,
+              right: right + 12,
+            },
+          ]}
+          testID="fullscreen-header"
+        >
           <Pressable
             onPress={() => {
               setFullscreenCaptionPickerOpen(false);
@@ -439,7 +463,18 @@ export default function VideoPlayerScreen() {
         </View>
       ) : null}
       {fullscreen && fullscreenCaptionPickerOpen ? (
-        <View style={styles.fullscreenCaptionPicker} testID="fullscreen-caption-picker">
+        <View
+          style={[
+            styles.fullscreenCaptionPicker,
+            {
+              paddingTop: top + 24,
+              paddingBottom: bottom + 24,
+              paddingLeft: left + 24,
+              paddingRight: right + 24,
+            },
+          ]}
+          testID="fullscreen-caption-picker"
+        >
           <View style={styles.fullscreenCaptionPanel}>
             <View style={styles.fullscreenCaptionHeader}>
               <Text style={styles.fullscreenCaptionTitle}>Captions</Text>
@@ -541,7 +576,7 @@ export default function VideoPlayerScreen() {
           setExternalFullscreenOpen(false);
         }}
       >
-        <View style={[styles.container, { paddingTop: top, paddingBottom: bottom }]}>{renderVideoSurface(true)}</View>
+        <View style={styles.container}>{renderVideoSurface(true)}</View>
       </Modal>
       <Sheet open={captionSheetOpen} onOpenChange={setCaptionSheetOpen}>
         <SheetHeader onClose={() => setCaptionSheetOpen(false)}>
@@ -581,9 +616,6 @@ const styles = StyleSheet.create({
   },
   fullscreenHeader: {
     position: "absolute",
-    top: 12,
-    left: 12,
-    right: 12,
     flexDirection: "row",
     justifyContent: "space-between",
   },
@@ -601,7 +633,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.75)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
   },
   fullscreenCaptionPanel: {
     width: "100%",
