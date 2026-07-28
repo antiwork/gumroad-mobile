@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
-import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
+import { useWebViewSession } from "@/lib/use-webview-session";
+import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
 import * as Sentry from "@sentry/react-native";
 import { Stack } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { WebView as BaseWebView, WebViewMessageEvent } from "react-native-webview";
 import type {
@@ -45,21 +46,24 @@ const isAllowedInWebView = (url: string) => {
   }
 };
 
-const buildPayoutUrl = (token: string | null) =>
-  `${env.EXPO_PUBLIC_GUMROAD_URL}/settings/payments?display=mobile_app&access_token=${token}&mobile_token=${env.EXPO_PUBLIC_MOBILE_TOKEN}`;
+const buildPayoutUrl = (token: string) =>
+  buildAuthenticatedWebViewUrl("/settings/payments", token, { display: "mobile_app" });
 
 export default function PayoutSettingsScreen() {
-  const { isLoading, accessToken } = useAuth();
   const webViewRef = useRef<BaseWebView>(null);
   const [canSave, setCanSave] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-
-  const sessionTokenRef = useRef(accessToken);
-  if (sessionTokenRef.current == null) sessionTokenRef.current = accessToken;
-  const sessionToken = sessionTokenRef.current;
-
-  const url = useMemo(() => buildPayoutUrl(sessionToken), [sessionToken]);
+  const {
+    accessToken,
+    handleAuthenticationHttpError,
+    handleAuthenticationNavigation,
+    handleSessionLoad,
+    handleSessionLoadError,
+    isLoading,
+    url,
+    webViewKey,
+  } = useWebViewSession(buildPayoutUrl, { syncExternalToken: false });
 
   const mainUrlRef = useRef(url);
 
@@ -77,11 +81,12 @@ export default function PayoutSettingsScreen() {
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
+      if (handleAuthenticationNavigation(request.url)) return false;
       if (request.url === url || isWebViewInternalUrl(request.url) || isAllowedInWebView(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },
-    [url],
+    [handleAuthenticationNavigation, url],
   );
 
   const handleOpenWindow = useCallback((event: WebViewOpenWindowEvent) => {
@@ -94,28 +99,35 @@ export default function PayoutSettingsScreen() {
   }, []);
 
   const handleRetry = useCallback(() => {
-    sessionTokenRef.current = accessToken;
-    mainUrlRef.current = buildPayoutUrl(accessToken);
+    mainUrlRef.current = url;
     setCanSave(false);
     setHasError(false);
     setReloadKey((k) => k + 1);
-  }, [accessToken]);
+  }, [url]);
 
-  const handleError = useCallback((event: WebViewErrorEvent) => {
-    if (event.nativeEvent.url !== mainUrlRef.current) return;
-    setCanSave(false);
-    setHasError(true);
-    Sentry.captureException(new Error(`Payouts WebView load error: ${event.nativeEvent.description}`));
-  }, []);
+  const handleError = useCallback(
+    (event: WebViewErrorEvent) => {
+      handleSessionLoadError({ token: accessToken });
+      if (event.nativeEvent.url !== mainUrlRef.current) return;
+      setCanSave(false);
+      setHasError(true);
+      Sentry.captureException(new Error(`Payouts WebView load error: ${event.nativeEvent.description}`));
+    },
+    [accessToken, handleSessionLoadError],
+  );
 
-  const handleHttpError = useCallback((event: WebViewHttpErrorEvent) => {
-    if (event.nativeEvent.url !== mainUrlRef.current) return;
-    setCanSave(false);
-    setHasError(true);
-    Sentry.captureException(
-      new Error(`Payouts WebView HTTP error ${event.nativeEvent.statusCode}: ${event.nativeEvent.description}`),
-    );
-  }, []);
+  const handleHttpError = useCallback(
+    (event: WebViewHttpErrorEvent) => {
+      if (handleAuthenticationHttpError(event.nativeEvent)) return;
+      if (event.nativeEvent.url !== mainUrlRef.current) return;
+      setCanSave(false);
+      setHasError(true);
+      Sentry.captureException(
+        new Error(`Payouts WebView HTTP error ${event.nativeEvent.statusCode}: ${event.nativeEvent.description}`),
+      );
+    },
+    [handleAuthenticationHttpError],
+  );
 
   useEffect(() => {
     mainUrlRef.current = url;
@@ -123,7 +135,7 @@ export default function PayoutSettingsScreen() {
     setHasError(false);
   }, [url]);
 
-  if (isLoading) {
+  if (isLoading || url === null) {
     return (
       <View className="flex-1 items-center justify-center bg-body-bg">
         <LoadingSpinner size="large" />
@@ -144,7 +156,7 @@ export default function PayoutSettingsScreen() {
         }}
       />
       <StyledWebView
-        key={`${sessionToken ?? "anonymous"}-${reloadKey}`}
+        key={`${webViewKey}-${reloadKey}`}
         ref={webViewRef}
         source={{ uri: url }}
         className="flex-1 bg-transparent"
@@ -160,6 +172,9 @@ export default function PayoutSettingsScreen() {
         onOpenWindow={handleOpenWindow}
         onNavigationStateChange={(navState) => {
           mainUrlRef.current = navState.url;
+        }}
+        onLoad={(event) => {
+          handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
         }}
         onError={handleError}
         onHttpError={handleHttpError}

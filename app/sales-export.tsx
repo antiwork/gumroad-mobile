@@ -3,17 +3,18 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
-import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
 import { downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
 import { getExportAllSalesUrl } from "@/lib/sales-export";
+import { useWebViewSession } from "@/lib/use-webview-session";
 import * as Sentry from "@sentry/react-native";
 import { File, Paths } from "expo-file-system";
 import { Stack } from "expo-router";
 import { shareFile } from "@/lib/share";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, View } from "react-native";
+import type { WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
 
 const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
 
@@ -79,21 +80,31 @@ const downloadSalesExportFile = async (url: string) => {
 };
 
 export default function SalesExportScreen() {
-  const { isLoading, accessToken } = useAuth();
   const [isDownloading, setIsDownloading] = useState(false);
-  const url = useMemo(() => getExportAllSalesUrl(accessToken), [accessToken]);
+  const {
+    accessToken,
+    handleAuthenticationHttpError,
+    handleAuthenticationNavigation,
+    handleSessionLoad,
+    handleSessionLoadError,
+    isLoading,
+    url,
+    webViewKey,
+  } = useWebViewSession(getExportAllSalesUrl);
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
+      if (handleAuthenticationNavigation(request.url)) return false;
       if (request.url === url || isWebViewInternalUrl(request.url) || isGumroadUrl(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },
-    [url],
+    [handleAuthenticationNavigation, url],
   );
 
   const downloadSalesExport = useCallback(async () => {
+    if (url === null) return;
     setIsDownloading(true);
     try {
       const downloaded = await downloadSalesExportFile(url);
@@ -114,7 +125,7 @@ export default function SalesExportScreen() {
     }
   }, [url]);
 
-  if (isLoading) {
+  if (isLoading || url === null) {
     return (
       <View className="flex-1 items-center justify-center bg-body-bg">
         <LoadingSpinner size="large" />
@@ -126,7 +137,7 @@ export default function SalesExportScreen() {
     <Screen>
       <Stack.Screen options={{ title: "Export all sales" }} />
       <StyledWebView
-        key={accessToken ?? "anonymous"}
+        key={webViewKey}
         source={{ uri: url }}
         className="flex-1 bg-transparent"
         webviewDebuggingEnabled
@@ -135,6 +146,15 @@ export default function SalesExportScreen() {
         thirdPartyCookiesEnabled
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onLoad={(event) => {
+          handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
+        }}
+        onError={() => {
+          handleSessionLoadError({ token: accessToken });
+        }}
+        onHttpError={(event: WebViewHttpErrorEvent) => {
+          handleAuthenticationHttpError(event.nativeEvent);
+        }}
       />
       <View className="border-t border-border bg-body-bg p-4">
         <Button onPress={downloadSalesExport} disabled={isDownloading}>

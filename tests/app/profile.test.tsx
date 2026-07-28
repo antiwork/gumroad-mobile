@@ -1,8 +1,10 @@
-import { render, screen } from "@testing-library/react-native";
+import { act, render, screen, waitFor } from "@testing-library/react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
 const mockInjectJavaScript = jest.fn();
+const mockRefreshToken = jest.fn();
+const mockLogout = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -44,7 +46,14 @@ const expectedUrl =
 describe("ProfileSettingsScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseAuth.mockReturnValue({ isLoading: false, accessToken: "test-access-token" });
+    mockRefreshToken.mockResolvedValue("refreshed-access-token");
+    mockLogout.mockResolvedValue(undefined);
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      accessToken: "test-access-token",
+      refreshToken: mockRefreshToken,
+      logout: mockLogout,
+    });
   });
 
   it("loads the authenticated profile page inside the WebView", () => {
@@ -88,6 +97,31 @@ describe("ProfileSettingsScreen", () => {
 
     expect(shouldStart({ url: "mailto:support@example.com" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("mailto:support@example.com");
+  });
+
+  it("refreshes the native session when the WebView rejects its access token", async () => {
+    render(<ProfileSettingsScreen />);
+
+    const onHttpError = screen.getByTestId("profile-webview").props.onHttpError as (event: {
+      nativeEvent: { statusCode: number; url: string; description: string };
+    }) => void;
+    act(() => {
+      onHttpError({
+        nativeEvent: {
+          statusCode: 401,
+          url: "https://example.com/profile",
+          description: "The access token is invalid",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-webview").props.source).toEqual({
+        uri: expectedUrl.replace("test-access-token", "refreshed-access-token"),
+      });
+    });
+    expect(mockRefreshToken).toHaveBeenCalledTimes(1);
+    expect(mockLogout).not.toHaveBeenCalled();
   });
 
   it("opens target=_blank help links externally but keeps provider popups in the WebView", () => {
