@@ -264,7 +264,6 @@ describe("AgentChat", () => {
 
     await waitFor(() => expect(screen.getByText("Checking your store...")).toBeTruthy());
     expect(screen.queryByText("Working on it...")).toBeNull();
-    expect(screen.getByTestId("agent-stream-progress-started")).toBeTruthy();
 
     const { handlers } = mockStreamAgentMessage.mock.calls[0][0] as {
       handlers: { onToken: (text: string) => void; onReset: () => void };
@@ -280,7 +279,6 @@ describe("AgentChat", () => {
       handlers.onToken("up 20%.");
     });
     await waitFor(() => expect(screen.getByText("Sales are up 20%.")).toBeTruthy());
-    expect(screen.getByTestId("agent-stream-progress-started")).toBeTruthy();
 
     await act(async () => {
       resolveTurn({ reply: "Sales are up 20% this week.", proposedAction: null, conversationId: "conv-123" });
@@ -372,10 +370,12 @@ describe("AgentChat", () => {
       list.props.onScrollEndDrag(scrollEvent(0));
     });
     scrollToEnd.mockClear();
+    expect(screen.getByTestId("agent-content-growth-pending")).toBeTruthy();
 
     act(() => list.props.onContentSizeChange(0, 2400));
 
     expect(scrollToEnd).not.toHaveBeenCalled();
+    expect(screen.getByTestId("agent-content-growth-observed")).toBeTruthy();
   });
 
   it("follows new content while the reader is already at the newest message", async () => {

@@ -18,7 +18,6 @@ import { useCSSVariable } from "uniwind";
 
 const IOS_KEYBOARD_VERTICAL_OFFSET = 88;
 const AUTOSCROLL_BOTTOM_THRESHOLD = 24;
-const STREAMING_REPLY_GROWTH_THRESHOLD = 120;
 
 const isNearBottom = ({ contentOffset, contentSize, layoutMeasurement }: NativeScrollEvent) =>
   contentSize.height - contentOffset.y - layoutMeasurement.height <= AUTOSCROLL_BOTTOM_THRESHOLD;
@@ -139,6 +138,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const [streamingReply, setStreamingReply] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [pendingActionIndex, setPendingActionIndex] = useState<number | null>(null);
+  const [hasContentGrownSinceReaderScroll, setHasContentGrownSinceReaderScroll] = useState(false);
   const conversationIdRef = useRef<string | null>(null);
   const hasSentMessageRef = useRef(false);
   const mutedColor = useCSSVariable("--color-muted") as string;
@@ -231,6 +231,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     isReaderMomentumPendingRef.current = false;
     isReaderMomentumRef.current = false;
     isProgrammaticScrollRef.current = false;
+    setHasContentGrownSinceReaderScroll(false);
 
     const userMessage: DisplayMessage = { role: "user", content: trimmed };
     const history: ChatMessage[] = [...messages, userMessage].map(
@@ -280,18 +281,21 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
         keyboardShouldPersistTaps="handled"
         // Scrolling on content growth keeps up with streaming tokens, which arrive faster than a debounce would fire.
         onContentSizeChange={() => {
-          if (
+          const readerOwnsScroll =
             isReaderDraggingRef.current ||
             isReaderMomentumPendingRef.current ||
             isReaderMomentumRef.current ||
-            !isAtBottomRef.current
-          )
+            !isAtBottomRef.current;
+          if (readerOwnsScroll) {
+            setHasContentGrownSinceReaderScroll(true);
             return;
+          }
           isProgrammaticScrollRef.current = true;
           listRef.current?.scrollToEnd({ animated: true });
         }}
         onScrollBeginDrag={() => {
           isProgrammaticScrollRef.current = false;
+          setHasContentGrownSinceReaderScroll(false);
           isReaderDraggingRef.current = true;
           isReaderMomentumPendingRef.current = false;
           isReaderMomentumRef.current = false;
@@ -372,13 +376,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
       <View className="border-t border-border p-4">
         <View
           className="relative rounded border border-border bg-background"
-          testID={
-            !streamingReply
-              ? "agent-stream-progress-idle"
-              : streamingReply.length < STREAMING_REPLY_GROWTH_THRESHOLD
-                ? "agent-stream-progress-started"
-                : "agent-stream-progress-expanded"
-          }
+          testID={hasContentGrownSinceReaderScroll ? "agent-content-growth-observed" : "agent-content-growth-pending"}
         >
           <TextInput
             className="max-h-32 py-3 pr-16 pl-3 font-sans text-base text-foreground"

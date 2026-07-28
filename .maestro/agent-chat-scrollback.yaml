@@ -33,7 +33,7 @@ appId: ${APP_ID}
 - tapOn: "Send"
 - extendedWaitUntil:
     visible:
-      id: "agent-stream-progress-started"
+      id: "agent-streaming-reply"
     timeout: 30000
 - assertNotVisible:
     id: "agent-user-message"
@@ -50,10 +50,10 @@ appId: ${APP_ID}
     text: "Message"
     enabled: false
 - assertVisible:
-    id: "agent-stream-progress-started"
+    id: "agent-content-growth-pending"
 - extendedWaitUntil:
     visible:
-      id: "agent-stream-progress-expanded"
+      id: "agent-content-growth-observed"
     timeout: 30000
 - assertVisible:
     id: "agent-user-message"
