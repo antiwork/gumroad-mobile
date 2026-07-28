@@ -7,6 +7,7 @@ let statusChangeListener: ((payload: StatusChangePayload) => void) | null = null
 let subtitleTrackChangeListener: ((payload: { subtitleTrack: unknown }) => void) | null = null;
 let timeUpdateListener: ((payload: TimeUpdatePayload) => void) | null = null;
 const mockSubscriptionRemove = jest.fn();
+const mockLockAsync = jest.fn().mockResolvedValue(undefined);
 
 const mockPlayer = {
   loop: false,
@@ -40,6 +41,14 @@ jest.mock("expo-video", () => {
     VideoView: (props: Record<string, unknown>) => <View testID="video-view" {...props} />,
   };
 });
+
+jest.mock("expo-screen-orientation", () => ({
+  lockAsync: (...args: unknown[]) => mockLockAsync(...args),
+  OrientationLock: {
+    PORTRAIT_UP: "portrait-up",
+    LANDSCAPE: "landscape",
+  },
+}));
 
 let mockSearchParams: Record<string, string> = { uri: "https://example.com/video.mp4", title: "Test Video" };
 
@@ -95,6 +104,7 @@ describe("VideoPlayerScreen", () => {
     timeUpdateListener = null;
     mockSearchParams = { uri: "https://example.com/video.mp4", title: "Test Video" };
     mockRequestAPI.mockReset();
+    mockLockAsync.mockResolvedValue(undefined);
 
     jest.spyOn(AppState, "addEventListener").mockImplementation((_type, callback) => {
       appStateCallback = callback as (state: string) => void;
@@ -428,14 +438,45 @@ External caption text
       expect(getByTestId("video-player").props.fullscreenOptions.enable).toBe(false);
       expect(getByTestId("video-player").props.surfaceType).toBe("textureView");
 
-      fireEvent.press(getByLabelText("Enter fullscreen"));
+      mockLockAsync.mockClear();
+      await act(async () => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
       expect(queryByTestId("video-player")).toBeNull();
       expect(getByTestId("fullscreen-video-player")).toBeTruthy();
       expect(queryByTestId("subtitle-overlay")).toBeTruthy();
+      expect(mockLockAsync).toHaveBeenCalledWith("landscape");
 
-      fireEvent.press(getByLabelText("Exit fullscreen"));
+      await act(async () => {
+        fireEvent.press(getByLabelText("Exit fullscreen"));
+      });
       expect(getByTestId("video-player")).toBeTruthy();
       expect(queryByTestId("fullscreen-video-player")).toBeNull();
+      expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+    });
+
+    it("opens the caption picker inside external-caption fullscreen", async () => {
+      const { getByLabelText, getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
+
+      await act(async () => {
+        fireEvent.press(getByTestId("captions-button"));
+      });
+      await act(async () => {
+        fireEvent.press(getByText("English"));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText("Enter fullscreen"));
+      });
+
+      fireEvent.press(getByTestId("fullscreen-captions-button"));
+
+      expect(getByTestId("fullscreen-video-player")).toBeTruthy();
+      expect(getByTestId("fullscreen-caption-picker")).toBeTruthy();
+
+      fireEvent.press(getByLabelText("Close captions"));
+
+      expect(queryByTestId("fullscreen-caption-picker")).toBeNull();
+      expect(getByTestId("fullscreen-video-player")).toBeTruthy();
     });
 
     it("updates the overlay text as playback progresses", async () => {

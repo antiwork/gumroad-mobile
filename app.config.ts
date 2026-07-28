@@ -5,13 +5,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Gumroad",
   slug: "gumroad",
   version: "2026.07.27",
-  orientation: "portrait",
+  orientation: "default",
   icon: "./assets/images/icon.png",
   scheme: "gumroadmobile",
   userInterfaceStyle: "automatic",
   ios: {
     buildNumber: "1",
     supportsTablet: true,
+    requireFullScreen: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
     infoPlist: {
       UIBackgroundModes: ["audio", "remote-notification", "fetch"],
@@ -44,6 +45,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "./plugins/gradle-memory",
     "./plugins/android-large-heap",
     "expo-router",
+    [
+      "expo-screen-orientation",
+      {
+        initialOrientation: "PORTRAIT_UP",
+      },
+    ],
     [
       "expo-font",
       {

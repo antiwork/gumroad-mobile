@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { useVideoPlayer, VideoView, type SubtitleTrack, type VideoPlayerStatus } from "expo-video";
 import { useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus, FlatList, Modal, Pressable, StyleSheet, View } from "react-native";
@@ -49,6 +50,13 @@ type CaptionSelection =
   | { type: "embedded"; track: SubtitleTrack }
   | { type: "external"; index: number };
 
+type CaptionOption = {
+  key: string;
+  label: string;
+  isSelected: boolean;
+  select: CaptionSelection;
+};
+
 const subtitleTrackKey = (track: SubtitleTrack): string => track.id ?? `${track.label}|${track.language}`;
 
 export default function VideoPlayerScreen() {
@@ -80,6 +88,7 @@ export default function VideoPlayerScreen() {
   const [currentCueText, setCurrentCueText] = useState<string | null>(null);
   const [captionSheetOpen, setCaptionSheetOpen] = useState(false);
   const [externalFullscreenOpen, setExternalFullscreenOpen] = useState(false);
+  const [fullscreenCaptionPickerOpen, setFullscreenCaptionPickerOpen] = useState(false);
   const cueCacheRef = useRef<Map<string, SubtitleCue[]>>(new Map());
   const captionRequestIdRef = useRef(0);
   const selectionRef = useRef<CaptionSelection>({ type: "off" });
@@ -96,6 +105,7 @@ export default function VideoPlayerScreen() {
     setCurrentCueText(null);
     setCaptionSheetOpen(false);
     setExternalFullscreenOpen(false);
+    setFullscreenCaptionPickerOpen(false);
 
     const resolveVideoUrl = async () => {
       if (!accessToken) return;
@@ -238,6 +248,26 @@ export default function VideoPlayerScreen() {
   }, [player, externalCues]);
 
   useEffect(() => {
+    if (!externalFullscreenOpen) return;
+
+    let active = true;
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+      .then(() => {
+        if (!active) {
+          return ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        }
+      })
+      .catch((error) => Sentry.captureException(error));
+
+    return () => {
+      active = false;
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) =>
+        Sentry.captureException(error),
+      );
+    };
+  }, [externalFullscreenOpen]);
+
+  useEffect(() => {
     const startingPosition = initialPosition ? Number(initialPosition) : 0;
     const subscription = player.addListener("timeUpdate", ({ currentTime }: { currentTime: number }) => {
       if (!playbackStartedRef.current && currentTime > startingPosition + 0.1) {
@@ -286,6 +316,7 @@ export default function VideoPlayerScreen() {
 
   const selectCaptionTrack = async (nextSelection: CaptionSelection) => {
     setCaptionSheetOpen(false);
+    setFullscreenCaptionPickerOpen(false);
     selectionRef.current = nextSelection;
     setSelection(nextSelection);
     const requestId = ++captionRequestIdRef.current;
@@ -328,6 +359,38 @@ export default function VideoPlayerScreen() {
 
   const hasCaptionOptions = externalTracks.length > 0 || embeddedTracks.length > 0;
   const externalCaptionSelected = selection.type === "external";
+  const captionOptions: CaptionOption[] = [
+    { key: "off", label: "Off", isSelected: selection.type === "off", select: { type: "off" } },
+    ...embeddedTracks.map((track, index) => ({
+      key: `embedded-${index}`,
+      label: track.label || track.language || "Embedded",
+      isSelected: selection.type === "embedded" && subtitleTrackKey(selection.track) === subtitleTrackKey(track),
+      select: { type: "embedded", track } as const,
+    })),
+    ...externalTracks.map((track, index) => ({
+      key: `external-${index}`,
+      label: track.language || "Captions",
+      isSelected: selection.type === "external" && selection.index === index,
+      select: { type: "external", index } as const,
+    })),
+  ];
+
+  const renderCaptionOption = ({ item }: { item: CaptionOption }, fullscreen = false) => (
+    <Pressable
+      onPress={() => selectCaptionTrack(item.select)}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: item.isSelected }}
+      className={cn(
+        "flex-row items-center justify-between px-4 py-3",
+        item.isSelected && (fullscreen ? "bg-white/10" : "bg-muted/20"),
+      )}
+    >
+      <Text className={cn("flex-1", fullscreen && "text-white", item.isSelected && "font-bold")}>{item.label}</Text>
+      {item.isSelected ? (
+        <LineIcon name="check" size={20} className={fullscreen ? "text-white" : "text-foreground"} />
+      ) : null}
+    </Pressable>
+  );
 
   const renderVideoSurface = (fullscreen: boolean) => (
     <View style={styles.videoSurface}>
@@ -352,7 +415,10 @@ export default function VideoPlayerScreen() {
       {fullscreen ? (
         <View style={styles.fullscreenHeader}>
           <Pressable
-            onPress={() => setExternalFullscreenOpen(false)}
+            onPress={() => {
+              setFullscreenCaptionPickerOpen(false);
+              setExternalFullscreenOpen(false);
+            }}
             accessibilityRole="button"
             accessibilityLabel="Exit fullscreen"
             style={styles.fullscreenAction}
@@ -361,17 +427,38 @@ export default function VideoPlayerScreen() {
           </Pressable>
           {hasCaptionOptions ? (
             <Pressable
-              onPress={() => {
-                setExternalFullscreenOpen(false);
-                setCaptionSheetOpen(true);
-              }}
+              onPress={() => setFullscreenCaptionPickerOpen(true)}
               accessibilityRole="button"
               accessibilityLabel="Captions"
+              testID="fullscreen-captions-button"
               style={styles.fullscreenAction}
             >
               <LineIcon name="captions" size={24} className="text-white" />
             </Pressable>
           ) : null}
+        </View>
+      ) : null}
+      {fullscreen && fullscreenCaptionPickerOpen ? (
+        <View style={styles.fullscreenCaptionPicker} testID="fullscreen-caption-picker">
+          <View style={styles.fullscreenCaptionPanel}>
+            <View style={styles.fullscreenCaptionHeader}>
+              <Text style={styles.fullscreenCaptionTitle}>Captions</Text>
+              <Pressable
+                onPress={() => setFullscreenCaptionPickerOpen(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close captions"
+                style={styles.fullscreenCaptionClose}
+              >
+                <LineIcon name="x" size={24} className="text-white" />
+              </Pressable>
+            </View>
+            <FlatList
+              data={captionOptions}
+              keyExtractor={(item) => item.key}
+              renderItem={(item) => renderCaptionOption(item, true)}
+              style={styles.fullscreenCaptionList}
+            />
+          </View>
         </View>
       ) : null}
     </View>
@@ -448,7 +535,11 @@ export default function VideoPlayerScreen() {
         visible={externalFullscreenOpen}
         animationType="fade"
         presentationStyle="fullScreen"
-        onRequestClose={() => setExternalFullscreenOpen(false)}
+        supportedOrientations={["landscape", "landscape-left", "landscape-right"]}
+        onRequestClose={() => {
+          setFullscreenCaptionPickerOpen(false);
+          setExternalFullscreenOpen(false);
+        }}
       >
         <View style={[styles.container, { paddingTop: top, paddingBottom: bottom }]}>{renderVideoSurface(true)}</View>
       </Modal>
@@ -457,36 +548,7 @@ export default function VideoPlayerScreen() {
           <SheetTitle>Captions</SheetTitle>
         </SheetHeader>
         <SheetContent>
-          <FlatList
-            data={[
-              { key: "off", label: "Off", isSelected: selection.type === "off", select: { type: "off" } as const },
-              ...embeddedTracks.map((track, index) => ({
-                key: `embedded-${index}`,
-                label: track.label || track.language || "Embedded",
-                isSelected:
-                  selection.type === "embedded" && subtitleTrackKey(selection.track) === subtitleTrackKey(track),
-                select: { type: "embedded", track } as const,
-              })),
-              ...externalTracks.map((track, index) => ({
-                key: `external-${index}`,
-                label: track.language || "Captions",
-                isSelected: selection.type === "external" && selection.index === index,
-                select: { type: "external", index } as const,
-              })),
-            ]}
-            keyExtractor={(item) => item.key}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => selectCaptionTrack(item.select)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: item.isSelected }}
-                className={cn("flex-row items-center justify-between px-4 py-3", item.isSelected && "bg-muted/20")}
-              >
-                <Text className={cn("flex-1", item.isSelected && "font-bold")}>{item.label}</Text>
-                {item.isSelected ? <LineIcon name="check" size={20} className="text-foreground" /> : null}
-              </Pressable>
-            )}
-          />
+          <FlatList data={captionOptions} keyExtractor={(item) => item.key} renderItem={renderCaptionOption} />
         </SheetContent>
       </Sheet>
     </View>
@@ -532,6 +594,46 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  fullscreenCaptionPicker: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  fullscreenCaptionPanel: {
+    width: "100%",
+    maxWidth: 360,
+    maxHeight: "80%",
+    overflow: "hidden",
+    borderRadius: 12,
+    backgroundColor: "#1c1c1e",
+  },
+  fullscreenCaptionHeader: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255, 255, 255, 0.2)",
+    paddingLeft: 16,
+    paddingRight: 6,
+  },
+  fullscreenCaptionTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  fullscreenCaptionClose: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullscreenCaptionList: {
+    flexGrow: 0,
   },
   subtitleOverlay: {
     position: "absolute",

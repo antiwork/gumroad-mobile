@@ -2,6 +2,7 @@ import { ForceUpdateScreen } from "@/components/force-update-screen";
 import { useMinimumVersion } from "@/components/use-minimum-version";
 import { PortalHost } from "@rn-primitives/portal";
 import { useNavigationContainerRef, Stack } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
@@ -48,6 +49,12 @@ const RootLayout = () => {
   useEffect(() => {
     setupPlayer().catch((error) => {
       console.error("Failed to setup player:", error);
+    });
+  }, []);
+
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch((error) => {
+      console.error("Failed to lock app orientation:", error);
     });
   }, []);
 
