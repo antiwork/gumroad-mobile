@@ -39,9 +39,9 @@ intro-cue
     const vtt = `WEBVTT
 
 00:01.000 --> 00:04.000
-<v Speaker>Tom &amp; Ria&lt;3&nbsp;today</v>
+<v Speaker>Ol&aacute; &amp; Ria&lt;3&nbsp;&#39;today&#39;</v>
 `;
-    expect(parseSubtitles(vtt)).toEqual([{ start: 1, end: 4, text: "Tom & Ria<3\u00A0today" }]);
+    expect(parseSubtitles(vtt)).toEqual([{ start: 1, end: 4, text: "Olá & Ria<3\u00A0'today'" }]);
   });
 
   it("parses SBV cues", () => {
@@ -49,6 +49,20 @@ intro-cue
 SBV cue text
 `;
     expect(parseSubtitles(sbv)).toEqual([{ start: 1, end: 3, text: "SBV cue text" }]);
+  });
+
+  it("parses frame-based MicroDVD SUB cues", () => {
+    const sub = `{1}{1}25.000
+{25}{50}{y:i}First line|Second line
+`;
+    expect(parseSubtitles(sub)).toEqual([{ start: 1, end: 2, text: "First line\nSecond line" }]);
+  });
+
+  it("parses SubViewer line breaks", () => {
+    const sub = `0:00:01.000,0:00:03.000
+First line[br]Second line
+`;
+    expect(parseSubtitles(sub)).toEqual([{ start: 1, end: 3, text: "First line\nSecond line" }]);
   });
 
   it("handles BOM and CRLF line endings", () => {

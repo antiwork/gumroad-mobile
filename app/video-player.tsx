@@ -13,7 +13,7 @@ import * as Sentry from "@sentry/react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView, type SubtitleTrack, type VideoPlayerStatus } from "expo-video";
 import { useEffect, useRef, useState } from "react";
-import { AppState, type AppStateStatus, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { AppState, type AppStateStatus, FlatList, Modal, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ExternalSubtitleTrack = {
@@ -64,7 +64,7 @@ export default function VideoPlayerScreen() {
   }>();
 
   const queryClient = useQueryClient();
-  const { bottom } = useSafeAreaInsets();
+  const { top, bottom } = useSafeAreaInsets();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -79,6 +79,7 @@ export default function VideoPlayerScreen() {
   const [externalCues, setExternalCues] = useState<SubtitleCue[]>([]);
   const [currentCueText, setCurrentCueText] = useState<string | null>(null);
   const [captionSheetOpen, setCaptionSheetOpen] = useState(false);
+  const [externalFullscreenOpen, setExternalFullscreenOpen] = useState(false);
   const cueCacheRef = useRef<Map<string, SubtitleCue[]>>(new Map());
   const captionRequestIdRef = useRef(0);
   const selectionRef = useRef<CaptionSelection>({ type: "off" });
@@ -94,6 +95,7 @@ export default function VideoPlayerScreen() {
     setExternalCues([]);
     setCurrentCueText(null);
     setCaptionSheetOpen(false);
+    setExternalFullscreenOpen(false);
 
     const resolveVideoUrl = async () => {
       if (!accessToken) return;
@@ -325,6 +327,55 @@ export default function VideoPlayerScreen() {
   };
 
   const hasCaptionOptions = externalTracks.length > 0 || embeddedTracks.length > 0;
+  const externalCaptionSelected = selection.type === "external";
+
+  const renderVideoSurface = (fullscreen: boolean) => (
+    <View style={styles.videoSurface}>
+      <VideoView
+        testID={fullscreen ? "fullscreen-video-player" : "video-player"}
+        accessibilityLabel={playbackStarted ? "Video playback started" : "Video playback waiting"}
+        style={styles.video}
+        player={player}
+        allowsPictureInPicture={!externalCaptionSelected}
+        surfaceType="textureView"
+        fullscreenOptions={{
+          enable: !externalCaptionSelected && !fullscreen,
+          orientation: "landscape",
+          autoExitOnRotate: true,
+        }}
+      />
+      {currentCueText ? (
+        <View pointerEvents="none" style={styles.subtitleOverlay} testID="subtitle-overlay">
+          <Text style={styles.subtitleText}>{currentCueText}</Text>
+        </View>
+      ) : null}
+      {fullscreen ? (
+        <View style={styles.fullscreenHeader}>
+          <Pressable
+            onPress={() => setExternalFullscreenOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Exit fullscreen"
+            style={styles.fullscreenAction}
+          >
+            <LineIcon name="fullscreen-exit" size={24} className="text-white" />
+          </Pressable>
+          {hasCaptionOptions ? (
+            <Pressable
+              onPress={() => {
+                setExternalFullscreenOpen(false);
+                setCaptionSheetOpen(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Captions"
+              style={styles.fullscreenAction}
+            >
+              <LineIcon name="captions" size={24} className="text-white" />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
 
   if (isLoading || !videoUrl) {
     return (
@@ -367,31 +418,40 @@ export default function VideoPlayerScreen() {
           headerTintColor: "#fff",
           headerRight: hasCaptionOptions
             ? () => (
-                <Pressable
-                  onPress={() => setCaptionSheetOpen(true)}
-                  accessibilityLabel="Captions"
-                  testID="captions-button"
-                  className="p-2"
-                >
-                  <LineIcon name="captions" size={24} className="text-white" />
-                </Pressable>
+                <View className="flex-row items-center">
+                  {externalCaptionSelected ? (
+                    <Pressable
+                      onPress={() => setExternalFullscreenOpen(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Enter fullscreen"
+                      className="p-2"
+                    >
+                      <LineIcon name="fullscreen" size={24} className="text-white" />
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    onPress={() => setCaptionSheetOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Captions"
+                    testID="captions-button"
+                    className="p-2"
+                  >
+                    <LineIcon name="captions" size={24} className="text-white" />
+                  </Pressable>
+                </View>
               )
             : undefined,
         }}
       />
-      <VideoView
-        testID="video-player"
-        accessibilityLabel={playbackStarted ? "Video playback started" : "Video playback waiting"}
-        style={styles.video}
-        player={player}
-        allowsPictureInPicture
-        fullscreenOptions={{ enable: true, orientation: "landscape", autoExitOnRotate: true }}
-      />
-      {currentCueText ? (
-        <View pointerEvents="none" style={styles.subtitleOverlay} testID="subtitle-overlay">
-          <Text style={styles.subtitleText}>{currentCueText}</Text>
-        </View>
-      ) : null}
+      {externalFullscreenOpen ? null : renderVideoSurface(false)}
+      <Modal
+        visible={externalFullscreenOpen}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setExternalFullscreenOpen(false)}
+      >
+        <View style={[styles.container, { paddingTop: top, paddingBottom: bottom }]}>{renderVideoSurface(true)}</View>
+      </Modal>
       <Sheet open={captionSheetOpen} onOpenChange={setCaptionSheetOpen}>
         <SheetHeader onClose={() => setCaptionSheetOpen(false)}>
           <SheetTitle>Captions</SheetTitle>
@@ -453,6 +513,25 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
     height: "100%",
+  },
+  videoSurface: {
+    flex: 1,
+  },
+  fullscreenHeader: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  fullscreenAction: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   subtitleOverlay: {
     position: "absolute",

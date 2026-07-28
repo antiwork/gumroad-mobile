@@ -1,3 +1,5 @@
+import { decodeHTMLStrict } from "entities";
+
 export type SubtitleCue = {
   start: number;
   end: number;
@@ -10,14 +12,9 @@ const SRT_VTT_TIMING_LINE = new RegExp(`^\\s*(${TIMESTAMP.source})\\s*-->\\s*(${
 
 const SBV_TIMING_LINE = new RegExp(`^\\s*(${TIMESTAMP.source})\\s*,\\s*(${TIMESTAMP.source})\\s*$`);
 
-const SUBTITLE_ENTITIES: Record<string, string> = {
-  amp: "&",
-  gt: ">",
-  lrm: "\u200E",
-  lt: "<",
-  nbsp: "\u00A0",
-  rlm: "\u200F",
-};
+const MICRODVD_TIMING_LINE = /^\{(\d+)\}\{(\d*)\}(.*)$/u;
+
+const DEFAULT_MICRODVD_FRAMES_PER_SECOND = 25;
 
 const parseTimestamp = (raw: string): number | null => {
   const match = TIMESTAMP.exec(raw);
@@ -27,15 +24,47 @@ const parseTimestamp = (raw: string): number | null => {
 };
 
 const stripMarkup = (text: string): string =>
-  text
-    .replace(/<[^>]*>/gu, "")
-    .replace(/\{[^}]*\}/gu, "")
-    .replace(/&(amp|gt|lrm|lt|nbsp|rlm);/giu, (_, entity: string) => SUBTITLE_ENTITIES[entity.toLowerCase()]);
+  decodeHTMLStrict(
+    text
+      .replace(/<[^>]*>/gu, "")
+      .replace(/\{[^}]*\}/gu, "")
+      .replace(/\[br\]/giu, "\n"),
+  );
 
 const normalize = (raw: string): string => raw.replace(/^\uFEFF/u, "").replace(/\r\n?/gu, "\n");
 
+const parseMicroDvd = (content: string): SubtitleCue[] => {
+  let framesPerSecond = DEFAULT_MICRODVD_FRAMES_PER_SECOND;
+  const cues: SubtitleCue[] = [];
+
+  for (const line of content.split("\n")) {
+    const match = MICRODVD_TIMING_LINE.exec(line.trim());
+    if (!match) continue;
+    const [, startFrameRaw, endFrameRaw, rawText] = match;
+    const startFrame = Number(startFrameRaw);
+    const endFrame = Number(endFrameRaw);
+    const declaredFramesPerSecond = Number(rawText);
+
+    if (startFrame === endFrame && Number.isFinite(declaredFramesPerSecond) && declaredFramesPerSecond > 0) {
+      framesPerSecond = declaredFramesPerSecond;
+      continue;
+    }
+    if (!endFrameRaw || endFrame <= startFrame) continue;
+
+    const text = stripMarkup(rawText.replace(/\|/gu, "\n")).trim();
+    if (!text) continue;
+    cues.push({ start: startFrame / framesPerSecond, end: endFrame / framesPerSecond, text });
+  }
+
+  return cues.sort((a, b) => a.start - b.start);
+};
+
 export const parseSubtitles = (content: string): SubtitleCue[] => {
-  const blocks = normalize(content)
+  const normalizedContent = normalize(content);
+  const microDvdCues = parseMicroDvd(normalizedContent);
+  if (microDvdCues.length > 0) return microDvdCues;
+
+  const blocks = normalizedContent
     .split(/\n{2,}/u)
     .map((block) => block.trim())
     .filter(Boolean);

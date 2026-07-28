@@ -410,7 +410,7 @@ External caption text
     });
 
     it("keeps external captions selected when disabling the embedded track emits a native event", async () => {
-      const { getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
+      const { getByLabelText, getByTestId, getByText, queryByTestId } = await renderWithExternalTrack();
 
       await act(async () => {
         fireEvent.press(getByTestId("captions-button"));
@@ -424,6 +424,18 @@ External caption text
       });
 
       expect(queryByTestId("subtitle-overlay")).toBeTruthy();
+      expect(getByTestId("video-player").props.allowsPictureInPicture).toBe(false);
+      expect(getByTestId("video-player").props.fullscreenOptions.enable).toBe(false);
+      expect(getByTestId("video-player").props.surfaceType).toBe("textureView");
+
+      fireEvent.press(getByLabelText("Enter fullscreen"));
+      expect(queryByTestId("video-player")).toBeNull();
+      expect(getByTestId("fullscreen-video-player")).toBeTruthy();
+      expect(queryByTestId("subtitle-overlay")).toBeTruthy();
+
+      fireEvent.press(getByLabelText("Exit fullscreen"));
+      expect(getByTestId("video-player")).toBeTruthy();
+      expect(queryByTestId("fullscreen-video-player")).toBeNull();
     });
 
     it("updates the overlay text as playback progresses", async () => {
