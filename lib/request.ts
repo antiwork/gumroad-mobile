@@ -83,9 +83,11 @@ export const isInvalidGrantError = (error: unknown): boolean =>
 // Detecting the redirect lets us surface the real condition (unauthorized) so the token-refresh
 // path can run, instead of failing the screen with a misleading "404 Not found".
 //
-// We compare the requested path against the final one rather than reading `response.redirected`:
-// React Native's fetch is the whatwg-fetch polyfill, which never sets that flag, so relying on it
-// meant this check could never fire on a device.
+// The final URL comes from the underlying XHR's responseURL, which React Native reports
+// differently per platform: on iOS it is the URL the redirect landed on, but on Android it is
+// always the URL that was requested. So this detection works on iOS only. Note also that
+// React Native's fetch is the whatwg-fetch polyfill, which never sets `redirected` on a
+// Response at all, so that flag cannot be used to identify a redirect here.
 const isRedirectToLogin = (requestedUrl: string, finalUrl: string | undefined): boolean => {
   if (!finalUrl) return false;
   try {
