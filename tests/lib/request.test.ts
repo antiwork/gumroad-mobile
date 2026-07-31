@@ -89,6 +89,23 @@ describe("request", () => {
     await expect(request("https://api.example.com/v2/things")).rejects.toThrow(UnauthorizedError);
   });
 
+  // React Native's fetch is the whatwg-fetch polyfill, which never sets `redirected` on a
+  // Response — it only sets `url` from the XHR's responseURL. A response shaped like this is
+  // what the app actually receives in production, so the login-redirect detection has to work
+  // without `redirected`.
+  it("throws UnauthorizedError for a /login redirect even though React Native's fetch omits `redirected`", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        url: "https://api.example.com/login",
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("Not Found"),
+      }),
+    );
+    await expect(request("https://api.example.com/v2/things")).rejects.toThrow(UnauthorizedError);
+  });
+
   it("does not treat a direct request to /login as unauthorized", async () => {
     mockFetch.mockReturnValueOnce(
       Promise.resolve({
@@ -109,6 +126,19 @@ describe("request", () => {
         ok: false,
         status: 404,
         redirected: false,
+        url: "https://api.example.com/test",
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("Not Found"),
+      }),
+    );
+    await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 404 Not found");
+  });
+
+  it("still throws the generic 404 error when a non-redirected response omits `redirected`", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 404,
         url: "https://api.example.com/test",
         json: () => Promise.resolve({}),
         text: () => Promise.resolve("Not Found"),
