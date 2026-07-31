@@ -10,6 +10,7 @@ const mockSubscriptionRemove = jest.fn();
 const mockLockAsync = jest.fn().mockResolvedValue(undefined);
 const mockUnlockAsync = jest.fn().mockResolvedValue(undefined);
 const mockFetchSubtitleText = jest.fn();
+const mockUpdateMediaLocation = jest.fn();
 const mockSetNavigationBarVisibilityAsync = jest.fn().mockResolvedValue(undefined);
 let mockSetAccessToken: ((token: string) => void) | null = null;
 
@@ -22,6 +23,7 @@ const mockPlayer = {
   staysActiveInBackground: true,
   playing: true,
   currentTime: 0,
+  duration: 0,
   timeUpdateEventInterval: 0,
   allowsExternalPlayback: true,
   subtitleTrack: null as unknown,
@@ -101,7 +103,8 @@ jest.mock("@/lib/auth-context", () => ({
 }));
 
 jest.mock("@/lib/media-location", () => ({
-  updateMediaLocation: jest.fn(),
+  ...jest.requireActual("@/lib/media-location"),
+  updateMediaLocation: (...args: unknown[]) => mockUpdateMediaLocation(...args),
 }));
 
 jest.mock("react-native-safe-area-context", () => ({
@@ -125,6 +128,7 @@ describe("VideoPlayerScreen", () => {
     mockPlayer.staysActiveInBackground = true;
     mockPlayer.loop = false;
     mockPlayer.currentTime = 0;
+    mockPlayer.duration = 0;
     mockPlayer.timeUpdateEventInterval = 0;
     mockPlayer.allowsExternalPlayback = true;
     mockPlayer.subtitleTrack = null;
@@ -167,6 +171,158 @@ describe("VideoPlayerScreen", () => {
     });
 
     expect(getByLabelText("Video playback started")).toBeTruthy();
+  });
+
+  describe("resuming from a saved position", () => {
+    it("starts the player at the saved position", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "1209" };
+
+      renderScreen();
+
+      expect(mockPlayer.currentTime).toBe(1209);
+      expect(mockPlayer.play).toHaveBeenCalled();
+    });
+
+    it("restarts a finished video from the beginning when content_length says it is at the end", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "600", contentLength: "600" };
+
+      renderScreen();
+
+      expect(mockPlayer.currentTime).toBe(0);
+    });
+
+    it("restarts a finished video from the beginning once the loaded duration reveals it is at the end", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "600" };
+      renderScreen();
+      expect(mockPlayer.currentTime).toBe(600);
+
+      mockPlayer.duration = 600;
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+
+      expect(mockPlayer.currentTime).toBe(0);
+    });
+
+    it("keeps a resumable position when the loaded duration is longer than it", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "600" };
+      renderScreen();
+
+      mockPlayer.duration = 1800;
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+
+      expect(mockPlayer.currentTime).toBe(600);
+    });
+
+    it("reports playback as started relative to the resumed position", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "1209" };
+      const { getByLabelText } = renderScreen();
+
+      act(() => {
+        timeUpdateListener!({ currentTime: 1209 });
+      });
+      expect(getByLabelText("Video playback waiting")).toBeTruthy();
+
+      act(() => {
+        timeUpdateListener!({ currentTime: 1209.5 });
+      });
+      expect(getByLabelText("Video playback started")).toBeTruthy();
+    });
+
+    it("exposes the resumed position so end-to-end flows can assert playback did not restart", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "1209", contentLength: "1800" };
+      const { getByTestId } = renderScreen();
+
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "20:09 of 30:00" });
+    });
+  });
+
+  describe("saving progress", () => {
+    const trackedParams = {
+      uri: "https://example.com/video.mp4",
+      urlRedirectId: "redirect-1",
+      productFileId: "file-1",
+      purchaseId: "purchase-1",
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockUpdateMediaLocation.mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("does not save a position at the very start over a saved one", () => {
+      mockSearchParams = trackedParams;
+      renderScreen();
+      mockPlayer.currentTime = 0;
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+    });
+
+    it("saves a position past the start", () => {
+      mockSearchParams = trackedParams;
+      renderScreen();
+      mockPlayer.currentTime = 42;
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      expect(mockUpdateMediaLocation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          urlRedirectId: "redirect-1",
+          productFileId: "file-1",
+          purchaseId: "purchase-1",
+          location: 42,
+        }),
+      );
+    });
+
+    it("saves the full duration once playback reaches the end", () => {
+      mockSearchParams = trackedParams;
+      renderScreen();
+      mockPlayer.currentTime = 599.8;
+      mockPlayer.duration = 600;
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: 600 }));
+    });
+
+    it("does not clobber a saved position when the screen unmounts before playback advanced", () => {
+      mockSearchParams = trackedParams;
+      const { unmount } = renderScreen();
+
+      unmount();
+
+      expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+    });
+
+    it("saves the reached position when the screen unmounts", () => {
+      mockSearchParams = trackedParams;
+      const { unmount } = renderScreen();
+      mockPlayer.currentTime = 77;
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      mockUpdateMediaLocation.mockClear();
+
+      unmount();
+
+      expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: 77 }));
+    });
   });
 
   it("pauses the player when app goes to background", () => {

@@ -205,12 +205,13 @@ export default function DownloadScreen() {
           pathname: "/video-player",
           params: {
             uri: productFileDownloadUrl(token, message.payload.resourceId),
-            streamingUrl: purchase?.file_data?.find((f) => f.id === message.payload.resourceId)?.streaming_url,
+            streamingUrl: fileData.streaming_url,
             title: purchase?.name,
             urlRedirectId: purchase?.url_redirect_external_id,
             productFileId: message.payload.resourceId,
             purchaseId: purchase?.purchase_id,
-            initialPosition: message.payload.resumeAt ?? undefined,
+            initialPosition: fileData.latest_media_location?.location ?? message.payload.resumeAt ?? undefined,
+            contentLength: fileData.content_length,
           },
         });
         return;

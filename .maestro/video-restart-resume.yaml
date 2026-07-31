@@ -1,0 +1,44 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_buyer_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: ".*Mobile Test Product 1.*"
+- extendedWaitUntil:
+    visible: Mobile Test Video
+    timeout: 30000
+- tapOn: "Watch|Watch again"
+- extendedWaitUntil:
+    visible:
+      id: video-player
+    timeout: 20000
+- extendedWaitUntil:
+    visible: Video playback started
+    timeout: 20000
+- assertNotVisible: This video failed to load
+# The player saves progress on a 5-second interval, so let it run past two saves before leaving.
+- extendedWaitUntil:
+    visible: "Video playback started, 0:1[0-9] of .*"
+    timeout: 25000
+- runFlow:
+    file: utils/back.yaml
+- runFlow:
+    file: utils/relaunch.yaml
+- tapOn: Library
+- tapOn: ".*Mobile Test Product 1.*"
+- extendedWaitUntil:
+    visible: Mobile Test Video
+    timeout: 45000
+- tapOn: "Watch|Watch again"
+- extendedWaitUntil:
+    visible:
+      id: video-player
+    timeout: 20000
+# The saved position must be read back: a player that started at 0:00 would report 0:0X here.
+- extendedWaitUntil:
+    visible: "Video playback (started|waiting), 0:(0[9]|1[0-9]|2[0-9]) of .*"
+    timeout: 20000
+- assertNotVisible: "Video playback (started|waiting), 0:0[0-5] of .*"
+- assertNotVisible: This video failed to load

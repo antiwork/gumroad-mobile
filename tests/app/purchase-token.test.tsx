@@ -11,12 +11,14 @@ jest.mock("@/lib/open-url", () => ({
   safeOpenURL: (url: string) => mockSafeOpenURL(url),
 }));
 
+const mockRouterPush = jest.fn();
+
 jest.mock("expo-router", () => ({
   Stack: {
     Screen: () => null,
   },
   useLocalSearchParams: () => ({ token: "test-token", urlRedirectExternalId: "redirect-id" }),
-  useRouter: () => ({ push: jest.fn() }),
+  useRouter: () => ({ push: mockRouterPush }),
 }));
 
 jest.mock("expo-file-system", () => ({
@@ -190,5 +192,72 @@ describe("DownloadScreen", () => {
 
     expect(mockPauseAudio).not.toHaveBeenCalled();
     expect(mockPlayAudio).toHaveBeenCalledWith(expect.objectContaining({ resourceId: "ep1" }));
+  });
+
+  describe("opening a video", () => {
+    const sendVideoTap = async (resourceId: string, resumeAt?: string) => {
+      const onMessage = screen.getByTestId("purchase-webview").props.onMessage as (event: {
+        nativeEvent: { data: string };
+      }) => Promise<void>;
+      await onMessage({
+        nativeEvent: {
+          data: JSON.stringify({ type: "click", payload: { resourceId, resumeAt, isDownload: false } }),
+        },
+      });
+    };
+
+    const purchaseWithVideo = {
+      purchase_id: "purchase-1",
+      url_redirect_external_id: "redirect-1",
+      file_data: [
+        {
+          id: "vid1",
+          filegroup: "video",
+          name: "Lesson 1",
+          content_length: 1800,
+          streaming_url: "mobile/url_redirects/stream/token/vid1",
+          latest_media_location: { location: 1209 },
+        },
+      ],
+    };
+
+    it("passes the saved position from the API when the WebView payload omits it", async () => {
+      mockUsePurchase.mockReturnValue(purchaseWithVideo);
+      render(<DownloadScreen />);
+
+      await sendVideoTap("vid1");
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: "/video-player",
+          params: expect.objectContaining({ initialPosition: 1209, contentLength: 1800 }),
+        }),
+      );
+    });
+
+    it("prefers the saved position over a stale WebView payload", async () => {
+      mockUsePurchase.mockReturnValue(purchaseWithVideo);
+      render(<DownloadScreen />);
+
+      await sendVideoTap("vid1", "0");
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({ params: expect.objectContaining({ initialPosition: 1209 }) }),
+      );
+    });
+
+    it("falls back to the WebView payload when the API has no saved position", async () => {
+      mockUsePurchase.mockReturnValue({
+        ...purchaseWithVideo,
+        file_data: [{ ...purchaseWithVideo.file_data[0], latest_media_location: undefined }],
+      });
+      render(<DownloadScreen />);
+
+      await sendVideoTap("vid1", "45");
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({ params: expect.objectContaining({ initialPosition: "45" }) }),
+      );
+    });
   });
 });

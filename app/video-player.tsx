@@ -4,7 +4,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
-import { updateMediaLocation } from "@/lib/media-location";
+import { formatTime } from "@/lib/format-time";
+import { isMeaningfulLocation, isResumableLocation, updateMediaLocation } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
 import { fetchSubtitleText, SubtitleFetchError } from "@/lib/subtitle-fetch";
 import { activeCueText, parseSubtitles, type SubtitleCue } from "@/lib/subtitles";
@@ -114,22 +115,30 @@ const subtitleTrackKey = (track: SubtitleTrack): string => track.id ?? `${track.
 
 export default function VideoPlayerScreen() {
   const { accessToken } = useAuth();
-  const { uri, streamingUrl, title, urlRedirectId, productFileId, purchaseId, initialPosition } = useLocalSearchParams<{
-    uri: string;
-    streamingUrl?: string;
-    title?: string;
-    urlRedirectId?: string;
-    productFileId?: string;
-    purchaseId?: string;
-    initialPosition?: string;
-  }>();
+  const { uri, streamingUrl, title, urlRedirectId, productFileId, purchaseId, initialPosition, contentLength } =
+    useLocalSearchParams<{
+      uri: string;
+      streamingUrl?: string;
+      title?: string;
+      urlRedirectId?: string;
+      productFileId?: string;
+      purchaseId?: string;
+      initialPosition?: string;
+      contentLength?: string;
+    }>();
+
+  const [savedPositionIsAtEnd, setSavedPositionIsAtEnd] = useState(false);
+  const videoLength = contentLength ? Number(contentLength) : undefined;
+  const savedPosition = initialPosition ? Number(initialPosition) : undefined;
+  const resumePosition = !savedPositionIsAtEnd && isResumableLocation(savedPosition, videoLength) ? savedPosition : 0;
 
   const queryClient = useQueryClient();
   const { top, bottom, left, right } = useSafeAreaInsets();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
-  const [currentPosition, setCurrentPosition] = useState(initialPosition ? Number(initialPosition) : 0);
+  const [currentPosition, setCurrentPosition] = useState(resumePosition);
+  const [videoDuration, setVideoDuration] = useState(videoLength ?? 0);
   const [playbackStarted, setPlaybackStarted] = useState(false);
   const playbackStartedRef = useRef(false);
   const currentPositionRef = useRefToLatest(currentPosition);
@@ -156,6 +165,7 @@ export default function VideoPlayerScreen() {
   const resolvedMediaIdentityRef = useRef<{ streamingUrl?: string; uri: string } | null>(null);
   const fallbackMediaIdentityRef = useRef<{ streamingUrl?: string; uri: string } | null>(null);
   const playerRef = useRef<ReturnType<typeof useVideoPlayer> | null>(null);
+  const videoDurationRef = useRefToLatest(videoDuration);
   const pendingSourceResumeRef = useRef<{ position: number; wasPlaying: boolean } | null>(null);
 
   const cancelCaptionRequest = useCallback(() => {
@@ -271,8 +281,8 @@ export default function VideoPlayerScreen() {
     pendingSourceResumeRef.current = null;
     if (pendingResume) {
       player.currentTime = pendingResume.position;
-    } else if (initialPosition) {
-      player.currentTime = Number(initialPosition);
+    } else if (resumePosition) {
+      player.currentTime = resumePosition;
     }
     if (pendingResume && !pendingResume.wasPlaying) {
       player.pause();
@@ -343,6 +353,15 @@ export default function VideoPlayerScreen() {
         } else if (status === "readyToPlay") {
           setPlaybackError(null);
           withReleasedPlayerGuard(() => {
+            setVideoDuration(player.duration);
+            // content_length is not serialised for every file, so the loaded duration is the
+            // first reliable chance to notice the saved position is at the end of the video.
+            // Seeking there stops playback instantly, which reads as "the video won't play".
+            if (savedPosition && !isResumableLocation(savedPosition, player.duration)) {
+              setSavedPositionIsAtEnd(true);
+              player.currentTime = 0;
+              setCurrentPosition(0);
+            }
             setEmbeddedTracks(player.availableSubtitleTracks);
             const subtitleTrack = player.subtitleTrack;
             if (subtitleTrack && selectionRef.current.type !== "external") {
@@ -358,7 +377,7 @@ export default function VideoPlayerScreen() {
       },
     );
     return () => subscription.remove();
-  }, [cancelCaptionRequest, externalFullscreenOpen, player]);
+  }, [cancelCaptionRequest, externalFullscreenOpen, player, savedPosition]);
 
   useEffect(() => {
     const subscription = player.addListener(
@@ -406,51 +425,62 @@ export default function VideoPlayerScreen() {
   }, [player, externalCues]);
 
   useEffect(() => {
-    const startingPosition = initialPosition ? Number(initialPosition) : 0;
     const subscription = player.addListener("timeUpdate", ({ currentTime }: { currentTime: number }) => {
-      if (!playbackStartedRef.current && currentTime > startingPosition + 0.1) {
+      if (!playbackStartedRef.current && currentTime > resumePosition + 0.1) {
         playbackStartedRef.current = true;
         setPlaybackStarted(true);
       }
     });
     return () => subscription.remove();
-  }, [initialPosition, player]);
+  }, [resumePosition, player]);
+
+  const persistLocation = useCallback(
+    (position: number, duration: number) => {
+      if (!urlRedirectId || !productFileId) return null;
+
+      const isEnd = duration > 0 && position >= duration - 0.5;
+      // Below the threshold the position is indistinguishable from a player sitting at the
+      // start, so saving it would overwrite the position the buyer actually reached.
+      if (!isMeaningfulLocation(position, isEnd)) return null;
+
+      return updateMediaLocation({
+        urlRedirectId,
+        productFileId,
+        purchaseId,
+        location: isEnd ? duration : position,
+        accessToken,
+      });
+    },
+    [urlRedirectId, productFileId, purchaseId, accessToken],
+  );
+
+  const persistLocationRef = useRefToLatest(persistLocation);
 
   useEffect(
     () => () => {
-      if (!urlRedirectId || !productFileId) return;
-
-      updateMediaLocation({
-        urlRedirectId,
-        productFileId,
-        purchaseId,
-        // We deliberately use the latest value of the ref for the latest media location
-
-        location: currentPositionRef.current,
-        accessToken,
-      }).then(() => queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] }));
+      if (!urlRedirectId) return;
+      persistLocationRef
+        .current(currentPositionRef.current, videoDurationRef.current)
+        ?.then(() => queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] }));
     },
-    [urlRedirectId, productFileId, purchaseId, currentPositionRef, accessToken, queryClient],
+    [urlRedirectId, currentPositionRef, videoDurationRef, persistLocationRef, queryClient],
   );
 
   useEffect(() => {
-    if (!player || !urlRedirectId || !productFileId) return;
+    if (!player) return;
 
     const interval = setInterval(() => {
-      const position = player.currentTime;
-      setCurrentPosition(position);
-
-      updateMediaLocation({
-        urlRedirectId,
-        productFileId,
-        purchaseId,
-        location: position,
-        accessToken,
+      withReleasedPlayerGuard(() => {
+        const position = player.currentTime;
+        const duration = player.duration || videoDurationRef.current;
+        setCurrentPosition(position);
+        setVideoDuration(duration);
+        persistLocation(position, duration);
       });
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [player, urlRedirectId, productFileId, purchaseId, accessToken]);
+  }, [player, persistLocation, videoDurationRef]);
 
   const selectCaptionTrack = async (nextSelection: CaptionSelection) => {
     setCaptionSheetOpen(false);
@@ -642,6 +672,7 @@ export default function VideoPlayerScreen() {
         key={videoSurfaceType}
         testID={fullscreen ? "fullscreen-video-player" : "video-player"}
         accessibilityLabel={playbackStarted ? "Video playback started" : "Video playback waiting"}
+        accessibilityValue={{ text: `${formatTime(currentPosition)} of ${formatTime(videoDuration)}` }}
         style={styles.video}
         player={player}
         allowsPictureInPicture={!externalCaptionSelected}
