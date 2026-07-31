@@ -1,5 +1,12 @@
 appId: ${APP_ID}
 ---
+# The seeded "Mobile Test Video" fixture is 10 seconds long. Positions asserted here have to sit
+# above the 3-second minimum the app will save and below the end, past which a finished video
+# deliberately restarts from the beginning. Check the fixture duration before widening them.
+#
+# This flow runs against a shared seeded account that other flows also watch this video on, so it
+# cannot assume a starting position. It normalises first by playing to the end, which is what makes
+# the next open start at a known 0:00.
 - runFlow:
     file: utils/sign-in.yaml
     env:
@@ -14,14 +21,26 @@ appId: ${APP_ID}
     visible:
       id: video-player
     timeout: 20000
-- extendedWaitUntil:
-    visible: Video playback started
-    timeout: 20000
 - assertNotVisible: This video failed to load
-# The player saves progress on a 5-second interval, so let it run past two saves before leaving.
+# Normalise: play through to the end, whatever position this account was left on.
 - extendedWaitUntil:
-    visible: "Video playback started, 0:1[0-9] of .*"
-    timeout: 25000
+    visible: "Video playback started, 0:(09|10) of 0:10"
+    timeout: 30000
+- runFlow:
+    file: utils/back.yaml
+# A finished video restarts from the beginning rather than seeking to the end and stopping.
+- tapOn: "Watch|Watch again"
+- extendedWaitUntil:
+    visible:
+      id: video-player
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "Video playback (started|waiting), 0:0[0-3] of 0:10"
+    timeout: 20000
+# Watch far enough in that the position is worth saving, then leave.
+- extendedWaitUntil:
+    visible: "Video playback started, 0:0[5-7] of 0:10"
+    timeout: 20000
 - runFlow:
     file: utils/back.yaml
 - runFlow:
@@ -36,9 +55,9 @@ appId: ${APP_ID}
     visible:
       id: video-player
     timeout: 20000
-# The saved position must be read back: a player that started at 0:00 would report 0:0X here.
+# The saved position has to be read back. Before this was fixed the player always opened at 0:00.
 - extendedWaitUntil:
-    visible: "Video playback (started|waiting), 0:(0[9]|1[0-9]|2[0-9]) of .*"
+    visible: "Video playback (started|waiting), 0:0[5-9] of 0:10"
     timeout: 20000
-- assertNotVisible: "Video playback (started|waiting), 0:0[0-5] of .*"
+- assertNotVisible: "Video playback (started|waiting), 0:0[0-3] of 0:10"
 - assertNotVisible: This video failed to load

@@ -216,6 +216,47 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(600);
     });
 
+    it("does not snap a rewatching buyer back to the start when readyToPlay fires again", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "600", contentLength: "600" };
+      renderScreen();
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+      expect(mockPlayer.currentTime).toBe(0);
+
+      // A seek or a rebuffer cycles the player back through readyToPlay.
+      mockPlayer.currentTime = 240;
+      mockPlayer.duration = 600;
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+
+      expect(mockPlayer.currentTime).toBe(240);
+    });
+
+    it("reports playback as started after a finished video restarts from the beginning", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "600", contentLength: "600" };
+      const { getByLabelText } = renderScreen();
+
+      act(() => {
+        timeUpdateListener!({ currentTime: 0.25 });
+      });
+
+      expect(getByLabelText("Video playback started")).toBeTruthy();
+    });
+
+    it("keeps the seeded duration when the player reports no duration yet", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "600", contentLength: "1800" };
+      const { getByTestId } = renderScreen();
+
+      mockPlayer.duration = 0;
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "10:00 of 30:00" });
+    });
+
     it("reports playback as started relative to the resumed position", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "1209" };
       const { getByLabelText } = renderScreen();

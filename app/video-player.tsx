@@ -127,10 +127,16 @@ export default function VideoPlayerScreen() {
       contentLength?: string;
     }>();
 
-  const [savedPositionIsAtEnd, setSavedPositionIsAtEnd] = useState(false);
   const videoLength = contentLength ? Number(contentLength) : undefined;
   const savedPosition = initialPosition ? Number(initialPosition) : undefined;
-  const resumePosition = !savedPositionIsAtEnd && isResumableLocation(savedPosition, videoLength) ? savedPosition : 0;
+  // A saved position at or past the end means the buyer finished the video. Seeking there stops
+  // playback instantly, which reads as "the video won't play", so those restart from the start.
+  // content_length is not serialised for every file, so the loaded duration is the second chance
+  // to notice it, hence the state rather than a plain derivation.
+  const [savedPositionIsAtEnd, setSavedPositionIsAtEnd] = useState(
+    savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength),
+  );
+  const resumePosition = savedPositionIsAtEnd ? 0 : (savedPosition ?? 0);
 
   const queryClient = useQueryClient();
   const { top, bottom, left, right } = useSafeAreaInsets();
@@ -198,6 +204,7 @@ export default function VideoPlayerScreen() {
       const offSelection = { type: "off" } as const;
       fallbackMediaIdentityRef.current = null;
       pendingSourceResumeRef.current = null;
+      setSavedPositionIsAtEnd(savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength));
       cancelCaptionRequest();
       fullscreenRequestIdRef.current += 1;
       if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
@@ -353,11 +360,10 @@ export default function VideoPlayerScreen() {
         } else if (status === "readyToPlay") {
           setPlaybackError(null);
           withReleasedPlayerGuard(() => {
-            setVideoDuration(player.duration);
-            // content_length is not serialised for every file, so the loaded duration is the
-            // first reliable chance to notice the saved position is at the end of the video.
-            // Seeking there stops playback instantly, which reads as "the video won't play".
-            if (savedPosition && !isResumableLocation(savedPosition, player.duration)) {
+            setVideoDuration(player.duration || videoDurationRef.current);
+            // readyToPlay fires again after every seek and rebuffer, so this must not re-run once
+            // handled or a buyer rewatching a finished video gets yanked back to the start.
+            if (!savedPositionIsAtEnd && savedPosition && !isResumableLocation(savedPosition, player.duration)) {
               setSavedPositionIsAtEnd(true);
               player.currentTime = 0;
               setCurrentPosition(0);
@@ -377,7 +383,7 @@ export default function VideoPlayerScreen() {
       },
     );
     return () => subscription.remove();
-  }, [cancelCaptionRequest, externalFullscreenOpen, player, savedPosition]);
+  }, [cancelCaptionRequest, externalFullscreenOpen, player, savedPosition, savedPositionIsAtEnd, videoDurationRef]);
 
   useEffect(() => {
     const subscription = player.addListener(
