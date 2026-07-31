@@ -75,15 +75,30 @@ describe("request", () => {
     await expect(request("https://api.example.com/test")).rejects.toThrow(UnauthorizedError);
   });
 
+  // React Native's fetch is the whatwg-fetch polyfill, which never sets `redirected` on a
+  // Response — it only sets `url`, from the XHR's responseURL. These mocks therefore leave
+  // `redirected` out, matching what the app actually receives at runtime.
   it("throws UnauthorizedError when the API redirects an unauthenticated request to /login (404)", async () => {
     mockFetch.mockReturnValueOnce(
       Promise.resolve({
         ok: false,
         status: 404,
-        redirected: true,
         url: "https://api.example.com/login",
         json: () => Promise.resolve({}),
         text: () => Promise.resolve("Not Found"),
+      }),
+    );
+    await expect(request("https://api.example.com/v2/things")).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("throws UnauthorizedError when a redirect to /login returns a 200 login page", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        url: "https://api.example.com/login",
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("<html>Log in</html>"),
       }),
     );
     await expect(request("https://api.example.com/v2/things")).rejects.toThrow(UnauthorizedError);
@@ -94,7 +109,6 @@ describe("request", () => {
       Promise.resolve({
         ok: false,
         status: 404,
-        redirected: true,
         url: "https://api.example.com/login",
         json: () => Promise.resolve({}),
         text: () => Promise.resolve("Not Found"),
@@ -103,12 +117,14 @@ describe("request", () => {
     await expect(request("https://api.example.com/login")).rejects.toThrow("Request failed: 404 Not found");
   });
 
+  // Android reports the requested URL as the responseURL even after following a redirect, so a
+  // response whose final URL matches the request is the ordinary case there as well as for a
+  // genuine 404.
   it("still throws the generic 404 error when the response was not redirected", async () => {
     mockFetch.mockReturnValueOnce(
       Promise.resolve({
         ok: false,
         status: 404,
-        redirected: false,
         url: "https://api.example.com/test",
         json: () => Promise.resolve({}),
         text: () => Promise.resolve("Not Found"),
