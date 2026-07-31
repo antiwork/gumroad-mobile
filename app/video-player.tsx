@@ -204,7 +204,15 @@ export default function VideoPlayerScreen() {
       const offSelection = { type: "off" } as const;
       fallbackMediaIdentityRef.current = null;
       pendingSourceResumeRef.current = null;
-      setSavedPositionIsAtEnd(savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength));
+      const nextPositionIsAtEnd = savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength);
+      setSavedPositionIsAtEnd(nextPositionIsAtEnd);
+      // Progress state belongs to one video. Carrying it into the next one shows the previous
+      // video's position on screen and, worse, lets a save write that position against the new
+      // video's duration, so the replacement video reopens at the wrong place.
+      setCurrentPosition(nextPositionIsAtEnd ? 0 : (savedPosition ?? 0));
+      setVideoDuration(videoLength ?? 0);
+      playbackStartedRef.current = false;
+      setPlaybackStarted(false);
       cancelCaptionRequest();
       fullscreenRequestIdRef.current += 1;
       if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
@@ -440,9 +448,18 @@ export default function VideoPlayerScreen() {
     return () => subscription.remove();
   }, [resumePosition, player]);
 
+  const loadedMediaMatchesParams = useCallback(() => {
+    const loadedMedia = resolvedMediaIdentityRef.current ?? fallbackMediaIdentityRef.current;
+    return loadedMedia?.uri === uri && loadedMedia.streamingUrl === streamingUrl;
+  }, [streamingUrl, uri]);
+
   const persistLocation = useCallback(
     (position: number, duration: number) => {
       if (!urlRedirectId || !productFileId) return null;
+
+      // While the screen is switching to another video the player still holds the previous
+      // source, so anything read off it now would be saved against the new video's file.
+      if (!loadedMediaMatchesParams()) return null;
 
       const isEnd = duration > 0 && position >= duration - 0.5;
       // Below the threshold the position is indistinguishable from a player sitting at the
@@ -457,7 +474,7 @@ export default function VideoPlayerScreen() {
         accessToken,
       });
     },
-    [urlRedirectId, productFileId, purchaseId, accessToken],
+    [urlRedirectId, productFileId, purchaseId, accessToken, loadedMediaMatchesParams],
   );
 
   const persistLocationRef = useRefToLatest(persistLocation);
@@ -477,6 +494,7 @@ export default function VideoPlayerScreen() {
 
     const interval = setInterval(() => {
       withReleasedPlayerGuard(() => {
+        if (!loadedMediaMatchesParams()) return;
         const position = player.currentTime;
         const duration = player.duration || videoDurationRef.current;
         setCurrentPosition(position);
@@ -486,7 +504,7 @@ export default function VideoPlayerScreen() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [player, persistLocation, videoDurationRef]);
+  }, [player, persistLocation, videoDurationRef, loadedMediaMatchesParams]);
 
   const selectCaptionTrack = async (nextSelection: CaptionSelection) => {
     setCaptionSheetOpen(false);

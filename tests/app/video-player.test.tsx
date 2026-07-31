@@ -366,6 +366,62 @@ describe("VideoPlayerScreen", () => {
     });
   });
 
+  describe("switching to another video", () => {
+    it("shows the new video's position instead of the previous one's", async () => {
+      mockSearchParams = {
+        uri: "https://example.com/first.mp4",
+        initialPosition: "1209",
+        contentLength: "1800",
+      };
+      const { getByTestId } = renderScreen();
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "20:09 of 30:00" });
+
+      await act(async () => {
+        mockSearchParams = { uri: "https://example.com/second.mp4", contentLength: "600" };
+        mockSetAccessToken!("token-after-switch");
+      });
+
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "0:00 of 10:00" });
+    });
+
+    it("does not save the previous video's position against the new video", async () => {
+      jest.useFakeTimers();
+      mockUpdateMediaLocation.mockResolvedValue(undefined);
+      mockRequestAPI.mockResolvedValueOnce({ playlist_url: "https://example.com/first.m3u8" });
+      mockSearchParams = {
+        uri: "https://example.com/first.mp4",
+        streamingUrl: "mobile/url_redirects/stream/token/first",
+        urlRedirectId: "redirect-1",
+        productFileId: "file-1",
+      };
+      renderScreen();
+      await act(async () => {});
+      mockPlayer.currentTime = 599.8;
+      mockPlayer.duration = 600;
+      mockUpdateMediaLocation.mockClear();
+
+      // The next video's stream lookup is still in flight, so the player is still playing the
+      // previous file while the screen already reports the new one's identifiers.
+      mockRequestAPI.mockReturnValueOnce(new Promise(() => {}));
+      await act(async () => {
+        mockSearchParams = {
+          uri: "https://example.com/second.mp4",
+          streamingUrl: "mobile/url_redirects/stream/token/second",
+          urlRedirectId: "redirect-1",
+          productFileId: "file-2",
+        };
+        mockSetAccessToken!("token-after-switch");
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+  });
+
   it("pauses the player when app goes to background", () => {
     renderScreen();
 
