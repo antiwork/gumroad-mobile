@@ -40,6 +40,7 @@ export interface ConversationMessage {
   role: ChatRole;
   content: string;
   proposed_action?: ProposedAction | null;
+  proposal_message_id?: string | null;
   action_status?: "applied" | "dismissed" | null;
 }
 
@@ -62,10 +63,12 @@ export const fetchLatestAgentConversation = async (accessToken: string): Promise
 export const executeAgentAction = async ({
   action,
   conversationId,
+  proposalMessageId,
   accessToken,
 }: {
   action: ProposedAction;
   conversationId?: string | null;
+  proposalMessageId?: string | null;
   accessToken: string;
 }): Promise<string> => {
   const json = await requestAPI<ExecuteActionResponse>("mobile/agent/actions", {
@@ -74,6 +77,7 @@ export const executeAgentAction = async ({
       type: action.type,
       params: action.params,
       ...(conversationId ? { conversation_id: conversationId } : {}),
+      ...(proposalMessageId ? { proposal_message_id: proposalMessageId } : {}),
     },
     accessToken,
   });
@@ -89,12 +93,14 @@ export interface AgentStreamHandlers {
 export interface AgentStreamResult {
   reply: string;
   proposedAction: ProposedAction | null;
+  proposalMessageId: string | null;
   conversationId: string | null;
 }
 
 interface DoneEventData {
   reply: string;
   proposed_action: ProposedAction | null;
+  proposal_message_id?: string | null;
   conversation_id?: string;
 }
 
@@ -159,6 +165,7 @@ export const streamAgentMessage = async ({
           return {
             reply: data.reply,
             proposedAction: data.proposed_action,
+            proposalMessageId: data.proposal_message_id ?? null,
             conversationId: data.conversation_id ?? conversationId ?? null,
           };
         }
