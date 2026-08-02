@@ -97,6 +97,15 @@ const isRedirectToLogin = (requestedUrl: string, finalUrl: string | undefined): 
   }
 };
 
+// Everything this app requests answers in JSON, so an HTML 404 means the request never reached
+// the endpoint it asked for — it was redirected to a web page that doesn't exist on that host.
+// Both known ways to lose a session land here: an API read redirected to /login, and a token
+// refresh whose POST was downgraded to a GET, which /oauth/token answers with an HTML 404.
+// Unlike the redirect check above this needs no knowledge of the final URL, so it works on
+// Android, where the XHR responseURL is always just the URL that was requested.
+const isHtmlResponse = (response: Response): boolean =>
+  response.headers.get("content-type")?.toLowerCase().includes("text/html") ?? false;
+
 export const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 30_000;
@@ -182,7 +191,7 @@ const requestOnce = async <T>(
       method: options?.method ?? "GET",
       status: response.status,
     };
-    if (response.status === 401 || isRedirectToLogin(url, response.url)) {
+    if (response.status === 401 || isRedirectToLogin(url, response.url) || (response.status === 404 && isHtmlResponse(response))) {
       console.info("HTTP request", details);
       throw new UnauthorizedError("Unauthorized");
     }
