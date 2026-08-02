@@ -172,11 +172,16 @@ describe("streamAgentMessage", () => {
 });
 
 describe("executeAgentAction", () => {
+  const originalFetch = global.fetch;
   const mockRequestFetch = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = mockRequestFetch as unknown as typeof fetch;
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
   });
 
   it("sends the proposal message id with the confirm payload", async () => {
@@ -200,16 +205,17 @@ describe("executeAgentAction", () => {
       }),
     ).resolves.toBe("Created product.");
 
+    const requestBody = JSON.parse(String(mockRequestFetch.mock.calls[0][1]?.body));
+    expect(requestBody).toEqual({
+      type: "api_write",
+      params: { endpoint: "create_product" },
+      proposal_message_id: "msg-123",
+      conversation_id: "conv-1",
+    });
     expect(mockRequestFetch).toHaveBeenCalledWith(
       "https://api.example.com/mobile/agent/actions?mobile_token=mobile-token",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({
-          type: "api_write",
-          params: { endpoint: "create_product" },
-          proposal_message_id: "msg-123",
-          conversation_id: "conv-1",
-        }),
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
       }),
     );
