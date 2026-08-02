@@ -112,6 +112,7 @@ describe("AgentChat", () => {
         type: "api_write",
         params: { code: "LAUNCH", percent_off: 20 },
         summary: "Create a 20% off code called LAUNCH",
+        proposal_message_id: "msg-123",
       },
     });
     mockExecuteAgentAction.mockResolvedValue("Created discount LAUNCH.");
@@ -137,6 +138,7 @@ describe("AgentChat", () => {
         type: "api_write",
         params: { code: "LAUNCH", percent_off: 20 },
         summary: "Create a 20% off code called LAUNCH",
+        proposal_message_id: "msg-123",
       },
     });
   });

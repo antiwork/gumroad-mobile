@@ -6,7 +6,7 @@ jest.mock("@/lib/env", () => ({
 const mockFetch = jest.fn();
 jest.mock("expo/fetch", () => ({ fetch: (...args: unknown[]) => mockFetch(...args) }));
 
-import { streamAgentMessage } from "@/lib/agent";
+import { executeAgentAction, streamAgentMessage } from "@/lib/agent";
 import { UnauthorizedError } from "@/lib/request";
 
 const encoder = new TextEncoder();
@@ -116,6 +116,26 @@ describe("streamAgentMessage", () => {
     expect(result.conversationId).toBe("conv-existing");
   });
 
+  it("attaches the proposal message id from the done frame to the proposed action", async () => {
+    mockFetch.mockResolvedValue(
+      streamResponse([
+        'event: done\ndata: {"reply":"Ready.","proposed_action":{"type":"api_write","params":{"endpoint":"create_product"},"summary":"Create product"},"proposal_message_id":"msg-123","conversation_id":"conv-3"}\n\n',
+      ]),
+    );
+
+    const result = await streamAgentMessage({
+      messages: [{ role: "user", content: "Create a product" }],
+      accessToken: "token",
+    });
+
+    expect(result.proposedAction).toEqual({
+      type: "api_write",
+      params: { endpoint: "create_product" },
+      summary: "Create product",
+      proposal_message_id: "msg-123",
+    });
+  });
+
   it("throws the server's message on an error event", async () => {
     const response = streamResponse(['event: error\ndata: {"message":"That conversation could not be found."}\n\n']);
     mockFetch.mockResolvedValue(response);
@@ -148,5 +168,50 @@ describe("streamAgentMessage", () => {
     await expect(
       streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" }),
     ).rejects.toThrow("Agent stream ended without a done event");
+  });
+});
+
+describe("executeAgentAction", () => {
+  const mockRequestFetch = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = mockRequestFetch as unknown as typeof fetch;
+  });
+
+  it("sends the proposal message id with the confirm payload", async () => {
+    mockRequestFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      url: "https://api.example.com/mobile/agent/actions",
+      json: jest.fn().mockResolvedValue({ success: true, message: "Created product." }),
+    });
+
+    await expect(
+      executeAgentAction({
+        action: {
+          type: "api_write",
+          params: { endpoint: "create_product" },
+          summary: "Create product",
+          proposal_message_id: "msg-123",
+        },
+        conversationId: "conv-1",
+        accessToken: "token",
+      }),
+    ).resolves.toBe("Created product.");
+
+    expect(mockRequestFetch).toHaveBeenCalledWith(
+      "https://api.example.com/mobile/agent/actions?mobile_token=mobile-token",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          type: "api_write",
+          params: { endpoint: "create_product" },
+          proposal_message_id: "msg-123",
+          conversation_id: "conv-1",
+        }),
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
   });
 });

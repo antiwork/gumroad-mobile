@@ -17,6 +17,7 @@ export interface ProposedAction {
   type: "api_write";
   params: Record<string, unknown>;
   summary: string;
+  proposal_message_id?: string;
   title?: string;
   fields?: ProposedActionField[];
 }
@@ -73,6 +74,7 @@ export const executeAgentAction = async ({
     data: {
       type: action.type,
       params: action.params,
+      ...(action.proposal_message_id ? { proposal_message_id: action.proposal_message_id } : {}),
       ...(conversationId ? { conversation_id: conversationId } : {}),
     },
     accessToken,
@@ -95,6 +97,7 @@ export interface AgentStreamResult {
 interface DoneEventData {
   reply: string;
   proposed_action: ProposedAction | null;
+  proposal_message_id?: string;
   conversation_id?: string;
 }
 
@@ -158,7 +161,12 @@ export const streamAgentMessage = async ({
           const data = raw as DoneEventData;
           return {
             reply: data.reply,
-            proposedAction: data.proposed_action,
+            proposedAction: data.proposed_action
+              ? {
+                  ...data.proposed_action,
+                  ...(data.proposal_message_id ? { proposal_message_id: data.proposal_message_id } : {}),
+                }
+              : null,
             conversationId: data.conversation_id ?? conversationId ?? null,
           };
         }
