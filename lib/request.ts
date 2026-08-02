@@ -191,7 +191,11 @@ const requestOnce = async <T>(
       method: options?.method ?? "GET",
       status: response.status,
     };
-    if (response.status === 401 || isRedirectToLogin(url, response.url) || (response.status === 404 && isHtmlResponse(response))) {
+    if (
+      response.status === 401 ||
+      isRedirectToLogin(url, response.url) ||
+      (response.status === 404 && isHtmlResponse(response))
+    ) {
       console.info("HTTP request", details);
       throw new UnauthorizedError("Unauthorized");
     }
