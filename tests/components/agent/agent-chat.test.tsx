@@ -141,6 +141,36 @@ describe("AgentChat", () => {
     });
   });
 
+  it("sends the proposal message id back when confirming a streamed proposal", async () => {
+    mockStreamAgentMessage.mockResolvedValue({
+      reply: "I've prepared your product.",
+      conversationId: "conv-123",
+      proposalMessageId: "msg-abc",
+      proposedAction: {
+        type: "api_write",
+        params: { name: "My ebook", price: 25 },
+        summary: "Create My ebook at $25",
+      },
+    });
+    mockExecuteAgentAction.mockResolvedValue("Created My ebook.");
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "Create my ebook");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(screen.getByText("Create My ebook at $25")).toBeTruthy());
+    await act(async () => {
+      fireEvent.press(screen.getByText("Confirm"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Applied")).toBeTruthy());
+    expect(mockExecuteAgentAction).toHaveBeenCalledWith(
+      expect.objectContaining({ proposalMessageId: "msg-abc", conversationId: "conv-123" }),
+    );
+  });
+
   it("dismisses a proposed action without applying it", async () => {
     mockStreamAgentMessage.mockResolvedValue({
       reply: "I've prepared a discount.",

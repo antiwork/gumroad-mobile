@@ -24,6 +24,10 @@ const isNearBottom = ({ contentOffset, contentSize, layoutMeasurement }: NativeS
 
 interface DisplayMessage extends ChatMessage {
   proposedAction?: ProposedAction;
+  // Binds a confirm to the exact stored proposal the seller saw. Without it the server falls back
+  // to matching on payload, which cannot tell two near-identical proposals apart and has
+  // double-created products when the model staged the same intent twice.
+  proposalMessageId?: string;
   actionStatus?: "applied" | "dismissed";
 }
 
@@ -171,6 +175,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
               role: message.role,
               content: message.content,
               ...(message.proposed_action ? { proposedAction: message.proposed_action } : {}),
+              ...(message.proposal_message_id ? { proposalMessageId: message.proposal_message_id } : {}),
               ...(message.action_status
                 ? { actionStatus: message.action_status }
                 : // A proposal that was never confirmed is stale after resuming, so show it as dismissed.
@@ -202,11 +207,16 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
           },
         }),
       ),
-    onSuccess: ({ reply, proposedAction, conversationId }) => {
+    onSuccess: ({ reply, proposedAction, proposalMessageId, conversationId }) => {
       conversationIdRef.current = conversationId;
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: reply, ...(proposedAction ? { proposedAction } : {}) },
+        {
+          role: "assistant",
+          content: reply,
+          ...(proposedAction ? { proposedAction } : {}),
+          ...(proposalMessageId ? { proposalMessageId } : {}),
+        },
       ]);
     },
     onError: () => {
@@ -219,9 +229,14 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   });
 
   const executeMutation = useMutation({
-    mutationFn: (action: ProposedAction) =>
+    mutationFn: ({ action, proposalMessageId }: { action: ProposedAction; proposalMessageId?: string }) =>
       authedRequest((token) =>
-        executeAgentAction({ action, conversationId: conversationIdRef.current, accessToken: token }),
+        executeAgentAction({
+          action,
+          conversationId: conversationIdRef.current,
+          proposalMessageId,
+          accessToken: token,
+        }),
       ),
   });
 
@@ -260,20 +275,23 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
     sendMutation.mutate(history);
   };
 
-  const confirmAction = (index: number, action: ProposedAction) => {
+  const confirmAction = (index: number, action: ProposedAction, proposalMessageId?: string) => {
     setPendingActionIndex(index);
-    executeMutation.mutate(action, {
-      onSuccess: () => {
-        setMessages((prev) => prev.map((msg, i) => (i === index ? { ...msg, actionStatus: "applied" } : msg)));
+    executeMutation.mutate(
+      { action, proposalMessageId },
+      {
+        onSuccess: () => {
+          setMessages((prev) => prev.map((msg, i) => (i === index ? { ...msg, actionStatus: "applied" } : msg)));
+        },
+        onError: () => {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "Sorry, I couldn't apply that change. Please try again." },
+          ]);
+        },
+        onSettled: () => setPendingActionIndex(null),
       },
-      onError: () => {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "Sorry, I couldn't apply that change. Please try again." },
-        ]);
-      },
-      onSettled: () => setPendingActionIndex(null),
-    });
+    );
   };
 
   const dismissAction = (index: number) => {
@@ -422,7 +440,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
             message={item}
             isPending={pendingActionIndex !== null}
             isApplying={pendingActionIndex === index}
-            onConfirm={() => item.proposedAction && confirmAction(index, item.proposedAction)}
+            onConfirm={() => item.proposedAction && confirmAction(index, item.proposedAction, item.proposalMessageId)}
             onDismiss={() => dismissAction(index)}
           />
         )}

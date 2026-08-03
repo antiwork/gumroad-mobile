@@ -60,7 +60,12 @@ describe("streamAgentMessage", () => {
     });
 
     expect(onToken.mock.calls.map(([text]) => text)).toEqual(["You have ", "3 products."]);
-    expect(result).toEqual({ reply: "You have 3 products.", proposedAction: null, conversationId: "conv-1" });
+    expect(result).toEqual({
+      reply: "You have 3 products.",
+      proposedAction: null,
+      proposalMessageId: null,
+      conversationId: "conv-1",
+    });
   });
 
   it("reassembles frames split across chunks", async () => {
