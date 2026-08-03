@@ -16,7 +16,6 @@ import {
 import { useAuthedRequest } from "@/lib/authed-request";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useMutation } from "@tanstack/react-query";
-import { randomUUID } from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, type NativeScrollEvent, Platform, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -37,6 +36,19 @@ const isNearBottom = ({ contentOffset, contentSize, layoutMeasurement }: NativeS
   contentSize.height - contentOffset.y - layoutMeasurement.height <= AUTOSCROLL_BOTTOM_THRESHOLD;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The id only has to distinguish this turn from the seller's other turns, so a timestamp plus
+// randomness is enough — the server accepts any hex-and-dash string up to 64 characters.
+const TURN_ID_RANDOM_SEGMENTS = 4;
+const generateTurnId = () =>
+  [
+    Date.now().toString(16),
+    ...Array.from({ length: TURN_ID_RANDOM_SEGMENTS }, () =>
+      Math.floor(Math.random() * 0x10000)
+        .toString(16)
+        .padStart(4, "0"),
+    ),
+  ].join("-");
 
 // Ask the server what became of a turn whose stream broke, identified by the id the app generated
 // before sending. Without this, an interruption is indistinguishable from a failure, so a turn the
@@ -251,7 +263,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
 
   const sendMutation = useMutation({
     mutationFn: async (history: ChatMessage[]) => {
-      const clientTurnId = randomUUID();
+      const clientTurnId = generateTurnId();
       try {
         return await authedRequest((token) =>
           streamAgentMessage({

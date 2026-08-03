@@ -87,6 +87,7 @@ describe("AgentChat", () => {
     expect(mockStreamAgentMessage).toHaveBeenCalledWith({
       accessToken: "test-token",
       conversationId: null,
+      clientTurnId: expect.stringMatching(/^[0-9a-f-]{1,64}$/),
       handlers: { onToken: expect.any(Function), onReset: expect.any(Function) },
       messages: [
         { role: "assistant", content: GREETING },
@@ -264,7 +265,7 @@ describe("AgentChat", () => {
     await waitFor(() => expect(screen.getByText("Your discount is ready.")).toBeTruthy(), { timeout: 10000 });
     expect(screen.queryByText("Sorry, I ran into a problem. Please try again.")).toBeNull();
     expect(mockStreamAgentMessage).toHaveBeenCalledTimes(1);
-    expect(mockStreamAgentMessage.mock.calls[0][0].clientTurnId).toEqual(expect.any(String));
+    expect(mockStreamAgentMessage.mock.calls[0][0].clientTurnId).toMatch(/^[0-9a-f-]{1,64}$/);
     expect(mockFetchAgentTurnStatus.mock.calls[0][0]).toBe(mockStreamAgentMessage.mock.calls[0][0].clientTurnId);
   });
 
