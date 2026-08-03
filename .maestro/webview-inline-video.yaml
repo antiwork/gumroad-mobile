@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+---
+# Verifies a third-party video embed plays INSIDE the purchase content page on iOS,
+# rather than iOS taking it over in a fullscreen player. Guards gumroad-mobile#337.
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_buyer_do_not_edit@gumroad.com
+      PASSWORD: password
+- extendedWaitUntil:
+    visible: ".*Mobile Embed Video Course.*"
+    timeout: 30000
+- tapOn: ".*Mobile Embed Video Course.*"
+- extendedWaitUntil:
+    visible: "Lesson 1"
+    timeout: 30000
+# The inline <video> renders inside the page. If iOS hijacks playback into its own
+# fullscreen player, the native player's Done/AirPlay chrome appears over the page.
+- assertNotVisible: "Done"
+- takeScreenshot: /tmp/maestro_inline_embed
