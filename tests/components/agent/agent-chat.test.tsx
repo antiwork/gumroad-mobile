@@ -1,5 +1,6 @@
 import { AgentChat } from "@/components/agent/agent-chat";
 import { LineIcon } from "@/components/icon";
+import { AgentStreamInterruptedError } from "@/lib/agent";
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { act } from "react";
 import { FlatList, KeyboardAvoidingView, Platform } from "react-native";
@@ -19,11 +20,13 @@ jest.mock("expo/fetch", () => ({ fetch: jest.fn() }));
 const mockStreamAgentMessage = jest.fn();
 const mockExecuteAgentAction = jest.fn();
 const mockFetchLatestAgentConversation = jest.fn();
+const mockFetchAgentTurnStatus = jest.fn();
 jest.mock("@/lib/agent", () => ({
   ...jest.requireActual("@/lib/agent"),
   streamAgentMessage: (...args: unknown[]) => mockStreamAgentMessage(...args),
   executeAgentAction: (...args: unknown[]) => mockExecuteAgentAction(...args),
   fetchLatestAgentConversation: (...args: unknown[]) => mockFetchLatestAgentConversation(...args),
+  fetchAgentTurnStatus: (...args: unknown[]) => mockFetchAgentTurnStatus(...args),
 }));
 
 const GREETING = "Hi! I'm your store assistant.";
@@ -241,6 +244,66 @@ describe("AgentChat", () => {
     });
 
     await waitFor(() => expect(screen.getByText("Sorry, I ran into a problem. Please try again.")).toBeTruthy());
+  });
+
+  it("adopts a turn the server persisted after the stream broke", async () => {
+    mockStreamAgentMessage.mockRejectedValue(new AgentStreamInterruptedError());
+    mockFetchAgentTurnStatus.mockResolvedValue({
+      status: "persisted",
+      conversationId: "conv-recovered",
+      message: { role: "assistant", content: "Your discount is ready.", proposal_message_id: "msg-7" },
+    });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "Create a launch discount");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Your discount is ready.")).toBeTruthy(), { timeout: 10000 });
+    expect(screen.queryByText("Sorry, I ran into a problem. Please try again.")).toBeNull();
+    expect(mockStreamAgentMessage).toHaveBeenCalledTimes(1);
+    expect(mockStreamAgentMessage.mock.calls[0][0].clientTurnId).toEqual(expect.any(String));
+    expect(mockFetchAgentTurnStatus.mock.calls[0][0]).toBe(mockStreamAgentMessage.mock.calls[0][0].clientTurnId);
+  });
+
+  it("keeps waiting while the server reports the interrupted turn is still generating", async () => {
+    mockStreamAgentMessage.mockRejectedValue(new AgentStreamInterruptedError());
+    mockFetchAgentTurnStatus
+      .mockResolvedValueOnce({ status: "in_progress" })
+      .mockResolvedValueOnce({ status: "in_progress" })
+      .mockResolvedValue({
+        status: "persisted",
+        conversationId: "conv-recovered",
+        message: { role: "assistant", content: "Here are your sales." },
+      });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Here are your sales.")).toBeTruthy(), { timeout: 20000 });
+    expect(mockFetchAgentTurnStatus).toHaveBeenCalledTimes(3);
+  }, 30000);
+
+  it("shows the fallback message when the server says the interrupted turn never persisted", async () => {
+    mockStreamAgentMessage.mockRejectedValue(new AgentStreamInterruptedError());
+    mockFetchAgentTurnStatus.mockResolvedValue({ status: "failed" });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Sorry, I ran into a problem. Please try again.")).toBeTruthy(), {
+      timeout: 10000,
+    });
   });
 
   it("shows an error message when applying a confirmed action fails", async () => {

@@ -104,14 +104,46 @@ interface DoneEventData {
   conversation_id?: string;
 }
 
+// Thrown when the stream ends without a `done` event: the connection broke, but the server may
+// still be generating the turn and may yet persist it. The caller recovers by asking the
+// turn-status endpoint what became of this exact turn, rather than assuming the turn was lost.
+export class AgentStreamInterruptedError extends Error {
+  constructor() {
+    super("Agent stream interrupted");
+    this.name = "AgentStreamInterruptedError";
+  }
+}
+
+export type AgentTurnStatus =
+  | { status: "persisted"; conversationId: string; message: ConversationMessage }
+  | { status: "in_progress" | "failed" | "unknown" };
+
+type AgentTurnStatusResponse =
+  | { success: true; status: "persisted"; conversation_id: string; message: ConversationMessage }
+  | { success: true; status: "in_progress" | "failed" | "unknown" }
+  | { success: false; error: string };
+
+export const fetchAgentTurnStatus = async (clientTurnId: string, accessToken: string): Promise<AgentTurnStatus> => {
+  const json = await requestAPI<AgentTurnStatusResponse>(`mobile/agent/turns/${encodeURIComponent(clientTurnId)}`, {
+    method: "GET",
+    accessToken,
+  });
+  if (!json.success) throw new Error(json.error);
+  return json.status === "persisted"
+    ? { status: json.status, conversationId: json.conversation_id, message: json.message }
+    : { status: json.status };
+};
+
 export const streamAgentMessage = async ({
   messages,
   conversationId,
+  clientTurnId,
   accessToken,
   handlers = {},
 }: {
   messages: ChatMessage[];
   conversationId?: string | null;
+  clientTurnId?: string | null;
   accessToken: string;
   handlers?: AgentStreamHandlers;
 }): Promise<AgentStreamResult> => {
@@ -128,7 +160,11 @@ export const streamAgentMessage = async ({
     const response = await streamingFetch(buildApiUrl("mobile/agent/messages/stream"), {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, ...(conversationId ? { conversation_id: conversationId } : {}) }),
+      body: JSON.stringify({
+        messages,
+        ...(conversationId ? { conversation_id: conversationId } : {}),
+        ...(clientTurnId ? { client_turn_id: clientTurnId } : {}),
+      }),
       signal: controller.signal,
     });
 
@@ -209,7 +245,7 @@ export const streamAgentMessage = async ({
       }
     }
 
-    if (!done) throw new Error("Agent stream ended without a done event");
+    if (!done) throw new AgentStreamInterruptedError();
     return done;
   } finally {
     clearTimeout(timeoutId);

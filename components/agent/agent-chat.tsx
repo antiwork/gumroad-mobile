@@ -4,23 +4,78 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Text } from "@/components/ui/text";
 import {
   type ChatMessage,
+  type AgentStreamResult,
+  type AgentTurnStatus,
   type ProposedAction,
+  AgentStreamInterruptedError,
   executeAgentAction,
+  fetchAgentTurnStatus,
   fetchLatestAgentConversation,
   streamAgentMessage,
 } from "@/lib/agent";
 import { useAuthedRequest } from "@/lib/authed-request";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useMutation } from "@tanstack/react-query";
+import { randomUUID } from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, type NativeScrollEvent, Platform, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 const IOS_KEYBOARD_VERTICAL_OFFSET = 88;
 const AUTOSCROLL_BOTTOM_THRESHOLD = 24;
+// After a stream breaks, how long to keep asking the server what became of the turn. The server
+// tolerates up to 120 seconds of model silence across as many as 25 tool iterations, so recovery
+// keeps polling for as long as it reports "in_progress"; the cap only guards a marker that never
+// resolves.
+const TURN_RECOVERY_POLL_INTERVAL_MS = 3000;
+const TURN_RECOVERY_MAX_POLLS = 60;
+// "unknown" means neither a stored turn nor a liveness marker, which is normally conclusive — but a
+// Redis blip can produce one spuriously, so take a couple of confirming looks before giving up.
+const TURN_RECOVERY_MAX_CONSECUTIVE_UNKNOWNS = 2;
 
 const isNearBottom = ({ contentOffset, contentSize, layoutMeasurement }: NativeScrollEvent) =>
   contentSize.height - contentOffset.y - layoutMeasurement.height <= AUTOSCROLL_BOTTOM_THRESHOLD;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Ask the server what became of a turn whose stream broke, identified by the id the app generated
+// before sending. Without this, an interruption is indistinguishable from a failure, so a turn the
+// server went on to persist is shown as an error and re-sending it duplicates the whole exchange.
+const recoverTurn = async (
+  clientTurnId: string,
+  authedRequest: <T>(request: (token: string) => Promise<T>) => Promise<T>,
+): Promise<AgentStreamResult> => {
+  let consecutiveUnknowns = 0;
+  for (let poll = 0; poll < TURN_RECOVERY_MAX_POLLS; poll++) {
+    await sleep(TURN_RECOVERY_POLL_INTERVAL_MS);
+    let turn: AgentTurnStatus;
+    try {
+      turn = await authedRequest((token) => fetchAgentTurnStatus(clientTurnId, token));
+    } catch {
+      // The same flaky network that broke the stream may still be down, so keep asking.
+      continue;
+    }
+    switch (turn.status) {
+      case "persisted":
+        return {
+          reply: turn.message.content,
+          proposedAction: turn.message.proposed_action ?? null,
+          proposalMessageId: turn.message.proposal_message_id ?? null,
+          conversationId: turn.conversationId,
+        };
+      case "failed":
+        throw new Error("Agent turn failed");
+      case "in_progress":
+        consecutiveUnknowns = 0;
+        continue;
+      case "unknown":
+        consecutiveUnknowns += 1;
+        if (consecutiveUnknowns >= TURN_RECOVERY_MAX_CONSECUTIVE_UNKNOWNS) throw new Error("Agent turn was lost");
+        continue;
+    }
+  }
+  throw new Error("Agent turn recovery timed out");
+};
 
 interface DisplayMessage extends ChatMessage {
   proposedAction?: ProposedAction;
@@ -195,18 +250,26 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   }, []);
 
   const sendMutation = useMutation({
-    mutationFn: (history: ChatMessage[]) =>
-      authedRequest((token) =>
-        streamAgentMessage({
-          messages: history,
-          conversationId: conversationIdRef.current,
-          accessToken: token,
-          handlers: {
-            onToken: (text) => setStreamingReply((prev) => (prev ?? "") + text),
-            onReset: () => setStreamingReply(null),
-          },
-        }),
-      ),
+    mutationFn: async (history: ChatMessage[]) => {
+      const clientTurnId = randomUUID();
+      try {
+        return await authedRequest((token) =>
+          streamAgentMessage({
+            messages: history,
+            conversationId: conversationIdRef.current,
+            clientTurnId,
+            accessToken: token,
+            handlers: {
+              onToken: (text) => setStreamingReply((prev) => (prev ?? "") + text),
+              onReset: () => setStreamingReply(null),
+            },
+          }),
+        );
+      } catch (error) {
+        if (!(error instanceof AgentStreamInterruptedError)) throw error;
+        return await recoverTurn(clientTurnId, authedRequest);
+      }
+    },
     onSuccess: ({ reply, proposedAction, proposalMessageId, conversationId }) => {
       conversationIdRef.current = conversationId;
       setMessages((prev) => [

@@ -6,7 +6,7 @@ jest.mock("@/lib/env", () => ({
 const mockFetch = jest.fn();
 jest.mock("expo/fetch", () => ({ fetch: (...args: unknown[]) => mockFetch(...args) }));
 
-import { streamAgentMessage } from "@/lib/agent";
+import { AgentStreamInterruptedError, fetchAgentTurnStatus, streamAgentMessage } from "@/lib/agent";
 import { UnauthorizedError } from "@/lib/request";
 
 const encoder = new TextEncoder();
@@ -147,11 +147,92 @@ describe("streamAgentMessage", () => {
     ).rejects.toThrow("Agent stream request failed");
   });
 
-  it("throws when the stream ends without a done event", async () => {
+  it("throws AgentStreamInterruptedError when the stream ends without a done event", async () => {
     mockFetch.mockResolvedValue(streamResponse(['event: token\ndata: {"text":"Half a re']));
 
     await expect(
       streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" }),
-    ).rejects.toThrow("Agent stream ended without a done event");
+    ).rejects.toThrow(AgentStreamInterruptedError);
+  });
+
+  it("sends the client turn id so a broken stream can be recovered by exact identity", async () => {
+    mockFetch.mockResolvedValue(
+      streamResponse(['event: done\ndata: {"reply":"Hi","proposed_action":null,"conversation_id":"conv-1"}\n\n']),
+    );
+
+    await streamAgentMessage({
+      messages: [{ role: "user", content: "Hi" }],
+      clientTurnId: "turn-abc",
+      accessToken: "token",
+    });
+
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toMatchObject({ client_turn_id: "turn-abc" });
+  });
+
+  it("omits the client turn id when none is given", async () => {
+    mockFetch.mockResolvedValue(
+      streamResponse(['event: done\ndata: {"reply":"Hi","proposed_action":null,"conversation_id":"conv-1"}\n\n']),
+    );
+
+    await streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" });
+
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).not.toHaveProperty("client_turn_id");
+  });
+});
+
+describe("fetchAgentTurnStatus", () => {
+  const mockGlobalFetch = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = mockGlobalFetch as unknown as typeof global.fetch;
+  });
+
+  const jsonResponse = (payload: unknown) => ({
+    ok: true,
+    status: 200,
+    url: "https://api.example.com/mobile/agent/turns/turn-abc",
+    headers: { get: () => "application/json" },
+    json: () => Promise.resolve(payload),
+  });
+
+  it("returns the stored turn when the server persisted it", async () => {
+    mockGlobalFetch.mockResolvedValue(
+      jsonResponse({
+        success: true,
+        status: "persisted",
+        conversation_id: "conv-9",
+        message: {
+          role: "assistant",
+          content: "Your product is ready to publish.",
+          proposed_action: { type: "api_write", params: { name: "Guide" }, summary: "Create Guide" },
+          proposal_message_id: "msg-7",
+        },
+      }),
+    );
+
+    await expect(fetchAgentTurnStatus("turn-abc", "token")).resolves.toEqual({
+      status: "persisted",
+      conversationId: "conv-9",
+      message: {
+        role: "assistant",
+        content: "Your product is ready to publish.",
+        proposed_action: { type: "api_write", params: { name: "Guide" }, summary: "Create Guide" },
+        proposal_message_id: "msg-7",
+      },
+    });
+    expect(mockGlobalFetch.mock.calls[0][0]).toContain("mobile/agent/turns/turn-abc");
+  });
+
+  it("reports a turn the server is still generating", async () => {
+    mockGlobalFetch.mockResolvedValue(jsonResponse({ success: true, status: "in_progress" }));
+
+    await expect(fetchAgentTurnStatus("turn-abc", "token")).resolves.toEqual({ status: "in_progress" });
+  });
+
+  it("throws the server's error when the turn id is rejected", async () => {
+    mockGlobalFetch.mockResolvedValue(jsonResponse({ success: false, error: "Invalid turn id." }));
+
+    await expect(fetchAgentTurnStatus("bad id", "token")).rejects.toThrow("Invalid turn id.");
   });
 });
