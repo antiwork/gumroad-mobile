@@ -130,11 +130,12 @@ describe("DownloadScreen", () => {
     expect(mockSafeOpenURL).toHaveBeenCalledWith("intent://pay#Intent;scheme=upi;end");
   });
 
-  it("allows fullscreen video for content playing inline in the WebView", () => {
+  it("lets video in the purchase content play inline and go fullscreen", () => {
     render(<DownloadScreen />);
 
     expect(screen.getByTestId("purchase-webview").props.incognito).toBe(true);
     expect(screen.getByTestId("purchase-webview").props.sharedCookiesEnabled).toBeUndefined();
+    expect(screen.getByTestId("purchase-webview").props.allowsInlineMediaPlayback).toBe(true);
     expect(screen.getByTestId("purchase-webview").props.allowsFullscreenVideo).toBe(true);
   });
 

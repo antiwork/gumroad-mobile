@@ -253,6 +253,8 @@ export default function DownloadScreen() {
         pullToRefreshEnabled
         thirdPartyCookiesEnabled
         mediaPlaybackRequiresUserAction={false}
+        // On iPhone, WebKit refuses to play video inside the page unless this is on, and instead takes it over in a fullscreen player. Embedded players (like the Loom videos sellers put in course lessons) ask to stay inline and can stall when that takeover happens.
+        allowsInlineMediaPlayback
         // Android blocks the HTML5 fullscreen API in WebViews unless this is enabled, so videos playing inline (like embedded players in rich content) would have a fullscreen button that does nothing. iOS ignores this prop.
         allowsFullscreenVideo
         originWhitelist={["*"]}

@@ -282,6 +282,7 @@ export default function PostScreen() {
                 style={{ height: bodyHeight, width: width - 32, backgroundColor: "transparent" }}
                 scrollEnabled={false}
                 showsVerticalScrollIndicator={false}
+                allowsInlineMediaPlayback
                 allowsFullscreenVideo
                 onMessage={handleHeightMessage}
                 injectedJavaScript={`
