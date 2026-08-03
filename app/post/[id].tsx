@@ -214,6 +214,7 @@ export default function PostScreen() {
         productFileId: fileId,
         purchaseId: purchase.purchase_id,
         initialPosition: file?.latest_media_location?.location ?? undefined,
+        contentLength: file?.content_length,
       },
     });
   };

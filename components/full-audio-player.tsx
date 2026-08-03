@@ -2,6 +2,7 @@ import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
 import { safeOpenURL } from "@/lib/open-url";
+import { formatTime } from "@/lib/format-time";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -36,14 +37,6 @@ export const getStoredLoopEnabled = async () => {
 };
 
 const setStoredLoopEnabled = (enabled: boolean) => SecureStore.setItemAsync(LOOP_ENABLED_KEY, enabled.toString());
-
-const formatTime = (seconds: number) => {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  if (hrs > 0) return `${hrs}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-};
 
 export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
   const playbackState = usePlaybackState();
