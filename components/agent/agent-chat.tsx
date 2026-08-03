@@ -24,10 +24,12 @@ const IOS_KEYBOARD_VERTICAL_OFFSET = 88;
 const AUTOSCROLL_BOTTOM_THRESHOLD = 24;
 // After a stream breaks, how long to keep asking the server what became of the turn. The server
 // tolerates up to 120 seconds of model silence across as many as 25 tool iterations, so recovery
-// keeps polling for as long as it reports "in_progress"; the cap only guards a marker that never
-// resolves.
+// keeps polling for as long as it reports "in_progress"; the deadline only guards a marker that
+// never resolves. It is wall-clock rather than a poll count because a status request can itself
+// hang for the request timeout, which would stretch a counted budget by an order of magnitude
+// while the composer stays disabled.
 const TURN_RECOVERY_POLL_INTERVAL_MS = 3000;
-const TURN_RECOVERY_MAX_POLLS = 60;
+const TURN_RECOVERY_DEADLINE_MS = 180_000;
 // "unknown" means neither a stored turn nor a liveness marker, which is normally conclusive — but a
 // Redis blip can produce one spuriously, so take a couple of confirming looks before giving up.
 const TURN_RECOVERY_MAX_CONSECUTIVE_UNKNOWNS = 2;
@@ -58,7 +60,8 @@ const recoverTurn = async (
   authedRequest: <T>(request: (token: string) => Promise<T>) => Promise<T>,
 ): Promise<AgentStreamResult> => {
   let consecutiveUnknowns = 0;
-  for (let poll = 0; poll < TURN_RECOVERY_MAX_POLLS; poll++) {
+  const deadline = Date.now() + TURN_RECOVERY_DEADLINE_MS;
+  while (Date.now() < deadline) {
     await sleep(TURN_RECOVERY_POLL_INTERVAL_MS);
     let turn: AgentTurnStatus;
     try {
