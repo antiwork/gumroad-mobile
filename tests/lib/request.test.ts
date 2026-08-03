@@ -19,10 +19,16 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
+/** Minimal stand-in for Response#headers — only content-type is read by the code under test. */
+const headers = (contentType: string) => ({
+  get: (name: string) => (name.toLowerCase() === "content-type" ? contentType : null),
+});
+
 const jsonResponse = (data: unknown, status = 200) =>
   Promise.resolve({
     ok: status >= 200 && status < 300,
     status,
+    headers: headers("application/json; charset=utf-8"),
     json: () => Promise.resolve(data),
     text: () => Promise.resolve(JSON.stringify(data)),
   });
@@ -84,6 +90,7 @@ describe("request", () => {
         ok: false,
         status: 404,
         url: "https://api.example.com/login",
+        headers: headers("text/html; charset=utf-8"),
         json: () => Promise.resolve({}),
         text: () => Promise.resolve("Not Found"),
       }),
@@ -97,6 +104,7 @@ describe("request", () => {
         ok: true,
         status: 200,
         url: "https://api.example.com/login",
+        headers: headers("text/html; charset=utf-8"),
         json: () => Promise.resolve({}),
         text: () => Promise.resolve("<html>Log in</html>"),
       }),
@@ -104,12 +112,13 @@ describe("request", () => {
     await expect(request("https://api.example.com/v2/things")).rejects.toThrow(UnauthorizedError);
   });
 
-  it("does not treat a direct request to /login as unauthorized", async () => {
+  it("does not treat a direct JSON 404 from /login as unauthorized", async () => {
     mockFetch.mockReturnValueOnce(
       Promise.resolve({
         ok: false,
         status: 404,
         url: "https://api.example.com/login",
+        headers: headers("application/json; charset=utf-8"),
         json: () => Promise.resolve({}),
         text: () => Promise.resolve("Not Found"),
       }),
@@ -117,15 +126,48 @@ describe("request", () => {
     await expect(request("https://api.example.com/login")).rejects.toThrow("Request failed: 404 Not found");
   });
 
-  // Android reports the requested URL as the responseURL even after following a redirect, so a
-  // response whose final URL matches the request is the ordinary case there as well as for a
-  // genuine 404.
-  it("still throws the generic 404 error when the response was not redirected", async () => {
+  // Android reports the requested URL as the responseURL even after following a redirect, so the
+  // redirect check above can never fire there. An HTML body is what identifies the same condition
+  // without needing the final URL: the API answers a genuinely missing endpoint with JSON.
+  it("throws UnauthorizedError on an HTML 404 even when the response was not redirected", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        url: "https://api.example.com/v2/things",
+        headers: headers("text/html; charset=utf-8"),
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("<html>The page you were looking for doesn't exist.</html>"),
+      }),
+    );
+    await expect(request("https://api.example.com/v2/things")).rejects.toThrow(UnauthorizedError);
+  });
+
+  // A refresh POST arriving as a GET (the redirect downgrades the method) is answered by the web
+  // host's HTML 404, and must end the session rather than surface "404 Not found" to the screen.
+  it("throws UnauthorizedError when a token refresh POST comes back as an HTML 404", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        url: "https://example.com/oauth/token",
+        headers: headers("text/html; charset=utf-8"),
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("<html>The page you were looking for doesn't exist.</html>"),
+      }),
+    );
+    await expect(
+      request("https://example.com/oauth/token", { method: "POST", data: { grant_type: "refresh_token" } }),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("still throws the generic 404 error for a JSON 404 from the API", async () => {
     mockFetch.mockReturnValueOnce(
       Promise.resolve({
         ok: false,
         status: 404,
         url: "https://api.example.com/test",
+        headers: headers("application/json; charset=utf-8"),
         json: () => Promise.resolve({}),
         text: () => Promise.resolve("Not Found"),
       }),
@@ -139,6 +181,7 @@ describe("request", () => {
       Promise.resolve({
         ok: false,
         status: 403,
+        headers: headers("application/xml"),
         json: () => Promise.resolve({}),
         text: () => Promise.resolve(xmlBody),
       }),
@@ -202,6 +245,7 @@ describe("request", () => {
       Promise.resolve({
         ok: false,
         status: 502,
+        headers: headers("text/html; charset=utf-8"),
         json: () => Promise.resolve({}),
         text: () => Promise.resolve(cloudflareHtml),
       });
