@@ -6,13 +6,25 @@
 #
 # The harness never asserts on the id. It renders the chat component, streams a proposal, presses
 # Confirm, and reports what left the device -- so a branch that does not fix the bug shows it.
+#
+# The "before" run happens in a disposable detached worktree, never in this checkout: comparing
+# against origin/main by checking those files out here and back would clobber any uncommitted
+# edits in lib/agent.ts or components/agent-chat.tsx, permanently if the run gets interrupted
+# between the two checkouts.
 set -euo pipefail
 
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 ROOT="$PWD"
 OUT="$ROOT/qa-media/pr-mobile-proposal-message-id-walkthrough.txt"
 REL_HARNESS="tests/components/agent/proposal-id-walkthrough.test.tsx"
-HARNESS_SRC="$(mktemp -t pmid-harness)"
+HARNESS_SRC="$(mktemp -t pmid-harness.XXXXXX)"
+BEFORE_WT="$(mktemp -d -t pmid-before-worktree.XXXXXX)"
+
+cleanup() {
+  git worktree remove --force "$BEFORE_WT" 2>/dev/null || rm -rf "$BEFORE_WT"
+  rm -f "$HARNESS_SRC"
+}
+trap cleanup EXIT
 
 cat > "$HARNESS_SRC" <<'HARNESS_EOF'
 import { AgentChat } from "@/components/agent/agent-chat";
@@ -86,8 +98,9 @@ it("walkthrough: what the app posts to /mobile/agent/actions on confirm", async 
 });
 HARNESS_EOF
 
-report() {
-  npx jest --forceExit --silent=false "$REL_HARNESS" 2>&1 |
+# $1 = directory to run the harness in.
+report_in() {
+  (cd "$1" && npx jest --forceExit --silent=false "$REL_HARNESS" 2>&1) |
     grep -E "^ +(server sent|POST body|server confirm|same intent)" |
     sed -E 's/^ +/  /' || echo "  (harness did not report)"
 }
@@ -102,23 +115,27 @@ report() {
   echo
 } > "$OUT"
 
-# Before: restore just the two changed source files to their origin/main state, leaving the
-# harness in place. Nothing else about the checkout differs between the two runs.
-cp "$HARNESS_SRC" "$ROOT/$REL_HARNESS"
-git checkout origin/main -- lib/agent.ts components/agent/agent-chat.tsx
+# Before: a disposable detached worktree checked out at origin/main, with node_modules borrowed
+# via symlink so npx jest doesn't need its own install. This checkout is never touched.
+git worktree add --detach --quiet "$BEFORE_WT" origin/main
+ln -s "$ROOT/node_modules" "$BEFORE_WT/node_modules"
+mkdir -p "$BEFORE_WT/$(dirname "$REL_HARNESS")"
+cp "$HARNESS_SRC" "$BEFORE_WT/$REL_HARNESS"
 {
   echo "=== origin/main (before) ==="
-  report
+  report_in "$BEFORE_WT"
   echo
 } >> "$OUT"
-git checkout HEAD -- lib/agent.ts components/agent/agent-chat.tsx
 
-# After: this branch's code, same harness.
+# After: this branch's own code, same harness, run in place -- nothing here is checked out
+# over or restored, so an interrupted run leaves this checkout exactly as the caller had it.
+mkdir -p "$ROOT/$(dirname "$REL_HARNESS")"
+cp "$HARNESS_SRC" "$ROOT/$REL_HARNESS"
 {
   echo "=== $BRANCH (after) ==="
-  report
+  report_in "$ROOT"
   echo
 } >> "$OUT"
-rm -f "$ROOT/$REL_HARNESS" "$HARNESS_SRC"
+rm -f "$ROOT/$REL_HARNESS"
 
 cat "$OUT"

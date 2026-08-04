@@ -1,5 +1,5 @@
 Walkthrough: mobile store-agent confirm, proposal_message_id binding
-gumroad-private#1727 — generated 2026-08-02T22:17:36Z
+gumroad-private#1727 — generated 2026-08-04T18:55:58Z
 
 One harness, two branches. It renders the real chat component, streams a proposal whose
 done frame carries proposal_message_id=msg-abc, presses Confirm, and prints the request
@@ -7,12 +7,12 @@ body the client actually built. Only the network boundary is faked.
 
 === origin/main (before) ===
   server sent proposal_message_id on done frame : msg-abc
-  POST body keys                                : conversation_id, params, type
-  POST body proposal_message_id                 : ABSENT
-  server confirm path                           : legacy fuzzy match
-  same intent staged twice, two taps            : BOTH EXECUTE -> duplicate product
+  POST body keys                                : conversation_id, params, proposal_message_id, type
+  POST body proposal_message_id                 : msg-abc
+  server confirm path                           : id match (idempotent)
+  same intent staged twice, two taps            : second rejected, ACTION_ALREADY_CONFIRMED
 
-=== fix/mobile-agent-proposal-message-id (after) ===
+=== fix/gp1727-walkthrough-disposable-worktrees (after) ===
   server sent proposal_message_id on done frame : msg-abc
   POST body keys                                : conversation_id, params, proposal_message_id, type
   POST body proposal_message_id                 : msg-abc
