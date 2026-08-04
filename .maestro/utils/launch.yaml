@@ -20,6 +20,13 @@ appId: ${APP_ID}
     commands:
       - openLink:
           link: "gumroadmobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8082"
+# openLink returns before whichever system/app dialog it triggers has rendered, so every
+# `when: visible` check below it races the animation and can silently no-op. Wait for the
+# first of the known post-link states before checking any of them — this can land on the
+# iOS "Open" confirm OR skip straight to the dev-menu sheet depending on prior app state.
+- extendedWaitUntil:
+    visible: "Open|Never for This Website|Not Now|Cancel|Continue|Toggle performance monitor|Sign in with Gumroad|.*Library.*|Logout"
+    timeout: 15000
 # Disable password saving for the disposable localhost test account.
 - runFlow:
     when:
@@ -52,6 +59,11 @@ appId: ${APP_ID}
     commands:
       - waitForAnimationToEnd:
           timeout: 10000
+# The dev-menu ("Continue"/"Toggle performance monitor") sheet, when it appears, renders
+# asynchronously after the app boots — same openLink race as above, one layer deeper.
+- extendedWaitUntil:
+    visible: "Continue|Toggle performance monitor|Don.t allow|Sign in with Gumroad|.*Library.*|Logout"
+    timeout: 15000
 # Skip past the development-menu prompt when it appears.
 - runFlow:
     when:
