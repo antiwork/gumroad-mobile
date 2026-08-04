@@ -17,8 +17,8 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 ROOT="$PWD"
 OUT="$ROOT/qa-media/pr-mobile-proposal-message-id-walkthrough.txt"
 REL_HARNESS="tests/components/agent/proposal-id-walkthrough.test.tsx"
-HARNESS_SRC="$(mktemp -t pmid-harness)"
-BEFORE_WT="$(mktemp -d -t pmid-before-worktree)"
+HARNESS_SRC="$(mktemp -t pmid-harness.XXXXXX)"
+BEFORE_WT="$(mktemp -d -t pmid-before-worktree.XXXXXX)"
 
 cleanup() {
   git worktree remove --force "$BEFORE_WT" 2>/dev/null || rm -rf "$BEFORE_WT"
