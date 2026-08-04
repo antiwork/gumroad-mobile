@@ -5,8 +5,11 @@ import { Text } from "@/components/ui/text";
 import {
   type ChatMessage,
   type ProposedAction,
+  AgentStreamInterruptedError,
   executeAgentAction,
+  fetchAgentTurnStatus,
   fetchLatestAgentConversation,
+  recoverAgentTurn,
   streamAgentMessage,
 } from "@/lib/agent";
 import { useAuthedRequest } from "@/lib/authed-request";
@@ -21,6 +24,19 @@ const AUTOSCROLL_BOTTOM_THRESHOLD = 24;
 
 const isNearBottom = ({ contentOffset, contentSize, layoutMeasurement }: NativeScrollEvent) =>
   contentSize.height - contentOffset.y - layoutMeasurement.height <= AUTOSCROLL_BOTTOM_THRESHOLD;
+
+// The id only has to distinguish this turn from the seller's other turns, so a timestamp plus
+// randomness is enough — the server accepts any hex-and-dash string up to 64 characters.
+const TURN_ID_RANDOM_SEGMENTS = 4;
+const generateTurnId = () =>
+  [
+    Date.now().toString(16),
+    ...Array.from({ length: TURN_ID_RANDOM_SEGMENTS }, () =>
+      Math.floor(Math.random() * 0x10000)
+        .toString(16)
+        .padStart(4, "0"),
+    ),
+  ].join("-");
 
 interface DisplayMessage extends ChatMessage {
   proposedAction?: ProposedAction;
@@ -147,6 +163,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
   const [hasContentGrownSinceReaderScroll, setHasContentGrownSinceReaderScroll] = useState(false);
   const conversationIdRef = useRef<string | null>(null);
   const hasSentMessageRef = useRef(false);
+  const turnControllerRef = useRef<AbortController | null>(null);
   const mutedColor = useCSSVariable("--color-muted") as string;
   const listRef = useRef<FlatList<DisplayMessage>>(null);
   const isAtBottomRef = useRef(true);
@@ -190,23 +207,44 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
       .catch(() => {});
     return () => {
       cancelled = true;
+      turnControllerRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resume runs once, on mount
   }, []);
 
   const sendMutation = useMutation({
-    mutationFn: (history: ChatMessage[]) =>
-      authedRequest((token) =>
-        streamAgentMessage({
-          messages: history,
-          conversationId: conversationIdRef.current,
-          accessToken: token,
-          handlers: {
-            onToken: (text) => setStreamingReply((prev) => (prev ?? "") + text),
-            onReset: () => setStreamingReply(null),
-          },
-        }),
-      ),
+    mutationFn: async (history: ChatMessage[]) => {
+      const clientTurnId = generateTurnId();
+      const turnController = new AbortController();
+      turnControllerRef.current = turnController;
+      try {
+        try {
+          return await authedRequest((token) =>
+            streamAgentMessage({
+              messages: history,
+              conversationId: conversationIdRef.current,
+              clientTurnId,
+              accessToken: token,
+              signal: turnController.signal,
+              handlers: {
+                onToken: (text) => setStreamingReply((prev) => (prev ?? "") + text),
+                onReset: () => setStreamingReply(null),
+              },
+            }),
+          );
+        } catch (error) {
+          if (!(error instanceof AgentStreamInterruptedError) || turnController.signal.aborted) throw error;
+          setStreamingReply(null);
+          return await recoverAgentTurn(
+            clientTurnId,
+            (turnId, signal) => authedRequest((token) => fetchAgentTurnStatus(turnId, token, signal)),
+            { interruptionPhase: error.phase, signal: turnController.signal },
+          );
+        }
+      } finally {
+        if (turnControllerRef.current === turnController) turnControllerRef.current = null;
+      }
+    },
     onSuccess: ({ reply, proposedAction, proposalMessageId, conversationId }) => {
       conversationIdRef.current = conversationId;
       setMessages((prev) => [

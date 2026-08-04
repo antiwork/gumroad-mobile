@@ -1,5 +1,6 @@
 import { AgentChat } from "@/components/agent/agent-chat";
 import { LineIcon } from "@/components/icon";
+import { AgentStreamInterruptedError } from "@/lib/agent";
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { act } from "react";
 import { FlatList, KeyboardAvoidingView, Platform } from "react-native";
@@ -19,11 +20,22 @@ jest.mock("expo/fetch", () => ({ fetch: jest.fn() }));
 const mockStreamAgentMessage = jest.fn();
 const mockExecuteAgentAction = jest.fn();
 const mockFetchLatestAgentConversation = jest.fn();
+const mockFetchAgentTurnStatus = jest.fn();
 jest.mock("@/lib/agent", () => ({
   ...jest.requireActual("@/lib/agent"),
+  recoverAgentTurn: (
+    clientTurnId: string,
+    fetchStatus: (turnId: string, signal: AbortSignal) => Promise<unknown>,
+    options: { interruptionPhase?: "request" | "stream"; signal?: AbortSignal } = {},
+  ) =>
+    jest.requireActual("@/lib/agent").recoverAgentTurn(clientTurnId, fetchStatus, {
+      ...options,
+      pollIntervalMs: 0,
+    }),
   streamAgentMessage: (...args: unknown[]) => mockStreamAgentMessage(...args),
   executeAgentAction: (...args: unknown[]) => mockExecuteAgentAction(...args),
   fetchLatestAgentConversation: (...args: unknown[]) => mockFetchLatestAgentConversation(...args),
+  fetchAgentTurnStatus: (...args: unknown[]) => mockFetchAgentTurnStatus(...args),
 }));
 
 const GREETING = "Hi! I'm your store assistant.";
@@ -84,6 +96,8 @@ describe("AgentChat", () => {
     expect(mockStreamAgentMessage).toHaveBeenCalledWith({
       accessToken: "test-token",
       conversationId: null,
+      clientTurnId: expect.stringMatching(/^[0-9a-f-]{1,64}$/),
+      signal: expect.any(AbortSignal),
       handlers: { onToken: expect.any(Function), onReset: expect.any(Function) },
       messages: [
         { role: "assistant", content: GREETING },
@@ -241,6 +255,164 @@ describe("AgentChat", () => {
     });
 
     await waitFor(() => expect(screen.getByText("Sorry, I ran into a problem. Please try again.")).toBeTruthy());
+  });
+
+  it("adopts a turn the server persisted after the stream broke", async () => {
+    mockStreamAgentMessage.mockRejectedValue(new AgentStreamInterruptedError());
+    mockFetchAgentTurnStatus.mockResolvedValue({
+      status: "persisted",
+      conversationId: "conv-recovered",
+      message: { role: "assistant", content: "Your discount is ready.", proposal_message_id: "msg-7" },
+    });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "Create a launch discount");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Your discount is ready.")).toBeTruthy(), { timeout: 10000 });
+    expect(screen.queryByText("Sorry, I ran into a problem. Please try again.")).toBeNull();
+    expect(mockStreamAgentMessage).toHaveBeenCalledTimes(1);
+    expect(mockStreamAgentMessage.mock.calls[0][0].clientTurnId).toMatch(/^[0-9a-f-]{1,64}$/);
+    expect(mockFetchAgentTurnStatus.mock.calls[0][0]).toBe(mockStreamAgentMessage.mock.calls[0][0].clientTurnId);
+  });
+
+  it("replaces a frozen partial reply with the activity indicator while recovering", async () => {
+    let resolveStatus!: (status: {
+      status: "persisted";
+      conversationId: string;
+      message: { role: "assistant"; content: string };
+    }) => void;
+    mockStreamAgentMessage.mockImplementation(({ handlers }: { handlers: { onToken: (text: string) => void } }) => {
+      handlers.onToken("A partial reply");
+      return Promise.reject(new AgentStreamInterruptedError());
+    });
+    mockFetchAgentTurnStatus.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        }),
+    );
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Working on it...")).toBeTruthy());
+    expect(screen.queryByText("A partial reply")).toBeNull();
+
+    await act(async () => {
+      resolveStatus({
+        status: "persisted",
+        conversationId: "conv-recovered",
+        message: { role: "assistant", content: "The complete reply" },
+      });
+    });
+    await waitFor(() => expect(screen.getByText("The complete reply")).toBeTruthy());
+  });
+
+  it("aborts turn recovery when the chat unmounts", async () => {
+    let requestSignal: AbortSignal | undefined;
+    mockStreamAgentMessage.mockRejectedValue(new AgentStreamInterruptedError());
+    mockFetchAgentTurnStatus.mockImplementation((_turnId: string, _token: string, signal: AbortSignal) => {
+      requestSignal = signal;
+      return new Promise<never>((_, reject) => {
+        signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+
+    const { unmount } = renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(mockFetchAgentTurnStatus).toHaveBeenCalledTimes(1));
+
+    unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
+    expect(mockFetchAgentTurnStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start recovery when the chat unmounts before its stream breaks", async () => {
+    let streamSignal: AbortSignal | undefined;
+    mockStreamAgentMessage.mockImplementation(({ signal }: { signal: AbortSignal }) => {
+      streamSignal = signal;
+      return new Promise<never>((_, reject) => {
+        signal.addEventListener("abort", () => reject(new AgentStreamInterruptedError()), { once: true });
+      });
+    });
+
+    const { unmount } = renderChat();
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+    await waitFor(() => expect(mockStreamAgentMessage).toHaveBeenCalledTimes(1));
+
+    unmount();
+    await act(async () => {});
+
+    expect(streamSignal?.aborted).toBe(true);
+    expect(mockFetchAgentTurnStatus).not.toHaveBeenCalled();
+  });
+
+  it("fails promptly when the request and recovery checks both find the device offline", async () => {
+    mockStreamAgentMessage.mockRejectedValue(new AgentStreamInterruptedError({ phase: "request" }));
+    mockFetchAgentTurnStatus.mockRejectedValue(new TypeError("Network request failed"));
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Sorry, I ran into a problem. Please try again.")).toBeTruthy());
+    expect(mockFetchAgentTurnStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps waiting while the server reports the interrupted turn is still generating", async () => {
+    mockStreamAgentMessage.mockRejectedValue(new AgentStreamInterruptedError());
+    mockFetchAgentTurnStatus
+      .mockResolvedValueOnce({ status: "in_progress" })
+      .mockResolvedValueOnce({ status: "in_progress" })
+      .mockResolvedValue({
+        status: "persisted",
+        conversationId: "conv-recovered",
+        message: { role: "assistant", content: "Here are your sales." },
+      });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Here are your sales.")).toBeTruthy(), { timeout: 20000 });
+    expect(mockFetchAgentTurnStatus).toHaveBeenCalledTimes(3);
+  }, 30000);
+
+  it("shows the fallback message when the server says the interrupted turn never persisted", async () => {
+    mockStreamAgentMessage.mockRejectedValue(new AgentStreamInterruptedError());
+    mockFetchAgentTurnStatus.mockResolvedValue({ status: "failed" });
+
+    renderChat();
+
+    fireEvent.changeText(screen.getByLabelText("Message"), "How are sales?");
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Send"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Sorry, I ran into a problem. Please try again.")).toBeTruthy(), {
+      timeout: 10000,
+    });
   });
 
   it("shows an error message when applying a confirmed action fails", async () => {
