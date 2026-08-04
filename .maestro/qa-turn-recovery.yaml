@@ -1,0 +1,42 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+
+- tapOn: ".*Agent.*"
+- extendedWaitUntil:
+    visible:
+      id: "agent-message-input-ready"
+    timeout: 15000
+
+- tapOn:
+    id: "agent-message-input-ready"
+- inputText: "Say hello and count from 1 to 30, one number per short sentence."
+- extendedWaitUntil:
+    visible:
+      text: "Send"
+      enabled: true
+    timeout: 5000
+- tapOn:
+    text: "Send"
+    enabled: true
+    waitToSettleTimeoutMs: 100
+
+# The proxy cuts the client connection after 2 SSE token events, simulating a broken
+# stream mid-turn. Composer should stay disabled while the app recovers.
+- assertVisible:
+    id: "agent-message-input-sending"
+
+# Give the recovery poll loop (3s interval, up to 3min) time to adopt the persisted reply.
+- extendedWaitUntil:
+    visible:
+      id: "agent-message-input-ready"
+    timeout: 60000
+
+- assertNotVisible: "Sorry, I ran into a problem"
+- assertVisible:
+    id: "agent-assistant-message-content"
+    text: "(?s).{10,}"

@@ -32,18 +32,21 @@ appId: ${APP_ID}
       visible: Not Now
     commands:
       - tapOn: Not Now
+# Tap through the iOS confirmation shown the first time a development-client link opens.
+# Checked BEFORE the stale-OAuth "Cancel" dismissal below: the same "Open in Gumroad?" dialog
+# has both an Open and a Cancel button, and matching Cancel first would close the dialog we
+# actually want to accept.
+- runFlow:
+    when:
+      visible: Open
+    commands:
+      - tapOn: Open
 # A failed OAuth browser session can outlive the app process on iOS.
 - runFlow:
     when:
       visible: Cancel
     commands:
       - tapOn: Cancel
-# Tap through the iOS confirmation shown the first time a development-client link opens.
-- runFlow:
-    when:
-      visible: Open
-    commands:
-      - tapOn: Open
 # Retain Android development-client state to avoid replaying its first-run
 # onboarding sheet. The sign-in helper logs out any existing app session.
 - runFlow:
