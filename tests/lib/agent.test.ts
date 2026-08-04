@@ -6,8 +6,14 @@ jest.mock("@/lib/env", () => ({
 const mockFetch = jest.fn();
 jest.mock("expo/fetch", () => ({ fetch: (...args: unknown[]) => mockFetch(...args) }));
 
-import { AgentStreamInterruptedError, fetchAgentTurnStatus, streamAgentMessage } from "@/lib/agent";
-import { UnauthorizedError } from "@/lib/request";
+import {
+  AgentStreamInterruptedError,
+  AgentTurnStatusError,
+  fetchAgentTurnStatus,
+  recoverAgentTurn,
+  streamAgentMessage,
+} from "@/lib/agent";
+import { RequestError, UnauthorizedError } from "@/lib/request";
 
 const encoder = new TextEncoder();
 
@@ -17,7 +23,8 @@ const streamResponse = (
     ok = true,
     status,
     contentType = "text/event-stream",
-  }: { ok?: boolean; status?: number; contentType?: string } = {},
+    readError,
+  }: { ok?: boolean; status?: number; contentType?: string; readError?: Error } = {},
 ) => {
   let index = 0;
   const cancel = jest.fn().mockResolvedValue(undefined);
@@ -30,7 +37,9 @@ const streamResponse = (
         read: () =>
           index < frames.length
             ? Promise.resolve({ value: encoder.encode(frames[index++]), done: false })
-            : Promise.resolve({ value: undefined, done: true }),
+            : readError
+              ? Promise.reject(readError)
+              : Promise.resolve({ value: undefined, done: true }),
         cancel,
       }),
     },
@@ -155,6 +164,96 @@ describe("streamAgentMessage", () => {
     ).rejects.toThrow(AgentStreamInterruptedError);
   });
 
+  it("preserves an initial stream request error when the request has no recoverable identity", async () => {
+    mockFetch.mockRejectedValue(new Error("The network connection was lost."));
+
+    await expect(
+      streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" }),
+    ).rejects.toThrow("The network connection was lost.");
+  });
+
+  it("recovers an identified turn when the connection fails before response headers arrive", async () => {
+    const transportError = new Error("The network connection was lost.");
+    mockFetch.mockRejectedValue(transportError);
+
+    const stream = streamAgentMessage({
+      messages: [{ role: "user", content: "Hi" }],
+      clientTurnId: "turn-abc",
+      accessToken: "token",
+    });
+
+    await expect(stream).rejects.toMatchObject({
+      name: "AgentStreamInterruptedError",
+      cause: transportError,
+      phase: "request",
+    });
+  });
+
+  it("aborts the stream request when its caller leaves", async () => {
+    let requestSignal: AbortSignal | undefined;
+    mockFetch.mockImplementation((_url: string, options: { signal: AbortSignal }) => {
+      requestSignal = options.signal;
+      return new Promise<never>((_, reject) => {
+        options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), {
+          once: true,
+        });
+      });
+    });
+    const controller = new AbortController();
+    const stream = streamAgentMessage({
+      messages: [{ role: "user", content: "Hi" }],
+      clientTurnId: "turn-abc",
+      accessToken: "token",
+      signal: controller.signal,
+    });
+
+    controller.abort();
+
+    await expect(stream).rejects.toMatchObject({ name: "AbortError" });
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("preserves the reader error that interrupted an identified turn", async () => {
+    const transportError = new Error("The network connection was lost.");
+    mockFetch.mockResolvedValue(
+      streamResponse(['event: token\ndata: {"text":"Half"}\n\n'], {
+        readError: transportError,
+      }),
+    );
+
+    await expect(
+      streamAgentMessage({
+        messages: [{ role: "user", content: "Hi" }],
+        clientTurnId: "turn-abc",
+        accessToken: "token",
+      }),
+    ).rejects.toMatchObject({ name: "AgentStreamInterruptedError", cause: transportError });
+  });
+
+  it("throws AgentStreamInterruptedError when the body reader rejects mid-stream", async () => {
+    mockFetch.mockResolvedValue(
+      streamResponse(['event: token\ndata: {"text":"Half"}\n\n'], {
+        readError: new Error("The network connection was lost."),
+      }),
+    );
+
+    await expect(
+      streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" }),
+    ).rejects.toThrow(AgentStreamInterruptedError);
+  });
+
+  it("returns a completed turn without waiting for the stream to close", async () => {
+    mockFetch.mockResolvedValue(
+      streamResponse(['event: done\ndata: {"reply":"Hi","proposed_action":null,"conversation_id":"conv-1"}\n\n'], {
+        readError: new Error("The network connection was lost."),
+      }),
+    );
+
+    await expect(
+      streamAgentMessage({ messages: [{ role: "user", content: "Hi" }], accessToken: "token" }),
+    ).resolves.toMatchObject({ reply: "Hi", conversationId: "conv-1" });
+  });
+
   it("sends the client turn id so a broken stream can be recovered by exact identity", async () => {
     mockFetch.mockResolvedValue(
       streamResponse(['event: done\ndata: {"reply":"Hi","proposed_action":null,"conversation_id":"conv-1"}\n\n']),
@@ -180,12 +279,187 @@ describe("streamAgentMessage", () => {
   });
 });
 
+describe("recoverAgentTurn", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(0);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("adopts the persisted turn returned by the status endpoint", async () => {
+    const fetchStatus = jest.fn().mockResolvedValue({
+      status: "persisted",
+      conversationId: "conv-recovered",
+      message: {
+        role: "assistant",
+        content: "Recovered reply",
+        proposed_action: { type: "api_write", params: { name: "Guide" }, summary: "Create Guide" },
+        proposal_message_id: "msg-7",
+      },
+    });
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus);
+
+    await jest.advanceTimersByTimeAsync(3_000);
+
+    await expect(recovery).resolves.toEqual({
+      reply: "Recovered reply",
+      proposedAction: { type: "api_write", params: { name: "Guide" }, summary: "Create Guide" },
+      proposalMessageId: "msg-7",
+      conversationId: "conv-recovered",
+    });
+  });
+
+  it("aborts an in-flight status request at the recovery deadline", async () => {
+    let requestSignal: AbortSignal | undefined;
+    const fetchStatus = jest.fn((_turnId: string, signal: AbortSignal) => {
+      requestSignal = signal;
+      return new Promise<never>((_, reject) => {
+        signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus);
+    const rejection = expect(recovery).rejects.toThrow("Agent turn recovery timed out");
+
+    await jest.advanceTimersByTimeAsync(180_000);
+
+    await rejection;
+    expect(fetchStatus).toHaveBeenCalledTimes(1);
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("aborts an in-flight status request and stops polling when the caller leaves", async () => {
+    const controller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    const fetchStatus = jest.fn((_turnId: string, signal: AbortSignal) => {
+      requestSignal = signal;
+      return new Promise<never>((_, reject) => {
+        signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus, { signal: controller.signal });
+    const rejection = expect(recovery).rejects.toMatchObject({ name: "AbortError" });
+
+    await jest.advanceTimersByTimeAsync(3_000);
+    controller.abort();
+    await rejection;
+    await jest.advanceTimersByTimeAsync(30_000);
+
+    expect(fetchStatus).toHaveBeenCalledTimes(1);
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("does not start another status request when the poll delay reaches the deadline", async () => {
+    const fetchStatus = jest.fn(
+      () =>
+        new Promise<{ status: "in_progress" }>((resolve) => {
+          setTimeout(() => resolve({ status: "in_progress" }), 176_500);
+        }),
+    );
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus);
+    const rejection = expect(recovery).rejects.toThrow("Agent turn recovery timed out");
+
+    await jest.advanceTimersByTimeAsync(180_000);
+
+    await rejection;
+    expect(fetchStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps polling after consecutive network errors until the status endpoint recovers", async () => {
+    const fetchStatus = jest
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Network request failed"))
+      .mockRejectedValueOnce(new TypeError("Network request failed"))
+      .mockResolvedValue({
+        status: "persisted",
+        conversationId: "conv-recovered",
+        message: { role: "assistant", content: "Recovered after reconnecting" },
+      });
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus);
+
+    await jest.advanceTimersByTimeAsync(9_000);
+
+    await expect(recovery).resolves.toMatchObject({
+      reply: "Recovered after reconnecting",
+      conversationId: "conv-recovered",
+    });
+    expect(fetchStatus).toHaveBeenCalledTimes(3);
+  });
+
+  it("fails promptly when both an initial request and its status checks show the device is offline", async () => {
+    const fetchStatus = jest.fn().mockRejectedValue(new TypeError("Network request failed"));
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus, { interruptionPhase: "request" });
+    const rejection = expect(recovery).rejects.toThrow("Network request failed");
+
+    await jest.advanceTimersByTimeAsync(6_000);
+
+    await rejection;
+    expect(fetchStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it("declares a turn lost after two consecutive unknown statuses and resets that count on progress", async () => {
+    const fetchStatus = jest
+      .fn()
+      .mockResolvedValueOnce({ status: "unknown" })
+      .mockResolvedValueOnce({ status: "in_progress" })
+      .mockResolvedValue({ status: "unknown" });
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus);
+    const rejection = expect(recovery).rejects.toThrow("Agent turn was lost");
+
+    await jest.advanceTimersByTimeAsync(12_000);
+
+    await rejection;
+    expect(fetchStatus).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps checking an unknown request-phase turn because the server may not have armed its marker yet", async () => {
+    const fetchStatus = jest
+      .fn()
+      .mockResolvedValueOnce({ status: "unknown" })
+      .mockResolvedValueOnce({ status: "unknown" })
+      .mockResolvedValueOnce({ status: "unknown" })
+      .mockResolvedValue({
+        status: "persisted",
+        conversationId: "conv-recovered",
+        message: { role: "assistant", content: "Recovered slow request" },
+      });
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus, { interruptionPhase: "request" });
+
+    await jest.advanceTimersByTimeAsync(12_000);
+
+    await expect(recovery).resolves.toMatchObject({ reply: "Recovered slow request" });
+    expect(fetchStatus).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    new UnauthorizedError("Unauthorized"),
+    new RequestError(422, "Invalid turn id"),
+    new AgentTurnStatusError("Feature unavailable"),
+  ])("does not retry a non-retryable status error", async (error) => {
+    const fetchStatus = jest.fn().mockRejectedValue(error);
+    const recovery = recoverAgentTurn("turn-abc", fetchStatus);
+    const rejection = expect(recovery).rejects.toBe(error);
+
+    await jest.advanceTimersByTimeAsync(3_000);
+
+    await rejection;
+    expect(fetchStatus).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("fetchAgentTurnStatus", () => {
   const mockGlobalFetch = jest.fn();
+  const originalFetch = global.fetch;
 
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = mockGlobalFetch as unknown as typeof global.fetch;
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
   });
 
   const jsonResponse = (payload: unknown) => ({
@@ -226,13 +500,24 @@ describe("fetchAgentTurnStatus", () => {
 
   it("reports a turn the server is still generating", async () => {
     mockGlobalFetch.mockResolvedValue(jsonResponse({ success: true, status: "in_progress" }));
+    const controller = new AbortController();
 
-    await expect(fetchAgentTurnStatus("turn-abc", "token")).resolves.toEqual({ status: "in_progress" });
+    await expect(fetchAgentTurnStatus("turn-abc", "token", controller.signal)).resolves.toEqual({
+      status: "in_progress",
+    });
+    const requestSignal = mockGlobalFetch.mock.calls[0][1].signal as AbortSignal;
+    expect(requestSignal.aborted).toBe(false);
+
+    controller.abort();
+
+    expect(requestSignal.aborted).toBe(true);
   });
 
   it("throws the server's error when the turn id is rejected", async () => {
     mockGlobalFetch.mockResolvedValue(jsonResponse({ success: false, error: "Invalid turn id." }));
 
-    await expect(fetchAgentTurnStatus("bad id", "token")).rejects.toThrow("Invalid turn id.");
+    await expect(fetchAgentTurnStatus("bad id", "token")).rejects.toEqual(
+      expect.objectContaining({ name: "AgentTurnStatusError", message: "Invalid turn id." }),
+    );
   });
 });

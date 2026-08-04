@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+tags:
+  - ios-only
+  - proxy-only
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_seller1_do_not_edit@gumroad.com
+      PASSWORD: password
+
+- tapOn: ".*Agent.*"
+- extendedWaitUntil:
+    visible:
+      id: "agent-message-input-ready"
+    timeout: 15000
+- evalScript: ${output.recoveryProduct = "RECOVERY_E2E_" + Date.now()}
+- tapOn:
+    id: "agent-message-input-ready"
+- inputText: ${"Create a product proposal named " + output.recoveryProduct + " priced at 1 dollar. Do not ask follow-up questions."}
+- tapOn:
+    text: "Send"
+    enabled: true
+    waitToSettleTimeoutMs: 100
+- extendedWaitUntil:
+    visible:
+      id: "agent-message-input-sending"
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "agent-message-input-ready"
+    timeout: 240000
+- assertNotVisible: "Sorry, I ran into a problem. Please try again."
+- assertVisible: ".*${output.recoveryProduct}.*"
+- assertVisible: "Confirm"
