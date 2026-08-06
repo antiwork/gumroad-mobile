@@ -290,7 +290,9 @@ export default function VideoPlayerScreen() {
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
     player.allowsExternalPlayback = true;
-    player.staysActiveInBackground = false;
+    // The media3 background session caused an Android-only ANR (see the AppState pause
+    // effect below), so only iOS gets podcast-style playback with the screen locked/backgrounded.
+    player.staysActiveInBackground = Platform.OS === "ios";
     player.timeUpdateEventInterval = 0.25;
     const pendingResume = pendingSourceResumeRef.current;
     pendingSourceResumeRef.current = null;
@@ -311,6 +313,11 @@ export default function VideoPlayerScreen() {
   const positionBeforeBackgroundRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // iOS gets staysActiveInBackground = true above, so it keeps playing on lock/background
+    // (podcast-style) without this pause/resume dance. Android still forces a pause here because
+    // media3's background session ANRs (see PR #215) — expo-video has not shipped a fix.
+    if (Platform.OS !== "android") return;
+
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       withReleasedPlayerGuard(() => {
         if (nextState === "background" || nextState === "inactive") {
