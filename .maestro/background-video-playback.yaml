@@ -1,0 +1,45 @@
+appId: ${APP_ID}
+---
+# iOS-only: PR #345 restored background/lock-screen playback on iOS after PR #215's
+# blanket AppState pause (added for an Android-only media3 ANR) had killed it there too.
+# Android intentionally still pauses on background, so this flow only runs on iOS.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - runFlow:
+          file: utils/sign-in.yaml
+          env:
+            EMAIL: mobile_buyer_do_not_edit@gumroad.com
+            PASSWORD: password
+      - tapOn: ".*Mobile Test Product 1.*"
+      - extendedWaitUntil:
+          visible: Mobile Test Video
+          timeout: 30000
+      - tapOn: "Watch|Watch again"
+      - extendedWaitUntil:
+          visible:
+            id: video-player
+          timeout: 20000
+      - assertNotVisible: This video failed to load
+      # Get past the earliest few seconds so the later "played through background" check
+      # can't be satisfied by a video that was already this far along before backgrounding.
+      - extendedWaitUntil:
+          visible: "Video playback started, 0:0[2-4] of 0:10"
+          timeout: 20000
+      # Background the app without stopping the process — pressKey: Home leaves audio
+      # session playback running, which is exactly the behavior this PR restored.
+      - pressKey: Home
+      - extendedWaitUntil:
+          visible: "Video playback started, 0:0[2-4] of 0:10"
+          timeout: 20000
+          notVisible: true
+      - launchApp:
+          stopApp: false
+      # If background playback had silently paused (the pre-#345 regression), the timer
+      # would still read the position from just before backgrounding. Assert it has moved
+      # forward instead of just being present, so a paused-but-rendered UI can't pass.
+      - extendedWaitUntil:
+          visible: "Video playback started, 0:0[5-9] of 0:10"
+          timeout: 20000
+      - assertNotVisible: This video failed to load
