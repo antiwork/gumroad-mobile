@@ -23,6 +23,7 @@ BEFORE_WT="$(mktemp -d -t pmid-before-worktree.XXXXXX)"
 cleanup() {
   git worktree remove --force "$BEFORE_WT" 2>/dev/null || rm -rf "$BEFORE_WT"
   rm -f "$HARNESS_SRC"
+  rm -f "$ROOT/$REL_HARNESS"
 }
 trap cleanup EXIT
 
