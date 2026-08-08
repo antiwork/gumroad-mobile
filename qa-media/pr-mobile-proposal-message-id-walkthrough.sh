@@ -20,9 +20,17 @@ REL_HARNESS="tests/components/agent/proposal-id-walkthrough.test.tsx"
 HARNESS_SRC="$(mktemp -t pmid-harness.XXXXXX)"
 BEFORE_WT="$(mktemp -d -t pmid-before-worktree.XXXXXX)"
 
+HARNESS_INSTALLED=0
+
 cleanup() {
   git worktree remove --force "$BEFORE_WT" 2>/dev/null || rm -rf "$BEFORE_WT"
   rm -f "$HARNESS_SRC"
+  # Only remove the caller-checkout copy if THIS run actually wrote it. Removing
+  # it unconditionally deletes a pre-existing, untracked file the caller owns
+  # when the script exits before it ever copies its own harness in.
+  if [ "$HARNESS_INSTALLED" = 1 ]; then
+    rm -f "$ROOT/$REL_HARNESS"
+  fi
 }
 trap cleanup EXIT
 
@@ -131,6 +139,7 @@ cp "$HARNESS_SRC" "$BEFORE_WT/$REL_HARNESS"
 # over or restored, so an interrupted run leaves this checkout exactly as the caller had it.
 mkdir -p "$ROOT/$(dirname "$REL_HARNESS")"
 cp "$HARNESS_SRC" "$ROOT/$REL_HARNESS"
+HARNESS_INSTALLED=1
 {
   echo "=== $BRANCH (after) ==="
   report_in "$ROOT"
