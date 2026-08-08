@@ -290,7 +290,7 @@ export default function VideoPlayerScreen() {
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
     player.allowsExternalPlayback = true;
-    player.staysActiveInBackground = false;
+    player.staysActiveInBackground = Platform.OS === "ios";
     player.timeUpdateEventInterval = 0.25;
     const pendingResume = pendingSourceResumeRef.current;
     pendingSourceResumeRef.current = null;
@@ -311,6 +311,10 @@ export default function VideoPlayerScreen() {
   const positionBeforeBackgroundRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // Scoped to Android: iOS already gets background playback via staysActiveInBackground
+    // above; the media3 background session ANRs on Android (see PR #215).
+    if (Platform.OS !== "android") return;
+
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       withReleasedPlayerGuard(() => {
         if (nextState === "background" || nextState === "inactive") {

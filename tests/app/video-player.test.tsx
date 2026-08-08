@@ -156,9 +156,15 @@ describe("VideoPlayerScreen", () => {
     jest.restoreAllMocks();
   });
 
-  it("sets staysActiveInBackground to false on player setup", () => {
-    renderScreen();
-    expect(mockPlayer.staysActiveInBackground).toBe(false);
+  it("sets staysActiveInBackground to false on player setup on Android", () => {
+    const originalPlatform = Platform.OS;
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "android" });
+    try {
+      renderScreen();
+      expect(mockPlayer.staysActiveInBackground).toBe(false);
+    } finally {
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform });
+    }
   });
 
   it("exposes when playback advances", () => {
@@ -422,46 +428,139 @@ describe("VideoPlayerScreen", () => {
     });
   });
 
-  it("pauses the player when app goes to background", () => {
-    renderScreen();
+  // Backgrounding video is Android-only (see the platform split in app/video-player.tsx): iOS
+  // sets staysActiveInBackground = true and keeps playing, so it needs no pause/resume handling.
+  describe("app backgrounding (Android)", () => {
+    let originalPlatform: string;
 
-    act(() => {
-      appStateCallback!("background");
+    beforeEach(() => {
+      originalPlatform = Platform.OS;
+      Object.defineProperty(Platform, "OS", { configurable: true, value: "android" });
     });
 
-    expect(mockPlayer.pause).toHaveBeenCalled();
-  });
-
-  it("resumes the player when app returns to active if it was playing", () => {
-    renderScreen();
-    mockPlayer.playing = true;
-
-    act(() => {
-      appStateCallback!("background");
+    afterEach(() => {
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform });
     });
 
-    act(() => {
-      appStateCallback!("active");
+    it("pauses the player when app goes to background", () => {
+      renderScreen();
+
+      act(() => {
+        appStateCallback!("background");
+      });
+
+      expect(mockPlayer.pause).toHaveBeenCalled();
     });
 
-    expect(mockPlayer.play).toHaveBeenCalled();
-  });
+    it("resumes the player when app returns to active if it was playing", () => {
+      renderScreen();
+      mockPlayer.playing = true;
 
-  it("does not resume the player when app returns to active if it was not playing", () => {
-    renderScreen();
-    mockPlayer.playing = false;
+      act(() => {
+        appStateCallback!("background");
+      });
 
-    act(() => {
-      appStateCallback!("background");
+      act(() => {
+        appStateCallback!("active");
+      });
+
+      expect(mockPlayer.play).toHaveBeenCalled();
     });
 
-    mockPlayer.play.mockClear();
+    it("does not resume the player when app returns to active if it was not playing", () => {
+      renderScreen();
+      mockPlayer.playing = false;
 
-    act(() => {
-      appStateCallback!("active");
+      act(() => {
+        appStateCallback!("background");
+      });
+
+      mockPlayer.play.mockClear();
+
+      act(() => {
+        appStateCallback!("active");
+      });
+
+      expect(mockPlayer.play).not.toHaveBeenCalled();
     });
 
-    expect(mockPlayer.play).not.toHaveBeenCalled();
+    it("does not crash on background when the player has already been released", () => {
+      renderScreen();
+      mockPlayer.pause.mockImplementation(() => {
+        throw Object.assign(new Error("Cannot use shared object that was already released"), {
+          code: "ERR_USING_RELEASED_SHARED_OBJECT",
+        });
+      });
+
+      expect(() => act(() => appStateCallback!("background"))).not.toThrow();
+    });
+
+    it("does not crash on background when the player call fails with the iOS not-found exception", () => {
+      renderScreen();
+      mockPlayer.pause.mockImplementation(() => {
+        throw Object.assign(
+          new Error(
+            "Calling the 'pause' function has failed\n→ Caused by: Unable to find the native shared object associated with given JavaScript object",
+          ),
+          { code: "ERR_FUNCTION_CALL" },
+        );
+      });
+
+      expect(() => act(() => appStateCallback!("background"))).not.toThrow();
+    });
+
+    it("restores the playback position when returning from background", () => {
+      renderScreen();
+      mockPlayer.currentTime = 120;
+      mockPlayer.playing = true;
+
+      act(() => {
+        appStateCallback!("background");
+      });
+
+      mockPlayer.currentTime = 0;
+
+      act(() => {
+        appStateCallback!("active");
+      });
+
+      expect(mockPlayer.currentTime).toBe(120);
+    });
+
+    it("does not seek when the player has retained its position after returning from background", () => {
+      renderScreen();
+      mockPlayer.currentTime = 120;
+      mockPlayer.playing = true;
+
+      act(() => {
+        appStateCallback!("background");
+      });
+
+      mockPlayer.currentTime = 119.5;
+
+      act(() => {
+        appStateCallback!("active");
+      });
+
+      expect(mockPlayer.currentTime).toBe(119.5);
+    });
+
+    it("does not register an AppState listener on iOS, where the player stays active", () => {
+      Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+      jest.spyOn(AppState, "addEventListener").mockClear();
+
+      renderScreen();
+
+      expect(AppState.addEventListener).not.toHaveBeenCalled();
+    });
+
+    it("sets staysActiveInBackground to true on iOS", () => {
+      Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+
+      renderScreen();
+
+      expect(mockPlayer.staysActiveInBackground).toBe(true);
+    });
   });
 
   it("pauses the player on unmount", () => {
@@ -484,17 +583,6 @@ describe("VideoPlayerScreen", () => {
     expect(() => unmount()).not.toThrow();
   });
 
-  it("does not crash on background when the player has already been released", () => {
-    renderScreen();
-    mockPlayer.pause.mockImplementation(() => {
-      throw Object.assign(new Error("Cannot use shared object that was already released"), {
-        code: "ERR_USING_RELEASED_SHARED_OBJECT",
-      });
-    });
-
-    expect(() => act(() => appStateCallback!("background"))).not.toThrow();
-  });
-
   it("does not crash on unmount when the player call fails with the iOS not-found exception", () => {
     const { unmount } = renderScreen();
     mockPlayer.pause.mockImplementation(() => {
@@ -507,56 +595,6 @@ describe("VideoPlayerScreen", () => {
     });
 
     expect(() => unmount()).not.toThrow();
-  });
-
-  it("does not crash on background when the player call fails with the iOS not-found exception", () => {
-    renderScreen();
-    mockPlayer.pause.mockImplementation(() => {
-      throw Object.assign(
-        new Error(
-          "Calling the 'pause' function has failed\n→ Caused by: Unable to find the native shared object associated with given JavaScript object",
-        ),
-        { code: "ERR_FUNCTION_CALL" },
-      );
-    });
-
-    expect(() => act(() => appStateCallback!("background"))).not.toThrow();
-  });
-
-  it("restores the playback position when returning from background", () => {
-    renderScreen();
-    mockPlayer.currentTime = 120;
-    mockPlayer.playing = true;
-
-    act(() => {
-      appStateCallback!("background");
-    });
-
-    mockPlayer.currentTime = 0;
-
-    act(() => {
-      appStateCallback!("active");
-    });
-
-    expect(mockPlayer.currentTime).toBe(120);
-  });
-
-  it("does not seek when the player has retained its position after returning from background", () => {
-    renderScreen();
-    mockPlayer.currentTime = 120;
-    mockPlayer.playing = true;
-
-    act(() => {
-      appStateCallback!("background");
-    });
-
-    mockPlayer.currentTime = 119.5;
-
-    act(() => {
-      appStateCallback!("active");
-    });
-
-    expect(mockPlayer.currentTime).toBe(119.5);
   });
 
   it("renders an error message when the player reports an error status", () => {
