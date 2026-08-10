@@ -22,30 +22,31 @@ appId: ${APP_ID}
             id: video-player
           timeout: 20000
       - assertNotVisible: This video failed to load
-      # Get past the earliest few seconds so the later "played through background" check
-      # can't be satisfied by a video that was already this far along before backgrounding.
+      # Narrow window so the margin below is computed against a known worst case,
+      # not a range that could itself eat into the post-relaunch wait budget.
       - extendedWaitUntil:
-          visible: "Video playback started, 0:0[2-4] of 0:10"
+          visible: "Video playback started, 0:0[1-2] of 0:10"
           timeout: 20000
       # Background the app without stopping the process — pressKey: Home leaves audio
       # session playback running, which is exactly the behavior this PR restored.
       - pressKey: Home
-      # Hold the background for a fixed ~5s (the tap-sleep idiom used elsewhere in this
-      # repo, e.g. audio-restart-resume.yaml) instead of just asserting the pre-background
-      # position disappeared — that only proves the app left foreground, not that playback
-      # kept running while it was gone.
+      # `tapOn` with `repeat: N` fires N taps separated by (N-1) `delay` waits — repeat: 2
+      # gives exactly ONE delay period, not repeat*delay. This hold is real ~6s (not the
+      # previous ~5s label, which the actual repeat:2/delay:2500 config only delivered ~2.5s
+      # of), matching the tap-sleep idiom in audio-restart-resume.yaml / flaky-network-recovery.yaml.
       - tapOn:
           point: "1%,1%"
           repeat: 2
-          delay: 2500
+          delay: 6000
       - launchApp:
           stopApp: false
-      # Assert the advance immediately, with a tight timeout. A player that paused on
-      # background and only resumed on reopen would still read ~0:02-0:04 here and need
-      # several more seconds of real playback to reach this range — a short timeout is
-      # what turns "resumed on reopen" and "kept playing while backgrounded" into two
-      # different, distinguishable outcomes instead of both passing this assertion.
+      # Assert the advance with a short, tight post-launch window. Worst case for a
+      # resume-on-reopen player: it paused at the top of the pre-background window (0:02)
+      # and only starts advancing again after relaunch, so in this 2s wait it can reach at
+      # most 0:04 — well short of the 0:08 (0:02 + ~6s real background) a genuinely
+      # continuous player lands at. That gap is what makes "resumed on reopen" and "kept
+      # playing while backgrounded" distinguishable instead of both passing.
       - extendedWaitUntil:
           visible: "Video playback started, 0:0[7-9] of 0:10"
-          timeout: 3000
+          timeout: 2000
       - assertNotVisible: This video failed to load
