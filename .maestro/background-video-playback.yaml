@@ -30,16 +30,22 @@ appId: ${APP_ID}
       # Background the app without stopping the process — pressKey: Home leaves audio
       # session playback running, which is exactly the behavior this PR restored.
       - pressKey: Home
-      - extendedWaitUntil:
-          visible: "Video playback started, 0:0[2-4] of 0:10"
-          timeout: 20000
-          notVisible: true
+      # Hold the background for a fixed ~5s (the tap-sleep idiom used elsewhere in this
+      # repo, e.g. audio-restart-resume.yaml) instead of just asserting the pre-background
+      # position disappeared — that only proves the app left foreground, not that playback
+      # kept running while it was gone.
+      - tapOn:
+          point: "1%,1%"
+          repeat: 2
+          delay: 2500
       - launchApp:
           stopApp: false
-      # If background playback had silently paused (the pre-#345 regression), the timer
-      # would still read the position from just before backgrounding. Assert it has moved
-      # forward instead of just being present, so a paused-but-rendered UI can't pass.
+      # Assert the advance immediately, with a tight timeout. A player that paused on
+      # background and only resumed on reopen would still read ~0:02-0:04 here and need
+      # several more seconds of real playback to reach this range — a short timeout is
+      # what turns "resumed on reopen" and "kept playing while backgrounded" into two
+      # different, distinguishable outcomes instead of both passing this assertion.
       - extendedWaitUntil:
-          visible: "Video playback started, 0:0[5-9] of 0:10"
-          timeout: 20000
+          visible: "Video playback started, 0:0[7-9] of 0:10"
+          timeout: 3000
       - assertNotVisible: This video failed to load
