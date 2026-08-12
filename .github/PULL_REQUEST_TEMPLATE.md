@@ -29,6 +29,7 @@ Issue: #
 - [ ] I have watched [Gumroad PR review livestreams](https://www.youtube.com/@anti-work)
 - [ ] I have performed a self-review and left review comments on my PR
 - [ ] I have added/updated tests for my changes
+- [ ] QA — I have exercised this change (click-path, console transcript, or API call) and confirmed the described behavior
 
 ---
 
