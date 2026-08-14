@@ -35,6 +35,7 @@ interface AuthContextType {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<string>;
+  refreshCreatorStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -237,6 +238,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return inflightRefresh.current;
   }, [storeTokens]);
 
+  const refreshCreatorStatus = useCallback(async () => {
+    const token = accessToken;
+    if (!token) return;
+    const creatorStatus = await fetchCreatorStatus(token);
+    setIsCreator((current) => current || creatorStatus);
+  }, [accessToken]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -247,6 +255,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         logout,
         refreshToken: refreshTokenFn,
+        refreshCreatorStatus,
       }}
     >
       {children}

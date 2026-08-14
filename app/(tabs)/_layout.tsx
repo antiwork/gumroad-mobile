@@ -104,6 +104,11 @@ const SettingsSheet = () => {
     logout();
   };
 
+  const handleCreateProduct = () => {
+    setSettingsOpen(false);
+    router.push("/create-product");
+  };
+
   const handleEditProfile = () => {
     setSettingsOpen(false);
     router.push("/settings/profile");
@@ -160,6 +165,10 @@ const SettingsSheet = () => {
               </>
             ) : null}
           </View>
+          <Button variant="outline" className="mb-2" onPress={handleCreateProduct}>
+            <Text>Create a product</Text>
+            <LineIcon name="plus-circle" size={20} className="text-foreground" />
+          </Button>
           {isCreator ? (
             <>
               <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
