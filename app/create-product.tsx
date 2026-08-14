@@ -47,7 +47,7 @@ const isProductEditUrl = (url: string) => {
 const buildCreateProductUrl = (token: string) =>
   buildAuthenticatedWebViewUrl("/products/new", token, { display: "mobile_app" });
 
-export default function CreateProductScreen() {
+const CreateProductScreen = () => {
   const webViewRef = useRef<BaseWebView>(null);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -149,8 +149,6 @@ export default function CreateProductScreen() {
         onOpenWindow={handleOpenWindow}
         onNavigationStateChange={(navState) => {
           mainUrlRef.current = navState.url;
-          // Landing on the product editor means the product row now exists, so
-          // the account's creator status flips once this screen closes.
           if (isProductEditUrl(navState.url)) hasCreatedProductRef.current = true;
         }}
         onLoad={(event) => {
@@ -172,4 +170,6 @@ export default function CreateProductScreen() {
       ) : null}
     </Screen>
   );
-}
+};
+
+export default CreateProductScreen;

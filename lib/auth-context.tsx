@@ -44,24 +44,45 @@ interface ProductsResponse {
   products: { id: string }[];
 }
 
-const fetchCreatorStatus = async (token: string): Promise<boolean> => {
+type CreatorStatusResult = { isCreator: boolean } | { error: unknown };
+
+const fetchCreatorStatusResult = async (token: string): Promise<CreatorStatusResult> => {
   try {
     const response = await request<ProductsResponse>(productsEndpoint, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    return (response.products?.length ?? 0) > 0;
+    return { isCreator: (response.products?.length ?? 0) > 0 };
   } catch (e) {
-    // UnauthorizedError (401) is expected here: we updated the required token
-    // scopes, so older tokens may lack access to this endpoint. This is a
-    // normal auth-refresh path, not a bug worth reporting to Sentry.
-    if (e instanceof UnauthorizedError) {
-      console.warn(e);
-    } else {
-      console.error(e);
-      Sentry.captureException(e);
-    }
+    return { error: e };
+  }
+};
+
+const reportCreatorStatusError = (e: unknown) => {
+  // UnauthorizedError (401) is expected here: we updated the required token
+  // scopes, so older tokens may lack access to this endpoint. This is a
+  // normal auth-refresh path, not a bug worth reporting to Sentry.
+  if (e instanceof UnauthorizedError) {
+    console.warn(e);
+  } else {
+    console.error(e);
+    Sentry.captureException(e);
+  }
+};
+
+const fetchCreatorStatus = async (token: string): Promise<boolean> => {
+  const result = await fetchCreatorStatusResult(token);
+  if ("error" in result) {
+    reportCreatorStatusError(result.error);
     return false;
   }
+  return result.isCreator;
+};
+
+const retryFetchCreatorStatus = async (token: string): Promise<CreatorStatusResult> => {
+  const result = await fetchCreatorStatusResult(token);
+  if (!("error" in result) || result.error instanceof UnauthorizedError) return result;
+
+  return fetchCreatorStatusResult(token);
 };
 
 const secureStoreOptions: SecureStore.SecureStoreOptions = {
@@ -241,9 +262,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshCreatorStatus = useCallback(async () => {
     const token = accessToken;
     if (!token) return;
-    const creatorStatus = await fetchCreatorStatus(token);
-    setIsCreator((current) => current || creatorStatus);
-  }, [accessToken]);
+    let result = await retryFetchCreatorStatus(token);
+    if ("error" in result && result.error instanceof UnauthorizedError) {
+      try {
+        result = await retryFetchCreatorStatus(await refreshTokenFn());
+      } catch (refreshError) {
+        reportCreatorStatusError(refreshError);
+        return;
+      }
+    }
+    if ("error" in result) {
+      reportCreatorStatusError(result.error);
+      return;
+    }
+    setIsCreator((current) => current || result.isCreator);
+  }, [accessToken, refreshTokenFn]);
 
   return (
     <AuthContext.Provider

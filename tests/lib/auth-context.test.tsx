@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/react-native";
-import { renderHook, waitFor } from "@testing-library/react-native";
+import { act, renderHook, waitFor } from "@testing-library/react-native";
 import * as AuthSession from "expo-auth-session";
 import React from "react";
 
@@ -178,6 +178,62 @@ describe("fetchCreatorStatus Sentry reporting", () => {
     await waitFor(() => {
       expect(Sentry.captureException).toHaveBeenCalledWith(networkError);
     });
+  });
+});
+
+describe("refreshCreatorStatus", () => {
+  const storedTokens = (key: string) =>
+    key === "gumroad_access_token"
+      ? Promise.resolve("stored-access")
+      : key === "gumroad_refresh_token"
+        ? Promise.resolve("stored-refresh")
+        : Promise.resolve(null);
+
+  it("refreshes the access token before rechecking creator status after an unauthorized response", async () => {
+    const { UnauthorizedError } = jest.requireMock("@/lib/request");
+    mockGetItemAsync.mockImplementation(storedTokens);
+    mockRequest
+      .mockResolvedValueOnce({ products: [] })
+      .mockRejectedValueOnce(new UnauthorizedError("Unauthorized"))
+      .mockResolvedValueOnce({ access_token: "new-access", refresh_token: "new-refresh" })
+      .mockResolvedValueOnce({ products: [{ id: "product-id" }] });
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.refreshCreatorStatus();
+    });
+
+    expect(result.current.isCreator).toBe(true);
+    expect(mockRequest).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("/oauth/token"),
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(mockRequest).toHaveBeenNthCalledWith(
+      4,
+      expect.stringContaining("/mobile/analytics/products.json"),
+      expect.objectContaining({ headers: { Authorization: "Bearer new-access" } }),
+    );
+  });
+
+  it("retries a transient creator-status probe before leaving the user in the non-creator state", async () => {
+    mockGetItemAsync.mockImplementation(storedTokens);
+    mockRequest
+      .mockResolvedValueOnce({ products: [] })
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockResolvedValueOnce({ products: [{ id: "product-id" }] });
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.refreshCreatorStatus();
+    });
+
+    expect(result.current.isCreator).toBe(true);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });
 
