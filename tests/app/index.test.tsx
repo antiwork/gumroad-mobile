@@ -130,7 +130,7 @@ describe("Index", () => {
     expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("first launch: navigates to /(tabs)/library for creators with no sales", async () => {
+  it("first launch: navigates to /(tabs)/dashboard for accounts with no sales", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
     mockRequestAPI.mockResolvedValue({ success: true, sales_count: 0 });
     render(<Index />);
@@ -139,10 +139,10 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
   });
 
-  it("first launch: falls back to /(tabs)/analytics for creators when the sales check fails", async () => {
+  it("first launch: falls back to /(tabs)/dashboard when the sales check fails", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: true, accessToken: "t" });
     mockRequestAPI.mockRejectedValue(new Error("offline"));
     render(<Index />);
@@ -151,7 +151,7 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/analytics");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
   });
 
   it("skips the sales lookup when launched from a notification with no saved tab", async () => {
@@ -167,7 +167,7 @@ describe("Index", () => {
     });
 
     expect(mockRequestAPI).not.toHaveBeenCalled();
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/analytics");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
     expect(mockPush).toHaveBeenCalledWith("/post/fast1");
   });
 
@@ -196,7 +196,7 @@ describe("Index", () => {
     expect(mockRequestAPI).not.toHaveBeenCalled();
   });
 
-  it("navigates to /(tabs)/library for non-creators", async () => {
+  it("navigates to /(tabs)/dashboard when there is no product-count gate", async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false });
     render(<Index />);
 
@@ -204,7 +204,19 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
+  });
+
+  it("first launch: uses sales count, not product count, for the landing tab", async () => {
+    mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isCreator: false, accessToken: "t" });
+    mockRequestAPI.mockResolvedValue({ success: true, sales_count: 3 });
+    render(<Index />);
+
+    await act(async () => {
+      await flushRaf();
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/analytics");
   });
 
   it("navigates to the linked post when launched from a notification tap", async () => {
@@ -224,7 +236,7 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
     expect(mockPush).toHaveBeenCalledWith("/post/abc123?purchaseId=p1");
     expect(mockClearLastNotificationResponseAsync).toHaveBeenCalled();
     expect(mockMarkIndexInitialRoutingComplete).toHaveBeenCalledTimes(1);
@@ -264,7 +276,7 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
     expect(mockClearLastNotificationResponseAsync).not.toHaveBeenCalled();
   });
 
@@ -278,7 +290,7 @@ describe("Index", () => {
       await flushRaf();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/library");
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
     expect(mockPush).not.toHaveBeenCalled();
   });
 

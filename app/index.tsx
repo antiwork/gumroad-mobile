@@ -15,9 +15,8 @@ type TabRoute = `/(tabs)/${TabName}`;
 
 const FIRST_LAUNCH_CHECK_TIMEOUT_MS = 3_000;
 
-const resolveFirstLaunchRoute = async (isCreator: boolean, accessToken: string | null): Promise<TabRoute> => {
-  if (!isCreator) return "/(tabs)/library";
-  if (!accessToken) return "/(tabs)/analytics";
+const resolveFirstLaunchRoute = async (accessToken: string | null): Promise<TabRoute> => {
+  if (!accessToken) return "/(tabs)/dashboard";
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FIRST_LAUNCH_CHECK_TIMEOUT_MS);
   try {
@@ -25,16 +24,16 @@ const resolveFirstLaunchRoute = async (isCreator: boolean, accessToken: string |
       buildSalesAnalyticsPath("year", new Date().toISOString()),
       { accessToken, signal: controller.signal },
     );
-    return response.success && response.sales_count === 0 ? "/(tabs)/library" : "/(tabs)/analytics";
+    return response.success && response.sales_count === 0 ? "/(tabs)/dashboard" : "/(tabs)/analytics";
   } catch {
-    return "/(tabs)/analytics";
+    return "/(tabs)/dashboard";
   } finally {
     clearTimeout(timeoutId);
   }
 };
 
 export default function Index() {
-  const { isLoading, isAuthenticated, isCreator, accessToken } = useAuth();
+  const { isLoading, isAuthenticated, accessToken } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -75,9 +74,9 @@ export default function Index() {
       if (savedTab) {
         defaultRoute = `/(tabs)/${savedTab}`;
       } else if (notificationResponse) {
-        defaultRoute = isCreator ? "/(tabs)/analytics" : "/(tabs)/library";
+        defaultRoute = "/(tabs)/dashboard";
       } else {
-        defaultRoute = await resolveFirstLaunchRoute(isCreator, accessToken);
+        defaultRoute = await resolveFirstLaunchRoute(accessToken);
       }
       if (cancelled) return;
 
@@ -102,7 +101,7 @@ export default function Index() {
       cancelled = true;
       cancelAnimationFrame(id);
     };
-  }, [isLoading, isAuthenticated, isCreator, accessToken, router]);
+  }, [isLoading, isAuthenticated, accessToken, router]);
 
   return null;
 }
