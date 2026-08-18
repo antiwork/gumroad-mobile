@@ -95,13 +95,18 @@ const SettingsButton = () => {
 
 const SettingsSheet = () => {
   const { isSettingsOpen, setSettingsOpen } = useSettingsSheet();
-  const { logout, isCreator } = useAuth();
+  const { logout } = useAuth();
   const { data: user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
 
   const handleLogout = () => {
     setSettingsOpen(false);
     logout();
+  };
+
+  const handleCreateProduct = () => {
+    setSettingsOpen(false);
+    router.push("/create-product");
   };
 
   const handleEditProfile = () => {
@@ -160,18 +165,18 @@ const SettingsSheet = () => {
               </>
             ) : null}
           </View>
-          {isCreator ? (
-            <>
-              <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
-                <Text>Edit profile</Text>
-                <LineIcon name="user-circle" size={20} className="text-foreground" />
-              </Button>
-              <Button variant="outline" className="mb-2" onPress={handlePayoutSettings}>
-                <Text>Payout settings</Text>
-                <LineIcon name="dollar-circle" size={20} className="text-foreground" />
-              </Button>
-            </>
-          ) : null}
+          <Button variant="outline" className="mb-2" onPress={handleCreateProduct}>
+            <Text>Create a product</Text>
+            <LineIcon name="plus-circle" size={20} className="text-foreground" />
+          </Button>
+          <Button variant="outline" className="mb-2" onPress={handleEditProfile}>
+            <Text>Edit profile</Text>
+            <LineIcon name="user-circle" size={20} className="text-foreground" />
+          </Button>
+          <Button variant="outline" className="mb-2" onPress={handlePayoutSettings}>
+            <Text>Payout settings</Text>
+            <LineIcon name="dollar-circle" size={20} className="text-foreground" />
+          </Button>
           <Button onPress={handleLogout}>
             <Text>Logout</Text>
             <LineIcon name="arrow-out-left-square-half" size={20} className="text-primary-foreground" />
