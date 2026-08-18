@@ -1,4 +1,4 @@
-import { assertDefined } from "@/lib/assert";
+import { useAuthedRequest } from "@/lib/authed-request";
 import { useAuth } from "@/lib/auth-context";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -38,13 +38,14 @@ export const deleteProductRequest = (id: string, accessToken: string) =>
 
 export const useProducts = (enabled = true) => {
   const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
+  const authedRequest = useAuthedRequest();
 
   const query = useInfiniteQuery<ProductsResponse, Error>({
     queryKey: PRODUCTS_QUERY_KEY,
     queryFn: ({ pageParam }) =>
-      requestAPI<ProductsResponse>(buildProductsPath(pageParam as number), {
-        accessToken: assertDefined(accessToken),
-      }),
+      authedRequest((token) =>
+        requestAPI<ProductsResponse>(buildProductsPath(pageParam as number), { accessToken: token }),
+      ),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.pagination.next ?? undefined,
     enabled: !!accessToken && enabled,
@@ -62,11 +63,11 @@ export const useProducts = (enabled = true) => {
 };
 
 export const useDeleteProduct = () => {
-  const { accessToken } = useAuth();
+  const authedRequest = useAuthedRequest();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteProductRequest(id, assertDefined(accessToken)),
+    mutationFn: (id: string) => authedRequest((token) => deleteProductRequest(id, token)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY }),
   });
 };
