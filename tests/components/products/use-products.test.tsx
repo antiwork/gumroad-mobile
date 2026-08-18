@@ -1,3 +1,4 @@
+/* eslint-disable import/first -- jest.mock must precede imports */
 import { renderHook, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode } from "react";
