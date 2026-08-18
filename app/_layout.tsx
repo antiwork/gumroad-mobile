@@ -87,6 +87,7 @@ const RootLayout = () => {
             <Stack.Screen name="settings/profile" options={{ title: "Profile" }} />
             <Stack.Screen name="settings/payments" options={{ title: "Payouts" }} />
             <Stack.Screen name="create-product" options={{ title: "Create product" }} />
+            <Stack.Screen name="edit-product" options={{ title: "Edit product" }} />
             <Stack.Screen name="post/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
             <Stack.Screen name="+not-found" options={{ title: "Not Found" }} />

@@ -211,6 +211,22 @@ const LibraryHeaderRight = () => (
   </View>
 );
 
+const ProductsHeaderRight = () => {
+  const router = useRouter();
+  return (
+    <View className="mr-3 flex-row items-center gap-4">
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="New product"
+        onPress={() => router.push("/create-product")}
+      >
+        <Text className="font-sans text-white">New</Text>
+      </TouchableOpacity>
+      <SettingsButton />
+    </View>
+  );
+};
+
 export default function TabsLayout() {
   const [isSearchActive, setSearchActive] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
@@ -254,6 +270,15 @@ export default function TabsLayout() {
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={color} />,
+            }}
+          />
+          <Tabs.Screen
+            name="products"
+            options={{
+              title: "Products",
+              headerLeft: () => <LogoIcon />,
+              headerRight: () => <ProductsHeaderRight />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="package" size={size} color={color} />,
             }}
           />
           <Tabs.Screen
