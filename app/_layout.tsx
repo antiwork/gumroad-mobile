@@ -1,4 +1,5 @@
 import { ForceUpdateScreen } from "@/components/force-update-screen";
+import { HeaderCloseButton } from "@/components/header-close-button";
 import { useMinimumVersion } from "@/components/use-minimum-version";
 import { PortalHost } from "@rn-primitives/portal";
 import { useNavigationContainerRef, Stack } from "expo-router";
@@ -86,8 +87,14 @@ const RootLayout = () => {
             <Stack.Screen name="sales-export" options={{ title: "Export all sales" }} />
             <Stack.Screen name="settings/profile" options={{ title: "Profile" }} />
             <Stack.Screen name="settings/payments" options={{ title: "Payouts" }} />
-            <Stack.Screen name="create-product" options={{ title: "Create product" }} />
-            <Stack.Screen name="edit-product" options={{ title: "Edit product" }} />
+            <Stack.Screen
+              name="create-product"
+              options={{ title: "Create product", headerLeft: () => <HeaderCloseButton /> }}
+            />
+            <Stack.Screen
+              name="edit-product"
+              options={{ title: "Edit product", headerLeft: () => <HeaderCloseButton /> }}
+            />
             <Stack.Screen name="post/[id]" options={{ title: "" }} />
             <Stack.Screen name="pdf-viewer" options={{ title: "PDF" }} />
             <Stack.Screen name="+not-found" options={{ title: "Not Found" }} />

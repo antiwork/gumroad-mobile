@@ -81,6 +81,7 @@ describe("Products", () => {
     mockProductsState = { ...mockProductsState, products: [] };
     render(<Products />);
 
+    expect(screen.getByText("Products you create will show up here.")).toBeTruthy();
     expect(screen.getByText("Create your first product")).toBeTruthy();
   });
 });

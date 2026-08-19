@@ -74,7 +74,7 @@ export default function Products() {
   if (products.length === 0) {
     return (
       <Screen>
-        <GettingStartedPlaceholder message="Create your first product and it will show up here." />
+        <GettingStartedPlaceholder message="Products you create will show up here." />
       </Screen>
     );
   }
