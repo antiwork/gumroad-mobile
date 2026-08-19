@@ -1,15 +1,7 @@
-import { assertDefined } from "@/lib/assert";
-
 export const env = {
-  EXPO_PUBLIC_GUMROAD_URL: assertDefined(process.env.EXPO_PUBLIC_GUMROAD_URL, "EXPO_PUBLIC_GUMROAD_URL is not set"),
-  EXPO_PUBLIC_GUMROAD_API_URL: assertDefined(
-    process.env.EXPO_PUBLIC_GUMROAD_API_URL,
-    "EXPO_PUBLIC_GUMROAD_API_URL is not set",
-  ),
-  EXPO_PUBLIC_GUMROAD_CLIENT_ID: assertDefined(
-    process.env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-    "EXPO_PUBLIC_GUMROAD_CLIENT_ID is not set",
-  ),
-  EXPO_PUBLIC_MOBILE_TOKEN: assertDefined(process.env.EXPO_PUBLIC_MOBILE_TOKEN, "EXPO_PUBLIC_MOBILE_TOKEN is not set"),
-  EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  EXPO_PUBLIC_GUMROAD_URL: "https://gumroad.com",
+  EXPO_PUBLIC_GUMROAD_API_URL: "https://api.gumroad.com",
+  EXPO_PUBLIC_GUMROAD_CLIENT_ID: "unused",
+  EXPO_PUBLIC_MOBILE_TOKEN: 'ps407sr3rno1561ro2o4n360q21248s4o24oq33770rpro59o11q9r5469ososoo',
+  EXPO_PUBLIC_SENTRY_DSN: undefined,
 };

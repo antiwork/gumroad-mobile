@@ -122,6 +122,7 @@ export const usePushNotifications = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !accessToken) return;
+    if (accessToken) return;
 
     getExpoPushToken()
       .then((token) => {

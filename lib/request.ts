@@ -136,10 +136,100 @@ const retryDelay = (ms: number, signal?: AbortSignal | null) =>
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 
+
+const emptyPagination = { count: 0, items: 24, page: 1, pages: 1, prev: null, next: null, last: 1 };
+
+const SCREENSHOT_PRODUCTS = [
+  {
+    id: "p1",
+    name: "Small Bets",
+    permalink: "small-bets",
+    price_formatted: "$149",
+    status: "published",
+    thumbnail_url: null,
+    can_edit: true,
+    can_destroy: true,
+  },
+  {
+    id: "p2",
+    name: "The Minimalist Entrepreneur",
+    permalink: "minimalist",
+    price_formatted: "$9.99",
+    status: "published",
+    thumbnail_url: null,
+    can_edit: true,
+    can_destroy: true,
+  },
+  {
+    id: "p3",
+    name: "Draft workbook",
+    permalink: "draft-workbook",
+    price_formatted: "$0+",
+    status: "unpublished",
+    thumbnail_url: null,
+    can_edit: true,
+    can_destroy: true,
+  },
+  {
+    id: "p4",
+    name: "Preorder pack",
+    permalink: "preorder-pack",
+    price_formatted: "$29",
+    status: "preorder",
+    thumbnail_url: null,
+    can_edit: true,
+    can_destroy: false,
+  },
+];
+
+const screenshotFixture = (url: string): unknown => {
+  const empty = "SCREENSHOT_EMPTY_PLACEHOLDER" === "1";
+  if (url.includes("mobile/products")) {
+    const products = empty ? [] : SCREENSHOT_PRODUCTS;
+    return {
+      success: true,
+      products,
+      pagination: { count: products.length, page: 1, pages: 1, next: null },
+    };
+  }
+  if (url.includes("mobile/purchases/search")) {
+    return { success: true, user_id: "u1", purchases: [], sellers: [], meta: { pagination: emptyPagination } };
+  }
+  if (url.includes("/v2/user") || url.includes("v2/user")) {
+    return { success: true, name: "Sahil", email: "sahil@gumroad.com", user_id: "u1", profile_picture_url: null };
+  }
+  if (url.includes("mobile/analytics/revenue_totals")) {
+    return { day: { formatted_revenue: "$0" }, week: { formatted_revenue: "$0" }, month: { formatted_revenue: "$0" }, year: { formatted_revenue: "$0" } };
+  }
+  if (url.includes("mobile/analytics/products")) {
+    return { products: [] };
+  }
+  if (url.includes("mobile/analytics/sales")) {
+    return { success: true, sales_count: empty ? 0 : 12 };
+  }
+  if (url.includes("mobile/agent/meta")) {
+    return { success: true, enabled: true, greeting: "Hi", suggestions: [] };
+  }
+  if (url.includes("mobile/agent/conversations/latest")) {
+    return { success: false };
+  }
+  if (url.includes("mobile_minimum_version")) {
+    return { minimum_version: "0.0.1" };
+  }
+  if (url.includes("mobile/devices")) {
+    return { success: true };
+  }
+  return { success: true };
+};
+
 export const request = async <T>(
   url: string,
   options?: RequestInit & { data?: any; skipResponseBody?: boolean },
 ): Promise<T> => {
+  if (typeof url === "string") {
+    const fixture = screenshotFixture(url);
+    if (fixture !== undefined) return fixture as T;
+  }
   // GET requests are safe to repeat, so give them one automatic retry before surfacing the
   // error; non-GET requests are not repeated here because they may have side effects —
   // their callers decide (react-query retries queries, mutations opt in).

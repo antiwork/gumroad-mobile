@@ -67,6 +67,17 @@ export default function Index() {
       }
       if (cancelled) return;
 
+      const screenshotRoute = "SCREENSHOT_ROUTE_VALUE" as string;
+      if (screenshotRoute !== "SCREENSHOT_ROUTE_PLACEHOLDER") {
+        if (screenshotRoute.startsWith("/edit-product")) {
+          router.replace({ pathname: "/edit-product", params: { permalink: "gywzrt", name: "iOS QA Pack" } });
+        } else {
+          router.replace(screenshotRoute as TabRoute);
+        }
+        markIndexInitialRoutingComplete();
+        return;
+      }
+
       const savedTab = await getSavedTab();
       if (cancelled) return;
 

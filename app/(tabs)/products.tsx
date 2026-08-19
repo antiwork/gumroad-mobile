@@ -25,6 +25,16 @@ export default function Products() {
     }, [refetch]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if ("SCREENSHOT_DELETE_PLACEHOLDER" !== "1") return;
+      Alert.alert("Delete product?", '"Small Bets" will be deleted. This cannot be undone.', [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive" },
+      ]);
+    }, []),
+  );
+
   const openCreate = () => router.push("/create-product");
 
   const openEdit = (product: SellerProduct) => {
@@ -74,7 +84,7 @@ export default function Products() {
   if (products.length === 0) {
     return (
       <Screen>
-        <GettingStartedPlaceholder message="Create your first product and it will show up here." />
+        <GettingStartedPlaceholder message="Products you create will show up here." />
       </Screen>
     );
   }
