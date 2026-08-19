@@ -1,0 +1,73 @@
+import { useAuthedRequest } from "@/lib/authed-request";
+import { useAuth } from "@/lib/auth-context";
+import { requestAPI } from "@/lib/request";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+
+export interface SellerProduct {
+  id: string;
+  name: string;
+  permalink: string;
+  price_formatted: string;
+  status: "published" | "unpublished" | "preorder";
+  thumbnail_url: string | null;
+  can_edit: boolean;
+  can_destroy: boolean;
+}
+
+interface ProductsResponse {
+  success: boolean;
+  products: SellerProduct[];
+  pagination: {
+    count: number;
+    page: number;
+    pages: number;
+    next: number | null;
+  };
+}
+
+export const PRODUCTS_QUERY_KEY = ["seller-products"] as const;
+
+export const buildProductsPath = (page: number) => `mobile/products.json?page=${page}`;
+
+export const deleteProductRequest = (id: string, accessToken: string) =>
+  requestAPI<{ success: boolean }>(`mobile/products/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    accessToken,
+  });
+
+export const useProducts = (enabled = true) => {
+  const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
+  const authedRequest = useAuthedRequest();
+
+  const query = useInfiniteQuery<ProductsResponse, Error>({
+    queryKey: PRODUCTS_QUERY_KEY,
+    queryFn: ({ pageParam }) =>
+      authedRequest((token) =>
+        requestAPI<ProductsResponse>(buildProductsPath(pageParam as number), { accessToken: token }),
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.pagination.next ?? undefined,
+    enabled: !!accessToken && enabled,
+    placeholderData: keepPreviousData,
+  });
+
+  const products = useMemo(() => query.data?.pages.flatMap((page) => page.products) ?? [], [query.data]);
+  const totalCount = query.data?.pages[0]?.pagination.count ?? 0;
+
+  useEffect(() => {
+    if (!isAuthLoading && !accessToken) logout();
+  }, [isAuthLoading, accessToken, logout]);
+
+  return { ...query, products, totalCount };
+};
+
+export const useDeleteProduct = () => {
+  const authedRequest = useAuthedRequest();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => authedRequest((token) => deleteProductRequest(id, token)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY }),
+  });
+};
