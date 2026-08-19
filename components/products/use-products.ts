@@ -1,6 +1,6 @@
 import { useAuthedRequest } from "@/lib/authed-request";
 import { useAuth } from "@/lib/auth-context";
-import { requestAPI, UnauthorizedError } from "@/lib/request";
+import { requestAPI } from "@/lib/request";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
@@ -56,8 +56,8 @@ export const useProducts = (enabled = true) => {
   const totalCount = query.data?.pages[0]?.pagination.count ?? 0;
 
   useEffect(() => {
-    if ((!isAuthLoading && !accessToken) || query.error instanceof UnauthorizedError) logout();
-  }, [isAuthLoading, accessToken, query.error, logout]);
+    if (!isAuthLoading && !accessToken) logout();
+  }, [isAuthLoading, accessToken, logout]);
 
   return { ...query, products, totalCount };
 };

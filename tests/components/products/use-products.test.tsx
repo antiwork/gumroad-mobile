@@ -28,10 +28,16 @@ jest.mock("@sentry/react-native", () => ({
 }));
 
 import { useDeleteProduct, useProducts } from "@/components/products/use-products";
-import { UnauthorizedError } from "@/lib/request";
+import { KeychainUnavailableError, UnauthorizedError } from "@/lib/request";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+);
+
+const noRetryWrapper = ({ children }: { children: ReactNode }) => (
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    {children}
+  </QueryClientProvider>
 );
 
 const productsPage = {
@@ -64,6 +70,16 @@ describe("useProducts", () => {
     await waitFor(() => expect(result.current.products).toHaveLength(1));
     expect(mockRefreshToken).toHaveBeenCalledTimes(1);
     expect(mockRequestAPI).toHaveBeenLastCalledWith("mobile/products.json?page=1", { accessToken: "fresh-token" });
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("keeps the session when the keychain is temporarily locked during refresh", async () => {
+    mockRequestAPI.mockRejectedValue(new UnauthorizedError("expired"));
+    mockRefreshToken.mockRejectedValue(new KeychainUnavailableError());
+
+    const { result } = renderHook(() => useProducts(), { wrapper: noRetryWrapper });
+
+    await waitFor(() => expect(result.current.error).toBeInstanceOf(UnauthorizedError));
     expect(mockLogout).not.toHaveBeenCalled();
   });
 });
