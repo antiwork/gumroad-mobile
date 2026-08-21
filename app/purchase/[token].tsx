@@ -1,6 +1,7 @@
 import { ContentPageNav, TocPage } from "@/components/content-page-nav";
 import { fetchPurchaseDetail, usePurchase } from "@/components/library/use-purchases";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
+import { PurchaseAudioFiles } from "@/components/purchase-audio-files";
 import { StyledWebView } from "@/components/styled";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
@@ -47,6 +48,29 @@ type TocDataMessage = {
   };
 };
 
+type EmbedCountMessage = {
+  type: "embedCount";
+  payload: { count: number };
+};
+
+const countFileEmbedsJs = `
+(function () {
+  function count() {
+    return document.querySelectorAll(".embed, file-embed").length;
+  }
+  function report() {
+    if (!window.ReactNativeWebView) return;
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({ type: "embedCount", payload: { count: count() } }),
+    );
+  }
+  report();
+  setTimeout(report, 800);
+  setTimeout(report, 2500);
+  true;
+})();
+`;
+
 const webViewInternalSchemes = ["about:", "data:", "blob:", "javascript:"];
 
 const isWebViewInternalUrl = (url: string) => {
@@ -59,6 +83,7 @@ export default function DownloadScreen() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [tocPages, setTocPages] = useState<TocDataMessage["payload"]["pages"]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
+  const [webViewEmbedCount, setWebViewEmbedCount] = useState<number | null>(null);
   const purchase = usePurchase(urlRedirectExternalId);
   const addRecentPurchase = useAddRecentPurchase();
   const router = useRouter();
@@ -81,6 +106,12 @@ export default function DownloadScreen() {
 
   const { pauseAudio, playAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
+  const audioFiles = purchase?.file_data?.filter((file) => file.filegroup === "audio") ?? [];
+  const showAudioFallback = webViewEmbedCount !== null && audioFiles.length > webViewEmbedCount;
+
+  useEffect(() => {
+    setWebViewEmbedCount(null);
+  }, [webViewKey]);
 
   // Download URLs embed the url_redirect token, which can go stale by the time the user taps a
   // file (for example after the app sat backgrounded). Refetching the purchase yields a current
@@ -126,11 +157,44 @@ export default function DownloadScreen() {
     webViewRef.current?.postMessage(JSON.stringify({ type: "mobileAppPageChange", payload: { pageIndex } }));
   }, []);
 
+  const playAudioFile = useCallback(
+    async (resourceId: string, resumeAt?: number) => {
+      if (resourceId === activeResourceId && isPlaying) {
+        await pauseAudio();
+        return;
+      }
+      const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
+      const allAudioTracks = allAudioFiles.map((fileData) => ({
+        uri: productFileDownloadUrl(token, fileData.id),
+        resourceId: fileData.id,
+        title: fileData.name ?? purchase?.name,
+        urlRedirectId: purchase?.url_redirect_external_id,
+        purchaseId: purchase?.purchase_id,
+        resumeAt: fileData.latest_media_location?.location,
+        contentLength: fileData.content_length,
+      }));
+      await playAudio({
+        resourceId,
+        resumeAt,
+        artist: purchase?.creator_name,
+        artistUrl: purchase?.creator_profile_url,
+        artwork: purchase?.thumbnail_url,
+        tracks: allAudioTracks,
+      });
+    },
+    [activeResourceId, isPlaying, pauseAudio, playAudio, purchase, token],
+  );
+
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
     try {
-      const message = JSON.parse(data) as ClickMessage | TocDataMessage;
+      const message = JSON.parse(data) as ClickMessage | TocDataMessage | EmbedCountMessage;
       console.info("WebView message received:", message);
+
+      if (message.type === "embedCount") {
+        setWebViewEmbedCount(message.payload.count);
+        return;
+      }
 
       if (message.type === "tocData") {
         const pages = message.payload.pages;
@@ -176,28 +240,10 @@ export default function DownloadScreen() {
         // The web row's isPlaying claim can go stale (it only receives player-info messages for
         // the current track, so a row left behind by auto-advance or track end still claims to
         // be playing). Trust the native player's state instead of the row's.
-        if (message.payload.resourceId === activeResourceId && isPlaying) {
-          await pauseAudio();
-        } else {
-          const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
-          const allAudioTracks = allAudioFiles.map((fileData) => ({
-            uri: productFileDownloadUrl(token, fileData.id),
-            resourceId: fileData.id,
-            title: fileData.name ?? purchase?.name,
-            urlRedirectId: purchase?.url_redirect_external_id,
-            purchaseId: purchase?.purchase_id,
-            resumeAt: fileData.latest_media_location?.location,
-            contentLength: fileData.content_length,
-          }));
-          await playAudio({
-            resourceId: message.payload.resourceId,
-            resumeAt: message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
-            artist: purchase?.creator_name,
-            artistUrl: purchase?.creator_profile_url,
-            artwork: purchase?.thumbnail_url,
-            tracks: allAudioTracks,
-          });
-        }
+        await playAudioFile(
+          message.payload.resourceId,
+          message.payload.resumeAt ? Number(message.payload.resumeAt) : undefined,
+        );
         return;
       }
       if (fileData?.filegroup === "video" && !message.payload.isDownload) {
@@ -261,6 +307,7 @@ export default function DownloadScreen() {
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onLoad={(event) => {
           handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
+          webViewRef.current?.injectJavaScript(countFileEmbedsJs);
         }}
         onError={() => {
           handleSessionLoadError({ token: accessToken });
@@ -275,6 +322,15 @@ export default function DownloadScreen() {
           <LoadingSpinner size="large" />
         </View>
       )}
+      {showAudioFallback ? (
+        <PurchaseAudioFiles
+          files={audioFiles}
+          onPlay={(id) => {
+            void playAudioFile(id);
+          }}
+          activeResourceId={activeResourceId}
+        />
+      ) : null}
       <View className="bg-body-bg">
         <MiniAudioPlayer />
       </View>

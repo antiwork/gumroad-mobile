@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
@@ -70,7 +70,7 @@ jest.mock("@/components/styled", () => {
   const { View } = require("react-native");
   return {
     StyledWebView: React.forwardRef(function MockWebView(props: Record<string, unknown>, ref: unknown) {
-      React.useImperativeHandle(ref, () => ({ postMessage: jest.fn() }));
+      React.useImperativeHandle(ref, () => ({ postMessage: jest.fn(), injectJavaScript: jest.fn() }));
       return React.createElement(View, { testID: "purchase-webview", ...props });
     }),
   };
@@ -260,5 +260,45 @@ describe("DownloadScreen", () => {
         expect.objectContaining({ params: expect.objectContaining({ initialPosition: "45" }) }),
       );
     });
+  });
+
+  const sendEmbedCount = async (count: number) => {
+    const onMessage = screen.getByTestId("purchase-webview").props.onMessage as (event: {
+      nativeEvent: { data: string };
+    }) => Promise<void>;
+    await act(async () => {
+      await onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "embedCount", payload: { count } }) },
+      });
+    });
+  };
+
+  it("hides the native audio list when the WebView painted every audio file", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    render(<DownloadScreen />);
+
+    await sendEmbedCount(2);
+
+    expect(screen.queryByTestId("purchase-audio-files")).toBeNull();
+  });
+
+  it("shows the native audio list when the WebView painted fewer embeds than file_data", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    render(<DownloadScreen />);
+
+    await sendEmbedCount(1);
+
+    expect(screen.getByTestId("purchase-audio-files")).toBeTruthy();
+  });
+
+  it("plays a missing audio file from the native list", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    render(<DownloadScreen />);
+
+    await sendEmbedCount(1);
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+    fireEvent.press(screen.getByTestId("purchase-audio-file-ep2"));
+
+    expect(mockPlayAudio).toHaveBeenCalledWith(expect.objectContaining({ resourceId: "ep2" }));
   });
 });
