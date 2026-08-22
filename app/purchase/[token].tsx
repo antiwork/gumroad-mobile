@@ -48,29 +48,6 @@ type TocDataMessage = {
   };
 };
 
-type EmbedCountMessage = {
-  type: "embedCount";
-  payload: { count: number };
-};
-
-const countFileEmbedsJs = `
-(function () {
-  function count() {
-    return document.querySelectorAll(".embed, file-embed").length;
-  }
-  function report() {
-    if (!window.ReactNativeWebView) return;
-    window.ReactNativeWebView.postMessage(
-      JSON.stringify({ type: "embedCount", payload: { count: count() } }),
-    );
-  }
-  report();
-  setTimeout(report, 800);
-  setTimeout(report, 2500);
-  true;
-})();
-`;
-
 const webViewInternalSchemes = ["about:", "data:", "blob:", "javascript:"];
 
 const isWebViewInternalUrl = (url: string) => {
@@ -83,7 +60,6 @@ export default function DownloadScreen() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [tocPages, setTocPages] = useState<TocDataMessage["payload"]["pages"]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
-  const [webViewEmbedCount, setWebViewEmbedCount] = useState<number | null>(null);
   const purchase = usePurchase(urlRedirectExternalId);
   const addRecentPurchase = useAddRecentPurchase();
   const router = useRouter();
@@ -107,11 +83,7 @@ export default function DownloadScreen() {
   const { pauseAudio, playAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
   const audioFiles = purchase?.file_data?.filter((file) => file.filegroup === "audio") ?? [];
-  const showAudioFallback = webViewEmbedCount !== null && audioFiles.length > webViewEmbedCount;
-
-  useEffect(() => {
-    setWebViewEmbedCount(null);
-  }, [webViewKey]);
+  const showAudioFiles = audioFiles.length > 0;
 
   // Download URLs embed the url_redirect token, which can go stale by the time the user taps a
   // file (for example after the app sat backgrounded). Refetching the purchase yields a current
@@ -188,13 +160,8 @@ export default function DownloadScreen() {
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
     try {
-      const message = JSON.parse(data) as ClickMessage | TocDataMessage | EmbedCountMessage;
+      const message = JSON.parse(data) as ClickMessage | TocDataMessage;
       console.info("WebView message received:", message);
-
-      if (message.type === "embedCount") {
-        setWebViewEmbedCount(message.payload.count);
-        return;
-      }
 
       if (message.type === "tocData") {
         const pages = message.payload.pages;
@@ -307,7 +274,6 @@ export default function DownloadScreen() {
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onLoad={(event) => {
           handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
-          webViewRef.current?.injectJavaScript(countFileEmbedsJs);
         }}
         onError={() => {
           handleSessionLoadError({ token: accessToken });
@@ -322,7 +288,7 @@ export default function DownloadScreen() {
           <LoadingSpinner size="large" />
         </View>
       )}
-      {showAudioFallback ? (
+      {showAudioFiles ? (
         <PurchaseAudioFiles
           files={audioFiles}
           onPlay={(id) => {
