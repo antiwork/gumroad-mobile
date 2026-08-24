@@ -1,4 +1,6 @@
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import * as Sentry from "@sentry/react-native";
+import { Alert as NativeAlert } from "react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
@@ -284,5 +286,19 @@ describe("DownloadScreen", () => {
     fireEvent.press(screen.getByTestId("purchase-audio-file-ep2"));
 
     expect(mockPlayAudio).toHaveBeenCalledWith(expect.objectContaining({ resourceId: "ep2" }));
+  });
+
+  it("reports native audio list playback failures", async () => {
+    const error = new Error("Could not start audio");
+    const alertSpy = jest.spyOn(NativeAlert, "alert").mockImplementation(() => {});
+    mockPlayAudio.mockRejectedValueOnce(error);
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    render(<DownloadScreen />);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+    fireEvent.press(screen.getByTestId("purchase-audio-file-ep2"));
+
+    await waitFor(() => expect(Sentry.captureException).toHaveBeenCalledWith(error));
+    expect(alertSpy).toHaveBeenCalledWith("Audio Playback Failed", "Could not start audio");
   });
 });

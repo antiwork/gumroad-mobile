@@ -157,6 +157,19 @@ export default function DownloadScreen() {
     [activeResourceId, isPlaying, pauseAudio, playAudio, purchase, token],
   );
 
+  const handleNativeAudioFilePlay = useCallback(
+    async (resourceId: string) => {
+      try {
+        await playAudioFile(resourceId);
+      } catch (error) {
+        console.error("Audio playback failed:", error);
+        Sentry.captureException(error);
+        Alert.alert("Audio Playback Failed", error instanceof Error ? error.message : "Failed to play audio file");
+      }
+    },
+    [playAudioFile],
+  );
+
   const handleMessage = async (event: WebViewMessageEvent) => {
     const data = event.nativeEvent.data;
     try {
@@ -292,7 +305,7 @@ export default function DownloadScreen() {
         <PurchaseAudioFiles
           files={audioFiles}
           onPlay={(id) => {
-            void playAudioFile(id);
+            void handleNativeAudioFilePlay(id);
           }}
           activeResourceId={activeResourceId}
         />
