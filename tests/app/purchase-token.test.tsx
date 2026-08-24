@@ -1,4 +1,6 @@
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import * as Sentry from "@sentry/react-native";
+import { Alert as NativeAlert } from "react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
@@ -260,5 +262,43 @@ describe("DownloadScreen", () => {
         expect.objectContaining({ params: expect.objectContaining({ initialPosition: "45" }) }),
       );
     });
+  });
+
+  it("shows the native audio list for every API audio file", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    render(<DownloadScreen />);
+
+    expect(screen.getByTestId("purchase-audio-files")).toBeTruthy();
+  });
+
+  it("hides the native audio list when the purchase has no audio files", async () => {
+    mockUsePurchase.mockReturnValue({ ...purchaseWithAudio, file_data: [] });
+    render(<DownloadScreen />);
+
+    expect(screen.queryByTestId("purchase-audio-files")).toBeNull();
+  });
+
+  it("plays an audio file from the native list", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    render(<DownloadScreen />);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+    fireEvent.press(screen.getByTestId("purchase-audio-file-ep2"));
+
+    expect(mockPlayAudio).toHaveBeenCalledWith(expect.objectContaining({ resourceId: "ep2" }));
+  });
+
+  it("reports native audio list playback failures", async () => {
+    const error = new Error("Could not start audio");
+    const alertSpy = jest.spyOn(NativeAlert, "alert").mockImplementation(() => {});
+    mockPlayAudio.mockRejectedValueOnce(error);
+    mockUsePurchase.mockReturnValue(purchaseWithAudio);
+    render(<DownloadScreen />);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+    fireEvent.press(screen.getByTestId("purchase-audio-file-ep2"));
+
+    await waitFor(() => expect(Sentry.captureException).toHaveBeenCalledWith(error));
+    expect(alertSpy).toHaveBeenCalledWith("Audio Playback Failed", "Could not start audio");
   });
 });
