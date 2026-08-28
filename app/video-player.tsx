@@ -176,6 +176,7 @@ export default function VideoPlayerScreen() {
   const pendingSourceResumeRef = useRef<{ position: number; wasPlaying: boolean } | null>(null);
   const videoUrlRef = useRef<string | null>(null);
   const playbackRetryCountRef = useRef(0);
+  const recoveryStartedAtRef = useRef<number | null>(null);
 
   const cancelCaptionRequest = useCallback(() => {
     captionRequestIdRef.current += 1;
@@ -217,6 +218,7 @@ export default function VideoPlayerScreen() {
       playbackStartedRef.current = false;
       setPlaybackStarted(false);
       playbackRetryCountRef.current = 0;
+      recoveryStartedAtRef.current = null;
       cancelCaptionRequest();
       fullscreenRequestIdRef.current += 1;
       if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
@@ -315,6 +317,7 @@ export default function VideoPlayerScreen() {
   const replayFromLastPosition = useCallback(() => {
     const position = Math.max(currentPositionRef.current, player.currentTime || 0);
     pendingSourceResumeRef.current = { position, wasPlaying: true };
+    recoveryStartedAtRef.current = position;
     withReleasedPlayerGuard(() => {
       const source = videoUrlRef.current;
       const replaceable = player as { replace?: (source: string) => void };
@@ -392,7 +395,6 @@ export default function VideoPlayerScreen() {
             setPlaybackError(message);
           }
         } else if (status === "readyToPlay") {
-          playbackRetryCountRef.current = 0;
           setPlaybackError(null);
           withReleasedPlayerGuard(() => {
             setVideoDuration(player.duration || videoDurationRef.current);
@@ -475,6 +477,11 @@ export default function VideoPlayerScreen() {
 
   useEffect(() => {
     const subscription = player.addListener("timeUpdate", ({ currentTime }: { currentTime: number }) => {
+      const recoveryStartedAt = recoveryStartedAtRef.current;
+      if (recoveryStartedAt !== null && currentTime > recoveryStartedAt + 0.1) {
+        playbackRetryCountRef.current = 0;
+        recoveryStartedAtRef.current = null;
+      }
       if (!playbackStartedRef.current && currentTime > resumePosition + 0.1) {
         playbackStartedRef.current = true;
         setPlaybackStarted(true);

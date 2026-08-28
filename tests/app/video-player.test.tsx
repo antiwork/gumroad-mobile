@@ -642,12 +642,14 @@ describe("VideoPlayerScreen", () => {
     expect(queryByText("This video failed to load")).toBeTruthy();
   });
 
-  it("resets the automatic retry budget after playback becomes ready again", () => {
+  it("resets the automatic retry budget after playback progresses again", () => {
     const { queryByText } = renderScreen();
     mockPlayer.play.mockClear();
     mockPlayer.replace.mockClear();
 
     for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const recoveryPosition = 40 + attempt;
+      mockPlayer.currentTime = recoveryPosition;
       act(() => {
         statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
       });
@@ -656,8 +658,27 @@ describe("VideoPlayerScreen", () => {
 
       act(() => {
         statusChangeListener!({ status: "readyToPlay" });
+        timeUpdateListener!({ currentTime: recoveryPosition + 0.25 });
       });
     }
+  });
+
+  it("keeps counting retries until playback moves past the recovery position", () => {
+    const { queryByText } = renderScreen();
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      mockPlayer.currentTime = 42;
+      act(() => {
+        statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+      expect(queryByText("This video failed to load")).toBeNull();
+    }
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+    });
+    expect(queryByText("This video failed to load")).toBeTruthy();
   });
 
   it("replays from the last position when Try again is pressed", () => {
