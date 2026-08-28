@@ -318,9 +318,31 @@ export default function VideoPlayerScreen() {
     const position = Math.max(currentPositionRef.current, player.currentTime || 0);
     pendingSourceResumeRef.current = { position, wasPlaying: true };
     recoveryStartedAtRef.current = position;
+    const source = videoUrlRef.current;
+    const replaceable = player as {
+      replace?: (source: string) => void;
+      replaceAsync?: (source: string) => Promise<void>;
+    };
+    const resume = () => {
+      withReleasedPlayerGuard(() => {
+        player.currentTime = position;
+        player.play();
+      });
+    };
+
+    if (source && Platform.OS === "ios" && replaceable.replaceAsync) {
+      replaceable
+        .replaceAsync(source)
+        .then(resume)
+        .catch((error) => {
+          if (isReleasedPlayerError(error)) return;
+          Sentry.captureException(error);
+          setPlaybackError(error instanceof Error ? error.message : "Unknown playback error");
+        });
+      return;
+    }
+
     withReleasedPlayerGuard(() => {
-      const source = videoUrlRef.current;
-      const replaceable = player as { replace?: (source: string) => void };
       if (source) replaceable.replace?.(source);
       player.currentTime = position;
       player.play();

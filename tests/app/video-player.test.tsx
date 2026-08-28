@@ -626,6 +626,32 @@ describe("VideoPlayerScreen", () => {
     expect(mockPlayer.play).toHaveBeenCalled();
   });
 
+  it("uses asynchronous source replacement for iOS playback recovery", async () => {
+    const originalPlatform = Platform.OS;
+    const replaceAsync = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(mockPlayer, "replaceAsync", { configurable: true, value: replaceAsync });
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+    try {
+      mockPlayer.currentTime = 42;
+      renderScreen();
+      mockPlayer.play.mockClear();
+      mockPlayer.replace.mockClear();
+
+      await act(async () => {
+        statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+        await Promise.resolve();
+      });
+
+      expect(replaceAsync).toHaveBeenCalledWith("https://example.com/video.mp4");
+      expect(mockPlayer.replace).not.toHaveBeenCalled();
+      expect(mockPlayer.currentTime).toBe(42);
+      expect(mockPlayer.play).toHaveBeenCalled();
+    } finally {
+      delete (mockPlayer as { replaceAsync?: unknown }).replaceAsync;
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform });
+    }
+  });
+
   it("shows the failed screen after three transient playback errors", () => {
     const { queryByText } = renderScreen();
 
