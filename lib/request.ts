@@ -136,10 +136,110 @@ const retryDelay = (ms: number, signal?: AbortSignal | null) =>
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 
+
+const screenshotFixture = (url: string): unknown => {
+  if (url.includes("mobile_minimum_version")) return { minimum_version: "0.0.1" };
+  if (url.includes("purchases/search"))
+    return {
+      success: true,
+      user_id: "1",
+      purchases: [
+        {
+          name: "Oil painting course",
+          unique_permalink: "oil",
+          creator_name: "Maya Chen",
+          creator_username: "maya",
+          creator_profile_url: "https://gumroad.com/maya",
+          creator_profile_picture_url: "",
+          thumbnail_url: null,
+          url_redirect_token: "tok1",
+          purchase_email: "you@example.com",
+        },
+        {
+          name: "Field notes PDF",
+          unique_permalink: "notes",
+          creator_name: "Maya Chen",
+          creator_username: "maya",
+          creator_profile_url: "https://gumroad.com/maya",
+          creator_profile_picture_url: "",
+          thumbnail_url: null,
+          url_redirect_token: "tok2",
+          purchase_email: "you@example.com",
+        },
+        {
+          name: "Late night mixes",
+          unique_permalink: "mixes",
+          creator_name: "Maya Chen",
+          creator_username: "maya",
+          creator_profile_url: "https://gumroad.com/maya",
+          creator_profile_picture_url: "",
+          thumbnail_url: null,
+          url_redirect_token: "tok3",
+          purchase_email: "you@example.com",
+        },
+      ],
+      sellers: [{ id: "1", name: "Maya Chen", purchases_count: 3 }],
+      meta: { pagination: { count: 3, items: 24, page: 1, pages: 1, prev: null, next: null, last: 1 } },
+    };
+  if (url.includes("v2/user")) return { success: true, user_id: "1", name: "Maya Chen", email: "maya@example.com" };
+  if (url.includes("revenue_totals"))
+    return {
+      day: { formatted_revenue: "$1,284" },
+      week: { formatted_revenue: "$4,910" },
+      month: { formatted_revenue: "$18,240" },
+      year: { formatted_revenue: "$96,400" },
+    };
+  if (url.includes("analytics/products")) return { products: [{ id: "1" }, { id: "2" }, { id: "3" }] };
+  if (url.includes("analytics/sales"))
+    return { success: true, sales_count: 12, formatted_revenue: "$1,284" };
+  if (url.includes("mobile/products"))
+    return {
+      success: true,
+      products: [
+        {
+          id: "1",
+          name: "Oil painting course",
+          permalink: "oil",
+          price_formatted: "$49",
+          status: "published",
+          thumbnail_url: null,
+          can_edit: true,
+          can_destroy: true,
+        },
+        {
+          id: "2",
+          name: "Field notes PDF",
+          permalink: "notes",
+          price_formatted: "$12",
+          status: "published",
+          thumbnail_url: null,
+          can_edit: true,
+          can_destroy: true,
+        },
+        {
+          id: "3",
+          name: "Sample pack",
+          permalink: "pack",
+          price_formatted: "$9",
+          status: "unpublished",
+          thumbnail_url: null,
+          can_edit: true,
+          can_destroy: true,
+        },
+      ],
+      pagination: { count: 3, page: 1, pages: 1, next: null },
+    };
+  if (url.includes("agent/meta")) return { success: true, enabled: true, greeting: "Hi", suggestions: [] };
+  if (url.includes("agent/conversations")) return { success: false };
+  return { success: true };
+};
+
 export const request = async <T>(
   url: string,
   options?: RequestInit & { data?: any; skipResponseBody?: boolean },
 ): Promise<T> => {
+  const authHeader = String((options?.headers as { Authorization?: string } | undefined)?.Authorization ?? "");
+  if (authHeader.includes("screenshot-fake-token")) return screenshotFixture(url) as T;
   // GET requests are safe to repeat, so give them one automatic retry before surfacing the
   // error; non-GET requests are not repeated here because they may have side effects —
   // their callers decide (react-query retries queries, mutations opt in).

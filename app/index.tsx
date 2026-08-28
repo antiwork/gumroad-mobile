@@ -70,6 +70,12 @@ export default function Index() {
       const savedTab = await getSavedTab();
       if (cancelled) return;
 
+      const screenshotRoute = "SCREENSHOT_ROUTE_VALUE" as string;
+      if (screenshotRoute !== "SCREENSHOT_ROUTE_PLACEHOLDER") {
+        router.replace(screenshotRoute as TabRoute);
+        markIndexInitialRoutingComplete();
+        return;
+      }
       let defaultRoute: TabRoute;
       if (savedTab) {
         defaultRoute = `/(tabs)/${savedTab}`;

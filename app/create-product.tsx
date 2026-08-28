@@ -47,6 +47,17 @@ const isProductEditUrl = (url: string) => {
 const buildCreateProductUrl = (token: string) =>
   buildAuthenticatedWebViewUrl("/products/new", token, { display: "mobile_app" });
 
+const SCREENSHOT_CREATE_HTML = `<!DOCTYPE html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><style>
+body{margin:0;font-family:-apple-system,sans-serif;background:#fff;color:#000;padding:20px}
+label{display:block;font-size:13px;color:#666;margin:16px 0 6px}
+input{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:8px;padding:14px;font-size:16px}
+.btn{margin-top:28px;background:#ff90e8;color:#000;text-align:center;font-weight:800;padding:16px;border-radius:999px;font-size:16px}
+</style></head><body>
+<label>Name</label><input value="Oil painting course">
+<label>Price</label><input value="$49">
+<label>Type</label><input value="Course">
+<div class=btn>Publish</div>
+</body></html>`;
 const CreateProductScreen = () => {
   const webViewRef = useRef<BaseWebView>(null);
   const [hasError, setHasError] = useState(false);
@@ -122,6 +133,14 @@ const CreateProductScreen = () => {
     },
     [refreshCreatorStatus],
   );
+
+  if (accessToken === "screenshot-fake-token") {
+    return (
+      <Screen>
+        <StyledWebView source={{ html: SCREENSHOT_CREATE_HTML }} className="flex-1 bg-transparent" />
+      </Screen>
+    );
+  }
 
   if (isLoading || url === null) {
     return (

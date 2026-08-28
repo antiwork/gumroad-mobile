@@ -94,9 +94,9 @@ const isKeychainUnavailableError = (error: unknown): boolean =>
   (error.message.includes("User interaction is not allowed") || error.message.includes("No keychain is available"));
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [isCreator, setIsCreator] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>("screenshot-fake-token");
+  const [isCreator, setIsCreator] = useState(true);
   const inflightRefresh = useRef<Promise<string> | null>(null);
   const router = useRouter();
 
@@ -118,6 +118,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     async function loadStoredAuth() {
+      if (accessToken === "screenshot-fake-token") {
+        setIsLoading(false);
+        return;
+      }
       try {
         const storedToken = await SecureStore.getItemAsync(accessTokenKey);
         if (storedToken) {
