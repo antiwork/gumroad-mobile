@@ -8,6 +8,7 @@ import { formatTime } from "@/lib/format-time";
 import { isMeaningfulLocation, isResumableLocation, updateMediaLocation } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
 import { fetchSubtitleText, SubtitleFetchError } from "@/lib/subtitle-fetch";
+import { isTransientPlaybackError, MAX_TRANSIENT_PLAYBACK_RETRIES } from "@/lib/transient-playback-error";
 import { activeCueText, parseSubtitles, type SubtitleCue } from "@/lib/subtitles";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -173,6 +174,8 @@ export default function VideoPlayerScreen() {
   const playerRef = useRef<ReturnType<typeof useVideoPlayer> | null>(null);
   const videoDurationRef = useRefToLatest(videoDuration);
   const pendingSourceResumeRef = useRef<{ position: number; wasPlaying: boolean } | null>(null);
+  const videoUrlRef = useRef<string | null>(null);
+  const playbackRetryCountRef = useRef(0);
 
   const cancelCaptionRequest = useCallback(() => {
     captionRequestIdRef.current += 1;
@@ -213,6 +216,7 @@ export default function VideoPlayerScreen() {
       setVideoDuration(videoLength ?? 0);
       playbackStartedRef.current = false;
       setPlaybackStarted(false);
+      playbackRetryCountRef.current = 0;
       cancelCaptionRequest();
       fullscreenRequestIdRef.current += 1;
       if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
@@ -306,6 +310,19 @@ export default function VideoPlayerScreen() {
     }
   });
   playerRef.current = player;
+  videoUrlRef.current = videoUrl;
+
+  const replayFromLastPosition = useCallback(() => {
+    const position = Math.max(currentPositionRef.current, player.currentTime || 0);
+    pendingSourceResumeRef.current = { position, wasPlaying: true };
+    withReleasedPlayerGuard(() => {
+      const source = videoUrlRef.current;
+      const replaceable = player as { replace?: (source: string) => void };
+      if (source) replaceable.replace?.(source);
+      player.currentTime = position;
+      player.play();
+    });
+  }, [currentPositionRef, player]);
 
   const wasPlayingBeforeBackgroundRef = useRef(false);
   const positionBeforeBackgroundRef = useRef<number | null>(null);
@@ -351,10 +368,15 @@ export default function VideoPlayerScreen() {
       "statusChange",
       ({ status, error }: { status: VideoPlayerStatus; error?: { message: string } }) => {
         if (status === "error") {
+          const message = error?.message ?? "Unknown playback error";
+          if (isTransientPlaybackError(message) && playbackRetryCountRef.current < MAX_TRANSIENT_PLAYBACK_RETRIES) {
+            playbackRetryCountRef.current += 1;
+            replayFromLastPosition();
+            return;
+          }
           fullscreenRequestIdRef.current += 1;
           setFullscreenCaptionPickerOpen(false);
           setExternalFullscreenOpen(false);
-          const message = error?.message ?? "Unknown playback error";
           if (externalFullscreenOpen && Platform.OS === "ios") {
             fullscreenTransitionPendingRef.current = true;
             setFullscreenTransitionPending(true);
@@ -395,7 +417,15 @@ export default function VideoPlayerScreen() {
       },
     );
     return () => subscription.remove();
-  }, [cancelCaptionRequest, externalFullscreenOpen, player, savedPosition, savedPositionIsAtEnd, videoDurationRef]);
+  }, [
+    cancelCaptionRequest,
+    externalFullscreenOpen,
+    player,
+    replayFromLastPosition,
+    savedPosition,
+    savedPositionIsAtEnd,
+    videoDurationRef,
+  ]);
 
   useEffect(() => {
     const subscription = player.addListener(
@@ -678,8 +708,10 @@ export default function VideoPlayerScreen() {
   const handleNativeFullscreenEnter = async () => {
     const requestId = ++fullscreenRequestIdRef.current;
     const orientationApplied = await prepareFullscreenOrientation();
+    const barsHidden = await hideFullscreenSystemBars();
     if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
       if (orientationApplied) restoreAppOrientation();
+      if (barsHidden) restoreFullscreenSystemBars();
       return;
     }
     fullscreenOrientationActiveRef.current = orientationApplied;
@@ -690,6 +722,7 @@ export default function VideoPlayerScreen() {
     fullscreenOrientationActiveRef.current = false;
     fullscreenTransitionPendingRef.current = false;
     setFullscreenTransitionPending(false);
+    restoreFullscreenSystemBars();
     restoreAppOrientation();
   };
 
@@ -843,8 +876,21 @@ export default function VideoPlayerScreen() {
           <View style={styles.errorContainer}>
             <Text className="text-center text-lg font-semibold text-white">This video failed to load</Text>
             <Text className="mt-2 text-center text-sm text-white/70">
-              Try downloading the file from the product page instead.
+              Try again, or download the file from the product page instead.
             </Text>
+            <Pressable
+              onPress={() => {
+                playbackRetryCountRef.current = 0;
+                setPlaybackError(null);
+                replayFromLastPosition();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Try again"
+              testID="retry-playback-button"
+              className="mt-6 rounded-full bg-white px-5 py-3"
+            >
+              <Text className="text-center text-sm font-semibold text-black">Try again</Text>
+            </Pressable>
             <Text className="mt-4 text-center text-xs text-white/50">{playbackError}</Text>
           </View>
         </View>
