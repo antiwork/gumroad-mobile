@@ -1,200 +1,62 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-<meta charset="utf-8" />
+<meta charset="utf-8">
 <title>Gumroad App Store frame</title>
 <style>
-  html, body { margin: 0; padding: 0; width: 1290px; height: 2796px; overflow: hidden; background: #000; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif; color: #fff; }
-  .page { width: 1290px; height: 2796px; background: #000; position: relative; }
-  .kicker { position: absolute; top: 168px; left: 90px; right: 90px; color: #ff90e8; font-size: 32px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; }
-  .headline { position: absolute; top: 228px; left: 90px; right: 90px; font-size: 84px; line-height: 1.05; font-weight: 800; letter-spacing: -0.045em; }
-  .phone {
-    position: absolute; left: 195px; top: 680px; width: 900px; height: 1880px;
-    background: #000; border: 6px solid #3a3a3a; border-radius: 68px; overflow: hidden;
+  @font-face {
+    font-family: "ABC Favorit";
+    src: url("../../assets/fonts/ABCFavorit-Bold-custom.ttf") format("truetype");
+    font-weight: 700;
   }
-  .sb { height: 78px; background: #000; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 48px 14px; font-size: 28px; font-weight: 600; }
-  .sb-icons { display: flex; gap: 12px; align-items: center; }
-  .sb-icons svg { display: block; }
-  .app-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 36px 22px; background: #000; }
-  .g { width: 52px; height: 52px; border-radius: 50%; background: #ff90e8; color: #111; font-weight: 800; font-size: 30px; display: flex; align-items: center; justify-content: center; }
-  .app-header h1 { margin: 0; font-size: 38px; font-weight: 700; position: absolute; left: 0; right: 0; text-align: center; pointer-events: none; }
-  .hdr-right { display: flex; gap: 28px; align-items: center; font-size: 32px; z-index: 1; }
-  .content { background: #1c1c1e; position: absolute; left: 0; right: 0; top: 156px; bottom: 148px; overflow: hidden; }
-  .row { display: flex; align-items: center; gap: 22px; padding: 0 28px 0 0; border-bottom: 1px solid #2c2c2e; background: #1c1c1e; }
-  .thumb { width: 128px; height: 128px; object-fit: cover; flex: 0 0 128px; background: #2c2c2e; display: block; }
-  .meta { flex: 1; min-width: 0; padding: 22px 0; }
-  .name { font-size: 30px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sub { font-size: 24px; color: #8e8e93; margin-top: 6px; }
-  .price { font-size: 28px; font-weight: 700; flex: 0 0 auto; padding-right: 8px; }
-  .ts { font-size: 22px; color: #8e8e93; text-align: right; margin-top: 4px; }
-  .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 148px; background: #000; display: flex; border-top: 1px solid #2c2c2e; padding-bottom: 18px; }
-  .tab { flex: 1; text-align: center; padding-top: 18px; font-size: 20px; color: #8e8e93; }
-  .tab .ic { font-size: 28px; line-height: 1; margin-bottom: 6px; }
-  .tab.on { color: #ff90e8; font-weight: 600; }
-  .wordmark { position: absolute; bottom: 72px; left: 0; right: 0; text-align: center; font-size: 24px; color: #555; letter-spacing: 0.28em; text-transform: uppercase; }
-  .dash-head { padding: 36px 28px 28px; border-bottom: 1px solid #2c2c2e; text-align: center; }
-  .big { font-size: 88px; font-weight: 400; letter-spacing: -0.04em; }
-  .from { font-size: 28px; margin-top: 4px; }
-  .ranges { display: flex; justify-content: center; gap: 12px; margin-top: 28px; }
-  .chip { font-size: 24px; padding: 10px 22px; border-radius: 999px; color: #fff; }
-  .chip.on { border: 2px solid #ff90e8; }
-  .form { padding: 0 36px 36px; }
-  .cover { width: 100%; height: 420px; object-fit: cover; display: block; background: #111; }
-  .label { font-size: 22px; color: #8e8e93; margin: 28px 0 10px; }
-  .input { background: #2c2c2e; border-radius: 16px; padding: 24px 26px; font-size: 32px; }
-  .publish { margin-top: 40px; background: #ff90e8; color: #111; text-align: center; font-weight: 800; font-size: 32px; padding: 28px; border-radius: 16px; }
-  .lib { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  .card { position: relative; height: 420px; border-radius: 12px; overflow: hidden; }
-  .card img.cover { width: 100%; height: 100%; }
-  .card .shade { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,.05) 55%); }
-  .card .cap { position: absolute; left: 18px; right: 18px; bottom: 18px; }
-  .card .cap .t { font-size: 26px; font-weight: 700; }
-  .who { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-  .who img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; object-fit: cover; }
-  .who span { font-size: 20px; }
+  @font-face {
+    font-family: "ABC Favorit";
+    src: url("../../assets/fonts/ABCFavorit-Regular-custom.ttf") format("truetype");
+    font-weight: 400;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1290px; height: 2796px; overflow: hidden; }
+  body {
+    font-family: "ABC Favorit", "Helvetica Neue", Arial, sans-serif;
+    position: relative;
+  }
+  .headline {
+    position: absolute;
+    top: 150px; left: 96px; right: 96px;
+    font-size: 148px;
+    line-height: 1.04;
+    font-weight: 700;
+    color: #000000;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .phone {
+    position: absolute;
+    top: 860px; left: 120px;
+    width: 1050px;
+    background: #000000;
+    border-radius: 116px;
+    padding: 26px;
+  }
+  .phone img { display: block; width: 100%; border-radius: 90px; }
 </style>
 </head>
 <body>
-<div class="page" id="page"></div>
 <script>
-const products = [
-  { img: "covers/oil.png", name: "Still life in oil", price: "$49" },
-  { img: "covers/brushes.png", name: "Gouache brush set", price: "$19" },
-  { img: "covers/notes.png", name: "Field notes", price: "$12" },
-  { img: "covers/lofi.png", name: "Late night mixes", price: "$9" },
-  { img: "covers/peony.png", name: "Peony print pack", price: "$24" },
-];
-const sales = [
-  { img: "covers/oil.png", name: "Still life in oil", email: "nina@studio", total: "$49", ts: "2m" },
-  { img: "covers/peony.png", name: "Peony print pack", email: "jules@mail", total: "$24", ts: "11m" },
-  { img: "covers/brushes.png", name: "Gouache brush set", email: "ari@draw", total: "$19", ts: "28m" },
-  { img: "covers/lofi.png", name: "Late night mixes", email: "ken@radio", total: "$9", ts: "1h" },
-  { img: "covers/notes.png", name: "Field notes", email: "sam@desk", total: "$12", ts: "1h" },
-  { img: "covers/oil.png", name: "Still life in oil", email: "lea@paint", total: "$49", ts: "2h" },
-];
-const productRows = products.map(p => `
-  <div class="row">
-    <img class="thumb" src="${p.img}" alt="">
-    <div class="meta"><div class="name">${p.name}</div><div class="sub">${p.price}</div></div>
-  </div>`).join("");
-const saleRows = sales.map(s => `
-  <div class="row">
-    <img class="thumb" src="${s.img}" alt="">
-    <div class="meta"><div class="name">${s.name}</div><div class="sub">${s.email}</div></div>
-    <div><div class="price">${s.total}</div><div class="ts">${s.ts}</div></div>
-  </div>`).join("");
-const libCards = products.slice(0,4).map(p => `
-  <div class="card">
-    <img class="cover" src="${p.img}" alt="">
-    <div class="shade"></div>
-    <div class="cap">
-      <div class="t">${p.name}</div>
-      <div class="who"><img src="covers/avatar.png" alt=""><span>Mira Chen</span></div>
-    </div>
-  </div>`).join("");
-
-const frames = {
-  1: {
-    kicker: "Create",
-    headline: "Create a product from your phone",
-    title: "Products",
-    right: "New",
-    tab: "Products",
-    body: productRows
-  },
-  2: {
-    kicker: "Publish",
-    headline: "Name it, price it, go live",
-    title: "New product",
-    right: "",
-    tab: "Products",
-    body: `
-      <img class="cover" src="covers/oil.png" alt="">
-      <div class="form">
-        <div class="label">Name</div>
-        <div class="input">Still life in oil</div>
-        <div class="label">Price</div>
-        <div class="input">$49</div>
-        <div class="publish">Publish</div>
-      </div>`
-  },
-  3: {
-    kicker: "Today",
-    headline: "See today before you open a laptop",
-    title: "Dashboard",
-    right: "",
-    tab: "Dashboard",
-    body: `
-      <div class="dash-head">
-        <div class="big">$2,418</div>
-        <div class="from">from 18 sales</div>
-        <div class="ranges">
-          <div class="chip on">Today</div>
-          <div class="chip">Month</div>
-          <div class="chip">Year</div>
-          <div class="chip">All</div>
-        </div>
-      </div>
-      ${saleRows}`
-  },
-  4: {
-    kicker: "Sales",
-    headline: "Your numbers, on your phone",
-    title: "Dashboard",
-    right: "",
-    tab: "Dashboard",
-    body: `
-      <div class="dash-head">
-        <div class="big">$48,290</div>
-        <div class="from">from 1,204 sales</div>
-        <div class="ranges">
-          <div class="chip">Today</div>
-          <div class="chip on">Month</div>
-          <div class="chip">Year</div>
-          <div class="chip">All</div>
-        </div>
-      </div>
-      ${saleRows}`
-  },
-  5: {
-    kicker: "Library",
-    headline: "Watch what you bought",
-    title: "Library",
-    right: "",
-    tab: "Library",
-    body: `<div class="lib">${libCards}</div>`
-  }
-};
-const n = new URLSearchParams(location.search).get("n") || "1";
-const f = frames[n];
-const tabMeta = [
-  ["Dashboard", "⌂"],
-  ["Products", "▣"],
-  ["Analytics", "▦"],
-  ["Agent", "◐"],
-  ["Library", "▤"]
-];
-const tabs = tabMeta.map(([t, ic]) =>
-  `<div class="tab${t===f.tab?" on":""}"><div class="ic">${ic}</div>${t}</div>`
-).join("");
-document.getElementById("page").innerHTML = `
-  <div class="kicker">${f.kicker}</div>
-  <div class="headline">${f.headline}</div>
-  <div class="phone">
-    <div class="sb"><span>9:41</span><div class="sb-icons">
-      <svg width="34" height="24" viewBox="0 0 34 24" fill="none"><path d="M4 10.5c7.2-7 18.8-7 26 0" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M9 14.5c4.4-4.2 11.6-4.2 16 0" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M13.5 18.2c2-1.9 5-1.9 7 0" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="17" cy="21.2" r="1.7" fill="#fff"/></svg>
-      <svg width="52" height="24" viewBox="0 0 52 24" fill="none"><rect x="1.5" y="5" width="42" height="14" rx="3" stroke="#fff" stroke-width="2"/><rect x="4" y="7.5" width="30" height="9" rx="1.5" fill="#fff"/><rect x="44.5" y="9" width="3.5" height="6" rx="1" fill="#fff"/></svg>
-    </div></div>
-    <div class="app-header">
-      <div class="g">G</div>
-      <h1>${f.title}</h1>
-      <div class="hdr-right">${f.right}</div>
-    </div>
-    <div class="content">${f.body}</div>
-    <div class="tabs">${tabs}</div>
-  </div>
-  <div class="wordmark">Gumroad</div>`;
+  const frames = {
+    1: { bg: "#FF90E8", headline: "Create a product from your phone.", img: "simulator-raw/products.png" },
+    2: { bg: "#FFC900", headline: "Name it, price it, go live.", img: "simulator-raw/create.png" },
+    3: { bg: "#23A094", headline: "See today before you open a laptop.", img: "simulator-raw/dashboard.png" },
+    4: { bg: "#90A8ED", headline: "Every sale, as it lands.", img: "simulator-raw/sales.png" },
+    5: { bg: "#F4F4F0", headline: "Everything you bought, in one place.", img: "simulator-raw/library.png" },
+  };
+  const n = new URLSearchParams(location.search).get("n") || "1";
+  const f = frames[n];
+  document.body.style.background = f.bg;
+  document.body.insertAdjacentHTML("beforeend",
+    `<div class="headline">${f.headline}</div>` +
+    `<div class="phone"><img src="${f.img}"></div>`
+  );
 </script>
 </body>
 </html>
