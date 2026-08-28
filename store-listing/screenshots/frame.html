@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Gumroad App Store frame</title>
+<style>
+  @font-face {
+    font-family: "ABC Favorit";
+    src: url("../../assets/fonts/ABCFavorit-Bold-custom.ttf") format("truetype");
+    font-weight: 700;
+  }
+  @font-face {
+    font-family: "ABC Favorit";
+    src: url("../../assets/fonts/ABCFavorit-Regular-custom.ttf") format("truetype");
+    font-weight: 400;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1290px; height: 2796px; overflow: hidden; }
+  body {
+    font-family: "ABC Favorit", "Helvetica Neue", Arial, sans-serif;
+    position: relative;
+  }
+  .headline {
+    position: absolute;
+    top: 150px; left: 96px; right: 96px;
+    font-size: 148px;
+    line-height: 1.04;
+    font-weight: 700;
+    color: #000000;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .phone {
+    position: absolute;
+    top: 860px; left: 120px;
+    width: 1050px;
+    background: #000000;
+    border-radius: 116px;
+    padding: 26px;
+  }
+  .phone img { display: block; width: 100%; border-radius: 90px; }
+</style>
+</head>
+<body>
+<script>
+  const frames = {
+    1: { bg: "#FF90E8", headline: "Create a product from your phone.", img: "simulator-raw/products.png" },
+    2: { bg: "#FFC900", headline: "Name it, price it, go live.", img: "simulator-raw/create.png" },
+    3: { bg: "#23A094", headline: "See today before you open a laptop.", img: "simulator-raw/dashboard.png" },
+    4: { bg: "#90A8ED", headline: "Every sale, as it lands.", img: "simulator-raw/sales.png" },
+    5: { bg: "#F4F4F0", headline: "Everything you bought, in one place.", img: "simulator-raw/library.png" },
+  };
+  const n = new URLSearchParams(location.search).get("n") || "1";
+  const f = frames[n];
+  document.body.style.background = f.bg;
+  document.body.insertAdjacentHTML("beforeend",
+    `<div class="headline">${f.headline}</div>` +
+    `<div class="phone"><img src="${f.img}"></div>`
+  );
+</script>
+</body>
+</html>
