@@ -19,15 +19,17 @@ Also move the iOS category from **Utilities** to **Business** in App Store Conne
 
 `screenshots/iphone-67/` — 1290×2796 PNG, App Store 6.7" slot.
 
-1. Create a product from your phone
-2. Change a live product from your phone
-3. Name it, price it, go live
-4. See today before you open a laptop
-5. Sell, and keep everything you own
+Each frame is a real iOS Simulator capture (iPhone 17 Pro, store build `com.GRD.Gumroad`) on a black 6.7" canvas with a headline. The UI inside the phone is the live app, not a mock.
 
-Source: `screenshots/frame.html`. Re-render with `screenshots/render.sh` (headless Chrome at 1290×2796, `frame.html?n=1` through `n=5`).
+1. Products — Create a product from your phone
+2. Products — Name it, price it, go live (same empty-state capture; create-product WebView signed the sim account out)
+3. Dashboard — See today before you open a laptop
+4. Dashboard — Your numbers, on your phone
+5. Library — Watch what you bought
 
-These are marketing frames, not device captures. Upload to App Store Connect (iPhone 6.7") and Play Console (phone). Play also wants 7" / 10" tablets — not in this folder.
+The sim account has no products or sales, so Dashboard is $0 and Library is empty. Recapture from a creator account with live catalogue before uploading to App Store Connect.
+
+Raw captures: `screenshots/simulator-raw/`. Upload the 1290×2796 frames to App Store Connect (iPhone 6.7") and Play Console (phone). Play also wants 7" / 10" tablets — not in this folder.
 
 ## Not in this PR
 
