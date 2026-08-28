@@ -392,6 +392,7 @@ export default function VideoPlayerScreen() {
             setPlaybackError(message);
           }
         } else if (status === "readyToPlay") {
+          playbackRetryCountRef.current = 0;
           setPlaybackError(null);
           withReleasedPlayerGuard(() => {
             setVideoDuration(player.duration || videoDurationRef.current);
@@ -887,9 +888,9 @@ export default function VideoPlayerScreen() {
               accessibilityRole="button"
               accessibilityLabel="Try again"
               testID="retry-playback-button"
-              className="mt-6 rounded-full bg-white px-5 py-3"
+              className="mt-6 rounded-full bg-accent px-5 py-3"
             >
-              <Text className="text-center text-sm font-semibold text-black">Try again</Text>
+              <Text className="text-center text-sm font-semibold text-accent-foreground">Try again</Text>
             </Pressable>
             <Text className="mt-4 text-center text-xs text-white/50">{playbackError}</Text>
           </View>

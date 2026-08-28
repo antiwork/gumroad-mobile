@@ -642,6 +642,24 @@ describe("VideoPlayerScreen", () => {
     expect(queryByText("This video failed to load")).toBeTruthy();
   });
 
+  it("resets the automatic retry budget after playback becomes ready again", () => {
+    const { queryByText } = renderScreen();
+    mockPlayer.play.mockClear();
+    mockPlayer.replace.mockClear();
+
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      act(() => {
+        statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+      });
+      expect(queryByText("This video failed to load")).toBeNull();
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(attempt);
+
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+    }
+  });
+
   it("replays from the last position when Try again is pressed", () => {
     mockPlayer.currentTime = 18;
     const { getByLabelText, queryByText } = renderScreen();
