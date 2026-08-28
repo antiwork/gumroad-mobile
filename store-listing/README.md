@@ -19,15 +19,17 @@ Also move the iOS category from **Utilities** to **Business** in App Store Conne
 
 `screenshots/iphone-67/` — 1290×2796 PNG, App Store 6.7" slot.
 
-Marketing frames of a mock successful creator (Mira Chen) with real product covers — not an empty sim account. Source: `screenshots/frame.html` + `screenshots/covers/`. Re-render with `screenshots/render.sh`.
+Each frame is a real iOS Simulator capture (iPhone 17 Pro, store build `com.GRD.Gumroad`) on a black 6.7" canvas with a headline. The UI inside the phone is the live app, not a mock.
 
-1. Products — Create a product from your phone
-2. New product — Name it, price it, go live
-3. Dashboard today — See today before you open a laptop
-4. Dashboard month — Your numbers, on your phone
-5. Library — Watch what you bought
+1. Products — Create a product from your phone (two live $5 products + New)
+2. Products — same catalogue still (create/edit WebView not recaptured)
+3. Dashboard — See today before you open a laptop ($10 from 2 sales)
+4. Dashboard — Your numbers, on your phone
+5. Library — Watch what you bought (seeded purchase)
 
-Upload the 1290×2796 frames to App Store Connect (iPhone 6.7") and Play Console (phone). Play also wants 7" / 10" tablets — not in this folder.
+Captured while signed in as the local seeded seller `mobile_seller1_do_not_edit@gumroad.com`. Dashboard sale rows show that seed buyer email.
+
+Raw captures: `screenshots/simulator-raw/`. Upload the 1290×2796 frames to App Store Connect (iPhone 6.7") and Play Console (phone). Play also wants 7" / 10" tablets — not in this folder.
 
 ## Not in this PR
 
