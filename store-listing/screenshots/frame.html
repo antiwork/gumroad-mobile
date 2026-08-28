@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Gumroad App Store frame</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 1290px; height: 2796px; overflow: hidden; background: #000; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; color: #fff; }
+  .page { width: 1290px; height: 2796px; background: #000; position: relative; }
+  .kicker { position: absolute; top: 180px; left: 90px; right: 90px; color: #ff90e8; font-size: 36px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
+  .headline { position: absolute; top: 250px; left: 90px; right: 90px; font-size: 92px; line-height: 1.05; font-weight: 800; letter-spacing: -0.04em; }
+  .phone {
+    position: absolute; left: 195px; top: 720px; width: 900px; height: 1840px;
+    background: #111; border: 10px solid #2a2a2a; border-radius: 72px; overflow: hidden;
+  }
+  .notch { height: 48px; background: #000; }
+  .app-header { display: flex; justify-content: space-between; align-items: center; padding: 28px 40px 16px; background: #000; }
+  .app-header h1 { margin: 0; font-size: 44px; font-weight: 800; }
+  .new-btn { background: #ff90e8; color: #000; font-weight: 800; font-size: 28px; padding: 14px 28px; border-radius: 999px; }
+  .list { padding: 12px 32px 0; }
+  .row { display: flex; gap: 24px; align-items: center; background: #1a1a1a; border-radius: 28px; padding: 24px; margin-bottom: 18px; }
+  .thumb { width: 96px; height: 96px; border-radius: 18px; background: #ff90e8; flex: 0 0 96px; }
+  .thumb.g { background: #90a8ff; }
+  .thumb.y { background: #ffe58a; }
+  .meta { flex: 1; }
+  .name { font-size: 32px; font-weight: 700; }
+  .sub { font-size: 24px; color: #b3b3b3; margin-top: 6px; }
+  .badge { font-size: 20px; color: #7dffa6; font-weight: 700; }
+  .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 140px; background: #000; display: flex; border-top: 1px solid #222; }
+  .tab { flex: 1; text-align: center; padding-top: 22px; font-size: 22px; color: #888; }
+  .tab.on { color: #ff90e8; font-weight: 700; }
+  .form { padding: 20px 40px; }
+  .label { font-size: 22px; color: #aaa; margin: 28px 0 10px; }
+  .input { background: #1a1a1a; border-radius: 20px; padding: 26px 28px; font-size: 32px; }
+  .publish { margin-top: 48px; background: #ff90e8; color: #000; text-align: center; font-weight: 800; font-size: 34px; padding: 32px; border-radius: 999px; }
+  .stat { padding: 40px; }
+  .stat .big { font-size: 96px; font-weight: 800; letter-spacing: -0.04em; }
+  .stat .lbl { font-size: 28px; color: #aaa; margin-top: 8px; }
+  .bars { display: flex; align-items: flex-end; gap: 18px; height: 280px; margin-top: 48px; }
+  .bar { flex: 1; background: #ff90e8; border-radius: 10px 10px 0 0; opacity: 0.85; }
+  .lib-card { margin: 24px 32px; background: #1a1a1a; border-radius: 28px; overflow: hidden; }
+  .poster { height: 420px; background: linear-gradient(160deg, #ff90e8, #5b4dff); }
+  .lib-meta { padding: 28px; }
+  .wordmark { position: absolute; bottom: 90px; left: 0; right: 0; text-align: center; font-size: 28px; color: #666; letter-spacing: 0.2em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="page" id="page"></div>
+<script>
+const frames = {
+  1: {
+    kicker: "New",
+    headline: "Create a product from your phone",
+    tab: "Products",
+    body: `
+      <div class="app-header"><h1>Products</h1><div class="new-btn">New</div></div>
+      <div class="list">
+        <div class="row"><div class="thumb"></div><div class="meta"><div class="name">Oil painting course</div><div class="sub">$49 · 128 sales</div></div><div class="badge">Live</div></div>
+        <div class="row"><div class="thumb g"></div><div class="meta"><div class="name">Field notes PDF</div><div class="sub">$12 · 41 sales</div></div><div class="badge">Live</div></div>
+        <div class="row"><div class="thumb y"></div><div class="meta"><div class="name">Sample pack</div><div class="sub">$9 · Draft</div></div></div>
+      </div>`
+  },
+  2: {
+    kicker: "Publish",
+    headline: "Name it, price it, go live",
+    tab: "Products",
+    body: `
+      <div class="app-header"><h1>New product</h1></div>
+      <div class="form">
+        <div class="label">Name</div>
+        <div class="input">Oil painting course</div>
+        <div class="label">Price</div>
+        <div class="input">$49</div>
+        <div class="label">Type</div>
+        <div class="input">Course</div>
+        <div class="publish">Publish</div>
+      </div>`
+  },
+  3: {
+    kicker: "Sales",
+    headline: "See today before you open a laptop",
+    tab: "Home",
+    body: `
+      <div class="app-header"><h1>Home</h1></div>
+      <div class="stat">
+        <div class="big">$1,284</div>
+        <div class="lbl">Today</div>
+        <div class="bars">
+          <div class="bar" style="height:40%"></div>
+          <div class="bar" style="height:55%"></div>
+          <div class="bar" style="height:35%"></div>
+          <div class="bar" style="height:70%"></div>
+          <div class="bar" style="height:90%"></div>
+          <div class="bar" style="height:60%"></div>
+          <div class="bar" style="height:100%"></div>
+        </div>
+      </div>`
+  },
+  4: {
+    kicker: "Library",
+    headline: "Watch what you bought",
+    tab: "Library",
+    body: `
+      <div class="app-header"><h1>Library</h1></div>
+      <div class="lib-card">
+        <div class="poster"></div>
+        <div class="lib-meta">
+          <div class="name">Oil painting course</div>
+          <div class="sub">Lesson 4 of 12 · 18:24 left</div>
+        </div>
+      </div>`
+  },
+  5: {
+    kicker: "One app",
+    headline: "Sell, and keep everything you own",
+    tab: "Library",
+    body: `
+      <div class="app-header"><h1>Library</h1></div>
+      <div class="list">
+        <div class="row"><div class="thumb"></div><div class="meta"><div class="name">Oil painting course</div><div class="sub">Video · In progress</div></div></div>
+        <div class="row"><div class="thumb g"></div><div class="meta"><div class="name">Field notes PDF</div><div class="sub">Ebook · Page 14</div></div></div>
+        <div class="row"><div class="thumb y"></div><div class="meta"><div class="name">Late night mixes</div><div class="sub">Audio · 32 min left</div></div></div>
+      </div>`
+  }
+};
+const n = new URLSearchParams(location.search).get("n") || "1";
+const f = frames[n];
+const tabs = ["Home","Products","Analytics","Agent","Library"].map(t =>
+  `<div class="tab${t===f.tab?" on":""}">${t}</div>`
+).join("");
+document.getElementById("page").innerHTML = `
+  <div class="kicker">${f.kicker}</div>
+  <div class="headline">${f.headline}</div>
+  <div class="phone">
+    <div class="notch"></div>
+    ${f.body}
+    <div class="tabs">${tabs}</div>
+  </div>
+  <div class="wordmark">Gumroad</div>`;
+</script>
+</body>
+</html>
