@@ -32,6 +32,7 @@
   .form { padding: 20px 40px; }
   .label { font-size: 22px; color: #aaa; margin: 28px 0 10px; }
   .input { background: #1a1a1a; border-radius: 20px; padding: 26px 28px; font-size: 32px; }
+  .input.multi { min-height: 140px; }
   .publish { margin-top: 48px; background: #ff90e8; color: #000; text-align: center; font-weight: 800; font-size: 34px; padding: 32px; border-radius: 999px; }
   .stat { padding: 40px; }
   .stat .big { font-size: 96px; font-weight: 800; letter-spacing: -0.04em; }
@@ -61,6 +62,22 @@ const frames = {
       </div>`
   },
   2: {
+    kicker: "Edit",
+    headline: "Change a live product from your phone",
+    tab: "Products",
+    body: `
+      <div class="app-header"><h1>Edit product</h1></div>
+      <div class="form">
+        <div class="label">Name</div>
+        <div class="input">Oil painting course</div>
+        <div class="label">Price</div>
+        <div class="input">$59</div>
+        <div class="label">Description</div>
+        <div class="input multi">12 lessons. New module this week.</div>
+        <div class="publish">Save</div>
+      </div>`
+  },
+  3: {
     kicker: "Publish",
     headline: "Name it, price it, go live",
     tab: "Products",
@@ -76,7 +93,7 @@ const frames = {
         <div class="publish">Publish</div>
       </div>`
   },
-  3: {
+  4: {
     kicker: "Sales",
     headline: "See today before you open a laptop",
     tab: "Home",
@@ -93,20 +110,6 @@ const frames = {
           <div class="bar" style="height:90%"></div>
           <div class="bar" style="height:60%"></div>
           <div class="bar" style="height:100%"></div>
-        </div>
-      </div>`
-  },
-  4: {
-    kicker: "Library",
-    headline: "Watch what you bought",
-    tab: "Library",
-    body: `
-      <div class="app-header"><h1>Library</h1></div>
-      <div class="lib-card">
-        <div class="poster"></div>
-        <div class="lib-meta">
-          <div class="name">Oil painting course</div>
-          <div class="sub">Lesson 4 of 12 · 18:24 left</div>
         </div>
       </div>`
   },

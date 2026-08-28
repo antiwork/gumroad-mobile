@@ -20,12 +20,12 @@ Also move the iOS category from **Utilities** to **Business** in App Store Conne
 `screenshots/iphone-67/` — 1290×2796 PNG, App Store 6.7" slot.
 
 1. Create a product from your phone
-2. Name it, price it, go live
-3. See today before you open a laptop
-4. Watch what you bought
+2. Change a live product from your phone
+3. Name it, price it, go live
+4. See today before you open a laptop
 5. Sell, and keep everything you own
 
-Source: `screenshots/frame.html`. Re-render with headless Chrome at 1290×2796 against `frame.html?n=1` through `n=5`.
+Source: `screenshots/frame.html`. Re-render with `screenshots/render.sh` (headless Chrome at 1290×2796, `frame.html?n=1` through `n=5`).
 
 These are marketing frames, not device captures. Upload to App Store Connect (iPhone 6.7") and Play Console (phone). Play also wants 7" / 10" tablets — not in this folder.
 
