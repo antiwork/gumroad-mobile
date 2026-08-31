@@ -652,6 +652,39 @@ describe("VideoPlayerScreen", () => {
     }
   });
 
+  it("keeps retrying transient iOS replacement failures within the retry budget", async () => {
+    const originalPlatform = Platform.OS;
+    const replaceAsync = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("The network connection was lost."))
+      .mockResolvedValueOnce(undefined);
+    Object.defineProperty(mockPlayer, "replaceAsync", { configurable: true, value: replaceAsync });
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+    try {
+      mockPlayer.currentTime = 42;
+      const { queryByText } = renderScreen();
+      mockPlayer.play.mockClear();
+      mockPlayer.replace.mockClear();
+
+      await act(async () => {
+        statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(queryByText("This video failed to load")).toBeNull();
+      expect(replaceAsync).toHaveBeenCalledTimes(2);
+      expect(mockPlayer.replace).not.toHaveBeenCalled();
+      expect(mockPlayer.currentTime).toBe(42);
+      expect(mockPlayer.play).toHaveBeenCalled();
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+    } finally {
+      delete (mockPlayer as { replaceAsync?: unknown }).replaceAsync;
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform });
+    }
+  });
+
   it("shows the failed screen after three transient playback errors", () => {
     const { queryByText } = renderScreen();
 

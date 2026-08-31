@@ -176,6 +176,7 @@ export default function VideoPlayerScreen() {
   const pendingSourceResumeRef = useRef<{ position: number; wasPlaying: boolean } | null>(null);
   const videoUrlRef = useRef<string | null>(null);
   const playbackRetryCountRef = useRef(0);
+  const playbackRecoveryRequestIdRef = useRef(0);
   const recoveryStartedAtRef = useRef<number | null>(null);
 
   const cancelCaptionRequest = useCallback(() => {
@@ -189,6 +190,7 @@ export default function VideoPlayerScreen() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      playbackRecoveryRequestIdRef.current += 1;
       fullscreenRequestIdRef.current += 1;
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
@@ -218,6 +220,7 @@ export default function VideoPlayerScreen() {
       playbackStartedRef.current = false;
       setPlaybackStarted(false);
       playbackRetryCountRef.current = 0;
+      playbackRecoveryRequestIdRef.current += 1;
       recoveryStartedAtRef.current = null;
       cancelCaptionRequest();
       fullscreenRequestIdRef.current += 1;
@@ -331,13 +334,24 @@ export default function VideoPlayerScreen() {
     };
 
     if (source && Platform.OS === "ios" && replaceable.replaceAsync) {
+      const recoveryRequestId = ++playbackRecoveryRequestIdRef.current;
       replaceable
         .replaceAsync(source)
-        .then(resume)
+        .then(() => {
+          if (!mountedRef.current || playbackRecoveryRequestIdRef.current !== recoveryRequestId) return;
+          resume();
+        })
         .catch((error) => {
           if (isReleasedPlayerError(error)) return;
+          if (!mountedRef.current || playbackRecoveryRequestIdRef.current !== recoveryRequestId) return;
+          const message = error instanceof Error ? error.message : "Unknown playback error";
+          if (isTransientPlaybackError(message) && playbackRetryCountRef.current < MAX_TRANSIENT_PLAYBACK_RETRIES) {
+            playbackRetryCountRef.current += 1;
+            replayFromLastPosition();
+            return;
+          }
           Sentry.captureException(error);
-          setPlaybackError(error instanceof Error ? error.message : "Unknown playback error");
+          setPlaybackError(message);
         });
       return;
     }
