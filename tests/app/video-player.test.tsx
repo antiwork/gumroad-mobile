@@ -30,6 +30,7 @@ const mockPlayer = {
   availableSubtitleTracks: [] as { language: string; label: string }[],
   play: jest.fn(),
   pause: jest.fn(),
+  replace: jest.fn(),
   addListener: jest.fn((eventName: string, listener: (payload: never) => void) => {
     if (eventName === "statusChange") {
       statusChangeListener = listener as (payload: StatusChangePayload) => void;
@@ -609,11 +610,160 @@ describe("VideoPlayerScreen", () => {
     expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 
+  it("retries a transient network error without showing the failed screen", () => {
+    mockPlayer.currentTime = 42;
+    const { queryByText } = renderScreen();
+    mockPlayer.play.mockClear();
+    mockPlayer.replace.mockClear();
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+    });
+
+    expect(queryByText("This video failed to load")).toBeNull();
+    expect(mockPlayer.replace).toHaveBeenCalledWith("https://example.com/video.mp4");
+    expect(mockPlayer.currentTime).toBe(42);
+    expect(mockPlayer.play).toHaveBeenCalled();
+  });
+
+  it("uses asynchronous source replacement for iOS playback recovery", async () => {
+    const originalPlatform = Platform.OS;
+    const replaceAsync = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(mockPlayer, "replaceAsync", { configurable: true, value: replaceAsync });
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+    try {
+      mockPlayer.currentTime = 42;
+      renderScreen();
+      mockPlayer.play.mockClear();
+      mockPlayer.replace.mockClear();
+
+      await act(async () => {
+        statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+        await Promise.resolve();
+      });
+
+      expect(replaceAsync).toHaveBeenCalledWith("https://example.com/video.mp4");
+      expect(mockPlayer.replace).not.toHaveBeenCalled();
+      expect(mockPlayer.currentTime).toBe(42);
+      expect(mockPlayer.play).toHaveBeenCalled();
+    } finally {
+      delete (mockPlayer as { replaceAsync?: unknown }).replaceAsync;
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform });
+    }
+  });
+
+  it("keeps retrying transient iOS replacement failures within the retry budget", async () => {
+    const originalPlatform = Platform.OS;
+    const replaceAsync = jest
+      .fn()
+      .mockRejectedValueOnce(new Error("The network connection was lost."))
+      .mockResolvedValueOnce(undefined);
+    Object.defineProperty(mockPlayer, "replaceAsync", { configurable: true, value: replaceAsync });
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+    try {
+      mockPlayer.currentTime = 42;
+      const { queryByText } = renderScreen();
+      mockPlayer.play.mockClear();
+      mockPlayer.replace.mockClear();
+
+      await act(async () => {
+        statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(queryByText("This video failed to load")).toBeNull();
+      expect(replaceAsync).toHaveBeenCalledTimes(2);
+      expect(mockPlayer.replace).not.toHaveBeenCalled();
+      expect(mockPlayer.currentTime).toBe(42);
+      expect(mockPlayer.play).toHaveBeenCalled();
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+    } finally {
+      delete (mockPlayer as { replaceAsync?: unknown }).replaceAsync;
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform });
+    }
+  });
+
+  it("shows the failed screen after three transient playback errors", () => {
+    const { queryByText } = renderScreen();
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+      statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+      statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+    });
+    expect(queryByText("This video failed to load")).toBeNull();
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+    });
+    expect(queryByText("This video failed to load")).toBeTruthy();
+  });
+
+  it("resets the automatic retry budget after playback progresses again", () => {
+    const { queryByText } = renderScreen();
+    mockPlayer.play.mockClear();
+    mockPlayer.replace.mockClear();
+
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const recoveryPosition = 40 + attempt;
+      mockPlayer.currentTime = recoveryPosition;
+      act(() => {
+        statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+      });
+      expect(queryByText("This video failed to load")).toBeNull();
+      expect(mockPlayer.replace).toHaveBeenCalledTimes(attempt);
+
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+        timeUpdateListener!({ currentTime: recoveryPosition + 0.25 });
+      });
+    }
+  });
+
+  it("keeps counting retries until playback moves past the recovery position", () => {
+    const { queryByText } = renderScreen();
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      mockPlayer.currentTime = 42;
+      act(() => {
+        statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+        statusChangeListener!({ status: "readyToPlay" });
+      });
+      expect(queryByText("This video failed to load")).toBeNull();
+    }
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "The network connection was lost." } });
+    });
+    expect(queryByText("This video failed to load")).toBeTruthy();
+  });
+
+  it("replays from the last position when Try again is pressed", () => {
+    mockPlayer.currentTime = 18;
+    const { getByLabelText, queryByText } = renderScreen();
+
+    act(() => {
+      statusChangeListener!({ status: "error", error: { message: "AVPlayer cannot decode the file" } });
+    });
+    mockPlayer.play.mockClear();
+    mockPlayer.replace.mockClear();
+
+    act(() => {
+      fireEvent.press(getByLabelText("Try again"));
+    });
+
+    expect(queryByText("This video failed to load")).toBeNull();
+    expect(mockPlayer.replace).toHaveBeenCalledWith("https://example.com/video.mp4");
+    expect(mockPlayer.play).toHaveBeenCalled();
+  });
+
   it("clears the error state once the player becomes ready to play", () => {
     const { queryByText } = renderScreen();
 
     act(() => {
-      statusChangeListener!({ status: "error", error: { message: "Transient network error" } });
+      statusChangeListener!({ status: "error", error: { message: "AVPlayer cannot decode the file" } });
     });
     expect(queryByText("This video failed to load")).toBeTruthy();
 
@@ -641,11 +791,34 @@ describe("VideoPlayerScreen", () => {
       await getByTestId("video-player").props.onFullscreenEnter();
     });
     expect(mockLockAsync).toHaveBeenCalledWith("landscape");
+    expect(StatusBar.setHidden).toHaveBeenCalledWith(true, "fade");
 
     act(() => {
       getByTestId("video-player").props.onFullscreenExit();
     });
     expect(mockLockAsync).toHaveBeenCalledWith("portrait-up");
+    expect(StatusBar.setHidden).toHaveBeenCalledWith(false, "fade");
+  });
+
+  it("hides the Android navigation bar for native fullscreen so system buttons do not cover the scrubber", async () => {
+    const originalPlatform = Platform.OS;
+    Object.defineProperty(Platform, "OS", { configurable: true, value: "android" });
+    try {
+      const { getByTestId } = renderScreen();
+      mockSetNavigationBarVisibilityAsync.mockClear();
+
+      await act(async () => {
+        await getByTestId("video-player").props.onFullscreenEnter();
+      });
+      expect(mockSetNavigationBarVisibilityAsync).toHaveBeenCalledWith("hidden");
+
+      act(() => {
+        getByTestId("video-player").props.onFullscreenExit();
+      });
+      expect(mockSetNavigationBarVisibilityAsync).toHaveBeenCalledWith("visible");
+    } finally {
+      Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatform });
+    }
   });
 
   it("restores the app orientation when native fullscreen playback fails", async () => {

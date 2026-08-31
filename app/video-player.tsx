@@ -8,6 +8,7 @@ import { formatTime } from "@/lib/format-time";
 import { isMeaningfulLocation, isResumableLocation, updateMediaLocation } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
 import { fetchSubtitleText, SubtitleFetchError } from "@/lib/subtitle-fetch";
+import { isTransientPlaybackError, MAX_TRANSIENT_PLAYBACK_RETRIES } from "@/lib/transient-playback-error";
 import { activeCueText, parseSubtitles, type SubtitleCue } from "@/lib/subtitles";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -173,6 +174,10 @@ export default function VideoPlayerScreen() {
   const playerRef = useRef<ReturnType<typeof useVideoPlayer> | null>(null);
   const videoDurationRef = useRefToLatest(videoDuration);
   const pendingSourceResumeRef = useRef<{ position: number; wasPlaying: boolean } | null>(null);
+  const videoUrlRef = useRef<string | null>(null);
+  const playbackRetryCountRef = useRef(0);
+  const playbackRecoveryRequestIdRef = useRef(0);
+  const recoveryStartedAtRef = useRef<number | null>(null);
 
   const cancelCaptionRequest = useCallback(() => {
     captionRequestIdRef.current += 1;
@@ -185,6 +190,7 @@ export default function VideoPlayerScreen() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      playbackRecoveryRequestIdRef.current += 1;
       fullscreenRequestIdRef.current += 1;
       fullscreenOrientationActiveRef.current = false;
       fullscreenTransitionPendingRef.current = false;
@@ -213,6 +219,9 @@ export default function VideoPlayerScreen() {
       setVideoDuration(videoLength ?? 0);
       playbackStartedRef.current = false;
       setPlaybackStarted(false);
+      playbackRetryCountRef.current = 0;
+      playbackRecoveryRequestIdRef.current += 1;
+      recoveryStartedAtRef.current = null;
       cancelCaptionRequest();
       fullscreenRequestIdRef.current += 1;
       if (Platform.OS !== "ios" && fullscreenOrientationActiveRef.current) {
@@ -306,6 +315,53 @@ export default function VideoPlayerScreen() {
     }
   });
   playerRef.current = player;
+  videoUrlRef.current = videoUrl;
+
+  const replayFromLastPosition = useCallback(() => {
+    const position = Math.max(currentPositionRef.current, player.currentTime || 0);
+    pendingSourceResumeRef.current = { position, wasPlaying: true };
+    recoveryStartedAtRef.current = position;
+    const source = videoUrlRef.current;
+    const replaceable = player as {
+      replace?: (source: string) => void;
+      replaceAsync?: (source: string) => Promise<void>;
+    };
+    const resume = () => {
+      withReleasedPlayerGuard(() => {
+        player.currentTime = position;
+        player.play();
+      });
+    };
+
+    if (source && Platform.OS === "ios" && replaceable.replaceAsync) {
+      const recoveryRequestId = ++playbackRecoveryRequestIdRef.current;
+      replaceable
+        .replaceAsync(source)
+        .then(() => {
+          if (!mountedRef.current || playbackRecoveryRequestIdRef.current !== recoveryRequestId) return;
+          resume();
+        })
+        .catch((error) => {
+          if (isReleasedPlayerError(error)) return;
+          if (!mountedRef.current || playbackRecoveryRequestIdRef.current !== recoveryRequestId) return;
+          const message = error instanceof Error ? error.message : "Unknown playback error";
+          if (isTransientPlaybackError(message) && playbackRetryCountRef.current < MAX_TRANSIENT_PLAYBACK_RETRIES) {
+            playbackRetryCountRef.current += 1;
+            replayFromLastPosition();
+            return;
+          }
+          Sentry.captureException(error);
+          setPlaybackError(message);
+        });
+      return;
+    }
+
+    withReleasedPlayerGuard(() => {
+      if (source) replaceable.replace?.(source);
+      player.currentTime = position;
+      player.play();
+    });
+  }, [currentPositionRef, player]);
 
   const wasPlayingBeforeBackgroundRef = useRef(false);
   const positionBeforeBackgroundRef = useRef<number | null>(null);
@@ -351,10 +407,15 @@ export default function VideoPlayerScreen() {
       "statusChange",
       ({ status, error }: { status: VideoPlayerStatus; error?: { message: string } }) => {
         if (status === "error") {
+          const message = error?.message ?? "Unknown playback error";
+          if (isTransientPlaybackError(message) && playbackRetryCountRef.current < MAX_TRANSIENT_PLAYBACK_RETRIES) {
+            playbackRetryCountRef.current += 1;
+            replayFromLastPosition();
+            return;
+          }
           fullscreenRequestIdRef.current += 1;
           setFullscreenCaptionPickerOpen(false);
           setExternalFullscreenOpen(false);
-          const message = error?.message ?? "Unknown playback error";
           if (externalFullscreenOpen && Platform.OS === "ios") {
             fullscreenTransitionPendingRef.current = true;
             setFullscreenTransitionPending(true);
@@ -395,7 +456,15 @@ export default function VideoPlayerScreen() {
       },
     );
     return () => subscription.remove();
-  }, [cancelCaptionRequest, externalFullscreenOpen, player, savedPosition, savedPositionIsAtEnd, videoDurationRef]);
+  }, [
+    cancelCaptionRequest,
+    externalFullscreenOpen,
+    player,
+    replayFromLastPosition,
+    savedPosition,
+    savedPositionIsAtEnd,
+    videoDurationRef,
+  ]);
 
   useEffect(() => {
     const subscription = player.addListener(
@@ -444,6 +513,11 @@ export default function VideoPlayerScreen() {
 
   useEffect(() => {
     const subscription = player.addListener("timeUpdate", ({ currentTime }: { currentTime: number }) => {
+      const recoveryStartedAt = recoveryStartedAtRef.current;
+      if (recoveryStartedAt !== null && currentTime > recoveryStartedAt + 0.1) {
+        playbackRetryCountRef.current = 0;
+        recoveryStartedAtRef.current = null;
+      }
       if (!playbackStartedRef.current && currentTime > resumePosition + 0.1) {
         playbackStartedRef.current = true;
         setPlaybackStarted(true);
@@ -678,8 +752,10 @@ export default function VideoPlayerScreen() {
   const handleNativeFullscreenEnter = async () => {
     const requestId = ++fullscreenRequestIdRef.current;
     const orientationApplied = await prepareFullscreenOrientation();
+    const barsHidden = await hideFullscreenSystemBars();
     if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId) {
       if (orientationApplied) restoreAppOrientation();
+      if (barsHidden) restoreFullscreenSystemBars();
       return;
     }
     fullscreenOrientationActiveRef.current = orientationApplied;
@@ -690,6 +766,7 @@ export default function VideoPlayerScreen() {
     fullscreenOrientationActiveRef.current = false;
     fullscreenTransitionPendingRef.current = false;
     setFullscreenTransitionPending(false);
+    restoreFullscreenSystemBars();
     restoreAppOrientation();
   };
 
@@ -843,8 +920,21 @@ export default function VideoPlayerScreen() {
           <View style={styles.errorContainer}>
             <Text className="text-center text-lg font-semibold text-white">This video failed to load</Text>
             <Text className="mt-2 text-center text-sm text-white/70">
-              Try downloading the file from the product page instead.
+              Try again, or download the file from the product page instead.
             </Text>
+            <Pressable
+              onPress={() => {
+                playbackRetryCountRef.current = 0;
+                setPlaybackError(null);
+                replayFromLastPosition();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Try again"
+              testID="retry-playback-button"
+              className="mt-6 rounded-full bg-accent px-5 py-3"
+            >
+              <Text className="text-center text-sm font-semibold text-accent-foreground">Try again</Text>
+            </Pressable>
             <Text className="mt-4 text-center text-xs text-white/50">{playbackError}</Text>
           </View>
         </View>
