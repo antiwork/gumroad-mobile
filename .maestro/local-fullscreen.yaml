@@ -1,0 +1,7 @@
+appId: ${APP_ID}
+---
+- tapOn:
+    id: video-player
+- tapOn: "Enter fullscreen"
+- waitForAnimationToEnd:
+    timeout: 3000

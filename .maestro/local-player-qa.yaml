@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "http://10.0.2.2:8082"
+    commands:
+      - tapOn: "http://10.0.2.2:8082"
+- extendedWaitUntil:
+    visible: "Library|Dashboard|Sign in with Gumroad|You're just getting started|QA"
+    timeout: 30000
+- openLink:
+    link: "gumroadmobile://video-player?uri=http%3A%2F%2F127.0.0.1%3A49302%2FBig%2520Buck%2520Bunny%2520-%2520Trailer.mp4&title=QA"
+- extendedWaitUntil:
+    visible:
+      id: video-player
+    timeout: 25000
+- waitForAnimationToEnd:
+    timeout: 4000

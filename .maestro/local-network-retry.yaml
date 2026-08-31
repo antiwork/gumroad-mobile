@@ -1,0 +1,39 @@
+appId: ${APP_ID}
+tags:
+  - android-only
+onFlowComplete:
+  - runFlow:
+      when:
+        platform: Android
+      commands:
+        - setAirplaneMode: disabled
+---
+- runFlow:
+    file: utils/sign-in.yaml
+    env:
+      EMAIL: mobile_buyer_do_not_edit@gumroad.com
+      PASSWORD: password
+- tapOn: ".*Mobile Test Product 1.*"
+- extendedWaitUntil:
+    visible: Mobile Test Video
+    timeout: 30000
+- tapOn: "Watch|Watch again"
+- extendedWaitUntil:
+    visible:
+      id: video-player
+    timeout: 20000
+- extendedWaitUntil:
+    visible: Video playback started
+    timeout: 20000
+- assertNotVisible: This video failed to load
+- takeScreenshot: /tmp/gm357-playing
+- setAirplaneMode: enabled
+- waitForAnimationToEnd:
+    timeout: 4000
+- setAirplaneMode: disabled
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: /tmp/gm357-after-handoff
+- assertNotVisible: This video failed to load
+- assertVisible:
+    id: video-player
