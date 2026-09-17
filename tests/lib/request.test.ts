@@ -77,8 +77,6 @@ describe("request", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  // A 200 whose body is a web page instead of JSON (captive portal, firewall page, edge error
-  // page served with a success status). Sentry GUMROAD-MOBILE-17H.
   const htmlOk = () =>
     Promise.resolve({
       ok: true,
@@ -89,7 +87,6 @@ describe("request", () => {
     });
 
   it("throws InvalidResponseError instead of a raw SyntaxError when a 2xx body is not JSON", async () => {
-    // Non-JSON 2xx is transient-class, so the GET is retried once — serve the bad body twice.
     mockFetch.mockReturnValueOnce(htmlOk()).mockReturnValueOnce(htmlOk());
     const pending = request("https://api.example.com/test").catch((e) => e);
     await jest.advanceTimersByTimeAsync(2_000);

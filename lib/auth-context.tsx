@@ -30,8 +30,6 @@ WebBrowser.maybeCompleteAuthSession();
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
-  // null while the creator check has not succeeded yet, so screens can tell "we don't know"
-  // apart from "this user has no products".
   isCreator: boolean | null;
   accessToken: string | null;
   login: () => Promise<void>;
