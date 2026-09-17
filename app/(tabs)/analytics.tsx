@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 
 type TabType = "sales" | "traffic";
@@ -29,11 +29,15 @@ const TabButton = <ValueType extends string>({
 );
 
 export default function Analytics() {
-  const { isCreator } = useAuth();
+  const { isCreator, refreshCreatorStatus } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("sales");
   const [timeRange, setTimeRange] = useState<AnalyticsTimeRange>("1w");
 
-  if (!isCreator) {
+  useEffect(() => {
+    if (isCreator === null) void refreshCreatorStatus();
+  }, [isCreator, refreshCreatorStatus]);
+
+  if (isCreator === false) {
     return (
       <Screen>
         <GettingStartedPlaceholder message="You don't have any sales yet. Once you do, you'll see them here, along with powerful data that can help you see what's working, and what could be working better." />

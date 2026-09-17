@@ -181,6 +181,39 @@ describe("fetchCreatorStatus Sentry reporting", () => {
   });
 });
 
+describe("creator status on launch", () => {
+  it("leaves isCreator unknown (null) when the creator probe fails, instead of marking the user a non-creator", async () => {
+    mockGetItemAsync.mockResolvedValue("stored-token");
+    mockRequest.mockRejectedValue(new Error("Request failed: 200 non-JSON response body"));
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(mockRequest).toHaveBeenCalled();
+    expect(result.current.isCreator).toBeNull();
+  });
+
+  it("marks the user a non-creator only when the probe succeeds with no products", async () => {
+    mockGetItemAsync.mockResolvedValue("stored-token");
+    mockRequest.mockResolvedValue({ products: [] });
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.isCreator).toBe(false);
+  });
+
+  it("marks the user a creator when the probe returns products", async () => {
+    mockGetItemAsync.mockResolvedValue("stored-token");
+    mockRequest.mockResolvedValue({ products: [{ id: "product-id" }] });
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.isCreator).toBe(true);
+  });
+});
+
 describe("refreshCreatorStatus", () => {
   const storedTokens = (key: string) =>
     key === "gumroad_access_token"
@@ -234,6 +267,22 @@ describe("refreshCreatorStatus", () => {
 
     expect(result.current.isCreator).toBe(true);
     expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it("resolves an unknown creator status once the probe succeeds", async () => {
+    mockGetItemAsync.mockImplementation(storedTokens);
+    mockRequest.mockRejectedValueOnce(new Error("Request failed: 200 non-JSON response body"));
+
+    const { result } = renderWithProvider(null);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isCreator).toBeNull();
+
+    mockRequest.mockResolvedValueOnce({ products: [{ id: "product-id" }] });
+    await act(async () => {
+      await result.current.refreshCreatorStatus();
+    });
+
+    expect(result.current.isCreator).toBe(true);
   });
 });
 

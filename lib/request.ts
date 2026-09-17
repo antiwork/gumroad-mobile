@@ -42,6 +42,19 @@ export class RequestError extends Error {
   }
 }
 
+// The server answered with a success status, but the body was not JSON. Every endpoint this app
+// talks to answers in JSON, so this means something between the app and the API (a captive
+// portal, a firewall page, an edge error page served with a 200) replaced the response. The
+// request itself is fine to repeat, so GETs get the same automatic retry as a gateway error.
+export class InvalidResponseError extends Error {
+  statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.name = "InvalidResponseError";
+    this.statusCode = statusCode;
+  }
+}
+
 // On iOS, React Native's fetch backs response bodies with native Blob storage. If the app is
 // suspended between the response arriving and the body being read, iOS can purge that storage,
 // and reading the body then rejects with "Unable to resolve data for blob: <uuid>". The response
@@ -147,12 +160,10 @@ export const request = async <T>(
   try {
     return await requestOnce<T>(url, options);
   } catch (error) {
-    if (
-      method === "GET" &&
-      !options?.signal?.aborted &&
-      error instanceof ServerError &&
-      TRANSIENT_STATUS_CODES.includes(error.statusCode)
-    ) {
+    const isTransient =
+      (error instanceof ServerError && TRANSIENT_STATUS_CODES.includes(error.statusCode)) ||
+      error instanceof InvalidResponseError;
+    if (method === "GET" && !options?.signal?.aborted && isTransient) {
       await retryDelay(SERVER_ERROR_RETRY_DELAY_MS, options?.signal);
       return requestOnce<T>(url, options);
     }
@@ -213,9 +224,19 @@ const requestOnce = async <T>(
       console.info("HTTP request", { ...details, error });
       throw new RequestError(response.status, `Request failed: ${response.status} ${error}`);
     }
-    console.info("HTTP request", details);
-    if (options?.skipResponseBody) return undefined as T;
-    return readBody(() => response.json());
+    if (options?.skipResponseBody) {
+      console.info("HTTP request", details);
+      return undefined as T;
+    }
+    try {
+      const data = await readBody(() => response.json());
+      console.info("HTTP request", details);
+      return data;
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      console.info("HTTP request", { ...details, error: "Non-JSON response body" });
+      throw new InvalidResponseError(response.status, `Request failed: ${response.status} non-JSON response body`);
+    }
   } finally {
     clearTimeout(timeoutId);
   }

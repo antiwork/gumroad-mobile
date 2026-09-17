@@ -1,4 +1,4 @@
-import { request, ServerError, StaleResponseError, UnauthorizedError } from "@/lib/request";
+import { InvalidResponseError, request, ServerError, StaleResponseError, UnauthorizedError } from "@/lib/request";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -69,11 +69,51 @@ describe("request", () => {
       Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.reject(new SyntaxError("Unexpected token < in JSON")),
+        json: () => Promise.reject(new TypeError("Network request failed")),
         text: () => Promise.resolve(""),
       }),
     );
-    await expect(request("https://api.example.com/test")).rejects.toThrow(SyntaxError);
+    await expect(request("https://api.example.com/test")).rejects.toThrow(TypeError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  // A 200 whose body is a web page instead of JSON (captive portal, firewall page, edge error
+  // page served with a success status). Sentry GUMROAD-MOBILE-17H.
+  const htmlOk = () =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: headers("text/html; charset=utf-8"),
+      json: () => Promise.reject(new SyntaxError("JSON Parse error: Unexpected character: <")),
+      text: () => Promise.resolve("<html><body>Please sign in to the network</body></html>"),
+    });
+
+  it("throws InvalidResponseError instead of a raw SyntaxError when a 2xx body is not JSON", async () => {
+    // Non-JSON 2xx is transient-class, so the GET is retried once — serve the bad body twice.
+    mockFetch.mockReturnValueOnce(htmlOk()).mockReturnValueOnce(htmlOk());
+    const pending = request("https://api.example.com/test").catch((e) => e);
+    await jest.advanceTimersByTimeAsync(2_000);
+    const thrown = (await pending) as InvalidResponseError;
+    expect(thrown).toBeInstanceOf(InvalidResponseError);
+    expect(thrown).not.toBeInstanceOf(SyntaxError);
+    expect(thrown.statusCode).toBe(200);
+    expect(thrown.message).toBe("Request failed: 200 non-JSON response body");
+    expect(thrown.message).not.toContain("Please sign in");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a GET once after a non-JSON 2xx and returns the second response", async () => {
+    mockFetch.mockReturnValueOnce(htmlOk()).mockReturnValueOnce(jsonResponse({ id: 9 }));
+    const promise = request("https://api.example.com/test");
+    await jest.advanceTimersByTimeAsync(2_000);
+    await expect(promise).resolves.toEqual({ id: 9 });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry non-GET requests after a non-JSON 2xx", async () => {
+    mockFetch.mockReturnValueOnce(htmlOk());
+    await expect(request("https://api.example.com/test", { method: "POST" })).rejects.toThrow(InvalidResponseError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("throws UnauthorizedError on 401", async () => {

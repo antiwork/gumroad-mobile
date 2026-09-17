@@ -30,7 +30,9 @@ WebBrowser.maybeCompleteAuthSession();
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
-  isCreator: boolean;
+  // null while the creator check has not succeeded yet, so screens can tell "we don't know"
+  // apart from "this user has no products".
+  isCreator: boolean | null;
   accessToken: string | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
@@ -69,11 +71,11 @@ const reportCreatorStatusError = (e: unknown) => {
   }
 };
 
-const fetchCreatorStatus = async (token: string): Promise<boolean> => {
+const fetchCreatorStatus = async (token: string): Promise<boolean | null> => {
   const result = await fetchCreatorStatusResult(token);
   if ("error" in result) {
     reportCreatorStatusError(result.error);
-    return false;
+    return null;
   }
   return result.isCreator;
 };
@@ -96,7 +98,7 @@ const isKeychainUnavailableError = (error: unknown): boolean =>
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [isCreator, setIsCreator] = useState(false);
+  const [isCreator, setIsCreator] = useState<boolean | null>(false);
   const inflightRefresh = useRef<Promise<string> | null>(null);
   const router = useRouter();
 
@@ -275,7 +277,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       reportCreatorStatusError(result.error);
       return;
     }
-    setIsCreator((current) => current || result.isCreator);
+    setIsCreator((current) => current === true || result.isCreator);
   }, [accessToken, refreshTokenFn]);
 
   return (

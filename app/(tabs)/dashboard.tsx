@@ -32,7 +32,7 @@ const TimeRangeButton = ({
 );
 
 export default function Dashboard() {
-  const { isLoading: isAuthLoading, isCreator } = useAuth();
+  const { isLoading: isAuthLoading, isCreator, refreshCreatorStatus } = useAuth();
   const {
     data,
     isLoading: isLoadingAnalytics,
@@ -41,16 +41,20 @@ export default function Dashboard() {
     isRefetching,
     timeRange,
     setTimeRange,
-  } = useSalesAnalytics({ enabled: isCreator });
+  } = useSalesAnalytics({ enabled: isCreator !== false });
   const accentColor = useCSSVariable("--color-accent") as string;
   const mutedColor = useCSSVariable("--color-muted") as string;
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const { isSearchActive, setSearchActive } = useDashboardSearch();
   const [searchText, setSearchText] = useState("");
   const isAllRange = timeRange === "all";
-  const salesSearch = useSales(searchText, isCreator && isSearchActive, { requireQuery: true });
-  const allSales = useSales("", isCreator && isAllRange && !isSearchActive);
+  const salesSearch = useSales(searchText, isCreator !== false && isSearchActive, { requireQuery: true });
+  const allSales = useSales("", isCreator !== false && isAllRange && !isSearchActive);
   const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (isCreator === null) void refreshCreatorStatus();
+  }, [isCreator, refreshCreatorStatus]);
 
   useEffect(() => {
     if (isSearchActive) {
@@ -83,7 +87,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!isCreator) {
+  if (isCreator === false) {
     return (
       <Screen>
         <GettingStartedPlaceholder message="Create your first product and your sales will show up here." />
