@@ -48,7 +48,6 @@ export default function PdfViewerScreen() {
   const [showTocModal, setShowTocModal] = useState(false);
   const [showViewModeModal, setShowViewModeModal] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
-  const [pdfMounted, setPdfMounted] = useState(true);
   const [pdfError, setPdfError] = useState(false);
   const [pdfKey, setPdfKey] = useState(0);
   const [cachedUri, setCachedUri] = useState<string | null>(null);
@@ -115,11 +114,7 @@ export default function PdfViewerScreen() {
   }, [downloadPdf]);
 
   const switchViewMode = (mode: "single" | "continuous") => {
-    // Unmount the PDF component first to let the native rendering thread finish
-    // before the document is closed, avoiding IllegalStateException: Already closed
-    setPdfMounted(false);
     setViewMode(mode);
-    requestAnimationFrame(() => setPdfMounted(true));
   };
 
   useEffect(() => {
@@ -235,7 +230,7 @@ export default function PdfViewerScreen() {
         <View className="flex-1 items-center justify-center">
           <LoadingSpinner testID="loading-spinner" />
         </View>
-      ) : pdfMounted ? (
+      ) : (
         <Pdf
           key={`${viewMode}-${pdfKey}`}
           ref={pdfRef}
@@ -262,7 +257,7 @@ export default function PdfViewerScreen() {
             setPdfError(true);
           }}
         />
-      ) : null}
+      )}
 
       <PdfNavigationSheet
         open={showTocModal}

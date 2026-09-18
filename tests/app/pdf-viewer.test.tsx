@@ -72,6 +72,8 @@ jest.mock("@/components/pdf-navigation-sheet", () => ({
 }));
 
 let mockOnError: ((e: unknown) => void) | null = null;
+const mockPdfMount = jest.fn();
+const mockPdfUnmount = jest.fn();
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -91,13 +93,17 @@ const deferred = <T,>(): Deferred<T> => {
 };
 
 jest.mock("react-native-pdf", () => {
-  const { forwardRef } = require("react");
+  const { forwardRef, useEffect } = require("react");
   const { View } = require("react-native");
   return {
     __esModule: true,
     default: forwardRef((props: Record<string, unknown>, _ref: unknown) => {
       mockOnError = props.onError as any;
-      return <View testID="pdf-component" />;
+      useEffect(() => {
+        mockPdfMount();
+        return () => mockPdfUnmount();
+      }, []);
+      return <View testID="pdf-component" accessibilityLabel={props.horizontal ? "single" : "continuous"} />;
     }),
   };
 });
@@ -119,11 +125,40 @@ describe("PdfViewerScreen", () => {
     const Sharing = require("expo-sharing");
     mockSearchParams = { ...defaultSearchParams };
     mockOnError = null;
+    mockPdfMount.mockClear();
+    mockPdfUnmount.mockClear();
     File.downloadFileAsync.mockReset();
     File.downloadFileAsync.mockResolvedValue({ uri: "file:///cache/test.pdf" });
     Sharing.isAvailableAsync.mockReset();
     Sharing.shareAsync.mockReset();
     Sharing.isAvailableAsync.mockResolvedValue(true);
+  });
+
+  it("remounts once immediately when changing view mode and keeps the selected mode mounted", async () => {
+    renderWithProviders();
+    await act(async () => {});
+    expect(mockPdfMount).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByLabelText("View mode"));
+    fireEvent.press(screen.getByText("Continuous"));
+
+    expect(screen.getByTestId("pdf-component").props.accessibilityLabel).toBe("continuous");
+    expect(mockPdfMount).toHaveBeenCalledTimes(2);
+    expect(mockPdfUnmount).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByLabelText("View mode"));
+    fireEvent.press(screen.getByText("Continuous"));
+
+    expect(screen.getByTestId("pdf-component")).toBeTruthy();
+    expect(mockPdfMount).toHaveBeenCalledTimes(2);
+    expect(mockPdfUnmount).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByLabelText("View mode"));
+    fireEvent.press(screen.getByText("Single Page"));
+
+    expect(screen.getByTestId("pdf-component").props.accessibilityLabel).toBe("single");
+    expect(mockPdfMount).toHaveBeenCalledTimes(3);
+    expect(mockPdfUnmount).toHaveBeenCalledTimes(2);
   });
 
   it("shows error view with Try Again button when PDF fails to load", async () => {
