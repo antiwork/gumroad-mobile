@@ -1,0 +1,13 @@
+def testSources = new File(initscript.sourceFile.parentFile, 'src')
+
+gradle.beforeProject { project ->
+    if (project.name == 'react-native-pdf') {
+        project.plugins.withId('com.android.library') {
+            project.android.sourceSets.test.java.srcDir(testSources)
+            project.android.testOptions.unitTests.includeAndroidResources = true
+            project.dependencies.add('testImplementation', 'junit:junit:4.13.2')
+            project.dependencies.add('testImplementation', 'org.robolectric:robolectric:4.16.1')
+            project.dependencies.add('testImplementation', 'org.mockito:mockito-core:5.18.0')
+        }
+    }
+}

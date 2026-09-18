@@ -1,3 +1,71 @@
+diff --git a/node_modules/react-native-pdf/android/src/main/java/com/github/barteksc/pdfviewer/RenderingDrain.java b/node_modules/react-native-pdf/android/src/main/java/com/github/barteksc/pdfviewer/RenderingDrain.java
+new file mode 100644
+index 0000000..a4879b5
+--- /dev/null
++++ b/node_modules/react-native-pdf/android/src/main/java/com/github/barteksc/pdfviewer/RenderingDrain.java
+@@ -0,0 +1,45 @@
++package com.github.barteksc.pdfviewer;
++
++import java.util.concurrent.CountDownLatch;
++
++public final class RenderingDrain {
++    private RenderingDrain() {}
++
++    public static void stopAndWait(PDFView view) {
++        RenderingHandler handler = view.renderingHandler;
++        if (handler == null) {
++            return;
++        }
++
++        Thread renderer = handler.getLooper().getThread();
++        if (renderer == Thread.currentThread()) {
++            throw new IllegalStateException("Cannot recycle a PDF from its rendering thread");
++        }
++
++        handler.stop();
++        handler.removeMessages(RenderingHandler.MSG_RENDER_TASK);
++        CountDownLatch drained = new CountDownLatch(1);
++        boolean posted = handler.post(drained::countDown);
++        boolean interrupted = false;
++        try {
++            while (true) {
++                try {
++                    // Removing queued work cannot stop a native render already using the document.
++                    // Never close on a timeout or interrupt while that render can still be running.
++                    if (posted) {
++                        drained.await();
++                    } else {
++                        renderer.join();
++                    }
++                    return;
++                } catch (InterruptedException exception) {
++                    interrupted = true;
++                }
++            }
++        } finally {
++            if (interrupted) {
++                Thread.currentThread().interrupt();
++            }
++        }
++    }
++}
+diff --git a/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java b/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
+index e9a1d16..af6fcec 100644
+--- a/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
++++ b/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
+@@ -99,6 +99,12 @@ public class PdfView extends PDFView implements OnPageChangeListener,OnLoadCompl
+         ConfigKt.setPdfiumConfig(new Config(new DefaultLogger(), AlreadyClosedBehavior.IGNORE));
+     }
+
++    @Override
++    public void recycle() {
++        com.github.barteksc.pdfviewer.RenderingDrain.stopAndWait(this);
++        super.recycle();
++    }
++
+     @Override
+     public void onPageChanged(int page, int numberOfPages) {
+         // pdf lib page start from 0, convert it to our page (start from 1)
 diff --git a/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm b/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
 index de46c98..ddc97f2 100644
 --- a/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
