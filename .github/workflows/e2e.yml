@@ -175,5 +175,7 @@ jobs:
             ~/.maestro/tests/**
             node_modules/react-native-pdf/android/build/reports/tests/testDebugUnitTest/**
             node_modules/react-native-pdf/android/build/test-results/testDebugUnitTest/**
+            node_modules/expo-image/android/build/reports/tests/testDebugUnitTest/**
+            node_modules/expo-image/android/build/test-results/testDebugUnitTest/**
           retention-days: 14
           if-no-files-found: warn

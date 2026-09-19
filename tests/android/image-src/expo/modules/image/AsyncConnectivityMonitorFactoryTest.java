@@ -17,7 +17,6 @@ import com.bumptech.glide.manager.ConnectivityMonitorFactory;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +30,7 @@ import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 34)
+@Config(sdk = {24, 34})
 @LooperMode(LooperMode.Mode.PAUSED)
 public class AsyncConnectivityMonitorFactoryTest {
   private final Queue<Runnable> tasks = new ArrayDeque<>();
