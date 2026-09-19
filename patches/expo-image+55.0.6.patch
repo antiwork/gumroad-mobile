@@ -1,9 +1,9 @@
 diff --git a/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java b/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java
 new file mode 100644
-index 0000000..4aedb2d
+index 0000000..02d7d99
 --- /dev/null
 +++ b/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,131 @@
 +package expo.modules.image;
 +
 +import android.Manifest;
@@ -82,23 +82,43 @@ index 0000000..4aedb2d
 +      if (generation.get() != token) return;
 +      if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_NETWORK_STATE)
 +          != PackageManager.PERMISSION_GRANTED) return;
-+      ConnectivityManager.NetworkCallback next = new ConnectivityManager.NetworkCallback() {
-+        @Override
-+        public void onAvailable(Network network) {
-+          notifyConnectivity(true, token);
-+        }
-+
-+        @Override
-+        public void onLost(Network network) {
-+          notifyConnectivity(false, token);
-+        }
-+      };
 +      try {
 +        manager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
++        boolean initiallyConnected = isConnected();
++        ConnectivityManager.NetworkCallback next = new ConnectivityManager.NetworkCallback() {
++          private boolean connected = initiallyConnected;
++
++          @Override
++          public void onAvailable(Network network) {
++            notifyConnectivity(true);
++          }
++
++          @Override
++          public void onLost(Network network) {
++            notifyConnectivity(false);
++          }
++
++          private void notifyConnectivity(boolean nextConnected) {
++            mainHandler.post(() -> {
++              if (generation.get() != token || connected == nextConnected) return;
++              connected = nextConnected;
++              listener.onConnectivityChanged(connected);
++            });
++          }
++        };
 +        manager.registerDefaultNetworkCallback(next);
 +        callback = next;
 +      } catch (RuntimeException error) {
 +        Log.w("ExpoImage", "Could not monitor image connectivity", error);
++      }
++    }
++
++    private boolean isConnected() {
++      try {
++        return manager.getActiveNetwork() != null;
++      } catch (RuntimeException error) {
++        Log.w("ExpoImage", "Could not read image connectivity", error);
++        return true;
 +      }
 +    }
 +
@@ -113,11 +133,6 @@ index 0000000..4aedb2d
 +      }
 +    }
 +
-+    private void notifyConnectivity(boolean connected, int token) {
-+      mainHandler.post(() -> {
-+        if (generation.get() == token) listener.onConnectivityChanged(connected);
-+      });
-+    }
 +  }
 +}
 diff --git a/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt b/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt

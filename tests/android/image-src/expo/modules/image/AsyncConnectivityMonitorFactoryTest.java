@@ -82,7 +82,7 @@ public class AsyncConnectivityMonitorFactoryTest {
   }
 
   @Test
-  public void initialAvailabilityAndReconnectNotifyGlideOnMainThread() {
+  public void connectivityRecoveredDuringRegistrationNotifiesGlideOnMainThread() {
     monitor.onStart();
     drain();
     ConnectivityManager.NetworkCallback callback = callback();
@@ -99,6 +99,45 @@ public class AsyncConnectivityMonitorFactoryTest {
     order.verify(listener).onConnectivityChanged(true);
     order.verify(listener).onConnectivityChanged(false);
     order.verify(listener).onConnectivityChanged(true);
+  }
+
+  @Test
+  public void initialAvailabilityAndNetworkSwitchDoNotRestartHealthyLoads() {
+    when(manager.getActiveNetwork()).thenReturn(mock(Network.class));
+    monitor.onStart();
+    drain();
+    ConnectivityManager.NetworkCallback first = callback();
+    first.onAvailable(mock(Network.class));
+    first.onAvailable(mock(Network.class));
+    shadowOf(Looper.getMainLooper()).idle();
+    verifyNoInteractions(listener);
+    monitor.onStop();
+    monitor.onStart();
+    drain();
+    callback().onAvailable(mock(Network.class));
+    shadowOf(Looper.getMainLooper()).idle();
+    verifyNoInteractions(listener);
+    callback().onLost(mock(Network.class));
+    callback().onLost(mock(Network.class));
+    callback().onAvailable(mock(Network.class));
+    callback().onAvailable(mock(Network.class));
+    shadowOf(Looper.getMainLooper()).idle();
+    var order = inOrder(listener);
+    order.verify(listener).onConnectivityChanged(false);
+    order.verify(listener).onConnectivityChanged(true);
+    order.verifyNoMoreInteractions();
+  }
+
+  @Test
+  public void failedConnectivityReadStillRegistersAndDetectsReconnect() {
+    when(manager.getActiveNetwork()).thenThrow(new SecurityException("denied"));
+    monitor.onStart();
+    drain();
+    callback().onLost(mock(Network.class));
+    callback().onAvailable(mock(Network.class));
+    shadowOf(Looper.getMainLooper()).idle();
+    verify(listener).onConnectivityChanged(false);
+    verify(listener).onConnectivityChanged(true);
   }
 
   @Test
