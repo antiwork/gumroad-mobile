@@ -1,3 +1,152 @@
+diff --git a/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java b/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java
+new file mode 100644
+index 0000000..02d7d99
+--- /dev/null
++++ b/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java
+@@ -0,0 +1,131 @@
++package expo.modules.image;
++
++import android.Manifest;
++import android.content.Context;
++import android.content.pm.PackageManager;
++import android.net.ConnectivityManager;
++import android.net.Network;
++import android.os.Handler;
++import android.os.Looper;
++import android.util.Log;
++import androidx.core.content.ContextCompat;
++import com.bumptech.glide.manager.ConnectivityMonitor;
++import com.bumptech.glide.manager.ConnectivityMonitorFactory;
++import java.util.concurrent.Executor;
++import java.util.concurrent.Executors;
++import java.util.concurrent.atomic.AtomicInteger;
++
++public final class AsyncConnectivityMonitorFactory implements ConnectivityMonitorFactory {
++  private static final Executor EXECUTOR = Executors.newSingleThreadExecutor(
++      task -> new Thread(task, "image-connectivity"));
++  private final Executor executor;
++
++  public AsyncConnectivityMonitorFactory() {
++    this(EXECUTOR);
++  }
++
++  AsyncConnectivityMonitorFactory(Executor executor) {
++    this.executor = executor;
++  }
++
++  @Override
++  public ConnectivityMonitor build(Context context, ConnectivityMonitor.ConnectivityListener listener) {
++    return new Monitor(context.getApplicationContext(), listener, executor);
++  }
++
++  private static final class Monitor implements ConnectivityMonitor {
++    private final Context context;
++    private final ConnectivityListener listener;
++    private final Executor executor;
++    private final Handler mainHandler = new Handler(Looper.getMainLooper());
++    private final AtomicInteger generation = new AtomicInteger();
++    private boolean started;
++    private boolean destroyed;
++    private ConnectivityManager manager;
++    private ConnectivityManager.NetworkCallback callback;
++
++    Monitor(Context context, ConnectivityListener listener, Executor executor) {
++      this.context = context;
++      this.listener = listener;
++      this.executor = executor;
++    }
++
++    @Override
++    public synchronized void onStart() {
++      if (started || destroyed) return;
++      started = true;
++      int token = generation.incrementAndGet();
++      executor.execute(() -> register(token));
++    }
++
++    @Override
++    public synchronized void onStop() {
++      if (!started) return;
++      started = false;
++      generation.incrementAndGet();
++      executor.execute(this::unregister);
++    }
++
++    @Override
++    public synchronized void onDestroy() {
++      destroyed = true;
++      onStop();
++    }
++
++    private void register(int token) {
++      if (generation.get() != token) return;
++      if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_NETWORK_STATE)
++          != PackageManager.PERMISSION_GRANTED) return;
++      try {
++        manager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
++        boolean initiallyConnected = isConnected();
++        ConnectivityManager.NetworkCallback next = new ConnectivityManager.NetworkCallback() {
++          private boolean connected = initiallyConnected;
++
++          @Override
++          public void onAvailable(Network network) {
++            notifyConnectivity(true);
++          }
++
++          @Override
++          public void onLost(Network network) {
++            notifyConnectivity(false);
++          }
++
++          private void notifyConnectivity(boolean nextConnected) {
++            mainHandler.post(() -> {
++              if (generation.get() != token || connected == nextConnected) return;
++              connected = nextConnected;
++              listener.onConnectivityChanged(connected);
++            });
++          }
++        };
++        manager.registerDefaultNetworkCallback(next);
++        callback = next;
++      } catch (RuntimeException error) {
++        Log.w("ExpoImage", "Could not monitor image connectivity", error);
++      }
++    }
++
++    private boolean isConnected() {
++      try {
++        return manager.getActiveNetwork() != null;
++      } catch (RuntimeException error) {
++        Log.w("ExpoImage", "Could not read image connectivity", error);
++        return true;
++      }
++    }
++
++    private void unregister() {
++      if (callback == null) return;
++      try {
++        manager.unregisterNetworkCallback(callback);
++      } catch (RuntimeException error) {
++        Log.w("ExpoImage", "Could not stop image connectivity monitor", error);
++      } finally {
++        callback = null;
++      }
++    }
++
++  }
++}
+diff --git a/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt b/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
+index 5735515..008f796 100644
+--- a/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
++++ b/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
+@@ -14,6 +14,7 @@ import com.bumptech.glide.module.AppGlideModule
+ class ExpoImageAppGlideModule : AppGlideModule() {
+   override fun applyOptions(context: Context, builder: GlideBuilder) {
+     super.applyOptions(context, builder)
++    builder.setConnectivityMonitorFactory(AsyncConnectivityMonitorFactory())
+ 
+     builder.setLogLevel(
+       if (BuildConfig.ALLOW_GLIDE_LOGS) {
 diff --git a/node_modules/expo-image/ios/ImageView.swift b/node_modules/expo-image/ios/ImageView.swift
 index adcf377..9bc3480 100644
 --- a/node_modules/expo-image/ios/ImageView.swift
