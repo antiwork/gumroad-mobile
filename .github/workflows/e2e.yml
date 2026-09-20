@@ -114,6 +114,11 @@ jobs:
         timeout-minutes: 10
         run: ./gradlew -I ../tests/android/enum-tests.gradle :expo-modules-core:testDebugUnitTest --no-daemon
 
+      - name: Test native WebView startup
+        working-directory: android
+        timeout-minutes: 10
+        run: ./gradlew -I ../tests/android/webview-startup-tests.gradle :webview-startup:testDebugUnitTest --no-daemon
+
       - name: Validate generated config
         run: |
           npx expo config --type prebuild --json > /tmp/expo-config.json

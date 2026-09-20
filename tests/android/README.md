@@ -1,5 +1,14 @@
 # Native Android tests
 
+## WebView startup
+
+```sh
+cd android
+./gradlew -I ../tests/android/webview-startup-tests.gradle :webview-startup:testDebugUnitTest --no-daemon
+```
+
+These tests compile the local `webview-startup` module and run on Android API 24 and 34 with Robolectric. They verify that WebView startup is handed to a non-main thread, that UI-thread startup tasks are skipped, that a failure on the startup thread is swallowed and leaves the executor usable, that a throwing startup call does not escape, and that the Expo package registers the application lifecycle listener. They do not start a real Chromium process: WebView startup support is a property of the installed WebView APK, so an emulator or a physical device is what shows whether the main thread is still blocked.
+
 ## Image connectivity
 
 ```sh
