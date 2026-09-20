@@ -15,13 +15,23 @@ type MediaLocationRequest = {
 // example after a failed resume). End-of-track saves are always meaningful.
 export const isMeaningfulLocation = (position: number, isEnd: boolean) => isEnd || position >= 3;
 
+export const NEAR_END_SECONDS = 30;
+export const NEAR_END_FRACTION = 0.05;
+
+// Cap at 30s and 5% so a long session that stopped in the tail restarts, while a
+// short file paused mid-track is still resumable.
+export const isNearEndLocation = (position: number, duration: number | undefined): boolean => {
+  if (!duration) return false;
+  return position >= duration - Math.min(NEAR_END_SECONDS, duration * NEAR_END_FRACTION);
+};
+
 // A saved location at or past the end of the track means the listener already finished it.
 // Seeking there starts playback at the very end and it stops immediately, which reads as
 // "the track won't play" — so finished tracks restart from the beginning, matching web.
 export const isResumableLocation = (
   location: number | undefined,
   contentLength: number | undefined,
-): location is number => !!location && !(contentLength && location >= contentLength);
+): location is number => !!location && !isNearEndLocation(location, contentLength);
 
 export const updateMediaLocation = async ({
   urlRedirectId,

@@ -1,6 +1,11 @@
 import { setAudioAccessToken, setAudioContext } from "@/lib/audio-player-store";
 import { useAuth } from "@/lib/auth-context";
-import { isMeaningfulLocation, isResumableLocation, updateMediaLocation } from "@/lib/media-location";
+import {
+  isMeaningfulLocation,
+  isNearEndLocation,
+  isResumableLocation,
+  updateMediaLocation,
+} from "@/lib/media-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import TrackPlayer, { Capability, Event, RepeatMode, State } from "react-native-track-player";
 import type { WebView } from "react-native-webview";
@@ -187,7 +192,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
 
       const { position, duration } = await TrackPlayer.getProgress();
       const isStart = position < 1;
-      const isEnd = forceIsEnd || (duration > 0 && position >= duration - 0.5);
+      const isEnd = forceIsEnd || isNearEndLocation(position, duration);
 
       webViewRef.current?.postMessage(
         JSON.stringify({
@@ -372,7 +377,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
         // beginning instead, matching how the web player treats finished tracks.
         const { state } = await TrackPlayer.getPlaybackState();
         const { position, duration } = await TrackPlayer.getProgress();
-        if (state === State.Ended || (duration > 0 && position >= duration - 0.5)) {
+        if (state === State.Ended || isNearEndLocation(position, duration)) {
           await TrackPlayer.seekTo(0);
         }
       }

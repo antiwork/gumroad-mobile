@@ -5,7 +5,12 @@ import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { formatTime } from "@/lib/format-time";
-import { isMeaningfulLocation, isResumableLocation, updateMediaLocation } from "@/lib/media-location";
+import {
+  isMeaningfulLocation,
+  isNearEndLocation,
+  isResumableLocation,
+  updateMediaLocation,
+} from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
 import { fetchSubtitleText, SubtitleFetchError } from "@/lib/subtitle-fetch";
 import { isTransientPlaybackError, MAX_TRANSIENT_PLAYBACK_RETRIES } from "@/lib/transient-playback-error";
@@ -539,7 +544,7 @@ export default function VideoPlayerScreen() {
       // source, so anything read off it now would be saved against the new video's file.
       if (!loadedMediaMatchesParams()) return null;
 
-      const isEnd = duration > 0 && position >= duration - 0.5;
+      const isEnd = isNearEndLocation(position, duration);
       // Below the threshold the position is indistinguishable from a player sitting at the
       // start, so saving it would overwrite the position the buyer actually reached.
       if (!isMeaningfulLocation(position, isEnd)) return null;

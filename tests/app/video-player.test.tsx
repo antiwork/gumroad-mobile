@@ -198,6 +198,14 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(0);
     });
 
+    it("restarts from the beginning when the saved position is in the last seconds", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "3690", contentLength: "3711" };
+
+      renderScreen();
+
+      expect(mockPlayer.currentTime).toBe(0);
+    });
+
     it("restarts a finished video from the beginning once the loaded duration reveals it is at the end", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "600" };
       renderScreen();
