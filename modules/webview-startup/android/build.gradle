@@ -15,6 +15,5 @@ android {
 }
 
 dependencies {
-  // Same version react-native-webview brings into the app; the startup API lands in 1.13.
   implementation "androidx.webkit:webkit:1.14.0"
 }

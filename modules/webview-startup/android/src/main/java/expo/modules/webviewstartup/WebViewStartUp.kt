@@ -7,10 +7,6 @@ import androidx.webkit.WebViewStartUpConfig
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
-/**
- * Runs as much of Chromium's browser process startup as possible before the first `<WebView>` is
- * mounted, so that the mount does not pay for it on the UI thread.
- */
 object WebViewStartUp {
   private val executor: Executor = Executors.newSingleThreadExecutor { Thread(it, "webview-startup") }
 
@@ -26,7 +22,6 @@ object WebViewStartUp {
     try {
       WebViewCompat.startUpWebView(application.applicationContext, config, WebViewCompat.WebViewStartUpCallback {})
     } catch (throwable: Throwable) {
-      // Best effort: a failed warm-up leaves the first WebView mount to start up as it does today.
     }
   }
 
@@ -35,7 +30,6 @@ object WebViewStartUp {
       try {
         command.run()
       } catch (throwable: Throwable) {
-        // This runs on our own thread, where an escaped exception would kill the process.
       }
     }
   }
