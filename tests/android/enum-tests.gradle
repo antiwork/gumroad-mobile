@@ -1,0 +1,12 @@
+def testSources = new File(initscript.sourceFile.parentFile, 'enum-src')
+
+gradle.beforeProject { project ->
+    if (project.name == 'expo-modules-core') {
+        project.plugins.withId('com.android.library') {
+            project.android.sourceSets.test.java.srcDir(testSources)
+            project.android.testOptions.unitTests.includeAndroidResources = true
+            project.dependencies.add('testImplementation', 'junit:junit:4.13.2')
+            project.dependencies.add('testImplementation', 'org.robolectric:robolectric:4.16.1')
+        }
+    }
+}
