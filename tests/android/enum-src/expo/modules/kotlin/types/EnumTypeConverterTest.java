@@ -6,6 +6,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import com.facebook.react.bridge.Dynamic;
+import com.facebook.react.bridge.DynamicFromObject;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import kotlin.jvm.JvmClassMappingKt;
@@ -63,6 +65,10 @@ public class EnumTypeConverterTest {
     return new EnumTypeConverter((KClass<Enum<?>>) kClass);
   }
 
+  private static Dynamic dynamic(Object value) {
+    return new DynamicFromObject(value);
+  }
+
   @Test
   public void nameOnlyEnumConvertsByCaseName() {
     EnumTypeConverter converter = converterFor(NameOnly.class);
@@ -106,6 +112,38 @@ public class EnumTypeConverterTest {
     EnumTypeConverter converter = converterFor(TwoField.class);
     try {
       converter.convertFromAny(1, null, false);
+      fail("expected two-field enum to be incompatible");
+    } catch (Exception error) {
+      assertTrue(error.getMessage(), error.getMessage().contains("not compatible"));
+    }
+  }
+
+  @Test
+  public void nameOnlyEnumConvertsFromDynamicByCaseName() {
+    EnumTypeConverter converter = converterFor(NameOnly.class);
+    assertEquals(NameOnly.ALPHA, converter.convertFromDynamic(dynamic("ALPHA"), null, false));
+    assertEquals(NameOnly.BETA, converter.convertFromDynamic(dynamic("BETA"), null, false));
+  }
+
+  @Test
+  public void intValueEnumConvertsFromDynamicJsNumber() {
+    EnumTypeConverter converter = converterFor(IntValue.class);
+    assertEquals(IntValue.LOW, converter.convertFromDynamic(dynamic(1.0), null, false));
+    assertEquals(IntValue.HIGH, converter.convertFromDynamic(dynamic(2.0), null, false));
+  }
+
+  @Test
+  public void stringValueEnumConvertsFromDynamicByUserField() {
+    EnumTypeConverter converter = converterFor(StringValue.class);
+    assertEquals(StringValue.ADMIN, converter.convertFromDynamic(dynamic("admin"), null, false));
+    assertEquals(StringValue.USER, converter.convertFromDynamic(dynamic("user"), null, false));
+  }
+
+  @Test
+  public void twoFieldEnumIsIncompatibleFromDynamic() {
+    EnumTypeConverter converter = converterFor(TwoField.class);
+    try {
+      converter.convertFromDynamic(dynamic(1.0), null, false);
       fail("expected two-field enum to be incompatible");
     } catch (Exception error) {
       assertTrue(error.getMessage(), error.getMessage().contains("not compatible"));
