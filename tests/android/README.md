@@ -25,3 +25,12 @@ The tests compile the patched `react-native-pdf` module and execute its `PdfView
 The tests verify disposal order, queued-task removal, detachment, interruption, and renderer shutdown. They do not execute PDFium's C++ renderer. Physical-device stress testing still verifies the native crash and teardown latency.
 
 The Android CI workflow runs these tests before building the app. Gradle writes results under `node_modules/react-native-pdf/android/build/reports/tests/testDebugUnitTest`.
+
+## Enum prop conversion
+
+```sh
+cd android
+./gradlew -I ../tests/android/enum-tests.gradle :expo-modules-core:testDebugUnitTest --no-daemon
+```
+
+These tests compile patched `expo-modules-core` and convert name-only, int, and string enum props on Android API 24 and 34. They also assert the converter class file does not reference `kotlin.reflect.full`. They do not prove ANR frequency on physical low-end devices.
