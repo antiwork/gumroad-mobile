@@ -114,11 +114,11 @@ describe("FullAudioPlayer screen reader progress", () => {
     expect(getByLabelText("Playback position").props.accessibilityValue).toEqual({ text: "0:12 of 2:00" });
   });
 
-  it("accepts reader changes after an initial query failure", async () => {
+  it("keeps publishing after an initial query failure", async () => {
     jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockRejectedValue(new Error("unavailable"));
     const { getByLabelText } = render(player);
     await act(async () => {});
-    expect(getByLabelText("Playback position").props.accessibilityValue).toBeUndefined();
+    expect(getByLabelText("Playback position").props.accessibilityValue).toEqual({ text: "0:12 of 2:00" });
     act(() => screenReaderListener(true));
     expect(getByLabelText("Playback position").props.accessibilityValue).toEqual({ text: "0:12 of 2:00" });
   });

@@ -59,7 +59,11 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
       (enabled) => {
         if (useInitialState) setScreenReaderEnabled(enabled);
       },
-      () => {},
+      () => {
+        // A failed query is not evidence the reader is off; keep publishing rather than
+        // silently dropping the playback position for someone who has one on.
+        if (useInitialState) setScreenReaderEnabled(true);
+      },
     );
     return () => {
       useInitialState = false;

@@ -259,11 +259,11 @@ describe("VideoPlayerScreen", () => {
       expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "0:00 of 0:00" });
     });
 
-    it("accepts reader changes after an initial query failure", async () => {
+    it("keeps publishing after an initial query failure", async () => {
       jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockRejectedValue(new Error("unavailable"));
       const { getByTestId } = renderScreen();
       await act(async () => {});
-      expect(getByTestId("video-player").props.accessibilityValue).toBeUndefined();
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "0:00 of 0:00" });
       act(() => screenReaderListener(true));
       expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "0:00 of 0:00" });
     });
