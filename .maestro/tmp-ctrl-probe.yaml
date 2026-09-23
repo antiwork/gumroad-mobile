@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+---
+# TEMPORARY probe (untracked): shorter settle on the reveal tap — does the tap still land,
+# and what position is readable right after the player opens?
+- launchApp
+- extendedWaitUntil:
+    visible: ".*Library.*"
+    timeout: 45000
+- tapOn:
+    text: Library
+    waitToSettleTimeoutMs: 1000
+- tapOn:
+    text: ".*Mobile Test Product 1.*"
+    waitToSettleTimeoutMs: 1000
+- extendedWaitUntil:
+    visible: Mobile Test Video
+    timeout: 30000
+- tapOn:
+    text: "Watch|Watch again"
+    waitToSettleTimeoutMs: 1000
+- extendedWaitUntil:
+    visible:
+      id: video-player
+    timeout: 20000
+- tapOn:
+    id: ".*surface_player_view"
+    waitToSettleTimeoutMs: 1000
+- assertVisible:
+    id: ".*exo_position"
+    text: "00:0[0-9]"
+- takeScreenshot: probe-fasttap2

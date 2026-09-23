@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+---
+# UNTRACKED probe: proves the adapted audio-restart-resume assertion (a bare-text match on the
+# visible position label, used because the accessibility value is only published with a screen
+# reader on) resolves against the real UI. Taps use a short settle so the label is read within
+# the first seconds of playback, where the committed pattern applies.
+- launchApp
+- extendedWaitUntil:
+    visible: ".*Library.*"
+    timeout: 45000
+- tapOn:
+    text: Library
+    waitToSettleTimeoutMs: 1000
+- tapOn:
+    text: ".*Mobile Test Product 1.*"
+    waitToSettleTimeoutMs: 1000
+- extendedWaitUntil:
+    visible: ".*Mobile Test Audio.*"
+    timeout: 30000
+- tapOn:
+    text: ".*Mobile Test Audio.*"
+    above: Mobile Test Video
+    waitToSettleTimeoutMs: 1000
+- extendedWaitUntil:
+    visible:
+      id: open-audio-player
+    timeout: 15000
+- tapOn:
+    id: open-audio-player
+    waitToSettleTimeoutMs: 1000
+- assertVisible: "0:(0[0-9]|1[0-5])"
