@@ -24,8 +24,12 @@ appId: ${APP_ID}
       - assertNotVisible: This video failed to load
       # Narrow window so the margin below is computed against a known worst case,
       # not a range that could itself eat into the post-relaunch wait budget.
+      # The app only publishes the playback position to the accessibility tree while a screen
+      # reader is on, so reveal the player's own controls and read their time label instead.
+      - tapOn:
+          point: "50%,40%"
       - extendedWaitUntil:
-          visible: "Video playback started, 0:0[1-2] of 0:10"
+          visible: "0:0[1-2]"
           timeout: 20000
       # Background the app without stopping the process — pressKey: Home leaves audio
       # session playback running, which is exactly the behavior this PR restored.
@@ -46,7 +50,9 @@ appId: ${APP_ID}
       # most 0:04 — well short of the 0:08 (0:02 + ~6s real background) a genuinely
       # continuous player lands at. That gap is what makes "resumed on reopen" and "kept
       # playing while backgrounded" distinguishable instead of both passing.
+      - tapOn:
+          point: "50%,40%"
       - extendedWaitUntil:
-          visible: "Video playback started, 0:0[7-9] of 0:10"
+          visible: "0:0[7-9]"
           timeout: 2000
       - assertNotVisible: This video failed to load

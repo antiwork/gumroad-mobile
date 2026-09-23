@@ -4,6 +4,12 @@ appId: ${APP_ID}
 # above the 3-second minimum the app will save and below the end, past which a finished video
 # deliberately restarts from the beginning. Check the fixture duration before widening them.
 #
+# The app publishes the playback position to the accessibility tree only while a screen reader is
+# enabled, so every position below is read off the native ExoPlayer controller instead: one tap on
+# the video surface brings the controller up, it stays up for about five seconds, and its position
+# text sits in the tree while it is up. Revealing the controller costs a few seconds of playback,
+# which is why the windows below are a little wider than the positions they pin down.
+#
 # This flow runs against a shared seeded account that other flows also watch this video on, so it
 # cannot assume a starting position. It normalises first by playing to the end, which is what makes
 # the next open start at a known 0:00.
@@ -23,9 +29,18 @@ appId: ${APP_ID}
     timeout: 20000
 - assertNotVisible: This video failed to load
 # Normalise: play through to the end, whatever position this account was left on.
+- tapOn:
+    point: "1%,1%"
+    repeat: 3
+    delay: 7000
+- tapOn:
+    id: ".*surface_player_view"
+    waitToSettleTimeoutMs: 1000
 - extendedWaitUntil:
-    visible: "Video playback started, 0:(09|10) of 0:10"
-    timeout: 30000
+    visible:
+      id: ".*exo_position"
+      text: "00:10"
+    timeout: 10000
 - runFlow:
     file: utils/back.yaml
 # A finished video restarts from the beginning rather than seeking to the end and stopping.
@@ -34,13 +49,19 @@ appId: ${APP_ID}
     visible:
       id: video-player
     timeout: 20000
+- tapOn:
+    id: ".*surface_player_view"
+    waitToSettleTimeoutMs: 1000
 - extendedWaitUntil:
-    visible: "Video playback (started|waiting), 0:0[0-3] of 0:10"
-    timeout: 20000
+    visible:
+      id: ".*exo_position"
+      text: "00:0[0-6]"
+    timeout: 10000
 # Watch far enough in that the position is worth saving, then leave.
-- extendedWaitUntil:
-    visible: "Video playback started, 0:0[5-7] of 0:10"
-    timeout: 20000
+- tapOn:
+    point: "1%,1%"
+    repeat: 2
+    delay: 3000
 - runFlow:
     file: utils/back.yaml
 - runFlow:
@@ -55,9 +76,16 @@ appId: ${APP_ID}
     visible:
       id: video-player
     timeout: 20000
+- tapOn:
+    id: ".*surface_player_view"
+    waitToSettleTimeoutMs: 1000
 # The saved position has to be read back. Before this was fixed the player always opened at 0:00.
 - extendedWaitUntil:
-    visible: "Video playback (started|waiting), 0:0[5-9] of 0:10"
-    timeout: 20000
-- assertNotVisible: "Video playback (started|waiting), 0:0[0-3] of 0:10"
+    visible:
+      id: ".*exo_position"
+      text: "00:(0[8-9]|10)"
+    timeout: 10000
+- assertNotVisible:
+    id: ".*exo_position"
+    text: "00:0[0-5]"
 - assertNotVisible: This video failed to load
