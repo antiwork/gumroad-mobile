@@ -18,6 +18,12 @@ jest.mock("@sentry/react-native", () => ({
   captureException: jest.fn(),
 }));
 
+const mockPush = jest.fn();
+
+jest.mock("expo-router", () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 jest.mock("react-native-webview", () => {
   const React = require("react");
   const { View } = require("react-native");
@@ -87,6 +93,19 @@ describe("CreateProductScreen", () => {
 
     expect(shouldStart({ url: "mailto:support@example.com" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("mailto:support@example.com");
+  });
+
+  it("opens payout settings natively instead of loading the headerless page in the WebView", () => {
+    render(<CreateProductScreen />);
+
+    const shouldStart = screen.getByTestId("create-product-webview").props.onShouldStartLoadWithRequest as (request: {
+      url: string;
+      mainDocumentURL?: string;
+    }) => boolean;
+
+    expect(shouldStart({ url: "https://example.com/settings/payments?display=mobile_app" })).toBe(false);
+    expect(mockPush).toHaveBeenCalledWith("/settings/payments");
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
   });
 
   it("refreshes creator status on unmount only after the WebView reached the product editor", () => {

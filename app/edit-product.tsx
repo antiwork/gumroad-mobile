@@ -7,10 +7,10 @@ import { Text } from "@/components/ui/text";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
 import { useWebViewSession } from "@/lib/use-webview-session";
-import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
+import { buildAuthenticatedWebViewUrl, nativeScreenForWebViewUrl } from "@/lib/webview-url";
 import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { WebView as BaseWebView } from "react-native-webview";
@@ -39,6 +39,7 @@ const isAllowedInWebView = (url: string) => {
 
 const EditProductScreen = () => {
   const { permalink } = useLocalSearchParams<{ permalink?: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const productPath = permalink ? `/products/${encodeURIComponent(permalink)}/edit` : null;
   const buildEditProductUrl = useCallback(
@@ -65,11 +66,17 @@ const EditProductScreen = () => {
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
       if (handleAuthenticationNavigation(request.url)) return false;
-      if (request.url === url || isWebViewInternalUrl(request.url) || isAllowedInWebView(request.url)) return true;
+      if (request.url === url || isWebViewInternalUrl(request.url)) return true;
+      const nativeScreen = nativeScreenForWebViewUrl(request.url);
+      if (nativeScreen) {
+        router.push(nativeScreen);
+        return false;
+      }
+      if (isAllowedInWebView(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },
-    [handleAuthenticationNavigation, url],
+    [handleAuthenticationNavigation, router, url],
   );
 
   const handleOpenWindow = useCallback((event: WebViewOpenWindowEvent) => {

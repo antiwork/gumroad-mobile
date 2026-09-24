@@ -7,8 +7,9 @@ import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
 import { useWebViewSession } from "@/lib/use-webview-session";
-import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
+import { buildAuthenticatedWebViewUrl, nativeScreenForWebViewUrl } from "@/lib/webview-url";
 import * as Sentry from "@sentry/react-native";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { WebView as BaseWebView } from "react-native-webview";
@@ -48,6 +49,7 @@ const buildCreateProductUrl = (token: string) =>
   buildAuthenticatedWebViewUrl("/products/new", token, { display: "mobile_app" });
 
 const CreateProductScreen = () => {
+  const router = useRouter();
   const webViewRef = useRef<BaseWebView>(null);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -70,11 +72,17 @@ const CreateProductScreen = () => {
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
       if (handleAuthenticationNavigation(request.url)) return false;
-      if (request.url === url || isWebViewInternalUrl(request.url) || isAllowedInWebView(request.url)) return true;
+      if (request.url === url || isWebViewInternalUrl(request.url)) return true;
+      const nativeScreen = nativeScreenForWebViewUrl(request.url);
+      if (nativeScreen) {
+        router.push(nativeScreen);
+        return false;
+      }
+      if (isAllowedInWebView(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },
-    [handleAuthenticationNavigation, url],
+    [handleAuthenticationNavigation, router, url],
   );
 
   const handleOpenWindow = useCallback((event: WebViewOpenWindowEvent) => {
