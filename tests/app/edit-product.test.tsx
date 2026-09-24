@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -15,6 +16,7 @@ jest.mock("@/lib/open-url", () => ({
 
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 jest.mock("@sentry/react-native", () => ({
@@ -73,5 +75,29 @@ describe("EditProductScreen", () => {
     expect(shouldStart({ url: "about:blank" })).toBe(true);
     expect(shouldStart({ url: "https://external.example/test" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+  });
+
+  it("opens payout settings natively instead of loading the headerless page in the WebView", () => {
+    renderScreen();
+
+    const shouldStart = screen.getByTestId("edit-product-webview").props.onShouldStartLoadWithRequest as (request: {
+      url: string;
+    }) => boolean;
+
+    expect(shouldStart({ url: "https://example.com/settings/payments?display=mobile_app" })).toBe(false);
+    expect(mockPush).toHaveBeenCalledWith("/settings/payments");
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
+  });
+
+  it("keeps the product editor and other Gumroad pages in the WebView", () => {
+    renderScreen();
+
+    const shouldStart = screen.getByTestId("edit-product-webview").props.onShouldStartLoadWithRequest as (request: {
+      url: string;
+    }) => boolean;
+
+    expect(shouldStart({ url: "https://example.com/products/abc123/edit?display=mobile_app" })).toBe(true);
+    expect(shouldStart({ url: "https://example.com/products/abc123" })).toBe(true);
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

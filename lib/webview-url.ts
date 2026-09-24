@@ -1,5 +1,22 @@
 import { env } from "@/lib/env";
 
+const gumroadOrigin = new URL(env.EXPO_PUBLIC_GUMROAD_URL).origin;
+
+const nativeSettingsScreens: Record<string, string> = {
+  "/settings/payments": "/settings/payments",
+};
+
+export const nativeScreenForWebViewUrl = (url: string) => {
+  try {
+    const { origin, pathname } = new URL(url);
+    if (origin !== gumroadOrigin) return null;
+    const normalized = pathname.replace(/\/+$/, "") || "/";
+    return nativeSettingsScreens[normalized] ?? null;
+  } catch {
+    return null;
+  }
+};
+
 export const buildAuthenticatedWebViewUrl = (
   path: string,
   accessToken: string,
