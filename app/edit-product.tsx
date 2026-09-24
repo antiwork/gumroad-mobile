@@ -10,7 +10,7 @@ import { useWebViewSession } from "@/lib/use-webview-session";
 import { buildAuthenticatedWebViewUrl, nativeScreenForWebViewUrl } from "@/lib/webview-url";
 import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { WebView as BaseWebView } from "react-native-webview";
@@ -47,6 +47,7 @@ const EditProductScreen = () => {
     [productPath],
   );
   const webViewRef = useRef<BaseWebView>(null);
+  const reloadOnReturnRef = useRef(false);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const {
@@ -69,6 +70,7 @@ const EditProductScreen = () => {
       if (request.url === url || isWebViewInternalUrl(request.url)) return true;
       const nativeScreen = nativeScreenForWebViewUrl(request.url);
       if (nativeScreen) {
+        reloadOnReturnRef.current = true;
         router.push(nativeScreen);
         return false;
       }
@@ -115,6 +117,17 @@ const EditProductScreen = () => {
     mainUrlRef.current = url;
     setHasError(false);
   }, [url]);
+
+  // The payout method is saved on the native Payouts screen, so the editor has to reload on the way
+  // back or the publish blocker the seller just resolved is still on the page.
+  useFocusEffect(
+    useCallback(() => {
+      if (!reloadOnReturnRef.current) return;
+      reloadOnReturnRef.current = false;
+      mainUrlRef.current = url;
+      setReloadKey((k) => k + 1);
+    }, [url]),
+  );
 
   useEffect(
     () => () => {
