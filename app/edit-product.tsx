@@ -118,15 +118,13 @@ const EditProductScreen = () => {
     setHasError(false);
   }, [url]);
 
-  // The payout method is saved on the native Payouts screen, so the editor has to reload on the way
-  // back or the publish blocker the seller just resolved is still on the page.
   useFocusEffect(
     useCallback(() => {
       if (!reloadOnReturnRef.current) return;
       reloadOnReturnRef.current = false;
-      mainUrlRef.current = url;
-      setReloadKey((k) => k + 1);
-    }, [url]),
+      setHasError(false);
+      webViewRef.current?.reload();
+    }, []),
   );
 
   useEffect(
