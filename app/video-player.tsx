@@ -130,8 +130,6 @@ export default function VideoPlayerScreen() {
         if (useInitialState) setScreenReaderEnabled(enabled);
       },
       () => {
-        // A failed query is not evidence the reader is off; keep publishing rather than
-        // silently dropping the playback position for someone who has one on.
         if (useInitialState) setScreenReaderEnabled(true);
       },
     );

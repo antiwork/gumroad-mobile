@@ -79,7 +79,4 @@ appId: ${APP_ID}
     id: mini-audio-play-pause
 - tapOn:
     id: open-audio-player
-# The app publishes the playback position to the accessibility tree only while a screen reader is
-# on, so read the time label the player already renders next to the progress bar instead. Its
-# duration label reads 0:46, which this pattern does not match.
 - assertVisible: "0:(0[0-9]|1[0-5])"

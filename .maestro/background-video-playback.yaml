@@ -24,8 +24,6 @@ appId: ${APP_ID}
       - assertNotVisible: This video failed to load
       # Narrow window so the margin below is computed against a known worst case,
       # not a range that could itself eat into the post-relaunch wait budget.
-      # The app only publishes the playback position to the accessibility tree while a screen
-      # reader is on, so reveal the player's own controls and read their time label instead.
       - tapOn:
           point: "50%,40%"
       - extendedWaitUntil:
