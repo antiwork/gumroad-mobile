@@ -5,6 +5,7 @@ const mockSafeOpenURL = jest.fn();
 const mockRefreshToken = jest.fn();
 const mockRefreshCreatorStatus = jest.fn();
 const mockLogout = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -12,6 +13,10 @@ jest.mock("@/lib/auth-context", () => ({
 
 jest.mock("@/lib/open-url", () => ({
   safeOpenURL: (url: string) => mockSafeOpenURL(url),
+}));
+
+jest.mock("expo-router", () => ({
+  useRouter: () => ({ push: mockPush }),
 }));
 
 jest.mock("@sentry/react-native", () => ({
@@ -75,6 +80,18 @@ describe("CreateProductScreen", () => {
 
     expect(shouldStart({ url: "https://external.example/test" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+  });
+
+  it("opens the payout settings link on the native Payouts screen instead of the create WebView", () => {
+    render(<CreateProductScreen />);
+
+    const shouldStart = screen.getByTestId("create-product-webview").props.onShouldStartLoadWithRequest as (request: {
+      url: string;
+    }) => boolean;
+
+    expect(shouldStart({ url: "https://example.com/settings/payments" })).toBe(false);
+    expect(mockPush).toHaveBeenCalledWith("/settings/payments");
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
   });
 
   it("hands non-web scheme navigations to the OS instead of loading them in the WebView", () => {

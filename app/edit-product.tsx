@@ -6,11 +6,12 @@ import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
+import { getNativeSettingsRoute } from "@/lib/settings-route";
 import { useWebViewSession } from "@/lib/use-webview-session";
 import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
 import * as Sentry from "@sentry/react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { WebView as BaseWebView } from "react-native-webview";
@@ -39,6 +40,7 @@ const isAllowedInWebView = (url: string) => {
 
 const EditProductScreen = () => {
   const { permalink } = useLocalSearchParams<{ permalink?: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const productPath = permalink ? `/products/${encodeURIComponent(permalink)}/edit` : null;
   const buildEditProductUrl = useCallback(
@@ -46,6 +48,7 @@ const EditProductScreen = () => {
     [productPath],
   );
   const webViewRef = useRef<BaseWebView>(null);
+  const reloadOnNextFocusRef = useRef(false);
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const {
@@ -65,11 +68,17 @@ const EditProductScreen = () => {
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
       if (handleAuthenticationNavigation(request.url)) return false;
+      const settingsRoute = getNativeSettingsRoute(request.url);
+      if (settingsRoute) {
+        reloadOnNextFocusRef.current = true;
+        router.push(settingsRoute);
+        return false;
+      }
       if (request.url === url || isWebViewInternalUrl(request.url) || isAllowedInWebView(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },
-    [handleAuthenticationNavigation, url],
+    [handleAuthenticationNavigation, router, url],
   );
 
   const handleOpenWindow = useCallback((event: WebViewOpenWindowEvent) => {
@@ -108,6 +117,17 @@ const EditProductScreen = () => {
     mainUrlRef.current = url;
     setHasError(false);
   }, [url]);
+
+  // The payout method is saved on the native Payouts screen, so the editor has to reload when the
+  // seller comes back or the publish blocker they just resolved is still on the page.
+  useFocusEffect(
+    useCallback(() => {
+      if (!reloadOnNextFocusRef.current) return;
+      reloadOnNextFocusRef.current = false;
+      mainUrlRef.current = url;
+      setReloadKey((k) => k + 1);
+    }, [url]),
+  );
 
   useEffect(
     () => () => {

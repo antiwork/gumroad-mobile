@@ -6,9 +6,11 @@ import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
+import { getNativeSettingsRoute } from "@/lib/settings-route";
 import { useWebViewSession } from "@/lib/use-webview-session";
 import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
 import * as Sentry from "@sentry/react-native";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { WebView as BaseWebView } from "react-native-webview";
@@ -49,6 +51,7 @@ const buildCreateProductUrl = (token: string) =>
 
 const CreateProductScreen = () => {
   const webViewRef = useRef<BaseWebView>(null);
+  const router = useRouter();
   const [hasError, setHasError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const { refreshCreatorStatus } = useAuth();
@@ -70,11 +73,17 @@ const CreateProductScreen = () => {
     (request: { url: string; mainDocumentURL?: string }) => {
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
       if (handleAuthenticationNavigation(request.url)) return false;
+      // No reload on return here: the create screen is holding a half-filled draft.
+      const settingsRoute = getNativeSettingsRoute(request.url);
+      if (settingsRoute) {
+        router.push(settingsRoute);
+        return false;
+      }
       if (request.url === url || isWebViewInternalUrl(request.url) || isAllowedInWebView(request.url)) return true;
       safeOpenURL(request.url);
       return false;
     },
-    [handleAuthenticationNavigation, url],
+    [handleAuthenticationNavigation, router, url],
   );
 
   const handleOpenWindow = useCallback((event: WebViewOpenWindowEvent) => {
