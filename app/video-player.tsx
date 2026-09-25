@@ -5,7 +5,13 @@ import { Text } from "@/components/ui/text";
 import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { useAuth } from "@/lib/auth-context";
 import { formatTime } from "@/lib/format-time";
-import { isMeaningfulLocation, isResumableLocation, updateMediaLocation } from "@/lib/media-location";
+import {
+  isMeaningfulLocation,
+  isNearEndLocation,
+  isResumableLocation,
+  RESTORE_DURATION_WAIT_MS,
+  updateMediaLocation,
+} from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
 import { fetchSubtitleText, SubtitleFetchError } from "@/lib/subtitle-fetch";
 import { isTransientPlaybackError, MAX_TRANSIENT_PLAYBACK_RETRIES } from "@/lib/transient-playback-error";
@@ -58,6 +64,10 @@ const withReleasedPlayerGuard = (operation: () => void) => {
     throw error;
   }
 };
+
+// Position deltas this large are the player jumping, not playing: playback advances by fractions of
+// a second between updates, so a bigger step came from a seek the buyer made.
+const SEEK_JUMP_TOLERANCE_SECONDS = 2;
 
 const restoreAppOrientation = () => {
   const request =
@@ -138,6 +148,8 @@ export default function VideoPlayerScreen() {
     savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength),
   );
   const resumePosition = savedPositionIsAtEnd ? 0 : (savedPosition ?? 0);
+  const restorePhaseRef = useRef<"pending" | "resolved" | "cancelled">("pending");
+  const restoreDeadlineRef = useRef(0);
 
   const queryClient = useQueryClient();
   const { top, bottom, left, right } = useSafeAreaInsets();
@@ -149,6 +161,7 @@ export default function VideoPlayerScreen() {
   const [playbackStarted, setPlaybackStarted] = useState(false);
   const playbackStartedRef = useRef(false);
   const currentPositionRef = useRefToLatest(currentPosition);
+  const lastSeenPositionRef = useRef(0);
 
   const [externalTracks, setExternalTracks] = useState<ExternalSubtitleTrack[]>([]);
   const [embeddedTracks, setEmbeddedTracks] = useState<SubtitleTrack[]>([]);
@@ -186,6 +199,13 @@ export default function VideoPlayerScreen() {
     return captionRequestIdRef.current;
   }, []);
 
+  const isRestoreDecisionOpen = useCallback(() => {
+    if (restorePhaseRef.current !== "pending") return false;
+    if (Date.now() < restoreDeadlineRef.current) return true;
+    restorePhaseRef.current = "cancelled";
+    return false;
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -208,10 +228,14 @@ export default function VideoPlayerScreen() {
 
     if (mediaChanged) {
       const offSelection = { type: "off" } as const;
+      resolvedMediaIdentityRef.current = null;
       fallbackMediaIdentityRef.current = null;
       pendingSourceResumeRef.current = null;
       const nextPositionIsAtEnd = savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength);
       setSavedPositionIsAtEnd(nextPositionIsAtEnd);
+      restorePhaseRef.current = "pending";
+      restoreDeadlineRef.current = Date.now() + RESTORE_DURATION_WAIT_MS;
+      lastSeenPositionRef.current = nextPositionIsAtEnd ? 0 : (savedPosition ?? 0);
       // Progress state belongs to one video. Carrying it into the next one shows the previous
       // video's position on screen and, worse, lets a save write that position against the new
       // video's duration, so the replacement video reopens at the wrong place.
@@ -305,7 +329,7 @@ export default function VideoPlayerScreen() {
     pendingSourceResumeRef.current = null;
     if (pendingResume) {
       player.currentTime = pendingResume.position;
-    } else if (resumePosition) {
+    } else if (resumePosition && restorePhaseRef.current === "pending") {
       player.currentTime = resumePosition;
     }
     if (pendingResume && !pendingResume.wasPlaying) {
@@ -436,10 +460,24 @@ export default function VideoPlayerScreen() {
             setVideoDuration(player.duration || videoDurationRef.current);
             // readyToPlay fires again after every seek and rebuffer, so this must not re-run once
             // handled or a buyer rewatching a finished video gets yanked back to the start.
-            if (!savedPositionIsAtEnd && savedPosition && !isResumableLocation(savedPosition, player.duration)) {
-              setSavedPositionIsAtEnd(true);
-              player.currentTime = 0;
-              setCurrentPosition(0);
+            const loadedMedia = resolvedMediaIdentityRef.current ?? fallbackMediaIdentityRef.current;
+            if (
+              loadedMedia?.uri === uri &&
+              loadedMedia.streamingUrl === streamingUrl &&
+              isRestoreDecisionOpen() &&
+              player.duration > 0
+            ) {
+              restorePhaseRef.current = "resolved";
+              if (savedPosition) {
+                const isAtEnd = !isResumableLocation(savedPosition, player.duration);
+                const position = isAtEnd ? 0 : savedPosition;
+                setSavedPositionIsAtEnd(isAtEnd);
+                if (position !== resumePosition) {
+                  player.currentTime = position;
+                  setCurrentPosition(position);
+                  if (isAtEnd) player.play();
+                }
+              }
             }
             setEmbeddedTracks(player.availableSubtitleTracks);
             const subtitleTrack = player.subtitleTrack;
@@ -459,10 +497,13 @@ export default function VideoPlayerScreen() {
   }, [
     cancelCaptionRequest,
     externalFullscreenOpen,
+    isRestoreDecisionOpen,
     player,
     replayFromLastPosition,
     savedPosition,
-    savedPositionIsAtEnd,
+    resumePosition,
+    uri,
+    streamingUrl,
     videoDurationRef,
   ]);
 
@@ -513,6 +554,14 @@ export default function VideoPlayerScreen() {
 
   useEffect(() => {
     const subscription = player.addListener("timeUpdate", ({ currentTime }: { currentTime: number }) => {
+      const previouslySeen = lastSeenPositionRef.current;
+      lastSeenPositionRef.current = currentTime;
+      if (
+        restorePhaseRef.current === "pending" &&
+        Math.abs(currentTime - previouslySeen) > SEEK_JUMP_TOLERANCE_SECONDS
+      ) {
+        restorePhaseRef.current = "cancelled";
+      }
       const recoveryStartedAt = recoveryStartedAtRef.current;
       if (recoveryStartedAt !== null && currentTime > recoveryStartedAt + 0.1) {
         playbackRetryCountRef.current = 0;
@@ -538,8 +587,9 @@ export default function VideoPlayerScreen() {
       // While the screen is switching to another video the player still holds the previous
       // source, so anything read off it now would be saved against the new video's file.
       if (!loadedMediaMatchesParams()) return null;
+      if (isRestoreDecisionOpen() && savedPosition) return null;
 
-      const isEnd = duration > 0 && position >= duration - 0.5;
+      const isEnd = isNearEndLocation(position, duration);
       // Below the threshold the position is indistinguishable from a player sitting at the
       // start, so saving it would overwrite the position the buyer actually reached.
       if (!isMeaningfulLocation(position, isEnd)) return null;
@@ -552,7 +602,15 @@ export default function VideoPlayerScreen() {
         accessToken,
       });
     },
-    [urlRedirectId, productFileId, purchaseId, accessToken, loadedMediaMatchesParams],
+    [
+      urlRedirectId,
+      productFileId,
+      purchaseId,
+      accessToken,
+      loadedMediaMatchesParams,
+      savedPosition,
+      isRestoreDecisionOpen,
+    ],
   );
 
   const persistLocationRef = useRefToLatest(persistLocation);
@@ -782,7 +840,10 @@ export default function VideoPlayerScreen() {
         player={player}
         allowsPictureInPicture={!externalCaptionSelected}
         surfaceType={videoSurfaceType}
-        onFullscreenEnter={handleNativeFullscreenEnter}
+        onFullscreenEnter={() => {
+          restorePhaseRef.current = "cancelled";
+          handleNativeFullscreenEnter();
+        }}
         onFullscreenExit={handleNativeFullscreenExit}
         fullscreenOptions={{
           enable: !externalCaptionSelected && !fullscreen,
