@@ -1,0 +1,9 @@
+{
+  "name": "webview-startup",
+  "version": "1.0.0",
+  "description": "Starts Chromium's browser process before the first WebView is mounted on Android.",
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

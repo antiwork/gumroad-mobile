@@ -1,10 +1,13 @@
-import { render, screen } from "@testing-library/react-native";
+import { render, screen, act } from "@testing-library/react-native";
 
 const mockUseAuth = jest.fn();
 const mockSafeOpenURL = jest.fn();
 const mockRefreshToken = jest.fn();
 const mockRefreshCreatorStatus = jest.fn();
 const mockLogout = jest.fn();
+const mockFocusCallbacks: (() => void)[] = [];
+const mockWebViewMounts = { count: 0 };
+const mockWebViewReload = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -18,12 +21,28 @@ jest.mock("@sentry/react-native", () => ({
   captureException: jest.fn(),
 }));
 
+const mockPush = jest.fn();
+
+jest.mock("expo-router", () => ({
+  useRouter: () => ({ push: mockPush }),
+  useFocusEffect: (callback: () => void) => {
+    mockFocusCallbacks.push(callback);
+  },
+}));
+
 jest.mock("react-native-webview", () => {
   const React = require("react");
   const { View } = require("react-native");
   return {
     WebView: React.forwardRef((props: Record<string, unknown>, ref: unknown) => {
-      React.useImperativeHandle(ref, () => ({ injectJavaScript: jest.fn(), postMessage: jest.fn() }));
+      React.useImperativeHandle(ref, () => ({
+        injectJavaScript: jest.fn(),
+        postMessage: jest.fn(),
+        reload: mockWebViewReload,
+      }));
+      React.useEffect(() => {
+        mockWebViewMounts.count += 1;
+      }, []);
       return React.createElement(View, { testID: "create-product-webview", ...props });
     }),
   };
@@ -37,6 +56,8 @@ const expectedUrl =
 describe("CreateProductScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFocusCallbacks.length = 0;
+    mockWebViewMounts.count = 0;
     mockRefreshToken.mockResolvedValue("refreshed-access-token");
     mockRefreshCreatorStatus.mockResolvedValue(undefined);
     mockLogout.mockResolvedValue(undefined);
@@ -87,6 +108,73 @@ describe("CreateProductScreen", () => {
 
     expect(shouldStart({ url: "mailto:support@example.com" })).toBe(false);
     expect(mockSafeOpenURL).toHaveBeenCalledWith("mailto:support@example.com");
+  });
+
+  it("opens payout settings natively instead of loading the headerless page in the WebView", () => {
+    render(<CreateProductScreen />);
+
+    const shouldStart = screen.getByTestId("create-product-webview").props.onShouldStartLoadWithRequest as (request: {
+      url: string;
+      mainDocumentURL?: string;
+    }) => boolean;
+
+    expect(shouldStart({ url: "https://example.com/settings/payments?display=mobile_app" })).toBe(false);
+    expect(mockPush).toHaveBeenCalledWith("/settings/payments");
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
+  });
+
+  it("reloads the create flow when the seller comes back from the native Payouts screen", () => {
+    render(<CreateProductScreen />);
+
+    const shouldStart = screen.getByTestId("create-product-webview").props.onShouldStartLoadWithRequest as (request: {
+      url: string;
+      mainDocumentURL?: string;
+    }) => boolean;
+
+    shouldStart({ url: "https://example.com/settings/payments?display=mobile_app" });
+    act(() => {
+      mockFocusCallbacks.forEach((callback) => callback());
+    });
+
+    expect(mockWebViewReload).toHaveBeenCalledTimes(1);
+    expect(mockWebViewMounts.count).toBe(1);
+  });
+
+  it("keeps the create flow as it is when it regains focus without a settings trip", () => {
+    render(<CreateProductScreen />);
+
+    act(() => {
+      mockFocusCallbacks.forEach((callback) => callback());
+    });
+
+    expect(mockWebViewMounts.count).toBe(1);
+    expect(mockWebViewReload).not.toHaveBeenCalled();
+  });
+
+  it("clears a load error when the seller comes back from the native Payouts screen", () => {
+    render(<CreateProductScreen />);
+
+    const webView = screen.getByTestId("create-product-webview");
+    act(() => {
+      (webView.props.onError as (event: unknown) => void)({
+        nativeEvent: { url: (webView.props.source as { uri: string }).uri, description: "offline" },
+      });
+    });
+    expect(screen.getByText("Something went wrong")).toBeTruthy();
+
+    (
+      screen.getByTestId("create-product-webview").props.onShouldStartLoadWithRequest as (request: {
+        url: string;
+      }) => boolean
+    )({
+      url: "https://example.com/settings/payments",
+    });
+    act(() => {
+      mockFocusCallbacks.forEach((callback) => callback());
+    });
+
+    expect(screen.queryByText("Something went wrong")).toBeNull();
+    expect(mockWebViewReload).toHaveBeenCalledTimes(1);
   });
 
   it("refreshes creator status on unmount only after the WebView reached the product editor", () => {

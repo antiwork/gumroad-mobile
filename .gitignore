@@ -52,3 +52,6 @@ app-example
 /modules/*/android
 !/modules/pdf-thumbnail/android
 !/modules/pdf-thumbnail/android/**
+!/modules/webview-startup/android
+!/modules/webview-startup/android/**
+/modules/*/android/build

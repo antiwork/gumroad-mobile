@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "packages": ["expo.modules.webviewstartup.WebViewStartUpPackage"]
+  }
+}
