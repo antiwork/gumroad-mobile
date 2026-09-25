@@ -1,3 +1,4 @@
+import { resumeAudioPlayback, setAudioPlaybackIntent, seekAudioBy } from "@/lib/audio-seek";
 import { FullAudioPlayer } from "@/components/full-audio-player";
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
@@ -28,15 +29,16 @@ const MiniAudioPlayerBase = () => {
   }, [activeTrack]);
 
   const handlePlayPause = async () => {
+    setAudioPlaybackIntent(!isPlaying);
     if (isPlaying) {
       await TrackPlayer.pause();
     } else {
-      await TrackPlayer.play();
+      await resumeAudioPlayback();
     }
   };
 
   const handleSkipForward = async () => {
-    await TrackPlayer.seekBy(30);
+    await seekAudioBy(30);
   };
 
   if (!isVisible || !activeTrack) {

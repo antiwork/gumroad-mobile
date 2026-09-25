@@ -18,10 +18,8 @@ export const isMeaningfulLocation = (position: number, isEnd: boolean) => isEnd 
 export const NEAR_END_SECONDS = 30;
 export const NEAR_END_FRACTION = 0.05;
 
-// Cap at 30s and 5% so a long session that stopped in the tail restarts, while a
-// short file paused mid-track is still resumable.
 export const isNearEndLocation = (position: number, duration: number | undefined): boolean => {
-  if (!duration) return false;
+  if (duration === undefined || duration <= 0) return false;
   return position >= duration - Math.min(NEAR_END_SECONDS, duration * NEAR_END_FRACTION);
 };
 

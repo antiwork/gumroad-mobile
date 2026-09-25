@@ -13,6 +13,8 @@ const mockFetchSubtitleText = jest.fn();
 const mockUpdateMediaLocation = jest.fn();
 const mockSetNavigationBarVisibilityAsync = jest.fn().mockResolvedValue(undefined);
 let mockSetAccessToken: ((token: string) => void) | null = null;
+let mockSetupOnSourceChange = false;
+let mockLastVideoSource: unknown;
 
 jest.mock("expo-navigation-bar", () => ({
   setVisibilityAsync: (...args: unknown[]) => mockSetNavigationBarVisibilityAsync(...args),
@@ -47,7 +49,8 @@ jest.mock("expo-video", () => {
   const { View } = require("react-native");
   return {
     useVideoPlayer: (_source: unknown, setup?: (player: typeof mockPlayer) => void) => {
-      if (setup) setup(mockPlayer);
+      if (setup && (!mockSetupOnSourceChange || mockLastVideoSource !== _source)) setup(mockPlayer);
+      mockLastVideoSource = _source;
       return mockPlayer;
     },
     VideoView: (props: Record<string, unknown>) => <View testID="video-view" {...props} />,
@@ -115,7 +118,7 @@ jest.mock("react-native-safe-area-context", () => ({
 import VideoPlayerScreen from "@/app/video-player";
 import * as Sentry from "@sentry/react-native";
 import { fireEvent } from "@testing-library/react-native";
-import { act } from "react";
+import { act, useReducer } from "react";
 
 let appStateCallback: ((state: string) => void) | null = null;
 const mockRemove = jest.fn();
@@ -145,6 +148,8 @@ describe("VideoPlayerScreen", () => {
     mockFetchSubtitleText.mockReset();
     mockSetNavigationBarVisibilityAsync.mockResolvedValue(undefined);
     mockSetAccessToken = null;
+    mockSetupOnSourceChange = false;
+    mockLastVideoSource = undefined;
 
     jest.spyOn(AppState, "addEventListener").mockImplementation((_type, callback) => {
       appStateCallback = callback as (state: string) => void;
@@ -292,6 +297,221 @@ describe("VideoPlayerScreen", () => {
       const { getByTestId } = renderScreen();
 
       expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "20:09 of 30:00" });
+    });
+  });
+
+  describe("authoritative loaded resume duration", () => {
+    it.each([
+      [600, 590, 0],
+      [600, 600, 0],
+      [600, 610, 0],
+      [600, 300, 300],
+      [10, 9.499, 9.499],
+      [10, 9.5, 0],
+      [10, 9.501, 0],
+    ])("restores unknown metadata with loaded %s and saved %s to %s", (duration, saved, expected) => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: String(saved) };
+      renderScreen();
+      mockPlayer.duration = duration;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(expected);
+    });
+
+    it("reverses metadata completion after loading without saving provisional progress or seeking again", () => {
+      jest.useFakeTimers();
+      mockSearchParams = {
+        uri: "https://example.com/video.mp4",
+        initialPosition: "580",
+        contentLength: "600",
+        urlRedirectId: "redirect-1",
+        productFileId: "file-1",
+        purchaseId: "purchase-1",
+      };
+      const { unmount } = renderScreen();
+      act(() => {
+        statusChangeListener!({ status: "readyToPlay" });
+        jest.advanceTimersByTime(5000);
+      });
+      expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+      mockPlayer.duration = 660;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(580);
+      mockPlayer.currentTime = 590;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(590);
+      act(() => jest.advanceTimersByTime(5000));
+      expect(mockUpdateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 590 }));
+      unmount();
+      jest.useRealTimers();
+    });
+  });
+
+  describe("round two native restore lifecycle", () => {
+    it.each([
+      [610, undefined, 600, 600, 0],
+      [590, undefined, 0, 600, 0],
+      [590, undefined, 591, 600, 0],
+      [580, "600", 5, 660, 580],
+    ])("reconciles saved %s with metadata %s and native readback %s", (saved, metadata, readback, duration, target) => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: String(saved) };
+      if (metadata) mockSearchParams.contentLength = metadata;
+      const requestedSeeks = jest.fn();
+      Object.defineProperty(mockPlayer, "currentTime", {
+        configurable: true,
+        get: () => readback,
+        set: requestedSeeks,
+      });
+      let screen: ReturnType<typeof renderScreen> | undefined;
+      try {
+        screen = renderScreen();
+        requestedSeeks.mockClear();
+        mockPlayer.duration = duration;
+        act(() => statusChangeListener!({ status: "readyToPlay" }));
+        expect(requestedSeeks).toHaveBeenCalledTimes(1);
+        expect(requestedSeeks).toHaveBeenLastCalledWith(target);
+        requestedSeeks.mockClear();
+        act(() => {
+          statusChangeListener!({ status: "loading" });
+          statusChangeListener!({ status: "readyToPlay" });
+          statusChangeListener!({ status: "readyToPlay" });
+        });
+        expect(requestedSeeks).not.toHaveBeenCalled();
+      } finally {
+        screen?.unmount();
+        Object.defineProperty(mockPlayer, "currentTime", { configurable: true, writable: true, value: 0 });
+      }
+    });
+
+    it("keeps already-playing drift when loaded duration agrees with the provisional restore", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "300" };
+      renderScreen();
+      mockPlayer.currentTime = 305;
+      mockPlayer.duration = 660;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(305);
+    });
+
+    it("cancels a pending restore when the buyer interacts with native controls", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "580", contentLength: "600" };
+      const { getByTestId } = renderScreen();
+      fireEvent(getByTestId("video-player"), "touchStart");
+      mockPlayer.currentTime = 240;
+      mockPlayer.duration = 660;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(240);
+      mockPlayer.currentTime = 590;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(590);
+    });
+
+    it("does not save provisional drift while loaded duration is still unavailable", () => {
+      jest.useFakeTimers();
+      mockSearchParams = {
+        uri: "https://example.com/video.mp4",
+        initialPosition: "580",
+        contentLength: "600",
+        urlRedirectId: "redirect-1",
+        productFileId: "file-1",
+      };
+      const { unmount } = renderScreen();
+      try {
+        mockPlayer.currentTime = 5;
+        act(() => jest.advanceTimersByTime(5000));
+        unmount();
+        expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("starts a new restore lifecycle for a replacement video after a cancelled restore", async () => {
+      mockSearchParams = { uri: "https://example.com/first.mp4", initialPosition: "580", contentLength: "600" };
+      const { getByTestId } = renderScreen();
+      fireEvent(getByTestId("video-player"), "touchStart");
+      mockPlayer.currentTime = 240;
+      await act(async () => {
+        mockSearchParams = { uri: "https://example.com/second.mp4", initialPosition: "610" };
+        mockSetAccessToken!("next-token");
+      });
+      mockPlayer.currentTime = 600;
+      mockPlayer.duration = 600;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(0);
+      mockPlayer.currentTime = 200;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(200);
+    });
+  });
+
+  describe("mounted replacement fallback identity", () => {
+    const mountResolvedVideo = async () => {
+      mockSetupOnSourceChange = true;
+      jest.spyOn(console, "warn").mockImplementation();
+      mockSearchParams = {
+        uri: "https://example.com/a.mp4",
+        streamingUrl: "mobile/stream/a",
+        initialPosition: "590",
+      };
+      mockRequestAPI.mockResolvedValueOnce({ playlist_url: "https://example.com/a.m3u8" });
+      let refreshRoute!: () => void;
+      const MountedRoute = () => {
+        const [, refresh] = useReducer((version: number) => version + 1, 0);
+        refreshRoute = refresh;
+        return <VideoPlayerScreen />;
+      };
+      const screen = renderWithQueryClient(<MountedRoute />);
+      await act(async () => {});
+      expect(mockLastVideoSource).toBe("https://example.com/a.m3u8");
+      const staleStatusListener = statusChangeListener!;
+      return {
+        ...screen,
+        staleStatusListener,
+        replaceRoute: async (saved: number) => {
+          await act(async () => {
+            mockSearchParams = {
+              uri: "https://example.com/b.mp4",
+              streamingUrl: "mobile/stream/b",
+              initialPosition: String(saved),
+            };
+            refreshRoute();
+          });
+        },
+      };
+    };
+
+    it.each([
+      [590, 0],
+      [300, 300],
+    ])("reconciles fallback B saved %s after its unknown duration loads", async (saved, expected) => {
+      const screen = await mountResolvedVideo();
+      mockRequestAPI.mockRejectedValueOnce(new Error("B stream lookup failed"));
+      await screen.replaceRoute(saved);
+      expect(mockLastVideoSource).toBe("https://example.com/b.mp4");
+      expect(mockPlayer.currentTime).toBe(saved);
+      mockPlayer.duration = 600;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(expected);
+      mockPlayer.currentTime = expected + 10;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(expected + 10);
+    });
+
+    it("ignores A's late ready event while B's stream lookup is pending", async () => {
+      const screen = await mountResolvedVideo();
+      let rejectStream!: (error: Error) => void;
+      mockRequestAPI.mockReturnValueOnce(new Promise((_, reject) => (rejectStream = reject)));
+      await screen.replaceRoute(590);
+      mockPlayer.duration = 600;
+      act(() => screen.staleStatusListener({ status: "readyToPlay" }));
+      const positionAfterStaleEvent = mockPlayer.currentTime;
+      mockPlayer.duration = 0;
+      await act(async () => rejectStream(new Error("B stream lookup failed")));
+      expect(positionAfterStaleEvent).toBe(590);
+      expect(mockLastVideoSource).toBe("https://example.com/b.mp4");
+      expect(mockPlayer.currentTime).toBe(590);
+      mockPlayer.duration = 600;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(0);
     });
   });
 

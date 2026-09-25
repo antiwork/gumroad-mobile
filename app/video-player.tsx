@@ -143,6 +143,7 @@ export default function VideoPlayerScreen() {
     savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength),
   );
   const resumePosition = savedPositionIsAtEnd ? 0 : (savedPosition ?? 0);
+  const restorePhaseRef = useRef<"pending" | "resolved" | "cancelled">("pending");
 
   const queryClient = useQueryClient();
   const { top, bottom, left, right } = useSafeAreaInsets();
@@ -213,10 +214,12 @@ export default function VideoPlayerScreen() {
 
     if (mediaChanged) {
       const offSelection = { type: "off" } as const;
+      resolvedMediaIdentityRef.current = null;
       fallbackMediaIdentityRef.current = null;
       pendingSourceResumeRef.current = null;
       const nextPositionIsAtEnd = savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength);
       setSavedPositionIsAtEnd(nextPositionIsAtEnd);
+      restorePhaseRef.current = "pending";
       // Progress state belongs to one video. Carrying it into the next one shows the previous
       // video's position on screen and, worse, lets a save write that position against the new
       // video's duration, so the replacement video reopens at the wrong place.
@@ -310,7 +313,7 @@ export default function VideoPlayerScreen() {
     pendingSourceResumeRef.current = null;
     if (pendingResume) {
       player.currentTime = pendingResume.position;
-    } else if (resumePosition) {
+    } else if (resumePosition && restorePhaseRef.current === "pending") {
       player.currentTime = resumePosition;
     }
     if (pendingResume && !pendingResume.wasPlaying) {
@@ -441,10 +444,24 @@ export default function VideoPlayerScreen() {
             setVideoDuration(player.duration || videoDurationRef.current);
             // readyToPlay fires again after every seek and rebuffer, so this must not re-run once
             // handled or a buyer rewatching a finished video gets yanked back to the start.
-            if (!savedPositionIsAtEnd && savedPosition && !isResumableLocation(savedPosition, player.duration)) {
-              setSavedPositionIsAtEnd(true);
-              player.currentTime = 0;
-              setCurrentPosition(0);
+            const loadedMedia = resolvedMediaIdentityRef.current ?? fallbackMediaIdentityRef.current;
+            if (
+              loadedMedia?.uri === uri &&
+              loadedMedia.streamingUrl === streamingUrl &&
+              restorePhaseRef.current === "pending" &&
+              player.duration > 0
+            ) {
+              restorePhaseRef.current = "resolved";
+              if (savedPosition) {
+                const isAtEnd = !isResumableLocation(savedPosition, player.duration);
+                const position = isAtEnd ? 0 : savedPosition;
+                setSavedPositionIsAtEnd(isAtEnd);
+                if (position !== resumePosition) {
+                  player.currentTime = position;
+                  setCurrentPosition(position);
+                  if (isAtEnd) player.play();
+                }
+              }
             }
             setEmbeddedTracks(player.availableSubtitleTracks);
             const subtitleTrack = player.subtitleTrack;
@@ -467,7 +484,9 @@ export default function VideoPlayerScreen() {
     player,
     replayFromLastPosition,
     savedPosition,
-    savedPositionIsAtEnd,
+    resumePosition,
+    uri,
+    streamingUrl,
     videoDurationRef,
   ]);
 
@@ -543,6 +562,7 @@ export default function VideoPlayerScreen() {
       // While the screen is switching to another video the player still holds the previous
       // source, so anything read off it now would be saved against the new video's file.
       if (!loadedMediaMatchesParams()) return null;
+      if (restorePhaseRef.current === "pending" && savedPosition) return null;
 
       const isEnd = isNearEndLocation(position, duration);
       // Below the threshold the position is indistinguishable from a player sitting at the
@@ -557,7 +577,7 @@ export default function VideoPlayerScreen() {
         accessToken,
       });
     },
-    [urlRedirectId, productFileId, purchaseId, accessToken, loadedMediaMatchesParams],
+    [urlRedirectId, productFileId, purchaseId, accessToken, loadedMediaMatchesParams, savedPosition],
   );
 
   const persistLocationRef = useRefToLatest(persistLocation);
@@ -787,7 +807,13 @@ export default function VideoPlayerScreen() {
         player={player}
         allowsPictureInPicture={!externalCaptionSelected}
         surfaceType={videoSurfaceType}
-        onFullscreenEnter={handleNativeFullscreenEnter}
+        onTouchStart={() => {
+          restorePhaseRef.current = "cancelled";
+        }}
+        onFullscreenEnter={() => {
+          restorePhaseRef.current = "cancelled";
+          handleNativeFullscreenEnter();
+        }}
         onFullscreenExit={handleNativeFullscreenExit}
         fullscreenOptions={{
           enable: !externalCaptionSelected && !fullscreen,
