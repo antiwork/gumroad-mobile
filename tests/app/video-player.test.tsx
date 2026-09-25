@@ -391,10 +391,12 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(305);
     });
 
-    it("cancels a pending restore when the buyer interacts with native controls", () => {
+    it("cancels a pending restore when the buyer seeks before the loaded duration arrives", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "580", contentLength: "600" };
-      const { getByTestId } = renderScreen();
-      fireEvent(getByTestId("video-player"), "touchStart");
+      renderScreen();
+      act(() => {
+        timeUpdateListener!({ currentTime: 240 });
+      });
       mockPlayer.currentTime = 240;
       mockPlayer.duration = 660;
       act(() => statusChangeListener!({ status: "readyToPlay" }));
@@ -402,6 +404,18 @@ describe("VideoPlayerScreen", () => {
       mockPlayer.currentTime = 590;
       act(() => statusChangeListener!({ status: "readyToPlay" }));
       expect(mockPlayer.currentTime).toBe(590);
+    });
+
+    it("restarts a finished video when the buyer only taps the video to show its controls", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "3690" };
+      const { getByTestId } = renderScreen();
+      expect(mockPlayer.currentTime).toBe(3690);
+
+      fireEvent(getByTestId("video-player"), "touchStart");
+      mockPlayer.duration = 3711;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+
+      expect(mockPlayer.currentTime).toBe(0);
     });
 
     it("does not save provisional drift while loaded duration is still unavailable", () => {
@@ -424,10 +438,32 @@ describe("VideoPlayerScreen", () => {
       }
     });
 
+    it("saves progress when the loaded duration never arrives", () => {
+      jest.useFakeTimers();
+      mockSearchParams = {
+        uri: "https://example.com/video.mp4",
+        initialPosition: "580",
+        contentLength: "600",
+        urlRedirectId: "redirect-1",
+        productFileId: "file-1",
+      };
+      const { unmount } = renderScreen();
+      try {
+        mockPlayer.currentTime = 120;
+        act(() => jest.advanceTimersByTime(25000));
+        expect(mockUpdateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 120 }));
+        unmount();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("starts a new restore lifecycle for a replacement video after a cancelled restore", async () => {
       mockSearchParams = { uri: "https://example.com/first.mp4", initialPosition: "580", contentLength: "600" };
-      const { getByTestId } = renderScreen();
-      fireEvent(getByTestId("video-player"), "touchStart");
+      renderScreen();
+      act(() => {
+        timeUpdateListener!({ currentTime: 240 });
+      });
       mockPlayer.currentTime = 240;
       await act(async () => {
         mockSearchParams = { uri: "https://example.com/second.mp4", initialPosition: "610" };

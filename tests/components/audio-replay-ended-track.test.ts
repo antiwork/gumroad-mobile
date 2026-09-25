@@ -491,6 +491,24 @@ describe("round two delayed audio restore lifecycle", () => {
     unmount();
   });
 
+  it("saves progress when the native duration never arrives", async () => {
+    const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
+    await act(async () => {
+      await result.current.playAudio({ resourceId: audio.resourceId, tracks: [audio] });
+    });
+    (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({ id: track.resourceId });
+    (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValue({ position: 5, duration: 0 });
+    await poll();
+    expect(updateMediaLocation).not.toHaveBeenCalled();
+    await poll();
+    await poll();
+    await poll();
+    await poll();
+    expect(mockTrackPlayer.seekTo).not.toHaveBeenCalled();
+    expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 5 }));
+    unmount();
+  });
+
   it("drops a pending restore when the background queue advances and later revisits the track", async () => {
     const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
     await act(async () => {

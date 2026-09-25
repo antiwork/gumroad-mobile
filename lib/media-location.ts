@@ -18,6 +18,11 @@ export const isMeaningfulLocation = (position: number, isEnd: boolean) => isEnd 
 export const NEAR_END_SECONDS = 30;
 export const NEAR_END_FRACTION = 0.05;
 
+// A restore that is still waiting on the media's own duration holds back writes it would
+// overwrite. Media that never reports a duration would hold them back for the whole session, so
+// the wait is bounded and the restore is dropped once it passes.
+export const RESTORE_DURATION_WAIT_MS = 20_000;
+
 export const isNearEndLocation = (position: number, duration: number | undefined): boolean => {
   if (duration === undefined || duration <= 0) return false;
   return position >= duration - Math.min(NEAR_END_SECONDS, duration * NEAR_END_FRACTION);
