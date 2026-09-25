@@ -30,7 +30,13 @@ jest.mock("expo-file-system", () => {
 
 import { File } from "expo-file-system";
 import * as Sentry from "@sentry/react-native";
-import { cacheFileDestination, downloadFileWithRetry, fileDisplayName, FileUnavailableError } from "@/lib/file-utils";
+import {
+  cacheFileDestination,
+  downloadFileWithRetry,
+  fileDisplayName,
+  fileDisplayNames,
+  FileUnavailableError,
+} from "@/lib/file-utils";
 
 describe("cacheFileDestination", () => {
   it("neutralizes URL-significant characters that break native file URI parsing", () => {
@@ -178,7 +184,25 @@ describe("fileDisplayName", () => {
     expect(fileDisplayName(".gitignore")).toBe(".gitignore");
   });
 
+  it("keeps a trailing dot, which does not introduce an extension", () => {
+    expect(fileDisplayName("Track.")).toBe("Track.");
+  });
+
   it("drops only the last extension of a multi-dot name", () => {
     expect(fileDisplayName("archive.tar.gz")).toBe("archive.tar");
+  });
+});
+
+describe("fileDisplayNames", () => {
+  it("drops every extension when the shortened names stay distinct", () => {
+    expect(fileDisplayNames(["Intro.mp3", "Outro.wav"])).toEqual(["Intro", "Outro"]);
+  });
+
+  it("keeps the extensions when dropping them would make two files read the same", () => {
+    expect(fileDisplayNames(["Track.mp3", "Track.wav"])).toEqual(["Track.mp3", "Track.wav"]);
+  });
+
+  it("passes an unknown name through without counting it as a collision", () => {
+    expect(fileDisplayNames([undefined, "Track.mp3"])).toEqual([undefined, "Track"]);
   });
 });

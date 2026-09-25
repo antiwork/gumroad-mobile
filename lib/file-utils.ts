@@ -12,14 +12,21 @@ const sanitizeFileName = (name: string) => {
   return cleaned.slice(0, MAX_FILE_NAME_LENGTH - extension.length) + extension;
 };
 
-// The player shows the file name while the product row shows the product name, so keeping the
-// extension makes one item read as two different names ("Track.mp3" in the player, "Track" in
-// the row) even though the row's format badge already communicates the file type. Drop only a
-// real extension: a name with no dot, or a dotfile, is returned unchanged.
 export const fileDisplayName = (name: string): string => {
   const dotIndex = name.lastIndexOf(".");
-  if (dotIndex <= 0) return name;
+  if (dotIndex <= 0 || dotIndex === name.length - 1) return name;
   return name.slice(0, dotIndex);
+};
+
+export const fileDisplayNames = (names: (string | undefined)[]): (string | undefined)[] => {
+  const displays = names.map((name) => (name === undefined ? undefined : fileDisplayName(name)));
+  const counts = new Map<string, number>();
+  for (const display of displays) {
+    if (display !== undefined) counts.set(display, (counts.get(display) ?? 0) + 1);
+  }
+  return displays.map((display, index) =>
+    display !== undefined && (counts.get(display) ?? 0) > 1 ? names[index] : display,
+  );
 };
 
 export const cacheFileDestination = (uniqueKey: string, fileName: string) => {
