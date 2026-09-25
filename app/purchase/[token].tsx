@@ -10,7 +10,7 @@ import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { assertDefined } from "@/lib/assert";
 import { productFileDownloadUrl } from "@/lib/download-url";
 import { env } from "@/lib/env";
-import { cacheFileDestination, downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
+import { cacheFileDestination, downloadFileWithRetry, fileDisplayName, FileUnavailableError } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
 import { shareFile } from "@/lib/share";
 import { useWebViewSession } from "@/lib/use-webview-session";
@@ -139,7 +139,7 @@ export default function DownloadScreen() {
       const allAudioTracks = allAudioFiles.map((fileData) => ({
         uri: productFileDownloadUrl(token, fileData.id),
         resourceId: fileData.id,
-        title: fileData.name ?? purchase?.name,
+        title: fileData.name ? fileDisplayName(fileData.name) : purchase?.name,
         urlRedirectId: purchase?.url_redirect_external_id,
         purchaseId: purchase?.purchase_id,
         resumeAt: fileData.latest_media_location?.location,

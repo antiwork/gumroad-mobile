@@ -30,7 +30,7 @@ jest.mock("expo-file-system", () => {
 
 import { File } from "expo-file-system";
 import * as Sentry from "@sentry/react-native";
-import { cacheFileDestination, downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
+import { cacheFileDestination, downloadFileWithRetry, fileDisplayName, FileUnavailableError } from "@/lib/file-utils";
 
 describe("cacheFileDestination", () => {
   it("neutralizes URL-significant characters that break native file URI parsing", () => {
@@ -162,5 +162,23 @@ describe("downloadFileWithRetry", () => {
       "Network request failed again",
     );
     expect(downloadMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("fileDisplayName", () => {
+  it("drops the extension so the player title matches the product row label", () => {
+    expect(fileDisplayName("Mobile Test Long Audio.mp3")).toBe("Mobile Test Long Audio");
+  });
+
+  it("keeps a name that has no extension", () => {
+    expect(fileDisplayName("Mobile Test Long Audio")).toBe("Mobile Test Long Audio");
+  });
+
+  it("keeps a dotfile intact instead of emptying it", () => {
+    expect(fileDisplayName(".gitignore")).toBe(".gitignore");
+  });
+
+  it("drops only the last extension of a multi-dot name", () => {
+    expect(fileDisplayName("archive.tar.gz")).toBe("archive.tar");
   });
 });
