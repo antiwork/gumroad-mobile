@@ -23,9 +23,18 @@ appId: ${APP_ID}
     timeout: 20000
 - assertNotVisible: This video failed to load
 # Normalise: play through to the end, whatever position this account was left on.
+- tapOn:
+    point: "1%,1%"
+    repeat: 3
+    delay: 7000
+- tapOn:
+    id: ".*surface_player_view"
+    waitToSettleTimeoutMs: 1000
 - extendedWaitUntil:
-    visible: "Video playback started, 0:(09|10) of 0:10"
-    timeout: 30000
+    visible:
+      id: ".*exo_position"
+      text: "00:10"
+    timeout: 10000
 - runFlow:
     file: utils/back.yaml
 # A finished video restarts from the beginning rather than seeking to the end and stopping.
@@ -34,13 +43,19 @@ appId: ${APP_ID}
     visible:
       id: video-player
     timeout: 20000
+- tapOn:
+    id: ".*surface_player_view"
+    waitToSettleTimeoutMs: 1000
 - extendedWaitUntil:
-    visible: "Video playback (started|waiting), 0:0[0-3] of 0:10"
-    timeout: 20000
+    visible:
+      id: ".*exo_position"
+      text: "00:0[0-6]"
+    timeout: 10000
 # Watch far enough in that the position is worth saving, then leave.
-- extendedWaitUntil:
-    visible: "Video playback started, 0:0[5-7] of 0:10"
-    timeout: 20000
+- tapOn:
+    point: "1%,1%"
+    repeat: 2
+    delay: 3000
 - runFlow:
     file: utils/back.yaml
 - runFlow:
@@ -55,9 +70,16 @@ appId: ${APP_ID}
     visible:
       id: video-player
     timeout: 20000
+- tapOn:
+    id: ".*surface_player_view"
+    waitToSettleTimeoutMs: 1000
 # The saved position has to be read back. Before this was fixed the player always opened at 0:00.
 - extendedWaitUntil:
-    visible: "Video playback (started|waiting), 0:0[5-9] of 0:10"
-    timeout: 20000
-- assertNotVisible: "Video playback (started|waiting), 0:0[0-3] of 0:10"
+    visible:
+      id: ".*exo_position"
+      text: "00:(0[8-9]|10)"
+    timeout: 10000
+- assertNotVisible:
+    id: ".*exo_position"
+    text: "00:0[0-5]"
 - assertNotVisible: This video failed to load

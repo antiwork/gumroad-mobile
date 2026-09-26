@@ -1,4 +1,4 @@
-import { AppState, Modal, Platform, StatusBar, StyleSheet } from "react-native";
+import { AccessibilityInfo, AppState, Modal, Platform, StatusBar, StyleSheet } from "react-native";
 import { renderWithQueryClient } from "../render-with-query-client";
 
 type StatusChangePayload = { status: string; error?: { message: string } };
@@ -119,12 +119,23 @@ import { act } from "react";
 
 let appStateCallback: ((state: string) => void) | null = null;
 const mockRemove = jest.fn();
+let screenReaderListener: (enabled: boolean) => void;
+const mockScreenReaderRemove = jest.fn();
 
 const renderScreen = () => renderWithQueryClient(<VideoPlayerScreen />);
 
 describe("VideoPlayerScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(AccessibilityInfo, "isScreenReaderEnabled").mockImplementation(() => new Promise(() => {}));
+    jest.spyOn(AccessibilityInfo, "addEventListener").mockImplementation(((
+      event: string,
+      listener: (enabled: boolean) => void,
+    ) => {
+      expect(event).toBe("screenReaderChanged");
+      screenReaderListener = listener;
+      return { remove: mockScreenReaderRemove };
+    }) as unknown as typeof AccessibilityInfo.addEventListener);
     mockPlayer.playing = true;
     mockPlayer.staysActiveInBackground = true;
     mockPlayer.loop = false;
@@ -178,6 +189,97 @@ describe("VideoPlayerScreen", () => {
     });
 
     expect(getByLabelText("Video playback started")).toBeTruthy();
+  });
+
+  describe("screen reader progress", () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+    it("omits the accessibility value across playback ticks when the reader is off", async () => {
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockResolvedValue(false);
+      const { getByTestId } = renderScreen();
+      await act(async () => {});
+      for (const currentTime of [1, 2, 3]) {
+        act(() => {
+          mockPlayer.currentTime = currentTime;
+          timeUpdateListener!({ currentTime });
+          jest.advanceTimersByTime(5000);
+        });
+        expect(getByTestId("video-player").props.accessibilityValue).toBeUndefined();
+      }
+      expect(getByTestId("video-player").props.accessibilityLabel).toBe("Video playback started");
+      expect(mockPlayer.timeUpdateEventInterval).toBe(0.25);
+      expect(mockPlayer.play).toHaveBeenCalled();
+    });
+
+    it("publishes advancing text when the reader is initially on", async () => {
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockResolvedValue(true);
+      mockSearchParams.contentLength = "120";
+      const { getByTestId } = renderScreen();
+      await act(async () => {});
+      for (const currentTime of [1, 2]) {
+        act(() => {
+          mockPlayer.currentTime = currentTime;
+          timeUpdateListener!({ currentTime });
+          jest.advanceTimersByTime(5000);
+        });
+        expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: `0:0${currentTime} of 2:00` });
+      }
+    });
+
+    it("starts and stops publishing when the reader changes during playback", async () => {
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockResolvedValue(false);
+      const { getByTestId } = renderScreen();
+      await act(async () => {});
+      act(() => {
+        mockPlayer.currentTime = 12;
+        timeUpdateListener!({ currentTime: 12 });
+        jest.advanceTimersByTime(5000);
+      });
+      act(() => screenReaderListener(true));
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "0:12 of 0:00" });
+      act(() => screenReaderListener(false));
+      act(() => {
+        mockPlayer.currentTime = 13;
+        timeUpdateListener!({ currentTime: 13 });
+        jest.advanceTimersByTime(5000);
+      });
+      expect(getByTestId("video-player").props.accessibilityValue).toBeUndefined();
+    });
+
+    it("ignores an initial result older than a reader change", async () => {
+      let resolveInitial!: (enabled: boolean) => void;
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockReturnValue(
+        new Promise((resolve) => {
+          resolveInitial = resolve;
+        }),
+      );
+      const { getByTestId } = renderScreen();
+      act(() => screenReaderListener(true));
+      await act(async () => resolveInitial(false));
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "0:00 of 0:00" });
+    });
+
+    it("keeps publishing after an initial query failure", async () => {
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockRejectedValue(new Error("unavailable"));
+      const { getByTestId } = renderScreen();
+      await act(async () => {});
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "0:00 of 0:00" });
+      act(() => screenReaderListener(true));
+      expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "0:00 of 0:00" });
+    });
+
+    it("removes the reader subscription and tolerates a late initial result on unmount", async () => {
+      let resolveInitial!: (enabled: boolean) => void;
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockReturnValue(
+        new Promise((resolve) => {
+          resolveInitial = resolve;
+        }),
+      );
+      const { unmount } = renderScreen();
+      unmount();
+      expect(mockScreenReaderRemove).toHaveBeenCalledTimes(1);
+      await act(async () => resolveInitial(true));
+    });
   });
 
   describe("resuming from a saved position", () => {
@@ -252,10 +354,12 @@ describe("VideoPlayerScreen", () => {
       expect(getByLabelText("Video playback started")).toBeTruthy();
     });
 
-    it("keeps the seeded duration when the player reports no duration yet", () => {
+    it("keeps the seeded duration when the player reports no duration yet", async () => {
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockResolvedValue(true);
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "600", contentLength: "1800" };
       const { getByTestId } = renderScreen();
 
+      await act(async () => {});
       mockPlayer.duration = 0;
       act(() => {
         statusChangeListener!({ status: "readyToPlay" });
@@ -279,10 +383,12 @@ describe("VideoPlayerScreen", () => {
       expect(getByLabelText("Video playback started")).toBeTruthy();
     });
 
-    it("exposes the resumed position so end-to-end flows can assert playback did not restart", () => {
+    it("exposes the resumed position so end-to-end flows can assert playback did not restart", async () => {
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockResolvedValue(true);
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "1209", contentLength: "1800" };
       const { getByTestId } = renderScreen();
 
+      await act(async () => {});
       expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "20:09 of 30:00" });
     });
   });
@@ -375,12 +481,14 @@ describe("VideoPlayerScreen", () => {
 
   describe("switching to another video", () => {
     it("shows the new video's position instead of the previous one's", async () => {
+      jest.mocked(AccessibilityInfo.isScreenReaderEnabled).mockResolvedValue(true);
       mockSearchParams = {
         uri: "https://example.com/first.mp4",
         initialPosition: "1209",
         contentLength: "1800",
       };
       const { getByTestId } = renderScreen();
+      await act(async () => {});
       expect(getByTestId("video-player").props.accessibilityValue).toEqual({ text: "20:09 of 30:00" });
 
       await act(async () => {

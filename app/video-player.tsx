@@ -19,6 +19,7 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import { useVideoPlayer, VideoView, type SubtitleTrack, type VideoPlayerStatus } from "expo-video";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   AppState,
   type AppStateStatus,
   FlatList,
@@ -116,6 +117,28 @@ const subtitleTrackKey = (track: SubtitleTrack): string => track.id ?? `${track.
 
 export default function VideoPlayerScreen() {
   const { accessToken } = useAuth();
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+
+  useEffect(() => {
+    let useInitialState = true;
+    const subscription = AccessibilityInfo.addEventListener("screenReaderChanged", (enabled) => {
+      useInitialState = false;
+      setScreenReaderEnabled(enabled);
+    });
+    AccessibilityInfo.isScreenReaderEnabled().then(
+      (enabled) => {
+        if (useInitialState) setScreenReaderEnabled(enabled);
+      },
+      () => {
+        if (useInitialState) setScreenReaderEnabled(true);
+      },
+    );
+    return () => {
+      useInitialState = false;
+      subscription.remove();
+    };
+  }, []);
+
   const { uri, streamingUrl, title, urlRedirectId, productFileId, purchaseId, initialPosition, contentLength } =
     useLocalSearchParams<{
       uri: string;
@@ -777,7 +800,9 @@ export default function VideoPlayerScreen() {
         key={videoSurfaceType}
         testID={fullscreen ? "fullscreen-video-player" : "video-player"}
         accessibilityLabel={playbackStarted ? "Video playback started" : "Video playback waiting"}
-        accessibilityValue={{ text: `${formatTime(currentPosition)} of ${formatTime(videoDuration)}` }}
+        accessibilityValue={
+          screenReaderEnabled ? { text: `${formatTime(currentPosition)} of ${formatTime(videoDuration)}` } : undefined
+        }
         style={styles.video}
         player={player}
         allowsPictureInPicture={!externalCaptionSelected}

@@ -4,7 +4,7 @@ import { Text } from "@/components/ui/text";
 import { safeOpenURL } from "@/lib/open-url";
 import { formatTime } from "@/lib/format-time";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Modal, TouchableOpacity, View } from "react-native";
+import { AccessibilityInfo, Modal, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,6 +47,27 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   const [loopEnabled, setLoopEnabled] = useState(true);
   const [queueLength, setQueueLength] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+
+  useEffect(() => {
+    let useInitialState = true;
+    const subscription = AccessibilityInfo.addEventListener("screenReaderChanged", (enabled) => {
+      useInitialState = false;
+      setScreenReaderEnabled(enabled);
+    });
+    AccessibilityInfo.isScreenReaderEnabled().then(
+      (enabled) => {
+        if (useInitialState) setScreenReaderEnabled(enabled);
+      },
+      () => {
+        if (useInitialState) setScreenReaderEnabled(true);
+      },
+    );
+    return () => {
+      useInitialState = false;
+      subscription.remove();
+    };
+  }, []);
 
   const updateQueueState = useCallback(async () => {
     const queue = await TrackPlayer.getQueue();
@@ -235,9 +256,13 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
             <View
               accessibilityLabel="Playback position"
               accessibilityRole="progressbar"
-              accessibilityValue={{
-                text: `${formatTime(seekProgress != null ? (seekProgress / 100) * duration : position)} of ${formatTime(duration)}`,
-              }}
+              accessibilityValue={
+                screenReaderEnabled
+                  ? {
+                      text: `${formatTime(seekProgress != null ? (seekProgress / 100) * duration : position)} of ${formatTime(duration)}`,
+                    }
+                  : undefined
+              }
               className="mb-2 justify-center py-2"
               onLayout={(e) => {
                 barWidthRef.current = e.nativeEvent.layout.width;
