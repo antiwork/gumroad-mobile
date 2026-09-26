@@ -205,4 +205,12 @@ describe("fileDisplayNames", () => {
   it("passes an unknown name through without counting it as a collision", () => {
     expect(fileDisplayNames([undefined, "Track.mp3"])).toEqual([undefined, "Track"]);
   });
+
+  it("keeps the extension when the shortened name matches another file's full name", () => {
+    expect(fileDisplayNames(["Track.1.mp3", "Track.1.wav", "Track.1.wav.mp3"])).toEqual([
+      "Track.1.mp3",
+      "Track.1.wav",
+      "Track.1.wav.mp3",
+    ]);
+  });
 });

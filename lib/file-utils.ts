@@ -24,9 +24,9 @@ export const fileDisplayNames = (names: (string | undefined)[]): (string | undef
   for (const display of displays) {
     if (display !== undefined) counts.set(display, (counts.get(display) ?? 0) + 1);
   }
-  return displays.map((display, index) =>
-    display !== undefined && (counts.get(display) ?? 0) > 1 ? names[index] : display,
-  );
+  const collides = (display: string, index: number) =>
+    (counts.get(display) ?? 0) > 1 || names.some((name, other) => other !== index && name === display);
+  return displays.map((display, index) => (display !== undefined && collides(display, index) ? names[index] : display));
 };
 
 export const cacheFileDestination = (uniqueKey: string, fileName: string) => {
