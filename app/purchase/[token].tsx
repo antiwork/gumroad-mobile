@@ -10,13 +10,13 @@ import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { assertDefined } from "@/lib/assert";
 import { productFileDownloadUrl } from "@/lib/download-url";
 import { env } from "@/lib/env";
-import { cacheFileDestination, downloadFileWithRetry, FileUnavailableError } from "@/lib/file-utils";
+import { cacheFileDestination, downloadFileWithRetry, fileDisplayNames, FileUnavailableError } from "@/lib/file-utils";
 import { safeOpenURL } from "@/lib/open-url";
 import { shareFile } from "@/lib/share";
 import { useWebViewSession } from "@/lib/use-webview-session";
 import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
 import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -83,6 +83,13 @@ export default function DownloadScreen() {
   const { pauseAudio, playAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
   const audioFiles = purchase?.file_data?.filter((file) => file.filegroup === "audio") ?? [];
+  const audioFileNames = useMemo(
+    () =>
+      fileDisplayNames(
+        (purchase?.file_data ?? []).filter((file) => file.filegroup === "audio").map((file) => file.name),
+      ),
+    [purchase?.file_data],
+  );
   const showAudioFiles = audioFiles.length > 0;
 
   // Download URLs embed the url_redirect token, which can go stale by the time the user taps a
@@ -136,10 +143,10 @@ export default function DownloadScreen() {
         return;
       }
       const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
-      const allAudioTracks = allAudioFiles.map((fileData) => ({
+      const allAudioTracks = allAudioFiles.map((fileData, index) => ({
         uri: productFileDownloadUrl(token, fileData.id),
         resourceId: fileData.id,
-        title: fileData.name ?? purchase?.name,
+        title: audioFileNames[index] ?? purchase?.name,
         urlRedirectId: purchase?.url_redirect_external_id,
         purchaseId: purchase?.purchase_id,
         resumeAt: fileData.latest_media_location?.location,
@@ -154,7 +161,7 @@ export default function DownloadScreen() {
         tracks: allAudioTracks,
       });
     },
-    [activeResourceId, isPlaying, pauseAudio, playAudio, purchase, token],
+    [activeResourceId, isPlaying, pauseAudio, playAudio, purchase, token, audioFileNames],
   );
 
   const handleNativeAudioFilePlay = useCallback(
@@ -303,7 +310,7 @@ export default function DownloadScreen() {
       )}
       {showAudioFiles ? (
         <PurchaseAudioFiles
-          files={audioFiles}
+          files={audioFiles.map((file, index) => ({ id: file.id, name: audioFileNames[index] }))}
           onPlay={(id) => {
             void handleNativeAudioFilePlay(id);
           }}

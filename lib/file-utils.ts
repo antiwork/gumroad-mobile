@@ -12,6 +12,23 @@ const sanitizeFileName = (name: string) => {
   return cleaned.slice(0, MAX_FILE_NAME_LENGTH - extension.length) + extension;
 };
 
+export const fileDisplayName = (name: string): string => {
+  const dotIndex = name.lastIndexOf(".");
+  if (dotIndex <= 0 || dotIndex === name.length - 1) return name;
+  return name.slice(0, dotIndex);
+};
+
+export const fileDisplayNames = (names: (string | undefined)[]): (string | undefined)[] => {
+  const displays = names.map((name) => (name === undefined ? undefined : fileDisplayName(name)));
+  const counts = new Map<string, number>();
+  for (const display of displays) {
+    if (display !== undefined) counts.set(display, (counts.get(display) ?? 0) + 1);
+  }
+  return displays.map((display, index) =>
+    display !== undefined && (counts.get(display) ?? 0) > 1 ? names[index] : display,
+  );
+};
+
 export const cacheFileDestination = (uniqueKey: string, fileName: string) => {
   const dir = new Directory(Paths.cache, uniqueKey);
   if (!dir.exists) dir.create({ idempotent: true });

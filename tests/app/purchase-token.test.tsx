@@ -301,4 +301,65 @@ describe("DownloadScreen", () => {
     await waitFor(() => expect(Sentry.captureException).toHaveBeenCalledWith(error));
     expect(alertSpy).toHaveBeenCalledWith("Audio Playback Failed", "Could not start audio");
   });
+
+  const purchaseWithMixedFiles = {
+    purchase_id: "purchase-1",
+    url_redirect_external_id: "redirect-1",
+    file_data: [
+      { id: "pdf1", filegroup: "pdf", name: "Guide.pdf", content_length: 12 },
+      { id: "a1", filegroup: "audio", name: "Intro.mp3", content_length: 223 },
+      { id: "a2", filegroup: "audio", name: "Outro.mp3", content_length: 223 },
+    ],
+  };
+
+  const titlesFor = (call: { tracks: { title?: string }[] }) => call.tracks.map((track) => track.title);
+
+  it("drops the extension in the native audio list and in the player title", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithMixedFiles);
+    render(<DownloadScreen />);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+    expect(screen.getByText("Intro")).toBeTruthy();
+    expect(screen.getByText("Outro")).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId("purchase-audio-file-a1"));
+
+    expect(titlesFor(mockPlayAudio.mock.calls[0][0])).toEqual(["Intro", "Outro"]);
+  });
+
+  it("keeps the extensions in both places when the shortened names would collide", async () => {
+    mockUsePurchase.mockReturnValue({
+      ...purchaseWithMixedFiles,
+      file_data: [
+        { id: "a1", filegroup: "audio", name: "Track.mp3", content_length: 223 },
+        { id: "a2", filegroup: "audio", name: "Track.wav", content_length: 223 },
+      ],
+    });
+    render(<DownloadScreen />);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+    expect(screen.getByText("Track.mp3")).toBeTruthy();
+    expect(screen.getByText("Track.wav")).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId("purchase-audio-file-a2"));
+
+    expect(titlesFor(mockPlayAudio.mock.calls[0][0])).toEqual(["Track.mp3", "Track.wav"]);
+  });
+
+  it("keeps each title paired with its own file when the purchase also holds non-audio files", async () => {
+    mockUsePurchase.mockReturnValue(purchaseWithMixedFiles);
+    render(<DownloadScreen />);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+    fireEvent.press(screen.getByTestId("purchase-audio-file-a2"));
+
+    expect(mockPlayAudio).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tracks: expect.arrayContaining([
+          expect.objectContaining({ resourceId: "a1", title: "Intro" }),
+          expect.objectContaining({ resourceId: "a2", title: "Outro" }),
+        ]),
+      }),
+    );
+  });
 });
