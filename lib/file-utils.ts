@@ -19,14 +19,22 @@ export const fileDisplayName = (name: string): string => {
 };
 
 export const fileDisplayNames = (names: (string | undefined)[]): (string | undefined)[] => {
-  const displays = names.map((name) => (name === undefined ? undefined : fileDisplayName(name)));
-  const counts = new Map<string, number>();
-  for (const display of displays) {
-    if (display !== undefined) counts.set(display, (counts.get(display) ?? 0) + 1);
+  const labels = names.map((name) => (name === undefined ? undefined : fileDisplayName(name)));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const counts = new Map<string, number>();
+    for (const label of labels) {
+      if (label !== undefined) counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    labels.forEach((label, index) => {
+      if (label !== undefined && label !== names[index] && (counts.get(label) ?? 0) > 1) {
+        labels[index] = names[index];
+        changed = true;
+      }
+    });
   }
-  const collides = (display: string, index: number) =>
-    (counts.get(display) ?? 0) > 1 || names.some((name, other) => other !== index && name === display);
-  return displays.map((display, index) => (display !== undefined && collides(display, index) ? names[index] : display));
+  return labels;
 };
 
 export const cacheFileDestination = (uniqueKey: string, fileName: string) => {

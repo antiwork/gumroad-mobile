@@ -213,4 +213,12 @@ describe("fileDisplayNames", () => {
       "Track.1.wav.mp3",
     ]);
   });
+
+  it("drops the extensions when a shortened name only matches another file's full name", () => {
+    expect(fileDisplayNames(["Track.wav", "Track.wav.mp3"])).toEqual(["Track", "Track.wav"]);
+  });
+
+  it("stops when two files share the same full name", () => {
+    expect(fileDisplayNames(["Track.mp3", "Track.mp3"])).toEqual(["Track.mp3", "Track.mp3"]);
+  });
 });
