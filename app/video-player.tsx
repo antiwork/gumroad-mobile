@@ -639,7 +639,7 @@ export default function VideoPlayerScreen() {
           const aheadWhileDurationUnknown =
             baseline !== null && observed > baseline + ACCEPTED_SAMPLE_SECONDS && player.duration <= 0;
           if (returnedBehindPlayback) {
-            observeNativeSeek();
+            nativeSeekObservedRef.current = true;
           } else if (!aheadWhileDurationUnknown) {
             const alreadySeeked = nativeSeekObservedRef.current;
             observeNativeSeek();
