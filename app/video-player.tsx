@@ -427,32 +427,23 @@ export default function VideoPlayerScreen() {
     if (!anchor || nativeSeekObservedRef.current) return;
     const elapsedSeconds = (performance.now() - anchor.time) / 1000;
     const playbackBaseline = previousObservedTimeRef.current;
-    const playbackOrigin =
-      resumePosition > 0 && anchor.position < resumePosition - 1 ? resumePosition : anchor.position;
-    const observedAdvance = playbackBaseline === null ? 0 : Math.max(0, playbackBaseline - playbackOrigin);
     const rate = Math.max(anchor.rate, player.playbackRate);
     const wallAdvance = player.playing ? elapsedSeconds * rate : 0;
     const position = player.currentTime;
     const sample = TIME_UPDATE_INTERVAL_SECONDS * rate;
-    const acceptedSlack = 1;
     const nearElapsed = (start: number) => {
       const expected = player.duration > 0 ? Math.min(start + wallAdvance, player.duration) : start + wallAdvance;
       return Math.abs(position - expected) <= sample;
     };
     const matchesElapsedPlayback =
       player.playing && (nearElapsed(anchor.position) || (resumePosition > 0 && nearElapsed(resumePosition)));
-    const withinAcceptedSample = playbackBaseline !== null && Math.abs(position - playbackBaseline) <= acceptedSlack;
-    const playbackAllowance = player.playing ? Math.min(wallAdvance, observedAdvance) : observedAdvance;
-    const maxAdvance = matchesElapsedPlayback
-      ? wallAdvance + sample
-      : playbackAllowance + (withinAcceptedSample ? acceptedSlack : sample);
-    const followsPlayback = (start: number) =>
-      position >= start - TIME_UPDATE_INTERVAL_SECONDS && position <= start + maxAdvance;
+    const baselineSlack = player.playing ? 1 : TIME_UPDATE_INTERVAL_SECONDS;
+    const matchesAcceptedSample = playbackBaseline !== null && Math.abs(position - playbackBaseline) <= baselineSlack;
     const followsClamp = (start: number) =>
       player.duration > 0 && Math.abs(position - Math.min(start, player.duration)) <= TIME_UPDATE_INTERVAL_SECONDS;
     if (
-      !followsPlayback(anchor.position) &&
-      !followsPlayback(resumePosition) &&
+      !matchesElapsedPlayback &&
+      !matchesAcceptedSample &&
       !followsClamp(anchor.position) &&
       !followsClamp(resumePosition)
     ) {
@@ -623,11 +614,7 @@ export default function VideoPlayerScreen() {
           observed >= baseline - TIME_UPDATE_INTERVAL_SECONDS
         ) {
           previousObservedTimeRef.current = observed;
-        } else if (
-          player.playing &&
-          nearSavedResume &&
-          (baseline === null || Math.abs(baseline - resumePosition) > 1)
-        ) {
+        } else if (player.playing && nearSavedResume && (baseline === null || baseline < resumePosition - 1)) {
           previousObservedTimeRef.current = observed;
         }
         lastObservedTimeRef.current = observed;

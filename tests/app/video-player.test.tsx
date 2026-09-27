@@ -740,6 +740,42 @@ describe("VideoPlayerScreen", () => {
       nowSpy.mockRestore();
     });
 
+    it("keeps a paused scrub back into the range already played", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      tap(screen);
+      ready(0);
+      playFor(20);
+      mockPlayer.playing = false;
+      nativeSeek(591);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(591);
+    });
+
+    it("keeps a backward scrub into the range already played", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      tap(screen);
+      ready(0);
+      playFor(20);
+      nativeSeek(591);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(591);
+    });
+
+    it("keeps a paused move beyond one sample of the touch position", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = false;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      nativeSeek(590.9);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(590.9);
+    });
+
     it("keeps a jump to the loaded end that elapsed playback has not reached", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const now = performance.now();
