@@ -861,6 +861,20 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(594);
     });
 
+    it("keeps a backward scrub at elapsed time when duration arrives before the next sample", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      tap(screen);
+      ready(0);
+      playFor(12);
+      nativeSeek(598);
+      playFor(4);
+      mockPlayer.currentTime = 594;
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(594);
+    });
+
     it("keeps a short backward scrub while playing", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const screen = renderScreen();

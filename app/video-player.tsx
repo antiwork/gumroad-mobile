@@ -447,14 +447,18 @@ export default function VideoPlayerScreen() {
       player.playing &&
       (nearElapsed(anchor.position) ||
         (resumePosition > 0 && anchor.position < resumePosition - sample && nearElapsed(resumePosition)));
+    const followsClamp = (start: number) =>
+      player.duration > 0 && Math.abs(position - Math.min(start, player.duration)) <= TIME_UPDATE_INTERVAL_SECONDS;
     const returnedBehindPlayback = returnedBehindObservedTime(playbackBaseline, lastObservedTimeRef.current, position);
+    if (returnedBehindPlayback && !followsClamp(anchor.position) && !followsClamp(resumePosition)) {
+      nativeSeekObservedRef.current = true;
+      return;
+    }
     const matchesAcceptedSample =
       playbackBaseline !== null &&
       !returnedBehindPlayback &&
       position >= playbackBaseline - TIME_UPDATE_INTERVAL_SECONDS &&
       position <= playbackBaseline + (player.playing ? ACCEPTED_SAMPLE_SECONDS : TIME_UPDATE_INTERVAL_SECONDS);
-    const followsClamp = (start: number) =>
-      player.duration > 0 && Math.abs(position - Math.min(start, player.duration)) <= TIME_UPDATE_INTERVAL_SECONDS;
     if (
       !matchesElapsedPlayback &&
       !matchesAcceptedSample &&
