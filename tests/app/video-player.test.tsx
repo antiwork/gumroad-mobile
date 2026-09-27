@@ -700,6 +700,61 @@ describe("VideoPlayerScreen", () => {
       nowSpy.mockRestore();
     });
 
+    it.each([
+      [15_000, 1, 600],
+      [15_000, 1, 599.8],
+      [6_000, 2, 600],
+    ])(
+      "restarts saved 590 when playback reaches the loaded end after %s ms at %sx and position %s",
+      (elapsedMs, rate, position) => {
+        mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+        const now = performance.now();
+        const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+        const screen = renderScreen();
+        mockPlayer.playing = true;
+        mockPlayer.playbackRate = rate;
+        mockPlayer.currentTime = 590;
+        tap(screen);
+        nowSpy.mockReturnValue(now + elapsedMs);
+        mockPlayer.currentTime = position;
+        mockPlayer.play.mockClear();
+        ready(600);
+        expect(mockPlayer.currentTime).toBe(0);
+        expect(mockPlayer.play).toHaveBeenCalled();
+        nowSpy.mockRestore();
+      },
+    );
+
+    it("restarts when a touch read zero and playback then reached the loaded end", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 0;
+      tap(screen);
+      nowSpy.mockReturnValue(now + 15_000);
+      mockPlayer.currentTime = 600;
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+      nowSpy.mockRestore();
+    });
+
+    it("keeps a jump to the loaded end that elapsed playback has not reached", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      nowSpy.mockReturnValue(now + 1000);
+      mockPlayer.currentTime = 600;
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(600);
+      nowSpy.mockRestore();
+    });
+
     it("restarts after a touch read zero before the provisional seek landed", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const now = performance.now();
