@@ -627,6 +627,14 @@ export default function VideoPlayerScreen() {
               previousObservedTimeRef.current = observed;
             }
           }
+        } else if (
+          !player.playing &&
+          restorePhaseRef.current === "pending" &&
+          touchAnchorRef.current &&
+          baseline !== null &&
+          Math.abs(observed - baseline) > TIME_UPDATE_INTERVAL_SECONDS
+        ) {
+          observeNativeSeek();
         }
         lastObservedTimeRef.current = observed;
       }

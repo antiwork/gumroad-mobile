@@ -778,6 +778,19 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(591);
     });
 
+    it("keeps a paused scrub that playback resumes before duration is known", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = false;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      nativeSeek(590.6);
+      mockPlayer.playing = true;
+      playFor(4);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(591.6);
+    });
+
     it("keeps a paused move beyond one sample of the touch position", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const screen = renderScreen();
