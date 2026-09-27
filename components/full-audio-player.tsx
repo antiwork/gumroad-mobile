@@ -1,3 +1,4 @@
+import { resumeAudioPlayback, setAudioPlaybackIntent, seekAudioBy, seekAudioTo } from "@/lib/audio-seek";
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { StyledImage } from "@/components/styled";
 import { Text } from "@/components/ui/text";
@@ -74,19 +75,20 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
   const progress = duration > 0 ? (position / duration) * 100 : 0;
 
   const handlePlayPause = async () => {
+    setAudioPlaybackIntent(!isPlaying);
     if (isPlaying) {
       await TrackPlayer.pause();
     } else {
-      await TrackPlayer.play();
+      await resumeAudioPlayback();
     }
   };
 
   const handleSkipBack = async () => {
-    await TrackPlayer.seekBy(-15);
+    await seekAudioBy(-15);
   };
 
   const handleSkipForward = async () => {
-    await TrackPlayer.seekBy(30);
+    await seekAudioBy(30);
   };
 
   const handleClose = async () => {
@@ -139,7 +141,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
       if (barWidthRef.current > 0 && duration > 0) {
         const pct = positionToSeekProgress(x);
         setSeekProgress(pct);
-        TrackPlayer.seekTo((pct / 100) * duration);
+        seekAudioTo((pct / 100) * duration);
       }
     },
     [duration],

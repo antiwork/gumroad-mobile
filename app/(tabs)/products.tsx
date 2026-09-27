@@ -62,7 +62,7 @@ export default function Products() {
     return (
       <Screen>
         <View className="flex-1 items-center justify-center gap-4 p-8">
-          <Text className="text-center font-sans text-foreground">Couldn't load your products.</Text>
+          <Text className="text-center font-sans text-foreground">Couldn&apos;t load your products.</Text>
           <Button onPress={() => void refetch()}>
             <Text>Retry</Text>
           </Button>

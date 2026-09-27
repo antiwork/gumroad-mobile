@@ -145,6 +145,16 @@ describe("isResumableLocation", () => {
     expect(isResumableLocation(301, 300)).toBe(false);
   });
 
+  it("rejects a position in the last 30 seconds of a long session", () => {
+    expect(isResumableLocation(3690, 3711)).toBe(false);
+    expect(isResumableLocation(3600, 3711)).toBe(true);
+  });
+
+  it("uses a 5% window on short files so mid-track progress stays resumable", () => {
+    expect(isResumableLocation(40, 60)).toBe(true);
+    expect(isResumableLocation(57, 60)).toBe(false);
+  });
+
   it("accepts any positive location when the track length is unknown", () => {
     expect(isResumableLocation(120, undefined)).toBe(true);
     expect(isResumableLocation(120, 0)).toBe(true);
