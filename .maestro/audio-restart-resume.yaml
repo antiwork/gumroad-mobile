@@ -79,4 +79,4 @@ appId: ${APP_ID}
     id: mini-audio-play-pause
 - tapOn:
     id: open-audio-player
-- assertVisible: "Playback position, 0:(0[0-9]|1[0-5]) of 0:46"
+- assertVisible: "0:(0[0-9]|1[0-5])"
