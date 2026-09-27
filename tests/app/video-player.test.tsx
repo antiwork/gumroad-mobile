@@ -789,6 +789,36 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(590.9);
     });
 
+    it("keeps a short backward scrub while playing", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      tap(screen);
+      ready(0);
+      playFor(20);
+      nativeSeek(594.3);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(594.3);
+    });
+
+    it("restarts when a late sample reaches the loaded end before duration is known", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      nowSpy.mockReturnValue(now + 15_000);
+      mockPlayer.currentTime = 600;
+      act(() => timeUpdateListener!({ currentTime: 600 }));
+      mockPlayer.play.mockClear();
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+      expect(mockPlayer.play).toHaveBeenCalled();
+      nowSpy.mockRestore();
+    });
+
     it("keeps a jump to the loaded end that elapsed playback has not reached", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const now = performance.now();

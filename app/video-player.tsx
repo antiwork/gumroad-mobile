@@ -437,8 +437,10 @@ export default function VideoPlayerScreen() {
     };
     const matchesElapsedPlayback =
       player.playing && (nearElapsed(anchor.position) || (resumePosition > 0 && nearElapsed(resumePosition)));
-    const baselineSlack = player.playing ? 1 : TIME_UPDATE_INTERVAL_SECONDS;
-    const matchesAcceptedSample = playbackBaseline !== null && Math.abs(position - playbackBaseline) <= baselineSlack;
+    const matchesAcceptedSample =
+      playbackBaseline !== null &&
+      position >= playbackBaseline - TIME_UPDATE_INTERVAL_SECONDS &&
+      position <= playbackBaseline + (player.playing ? 1 : TIME_UPDATE_INTERVAL_SECONDS);
     const followsClamp = (start: number) =>
       player.duration > 0 && Math.abs(position - Math.min(start, player.duration)) <= TIME_UPDATE_INTERVAL_SECONDS;
     if (
@@ -617,10 +619,13 @@ export default function VideoPlayerScreen() {
         } else if (player.playing && nearSavedResume && (baseline === null || baseline < resumePosition - 1)) {
           previousObservedTimeRef.current = observed;
         } else if (player.playing && restorePhaseRef.current === "pending" && touchAnchorRef.current) {
-          const alreadySeeked = nativeSeekObservedRef.current;
-          observeNativeSeek();
-          if (!alreadySeeked && !nativeSeekObservedRef.current) {
-            previousObservedTimeRef.current = observed;
+          const aheadWhileDurationUnknown = baseline !== null && observed > baseline + sample && player.duration <= 0;
+          if (!aheadWhileDurationUnknown) {
+            const alreadySeeked = nativeSeekObservedRef.current;
+            observeNativeSeek();
+            if (!alreadySeeked && !nativeSeekObservedRef.current) {
+              previousObservedTimeRef.current = observed;
+            }
           }
         }
         lastObservedTimeRef.current = observed;
