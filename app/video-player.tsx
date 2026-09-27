@@ -431,7 +431,6 @@ export default function VideoPlayerScreen() {
 
   const observeNativeSeek = useCallback(() => {
     const anchor = touchAnchorRef.current;
-    // A touchless jump is not a buyer seek. The player also moves when it applies the provisional resume.
     if (!anchor || nativeSeekObservedRef.current) return;
     const elapsedSeconds = (performance.now() - anchor.time) / 1000;
     const playbackBaseline = previousObservedTimeRef.current;
@@ -520,7 +519,6 @@ export default function VideoPlayerScreen() {
                 if (position !== resumePosition) {
                   player.currentTime = position;
                   setCurrentPosition(position);
-                  // The exit save prefers the last timeUpdate, which still holds the pre-seek position.
                   lastObservedTimeRef.current = position;
                   if (isAtEnd) player.play();
                 }
@@ -625,7 +623,6 @@ export default function VideoPlayerScreen() {
         }
         const baseline = previousObservedTimeRef.current;
         const nearSavedResume = resumePosition > 0 && Math.abs(observed - resumePosition) <= ACCEPTED_SAMPLE_SECONDS;
-        // A return behind the last observed time is a scrub even when it lands near the stale baseline.
         const returnedBehindPlayback = returnedBehindObservedTime(baseline, lastObservedTime, observed);
         if (
           player.playing &&
@@ -636,10 +633,8 @@ export default function VideoPlayerScreen() {
         ) {
           previousObservedTimeRef.current = observed;
         } else if (player.playing && nearSavedResume && (baseline === null || baseline < resumePosition - 1)) {
-          // A touch that read zero before the provisional seek landed is still the saved resume.
           previousObservedTimeRef.current = observed;
         } else if (player.playing && restorePhaseRef.current === "pending" && touchAnchorRef.current) {
-          // A forward jump before duration is known cannot yet be separated from playback clamped at the end.
           const aheadWhileDurationUnknown =
             baseline !== null && observed > baseline + ACCEPTED_SAMPLE_SECONDS && player.duration <= 0;
           if (returnedBehindPlayback) {
