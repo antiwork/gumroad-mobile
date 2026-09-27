@@ -1,5 +1,6 @@
 import {
   getPendingAudioRestore,
+  isAudioProgressDeferred,
   isAudioRestorePending,
   resolvePendingAudioRestore,
   setPendingAudioRestore,
@@ -185,7 +186,13 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
   const syncMediaLocation = useCallback(
     async (position: number, isEnd = false) => {
       const currentAudio = currentAudioRef.current;
-      if (!currentAudio || !currentAudio.urlRedirectId || isAudioRestorePending(currentAudio.resourceId)) return;
+      if (
+        !currentAudio ||
+        !currentAudio.urlRedirectId ||
+        isAudioProgressDeferred(currentAudio.resourceId) ||
+        (isEnd && isAudioRestorePending(currentAudio.resourceId))
+      )
+        return;
       if (!isMeaningfulLocation(position, isEnd)) return;
 
       const location = isEnd && currentAudio.contentLength ? currentAudio.contentLength : Math.floor(position);
@@ -202,13 +209,26 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
   );
 
   const sendAudioPlayerInfo = useCallback(
-    async ({ isPlaying, isEnd: forceIsEnd }: { isPlaying: boolean; isEnd?: boolean }) => {
+    async ({
+      isPlaying,
+      isEnd: forceIsEnd,
+      confirmObservation = false,
+    }: {
+      isPlaying: boolean;
+      isEnd?: boolean;
+      confirmObservation?: boolean;
+    }) => {
       const currentAudio = currentAudioRef.current;
       if (!currentAudio) return;
 
       const progress = await TrackPlayer.getProgress();
       if (currentAudioRef.current !== currentAudio) return;
-      const resolved = await resolvePendingAudioRestore(currentAudio.resourceId, progress, isPlaying || !!forceIsEnd);
+      const resolved = await resolvePendingAudioRestore(
+        currentAudio.resourceId,
+        progress,
+        isPlaying || !!forceIsEnd,
+        confirmObservation,
+      );
       if (!resolved || currentAudioRef.current !== currentAudio) return;
       const { position, duration } = resolved;
       if (resolved.restored) forceIsEnd = false;
@@ -254,7 +274,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
       } else if (state === State.Paused || state === State.Stopped) {
         setPendingAudioPlaybackIntent(false);
         setIsPlaying(false);
-        await sendAudioPlayerInfo({ isPlaying: false });
+        await sendAudioPlayerInfo({ isPlaying: false, confirmObservation: true });
       } else if (state === State.Ended) {
         setIsPlaying(false);
         setActiveResourceId(null);
@@ -283,7 +303,7 @@ export const useAudioPlayerSync = (webViewRef: React.RefObject<WebView | null>) 
     }
     setAudioPlaybackIntent(false);
     await TrackPlayer.pause();
-    await sendAudioPlayerInfo({ isPlaying: false });
+    await sendAudioPlayerInfo({ isPlaying: false, confirmObservation: true });
   }, [sendAudioPlayerInfo]);
 
   const updateCurrentAudioRef = useCallback((resourceId: string, duration?: number) => {

@@ -24,6 +24,7 @@ const mockPlayer = {
   loop: false,
   staysActiveInBackground: true,
   playing: true,
+  playbackRate: 1,
   currentTime: 0,
   duration: 0,
   timeUpdateEventInterval: 0,
@@ -129,6 +130,7 @@ describe("VideoPlayerScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPlayer.playing = true;
+    mockPlayer.playbackRate = 1;
     mockPlayer.staysActiveInBackground = true;
     mockPlayer.loop = false;
     mockPlayer.currentTime = 0;
@@ -391,12 +393,10 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(305);
     });
 
-    it("cancels a pending restore when the buyer seeks before the loaded duration arrives", () => {
+    it("cancels a pending restore when the buyer interacts with native controls", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "580", contentLength: "600" };
-      renderScreen();
-      act(() => {
-        timeUpdateListener!({ currentTime: 240 });
-      });
+      const { getByTestId } = renderScreen();
+      fireEvent(getByTestId("video-player"), "touchStart");
       mockPlayer.currentTime = 240;
       mockPlayer.duration = 660;
       act(() => statusChangeListener!({ status: "readyToPlay" }));
@@ -406,16 +406,32 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(590);
     });
 
-    it("restarts a finished video when the buyer only taps the video to show its controls", () => {
-      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "3690" };
-      const { getByTestId } = renderScreen();
-      expect(mockPlayer.currentTime).toBe(3690);
-
-      fireEvent(getByTestId("video-player"), "touchStart");
-      mockPlayer.duration = 3711;
-      act(() => statusChangeListener!({ status: "readyToPlay" }));
-
-      expect(mockPlayer.currentTime).toBe(0);
+    it("restarts a finished video after a reveal tap when native duration clamps the saved position", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "610" };
+      const requestedSeeks = jest.fn();
+      let currentTime = 610;
+      Object.defineProperty(mockPlayer, "currentTime", {
+        configurable: true,
+        get: () => currentTime,
+        set: (value: number) => {
+          currentTime = value;
+          requestedSeeks(value);
+        },
+      });
+      let screen: ReturnType<typeof renderScreen> | undefined;
+      try {
+        screen = renderScreen();
+        fireEvent(screen.getByTestId("video-player"), "touchStart");
+        requestedSeeks.mockClear();
+        currentTime = 600;
+        mockPlayer.duration = 600;
+        act(() => statusChangeListener!({ status: "readyToPlay" }));
+        expect(requestedSeeks).toHaveBeenLastCalledWith(0);
+      } finally {
+        screen?.unmount();
+        Object.defineProperty(mockPlayer, "currentTime", { configurable: true, writable: true, value: 0 });
+        mockPlayer.duration = 0;
+      }
     });
 
     it("does not save provisional drift while loaded duration is still unavailable", () => {
@@ -438,32 +454,10 @@ describe("VideoPlayerScreen", () => {
       }
     });
 
-    it("saves progress when the loaded duration never arrives", () => {
-      jest.useFakeTimers();
-      mockSearchParams = {
-        uri: "https://example.com/video.mp4",
-        initialPosition: "580",
-        contentLength: "600",
-        urlRedirectId: "redirect-1",
-        productFileId: "file-1",
-      };
-      const { unmount } = renderScreen();
-      try {
-        mockPlayer.currentTime = 120;
-        act(() => jest.advanceTimersByTime(25000));
-        expect(mockUpdateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 120 }));
-        unmount();
-      } finally {
-        jest.useRealTimers();
-      }
-    });
-
     it("starts a new restore lifecycle for a replacement video after a cancelled restore", async () => {
       mockSearchParams = { uri: "https://example.com/first.mp4", initialPosition: "580", contentLength: "600" };
-      renderScreen();
-      act(() => {
-        timeUpdateListener!({ currentTime: 240 });
-      });
+      const { getByTestId } = renderScreen();
+      fireEvent(getByTestId("video-player"), "touchStart");
       mockPlayer.currentTime = 240;
       await act(async () => {
         mockSearchParams = { uri: "https://example.com/second.mp4", initialPosition: "610" };
@@ -476,6 +470,392 @@ describe("VideoPlayerScreen", () => {
       mockPlayer.currentTime = 200;
       act(() => statusChangeListener!({ status: "readyToPlay" }));
       expect(mockPlayer.currentTime).toBe(200);
+    });
+  });
+
+  describe("revealing native controls before the restore resolves", () => {
+    it.each([
+      ["590", undefined, 590, 600, 0],
+      ["580", "600", 0, 660, 580],
+      ["590", undefined, 0, 600, 0],
+    ])(
+      "still reconciles saved %s with metadata %s after a tap at %s that does not seek",
+      (saved, metadata, touchReadback, duration, expected) => {
+        mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: saved };
+        if (metadata) mockSearchParams.contentLength = metadata;
+        const { getByTestId } = renderScreen();
+        const provisional = mockPlayer.currentTime;
+        mockPlayer.currentTime = touchReadback;
+        fireEvent(getByTestId("video-player"), "touchStart");
+        mockPlayer.currentTime = provisional;
+        mockPlayer.play.mockClear();
+        mockPlayer.duration = duration;
+        act(() => statusChangeListener!({ status: "readyToPlay" }));
+        expect(mockPlayer.currentTime).toBe(expected);
+        if (expected === 0) expect(mockPlayer.play).toHaveBeenCalled();
+      },
+    );
+
+    it("keeps a native seek made after a tap that only revealed the controls", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const { getByTestId } = renderScreen();
+      fireEvent(getByTestId("video-player"), "touchStart");
+      mockPlayer.currentTime = 120;
+      fireEvent(getByTestId("video-player"), "touchStart");
+      mockPlayer.duration = 600;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(120);
+      mockPlayer.currentTime = 130;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(130);
+    });
+
+    it("keeps a paused scrub that wall time would otherwise treat as playback", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const { getByTestId } = renderScreen();
+      mockPlayer.playing = false;
+      mockPlayer.currentTime = 590;
+      fireEvent(getByTestId("video-player"), "touchStart");
+      nowSpy.mockReturnValue(now + 10_000);
+      mockPlayer.currentTime = 596;
+      mockPlayer.duration = 600;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(596);
+      nowSpy.mockRestore();
+      mockPlayer.playing = true;
+    });
+  });
+
+  describe("telling native seeks from playback after a reveal tap", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockSetupOnSourceChange = true;
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    const tap = (screen: ReturnType<typeof renderScreen>) =>
+      fireEvent(screen.getByTestId("video-player"), "touchStart");
+    const ready = (duration: number) => {
+      mockPlayer.duration = duration;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+    };
+    const playFor = (steps: number) => {
+      for (let step = 0; step < steps; step += 1) {
+        act(() => jest.advanceTimersByTime(250));
+        mockPlayer.currentTime += 0.25 * mockPlayer.playbackRate;
+        act(() => timeUpdateListener!({ currentTime: mockPlayer.currentTime }));
+      }
+    };
+    const nativeSeek = (position: number) => {
+      mockPlayer.currentTime = position;
+      act(() => timeUpdateListener!({ currentTime: position }));
+    };
+
+    it.each([["before"], ["after"]])(
+      "restarts saved 590 after a reveal tap %s the durationless ready and normal playback",
+      (tapOrder) => {
+        mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+        const screen = renderScreen();
+        if (tapOrder === "before") tap(screen);
+        ready(0);
+        if (tapOrder === "after") tap(screen);
+        playFor(2);
+        expect(mockPlayer.currentTime).toBe(590.5);
+        mockPlayer.play.mockClear();
+        ready(600);
+        expect(mockPlayer.currentTime).toBe(0);
+        expect(mockPlayer.play).toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ["590", undefined, 600, 0],
+      ["580", "600", 660, 580],
+    ])(
+      "reconciles saved %s with metadata %s after a stale tap and long normal playback",
+      (saved, metadata, duration, expected) => {
+        mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: saved };
+        if (metadata) mockSearchParams.contentLength = metadata;
+        const screen = renderScreen();
+        tap(screen);
+        act(() => jest.advanceTimersByTime(3000));
+        ready(0);
+        playFor(20);
+        ready(duration);
+        expect(mockPlayer.currentTime).toBe(expected);
+      },
+    );
+
+    it("restarts saved 590 after a reveal tap and normal double-speed playback", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playbackRate = 2;
+      tap(screen);
+      ready(0);
+      playFor(4);
+      expect(mockPlayer.currentTime).toBe(592);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+    });
+
+    it("reconciles after a tap that read the position before the provisional seek landed", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.currentTime = 0;
+      tap(screen);
+      ready(0);
+      mockPlayer.currentTime = 590;
+      playFor(2);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+    });
+
+    it.each([
+      [596, true],
+      [120, true],
+      [596, false],
+      [120, false],
+    ])("keeps a native seek to %s after several normal updates while playing %s", (target, playing) => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = playing;
+      tap(screen);
+      ready(0);
+      if (playing) playFor(3);
+      else act(() => jest.advanceTimersByTime(750));
+      nativeSeek(target);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(target);
+    });
+
+    it("reconciles a paused player that did not move after a reveal tap", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = false;
+      tap(screen);
+      act(() => jest.advanceTimersByTime(10000));
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+    });
+
+    it("keeps a forward scrub made long after a reveal tap on paused controls", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = false;
+      tap(screen);
+      ready(0);
+      act(() => jest.advanceTimersByTime(10000));
+      tap(screen);
+      nativeSeek(596);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(596);
+    });
+
+    it("keeps a seek that a later reveal tap followed", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      tap(screen);
+      ready(0);
+      playFor(2);
+      nativeSeek(120);
+      act(() => jest.advanceTimersByTime(1000));
+      tap(screen);
+      playFor(2);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(120.5);
+    });
+
+    it("keeps a backward scrub made after long normal playback from a stale tap", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "580", contentLength: "600" };
+      const screen = renderScreen();
+      tap(screen);
+      ready(0);
+      playFor(20);
+      tap(screen);
+      nativeSeek(1);
+      ready(660);
+      expect(mockPlayer.currentTime).toBe(1);
+    });
+  });
+
+  describe("saving progress while the loaded duration never arrives", () => {
+    const trackedParams = {
+      uri: "https://example.com/video.mp4",
+      urlRedirectId: "redirect-1",
+      productFileId: "file-1",
+      purchaseId: "purchase-1",
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockUpdateMediaLocation.mockResolvedValue(undefined);
+      mockSetupOnSourceChange = true;
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    const playWithoutDuration = (saved: string, metadata?: string) => {
+      mockSearchParams = { ...trackedParams, initialPosition: saved };
+      if (metadata) mockSearchParams.contentLength = metadata;
+      const screen = renderScreen();
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      mockPlayer.currentTime = 5;
+      act(() => jest.advanceTimersByTime(5000));
+      expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+      return screen;
+    };
+
+    const observePlayback = (reached: number) => {
+      mockPlayer.currentTime = reached;
+      act(() => timeUpdateListener!({ currentTime: reached - 0.25 }));
+      act(() => timeUpdateListener!({ currentTime: reached }));
+    };
+
+    it.each([
+      ["1209", undefined, 1250],
+      ["580", "600", 42],
+    ])("saves observed playback from saved %s with metadata %s periodically", (saved, metadata, reached) => {
+      const { unmount } = playWithoutDuration(saved, metadata);
+      observePlayback(reached);
+      act(() => jest.advanceTimersByTime(5000));
+      expect(mockUpdateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: reached }));
+      unmount();
+    });
+
+    it.each([
+      ["1209", undefined, 1250],
+      ["580", "600", 42],
+    ])("saves observed playback from saved %s with metadata %s on exit", (saved, metadata, reached) => {
+      const { unmount } = playWithoutDuration(saved, metadata);
+      observePlayback(reached);
+      act(() => jest.advanceTimersByTime(5000));
+      mockUpdateMediaLocation.mockClear();
+      unmount();
+      expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: reached }));
+    });
+
+    it.each([
+      ["1209", undefined, [0.25, 5]],
+      ["580", "600", [5]],
+      ["580", "600", [5, 5]],
+    ])(
+      "does not save saved %s with metadata %s after readbacks %j without advancement",
+      (saved, metadata, readbacks) => {
+        const { unmount } = playWithoutDuration(saved, metadata);
+        for (const currentTime of readbacks) act(() => timeUpdateListener!({ currentTime }));
+        act(() => jest.advanceTimersByTime(5000));
+        unmount();
+        expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+      },
+    );
+
+    it("still reconciles a late loaded duration after saving observed playback", () => {
+      const { unmount } = playWithoutDuration("580", "600");
+      observePlayback(42);
+      act(() => jest.advanceTimersByTime(5000));
+      expect(mockUpdateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 42 }));
+      mockPlayer.duration = 660;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(580);
+      unmount();
+    });
+
+    it.each([[true], [false]])(
+      "saves the reconciled position when exiting right after a late loaded duration (after a poll: %s)",
+      (polled) => {
+        const { unmount } = playWithoutDuration("580", "600");
+        observePlayback(42);
+        if (polled) act(() => jest.advanceTimersByTime(5000));
+        mockPlayer.duration = 660;
+        act(() => statusChangeListener!({ status: "readyToPlay" }));
+        expect(mockPlayer.currentTime).toBe(580);
+        mockUpdateMediaLocation.mockClear();
+        unmount();
+        expect(mockUpdateMediaLocation).toHaveBeenCalledTimes(1);
+        expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: 580 }));
+      },
+    );
+
+    const playForBeforePoll = (steps: number) => {
+      for (let step = 0; step < steps; step += 1) {
+        act(() => jest.advanceTimersByTime(250));
+        mockPlayer.currentTime += 0.25;
+        act(() => timeUpdateListener!({ currentTime: mockPlayer.currentTime }));
+      }
+    };
+
+    it.each([
+      ["1209", undefined, 1209, 1212],
+      ["580", "600", 0, 4],
+    ])(
+      "saves the observed position when exiting saved %s with metadata %s before the first poll",
+      (saved, metadata, provisional, reached) => {
+        mockSearchParams = { ...trackedParams, initialPosition: saved };
+        if (metadata) mockSearchParams.contentLength = metadata;
+        const { unmount } = renderScreen();
+        act(() => statusChangeListener!({ status: "readyToPlay" }));
+        expect(mockPlayer.currentTime).toBe(provisional);
+        playForBeforePoll((reached - provisional) * 4);
+        expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+        unmount();
+        expect(mockUpdateMediaLocation).toHaveBeenCalledTimes(1);
+        expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: reached }));
+      },
+    );
+
+    it("saves the observed position when exiting a video without a saved position before the first poll", () => {
+      mockSearchParams = trackedParams;
+      const { unmount } = renderScreen();
+      playForBeforePoll(16);
+      unmount();
+      expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: 4 }));
+    });
+
+    it("does not save the previous video's observed position when exiting the replacement", async () => {
+      mockSearchParams = { ...trackedParams, uri: "https://example.com/first.mp4" };
+      const { unmount } = renderScreen();
+      mockPlayer.currentTime = 299.75;
+      playForBeforePoll(1);
+      await act(async () => {
+        mockSearchParams = { ...trackedParams, uri: "https://example.com/second.mp4", productFileId: "file-2" };
+        mockSetAccessToken!("token-after-switch");
+      });
+      mockUpdateMediaLocation.mockClear();
+      unmount();
+      expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+    });
+
+    it("does not count the previous video's playback toward the replacement's restore", async () => {
+      mockSearchParams = { ...trackedParams, uri: "https://example.com/first.mp4" };
+      const { unmount } = renderScreen();
+      let resolveStream!: (value: { playlist_url: string }) => void;
+      mockRequestAPI.mockReturnValueOnce(new Promise((resolve) => (resolveStream = resolve)));
+      await act(async () => {
+        mockSearchParams = {
+          ...trackedParams,
+          uri: "https://example.com/second.mp4",
+          streamingUrl: "mobile/url_redirects/stream/token/second",
+          productFileId: "file-2",
+          initialPosition: "580",
+          contentLength: "600",
+        };
+        mockSetAccessToken!("token-after-switch");
+      });
+      act(() => timeUpdateListener!({ currentTime: 299.75 }));
+      act(() => timeUpdateListener!({ currentTime: 300 }));
+      await act(async () => resolveStream({ playlist_url: "https://example.com/second.m3u8" }));
+      mockUpdateMediaLocation.mockClear();
+      mockPlayer.currentTime = 5;
+      act(() => jest.advanceTimersByTime(5000));
+      expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+      unmount();
     });
   });
 
@@ -634,6 +1014,37 @@ describe("VideoPlayerScreen", () => {
       unmount();
 
       expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: 77 }));
+    });
+
+    it("does not overwrite a polled seek with an older time update on exit", () => {
+      mockSearchParams = trackedParams;
+      const { unmount } = renderScreen();
+      act(() => timeUpdateListener?.({ currentTime: 20 }));
+      mockPlayer.currentTime = 40;
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      mockUpdateMediaLocation.mockClear();
+
+      unmount();
+
+      expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: 40 }));
+    });
+
+    it("does not let a stale time update replace a newer polled position on exit", () => {
+      mockSearchParams = trackedParams;
+      const { unmount } = renderScreen();
+      mockPlayer.currentTime = 40;
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      act(() => timeUpdateListener?.({ currentTime: 20 }));
+      mockUpdateMediaLocation.mockClear();
+
+      unmount();
+
+      expect(mockUpdateMediaLocation).toHaveBeenCalledWith(expect.objectContaining({ location: 40 }));
     });
   });
 

@@ -173,6 +173,28 @@ describe("syncCurrentPosition via remote pause", () => {
 
     expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
   });
+
+  it("saves a remote pause that confirms playback while duration is still unknown", async () => {
+    setPendingAudioRestore({
+      resourceId: "file-2",
+      position: 120,
+      provisionalPosition: 120,
+      observedPosition: 123,
+    });
+    (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({
+      id: "file-2",
+      urlRedirectId: "redirect-2",
+      purchaseId: "purchase-2",
+    });
+    (mockTrackPlayer.getPlaybackState as jest.Mock).mockResolvedValue({ state: "paused" });
+    (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValue({ position: 131, duration: 0 });
+
+    await remotePause();
+
+    expect(mockUpdateMediaLocation).toHaveBeenCalledWith(
+      expect.objectContaining({ productFileId: "file-2", location: 131 }),
+    );
+  });
 });
 
 describe("round three background restore ownership", () => {

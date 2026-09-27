@@ -53,6 +53,7 @@ jest.mock("@/lib/media-location", () => ({
 }));
 
 /* eslint-disable import/first -- jest.mock calls must precede the imports they affect */
+import { getPendingAudioRestore } from "@/lib/audio-seek";
 import { useAuth } from "@/lib/auth-context";
 import { updateMediaLocation } from "@/lib/media-location";
 import { Platform } from "react-native";
@@ -491,24 +492,6 @@ describe("round two delayed audio restore lifecycle", () => {
     unmount();
   });
 
-  it("saves progress when the native duration never arrives", async () => {
-    const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
-    await act(async () => {
-      await result.current.playAudio({ resourceId: audio.resourceId, tracks: [audio] });
-    });
-    (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({ id: track.resourceId });
-    (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValue({ position: 5, duration: 0 });
-    await poll();
-    expect(updateMediaLocation).not.toHaveBeenCalled();
-    await poll();
-    await poll();
-    await poll();
-    await poll();
-    expect(mockTrackPlayer.seekTo).not.toHaveBeenCalled();
-    expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 5 }));
-    unmount();
-  });
-
   it("drops a pending restore when the background queue advances and later revisits the track", async () => {
     const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
     await act(async () => {
@@ -564,6 +547,181 @@ describe("round two delayed audio restore lifecycle", () => {
       expect.objectContaining({ productFileId: audio.resourceId, location: 580 }),
     );
     unmount();
+  });
+
+  describe("while the loaded duration never arrives", () => {
+    const resumable = { ...audio, contentLength: undefined, resumeAt: 120 };
+    const progressAt = (position: number) =>
+      (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValue({ position, duration: 0 });
+
+    it("saves observed playback periodically and on pause", async () => {
+      const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
+      await act(async () => {
+        await result.current.playAudio({ resourceId: audio.resourceId, tracks: [resumable] });
+      });
+      expect(mockTrackPlayer.seekTo).toHaveBeenCalledWith(120);
+      (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({ id: track.resourceId });
+      for (const position of [120, 123]) {
+        progressAt(position);
+        await poll();
+      }
+      expect(updateMediaLocation).not.toHaveBeenCalled();
+      progressAt(125);
+      await poll();
+      expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 125 }));
+      progressAt(131);
+      await act(async () => {
+        await result.current.pauseAudio();
+      });
+      expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 131 }));
+      unmount();
+    });
+
+    it("saves a pause that confirms playback before the next poll while duration is unknown", async () => {
+      const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
+      await act(async () => {
+        await result.current.playAudio({ resourceId: audio.resourceId, tracks: [resumable] });
+      });
+      (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({ id: track.resourceId });
+      for (const position of [120, 123]) {
+        progressAt(position);
+        await poll();
+      }
+      expect(updateMediaLocation).not.toHaveBeenCalled();
+      progressAt(131);
+      await act(async () => {
+        await result.current.pauseAudio();
+      });
+      expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 131 }));
+      unmount();
+    });
+
+    it("saves a pause at the last observed position while duration is unknown", async () => {
+      const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
+      await act(async () => {
+        await result.current.playAudio({ resourceId: audio.resourceId, tracks: [resumable] });
+      });
+      (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({ id: track.resourceId });
+      progressAt(123);
+      await poll();
+      expect(updateMediaLocation).not.toHaveBeenCalled();
+      await act(async () => {
+        await result.current.pauseAudio();
+      });
+      expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 123 }));
+      unmount();
+    });
+
+    it("saves observed background playback after the screen unmounts", async () => {
+      const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
+      await act(async () => {
+        await result.current.playAudio({ resourceId: audio.resourceId, tracks: [resumable] });
+      });
+      await act(async () => {
+        unmount();
+      });
+      (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({
+        id: audio.resourceId,
+        urlRedirectId: audio.urlRedirectId,
+      });
+      await startService();
+      for (const position of [120, 123]) {
+        progressAt(position);
+        await poll();
+      }
+      expect(updateMediaLocation).not.toHaveBeenCalled();
+      progressAt(126);
+      await poll();
+      expect(updateMediaLocation).toHaveBeenLastCalledWith(
+        expect.objectContaining({ productFileId: audio.resourceId, location: 126 }),
+      );
+    });
+
+    it("does not save playback that never passed the provisional restore", async () => {
+      const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
+      await act(async () => {
+        await result.current.playAudio({ resourceId: audio.resourceId, tracks: [resumable] });
+      });
+      (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({ id: track.resourceId });
+      for (const position of [0, 5, 10]) {
+        progressAt(position);
+        await poll();
+      }
+      await act(async () => {
+        await result.current.pauseAudio();
+      });
+      expect(updateMediaLocation).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it("saves observed playback from a restarted track and still reconciles a late duration", async () => {
+      const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
+      await act(async () => {
+        await result.current.playAudio({ resourceId: audio.resourceId, tracks: [audio] });
+      });
+      (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({ id: track.resourceId });
+      progressAt(5);
+      await poll();
+      await poll();
+      expect(updateMediaLocation).not.toHaveBeenCalled();
+      progressAt(10);
+      await poll();
+      expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 10 }));
+      (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValue({ position: 10, duration: 660 });
+      await poll();
+      expect(mockTrackPlayer.seekTo).toHaveBeenCalledTimes(1);
+      expect(mockTrackPlayer.seekTo).toHaveBeenLastCalledWith(580);
+      expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 580 }));
+      unmount();
+    });
+
+    const listenerFor = (event: string) =>
+      (mockTrackPlayer.addEventListener as jest.Mock).mock.calls.find(([name]) => name === event)[1];
+    const endTriggers: Record<string, () => Promise<void>> = {
+      "queue ended": () => act(async () => listenerFor("playback-queue-ended")({})),
+      "ended state": () => act(async () => listenerFor("playback-state")({ state: "ended" })),
+      "ended poll": () => {
+        (mockTrackPlayer.getPlaybackState as jest.Mock).mockResolvedValue({ state: "ended" });
+        return poll();
+      },
+    };
+
+    it.each([
+      ["queue ended", [10, 15], 20, 15],
+      ["ended state", [10, 15], 20, 15],
+      ["ended poll", [10, 15], 20, 15],
+      ["queue ended", [1, 2], 2.5, undefined],
+    ])(
+      "does not save metadata completion on %s after observed playback %j while the restore is pending",
+      async (trigger, positions, endPosition, lastSaved) => {
+        const { result, unmount } = renderHook(() => useAudioPlayerSync(webViewRef));
+        await act(async () => {
+          await result.current.playAudio({ resourceId: audio.resourceId, tracks: [audio] });
+        });
+        expect(mockTrackPlayer.seekTo).not.toHaveBeenCalled();
+        (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({ id: track.resourceId });
+        for (const position of positions) {
+          progressAt(position);
+          await poll();
+        }
+        progressAt(endPosition);
+        await endTriggers[trigger]();
+        expect(updateMediaLocation).not.toHaveBeenCalledWith(expect.objectContaining({ location: 600 }));
+        if (lastSaved === undefined) expect(updateMediaLocation).not.toHaveBeenCalled();
+        else expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: lastSaved }));
+        expect(getPendingAudioRestore()).toEqual(
+          expect.objectContaining({ resourceId: audio.resourceId, position: 580 }),
+        );
+        (mockTrackPlayer.getPlaybackState as jest.Mock).mockResolvedValue({ state: "ended" });
+        (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValue({ position: endPosition, duration: 660 });
+        await poll();
+        expect(mockTrackPlayer.seekTo).toHaveBeenCalledTimes(1);
+        expect(mockTrackPlayer.seekTo).toHaveBeenLastCalledWith(580);
+        expect(updateMediaLocation).toHaveBeenLastCalledWith(expect.objectContaining({ location: 580 }));
+        expect(getPendingAudioRestore()).toBeNull();
+        unmount();
+      },
+    );
   });
 
   it.each([true, false])(

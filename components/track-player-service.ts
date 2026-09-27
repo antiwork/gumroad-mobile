@@ -15,7 +15,7 @@ import { isPlayerInitialized } from "./use-audio-player-sync";
 
 let activeTrackVersion = 0;
 
-const syncCurrentPosition = async () => {
+const syncCurrentPosition = async (confirmObservation = false) => {
   const trackVersion = activeTrackVersion;
   const accessToken = getAudioAccessToken();
   if (!accessToken) return;
@@ -40,6 +40,7 @@ const syncCurrentPosition = async () => {
     productFileId,
     progress,
     state === State.Playing || state === State.Ended,
+    confirmObservation,
   );
   if (!resolved) return;
   if ((await TrackPlayer.getActiveTrack())?.id !== activeTrack?.id || trackVersion !== activeTrackVersion) return;
@@ -72,13 +73,13 @@ export const playbackService = async () => {
   TrackPlayer.addEventListener(Event.RemotePause, async () => {
     setAudioPlaybackIntent(false);
     await TrackPlayer.pause();
-    await syncCurrentPosition();
+    await syncCurrentPosition(true);
   });
 
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
     setAudioPlaybackIntent(false);
     await TrackPlayer.stop();
-    await syncCurrentPosition();
+    await syncCurrentPosition(true);
   });
 
   TrackPlayer.addEventListener(Event.RemoteNext, async () => {
