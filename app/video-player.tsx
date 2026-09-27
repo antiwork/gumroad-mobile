@@ -616,12 +616,18 @@ export default function VideoPlayerScreen() {
           previousObservedTimeRef.current = observed;
         } else if (player.playing && nearSavedResume && (baseline === null || baseline < resumePosition - 1)) {
           previousObservedTimeRef.current = observed;
+        } else if (player.playing && restorePhaseRef.current === "pending" && touchAnchorRef.current) {
+          const alreadySeeked = nativeSeekObservedRef.current;
+          observeNativeSeek();
+          if (!alreadySeeked && !nativeSeekObservedRef.current) {
+            previousObservedTimeRef.current = observed;
+          }
         }
         lastObservedTimeRef.current = observed;
       }
     });
     return () => subscription.remove();
-  }, [resumePosition, player, loadedMediaMatchesParams]);
+  }, [resumePosition, player, loadedMediaMatchesParams, observeNativeSeek]);
 
   const persistLocation = useCallback(
     (position: number, duration: number) => {

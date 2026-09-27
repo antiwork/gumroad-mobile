@@ -753,6 +753,19 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(591);
     });
 
+    it("keeps a backward scrub after playback runs past the last accepted sample", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      tap(screen);
+      ready(0);
+      playFor(20);
+      nativeSeek(591);
+      playFor(20);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(596);
+    });
+
     it("keeps a backward scrub into the range already played", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const screen = renderScreen();
