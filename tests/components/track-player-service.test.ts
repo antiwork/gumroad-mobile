@@ -269,10 +269,12 @@ describe("round three background restore ownership", () => {
     expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
   });
 
-  it("does not save an ended background poll while duration is unknown", async () => {
+  it("does not save an ended read from a playing poll while duration is unknown", async () => {
     setPendingAudioRestore(null);
     mockTrackPlayer.getProgress.mockResolvedValue({ position: 600, duration: 0, buffered: 0 });
-    (mockTrackPlayer.getPlaybackState as jest.Mock).mockResolvedValue({ state: "ended" });
+    (mockTrackPlayer.getPlaybackState as jest.Mock)
+      .mockResolvedValueOnce({ state: "playing" })
+      .mockResolvedValueOnce({ state: "ended" });
 
     await poll();
 

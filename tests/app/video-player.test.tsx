@@ -778,6 +778,18 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(591);
     });
 
+    it("restarts when a paused touch read zero before the provisional seek landed", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = false;
+      mockPlayer.currentTime = 0;
+      tap(screen);
+      mockPlayer.currentTime = 590;
+      act(() => timeUpdateListener!({ currentTime: 590 }));
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+    });
+
     it("keeps a paused scrub that playback resumes before duration is known", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const screen = renderScreen();

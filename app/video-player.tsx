@@ -631,10 +631,13 @@ export default function VideoPlayerScreen() {
           !player.playing &&
           restorePhaseRef.current === "pending" &&
           touchAnchorRef.current &&
-          baseline !== null &&
-          Math.abs(observed - baseline) > TIME_UPDATE_INTERVAL_SECONDS
+          baseline !== null
         ) {
-          observeNativeSeek();
+          if (nearSavedResume && baseline < resumePosition - 1) {
+            previousObservedTimeRef.current = observed;
+          } else if (Math.abs(observed - baseline) > TIME_UPDATE_INTERVAL_SECONDS) {
+            observeNativeSeek();
+          }
         }
         lastObservedTimeRef.current = observed;
       }
