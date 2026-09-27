@@ -149,6 +149,7 @@ export default function VideoPlayerScreen() {
   const touchAnchorRef = useRef<{ position: number; time: number; rate: number } | null>(null);
   const nativeSeekObservedRef = useRef(false);
   const lastObservedTimeRef = useRef<number | null>(null);
+  const previousObservedTimeRef = useRef<number | null>(null);
   const playbackAdvancedRef = useRef(false);
 
   const queryClient = useQueryClient();
@@ -229,6 +230,7 @@ export default function VideoPlayerScreen() {
       touchAnchorRef.current = null;
       nativeSeekObservedRef.current = false;
       lastObservedTimeRef.current = null;
+      previousObservedTimeRef.current = null;
       playbackAdvancedRef.current = false;
       // Progress state belongs to one video. Carrying it into the next one shows the previous
       // video's position on screen and, worse, lets a save write that position against the new
@@ -422,16 +424,30 @@ export default function VideoPlayerScreen() {
 
   const observeNativeSeek = useCallback(() => {
     const anchor = touchAnchorRef.current;
-    // A touchless jump is not a buyer seek. The player also moves when it applies the provisional resume.
     if (!anchor || nativeSeekObservedRef.current) return;
     const elapsedSeconds = (performance.now() - anchor.time) / 1000;
-    const maxAdvance = player.playing
-      ? elapsedSeconds * Math.max(anchor.rate, player.playbackRate) + TIME_UPDATE_INTERVAL_SECONDS
-      : TIME_UPDATE_INTERVAL_SECONDS;
+    const playbackBaseline = previousObservedTimeRef.current;
+    const playbackOrigin =
+      resumePosition > 0 && anchor.position < resumePosition - 1 ? resumePosition : anchor.position;
+    const observedAdvance = playbackBaseline === null ? 0 : Math.max(0, playbackBaseline - playbackOrigin);
+    const rate = Math.max(anchor.rate, player.playbackRate);
+    const wallAdvance = player.playing ? elapsedSeconds * rate : 0;
     const position = player.currentTime;
+    const sample = TIME_UPDATE_INTERVAL_SECONDS * rate;
+    const acceptedSlack = 1;
+    const nearElapsed = (start: number) => {
+      const expected = player.duration > 0 ? Math.min(start + wallAdvance, player.duration) : start + wallAdvance;
+      return Math.abs(position - expected) <= sample;
+    };
+    const matchesElapsedPlayback =
+      player.playing && (nearElapsed(anchor.position) || (resumePosition > 0 && nearElapsed(resumePosition)));
+    const withinAcceptedSample = playbackBaseline !== null && Math.abs(position - playbackBaseline) <= acceptedSlack;
+    const playbackAllowance = player.playing ? Math.min(wallAdvance, observedAdvance) : observedAdvance;
+    const maxAdvance = matchesElapsedPlayback
+      ? wallAdvance + sample
+      : playbackAllowance + (withinAcceptedSample ? acceptedSlack : sample);
     const followsPlayback = (start: number) =>
       position >= start - TIME_UPDATE_INTERVAL_SECONDS && position <= start + maxAdvance;
-    // A loaded duration can clamp the provisional position to the end. That is not a buyer seek.
     const followsClamp = (start: number) =>
       player.duration > 0 && Math.abs(position - Math.min(start, player.duration)) <= TIME_UPDATE_INTERVAL_SECONDS;
     if (
@@ -495,7 +511,6 @@ export default function VideoPlayerScreen() {
                 if (position !== resumePosition) {
                   player.currentTime = position;
                   setCurrentPosition(position);
-                  // The exit save prefers the last timeUpdate, which still holds the pre-seek position.
                   lastObservedTimeRef.current = position;
                   if (isAtEnd) player.play();
                 }
@@ -597,6 +612,23 @@ export default function VideoPlayerScreen() {
         const lastObservedTime = lastObservedTimeRef.current;
         if (lastObservedTime !== null && lastObservedTime > resumePosition && observed > lastObservedTime) {
           playbackAdvancedRef.current = true;
+        }
+        const baseline = previousObservedTimeRef.current;
+        const sample = 1;
+        const nearSavedResume = resumePosition > 0 && Math.abs(observed - resumePosition) <= 1;
+        if (
+          player.playing &&
+          baseline !== null &&
+          observed <= baseline + sample &&
+          observed >= baseline - TIME_UPDATE_INTERVAL_SECONDS
+        ) {
+          previousObservedTimeRef.current = observed;
+        } else if (
+          player.playing &&
+          nearSavedResume &&
+          (baseline === null || Math.abs(baseline - resumePosition) > 1)
+        ) {
+          previousObservedTimeRef.current = observed;
         }
         lastObservedTimeRef.current = observed;
       }
@@ -870,6 +902,7 @@ export default function VideoPlayerScreen() {
               time: performance.now(),
               rate: player.playbackRate,
             };
+            previousObservedTimeRef.current = player.currentTime;
           });
         }}
         onFullscreenEnter={() => {

@@ -36,13 +36,15 @@ const syncCurrentPosition = async (confirmObservation = false) => {
   const progress = await TrackPlayer.getProgress();
   const { state } = await TrackPlayer.getPlaybackState();
   if ((await TrackPlayer.getActiveTrack())?.id !== activeTrack?.id || trackVersion !== activeTrackVersion) return;
+  const isEnd = state === State.Ended;
   const resolved = await resolvePendingAudioRestore(
     productFileId,
     progress,
-    state === State.Playing || state === State.Ended,
+    state === State.Playing || isEnd,
     confirmObservation,
   );
   if (!resolved) return;
+  if (isEnd && !confirmObservation && !(progress.duration > 0)) return;
   if ((await TrackPlayer.getActiveTrack())?.id !== activeTrack?.id || trackVersion !== activeTrackVersion) return;
   const { position } = resolved;
   if (!isMeaningfulLocation(position, false)) return;

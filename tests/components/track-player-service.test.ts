@@ -32,7 +32,7 @@ jest.mock("react-native-track-player", () => ({
     PlaybackQueueEnded: "playback-queue-ended",
     PlaybackActiveTrackChanged: "playback-active-track-changed",
   },
-  State: { Playing: "playing", Paused: "paused", Stopped: "stopped" },
+  State: { Playing: "playing", Paused: "paused", Stopped: "stopped", Ended: "ended" },
 }));
 
 jest.mock("@/lib/audio-player-store", () => ({
@@ -195,6 +195,28 @@ describe("syncCurrentPosition via remote pause", () => {
       expect.objectContaining({ productFileId: "file-2", location: 131 }),
     );
   });
+
+  it("saves a confirming pause when the player already reports ended", async () => {
+    setPendingAudioRestore({
+      resourceId: "file-2",
+      position: 120,
+      provisionalPosition: 120,
+      observedPosition: 123,
+    });
+    (mockTrackPlayer.getActiveTrack as jest.Mock).mockResolvedValue({
+      id: "file-2",
+      urlRedirectId: "redirect-2",
+      purchaseId: "purchase-2",
+    });
+    (mockTrackPlayer.getPlaybackState as jest.Mock).mockResolvedValue({ state: "ended" });
+    (mockTrackPlayer.getProgress as jest.Mock).mockResolvedValue({ position: 131, duration: 0 });
+
+    await remotePause();
+
+    expect(mockUpdateMediaLocation).toHaveBeenCalledWith(
+      expect.objectContaining({ productFileId: "file-2", location: 131 }),
+    );
+  });
 });
 
 describe("round three background restore ownership", () => {
@@ -229,6 +251,32 @@ describe("round three background restore ownership", () => {
     setPendingAudioRestore(null);
     jest.clearAllTimers();
     jest.useRealTimers();
+  });
+
+  it("does not save an ended position while duration is still unknown", async () => {
+    setPendingAudioRestore({
+      resourceId: trackA.id,
+      position: 580,
+      provisionalPosition: 0,
+      observedPosition: 20,
+      playbackAdvanced: true,
+    });
+    mockTrackPlayer.getProgress.mockResolvedValue({ position: 600, duration: 0, buffered: 0 });
+    (mockTrackPlayer.getPlaybackState as jest.Mock).mockResolvedValue({ state: "ended" });
+
+    await poll();
+
+    expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
+  });
+
+  it("does not save an ended background poll while duration is unknown", async () => {
+    setPendingAudioRestore(null);
+    mockTrackPlayer.getProgress.mockResolvedValue({ position: 600, duration: 0, buffered: 0 });
+    (mockTrackPlayer.getPlaybackState as jest.Mock).mockResolvedValue({ state: "ended" });
+
+    await poll();
+
+    expect(mockUpdateMediaLocation).not.toHaveBeenCalled();
   });
 
   it.each(["pause", "stop"])("preserves remote %s intent through a deferred seek", async (action) => {

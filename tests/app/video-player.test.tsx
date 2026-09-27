@@ -656,6 +656,134 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(596);
     });
 
+    it("keeps a paused scrub made through small position updates", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = false;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      for (let position = 590.5; position <= 596; position += 0.5) {
+        mockPlayer.currentTime = position;
+        act(() => timeUpdateListener!({ currentTime: position }));
+      }
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(596);
+    });
+
+    it("keeps a forward scrub that wall time would treat as playback", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      nowSpy.mockReturnValue(now + 10_000);
+      nativeSeek(596);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(596);
+      nowSpy.mockRestore();
+    });
+
+    it("restarts saved 590 after playback that matches elapsed time without a time update", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      nowSpy.mockReturnValue(now + 1000);
+      mockPlayer.currentTime = 591;
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+      nowSpy.mockRestore();
+    });
+
+    it("restarts after a touch read zero before the provisional seek landed", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 0;
+      tap(screen);
+      nowSpy.mockReturnValue(now + 1000);
+      mockPlayer.currentTime = 591;
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+      nowSpy.mockRestore();
+    });
+
+    it("keeps a scrub after a touch that read zero before the provisional seek", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 0;
+      tap(screen);
+      mockPlayer.currentTime = 591;
+      act(() => timeUpdateListener!({ currentTime: 591 }));
+      nowSpy.mockReturnValue(now + 10_000);
+      nativeSeek(596);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(596);
+      nowSpy.mockRestore();
+    });
+
+    it("keeps a forward scrub after a later time update", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      nowSpy.mockReturnValue(now + 10_000);
+      nativeSeek(596);
+      mockPlayer.currentTime = 596.25;
+      act(() => timeUpdateListener!({ currentTime: 596.25 }));
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(596.25);
+      nowSpy.mockRestore();
+    });
+
+    it("restarts when a coarse time update stays behind elapsed playback", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      mockPlayer.currentTime = 590.5;
+      act(() => timeUpdateListener!({ currentTime: 590.5 }));
+      nowSpy.mockReturnValue(now + 5_000);
+      mockPlayer.currentTime = 591;
+      act(() => timeUpdateListener!({ currentTime: 591 }));
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+      nowSpy.mockRestore();
+    });
+
+    it("restarts playback within one second of the last accepted sample", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 590;
+      tap(screen);
+      mockPlayer.currentTime = 590.5;
+      act(() => timeUpdateListener!({ currentTime: 590.5 }));
+      nowSpy.mockReturnValue(now + 8_000);
+      mockPlayer.currentTime = 591.2;
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(0);
+      nowSpy.mockRestore();
+    });
+
     it("keeps a seek that a later reveal tap followed", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const screen = renderScreen();
