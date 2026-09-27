@@ -436,9 +436,17 @@ export default function VideoPlayerScreen() {
       return Math.abs(position - expected) <= sample;
     };
     const matchesElapsedPlayback =
-      player.playing && (nearElapsed(anchor.position) || (resumePosition > 0 && nearElapsed(resumePosition)));
+      player.playing &&
+      (nearElapsed(anchor.position) ||
+        (resumePosition > 0 && anchor.position < resumePosition - sample && nearElapsed(resumePosition)));
+    const returnedBehindObservedTime =
+      playbackBaseline !== null &&
+      lastObservedTimeRef.current !== null &&
+      lastObservedTimeRef.current > playbackBaseline + 1 &&
+      position < lastObservedTimeRef.current - TIME_UPDATE_INTERVAL_SECONDS;
     const matchesAcceptedSample =
       playbackBaseline !== null &&
+      !returnedBehindObservedTime &&
       position >= playbackBaseline - TIME_UPDATE_INTERVAL_SECONDS &&
       position <= playbackBaseline + (player.playing ? 1 : TIME_UPDATE_INTERVAL_SECONDS);
     const followsClamp = (start: number) =>
@@ -609,18 +617,26 @@ export default function VideoPlayerScreen() {
         const baseline = previousObservedTimeRef.current;
         const sample = 1;
         const nearSavedResume = resumePosition > 0 && Math.abs(observed - resumePosition) <= 1;
+        const returnedBehindObservedTime =
+          baseline !== null &&
+          lastObservedTime !== null &&
+          lastObservedTime > baseline + sample &&
+          observed < lastObservedTime - TIME_UPDATE_INTERVAL_SECONDS;
         if (
           player.playing &&
           baseline !== null &&
           observed <= baseline + sample &&
-          observed >= baseline - TIME_UPDATE_INTERVAL_SECONDS
+          observed >= baseline - TIME_UPDATE_INTERVAL_SECONDS &&
+          !returnedBehindObservedTime
         ) {
           previousObservedTimeRef.current = observed;
         } else if (player.playing && nearSavedResume && (baseline === null || baseline < resumePosition - 1)) {
           previousObservedTimeRef.current = observed;
         } else if (player.playing && restorePhaseRef.current === "pending" && touchAnchorRef.current) {
           const aheadWhileDurationUnknown = baseline !== null && observed > baseline + sample && player.duration <= 0;
-          if (!aheadWhileDurationUnknown) {
+          if (returnedBehindObservedTime) {
+            observeNativeSeek();
+          } else if (!aheadWhileDurationUnknown) {
             const alreadySeeked = nativeSeekObservedRef.current;
             observeNativeSeek();
             if (!alreadySeeked && !nativeSeekObservedRef.current) {

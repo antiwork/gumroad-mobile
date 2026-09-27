@@ -814,6 +814,39 @@ describe("VideoPlayerScreen", () => {
       expect(mockPlayer.currentTime).toBe(590.9);
     });
 
+    it("keeps a backward scrub after a skipped forward jump", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      tap(screen);
+      ready(0);
+      playFor(8);
+      nativeSeek(598);
+      playFor(4);
+      nativeSeek(592.3);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(592.3);
+    });
+
+    it("keeps a backward scrub that lands on elapsed time from the saved position", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
+      const now = performance.now();
+      const nowSpy = jest.spyOn(performance, "now").mockReturnValue(now);
+      const screen = renderScreen();
+      mockPlayer.playing = true;
+      mockPlayer.currentTime = 590;
+      ready(0);
+      playFor(20);
+      nowSpy.mockReturnValue(now);
+      mockPlayer.currentTime = 595;
+      tap(screen);
+      nowSpy.mockReturnValue(now + 2_000);
+      nativeSeek(592);
+      ready(600);
+      expect(mockPlayer.currentTime).toBe(592);
+      nowSpy.mockRestore();
+    });
+
     it("keeps a short backward scrub while playing", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "590" };
       const screen = renderScreen();
