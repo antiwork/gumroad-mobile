@@ -37,6 +37,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const TIME_UPDATE_INTERVAL_SECONDS = 0.25;
+const ACCEPTED_SAMPLE_SECONDS = 1;
+
+const returnedBehindObservedTime = (baseline: number | null, lastObserved: number | null, position: number) =>
+  baseline !== null &&
+  lastObserved !== null &&
+  lastObserved > baseline + ACCEPTED_SAMPLE_SECONDS &&
+  position < lastObserved - TIME_UPDATE_INTERVAL_SECONDS;
 
 type ExternalSubtitleTrack = {
   url: string;
@@ -424,6 +431,7 @@ export default function VideoPlayerScreen() {
 
   const observeNativeSeek = useCallback(() => {
     const anchor = touchAnchorRef.current;
+    // A touchless jump is not a buyer seek. The player also moves when it applies the provisional resume.
     if (!anchor || nativeSeekObservedRef.current) return;
     const elapsedSeconds = (performance.now() - anchor.time) / 1000;
     const playbackBaseline = previousObservedTimeRef.current;
@@ -439,16 +447,12 @@ export default function VideoPlayerScreen() {
       player.playing &&
       (nearElapsed(anchor.position) ||
         (resumePosition > 0 && anchor.position < resumePosition - sample && nearElapsed(resumePosition)));
-    const returnedBehindObservedTime =
-      playbackBaseline !== null &&
-      lastObservedTimeRef.current !== null &&
-      lastObservedTimeRef.current > playbackBaseline + 1 &&
-      position < lastObservedTimeRef.current - TIME_UPDATE_INTERVAL_SECONDS;
+    const returnedBehindPlayback = returnedBehindObservedTime(playbackBaseline, lastObservedTimeRef.current, position);
     const matchesAcceptedSample =
       playbackBaseline !== null &&
-      !returnedBehindObservedTime &&
+      !returnedBehindPlayback &&
       position >= playbackBaseline - TIME_UPDATE_INTERVAL_SECONDS &&
-      position <= playbackBaseline + (player.playing ? 1 : TIME_UPDATE_INTERVAL_SECONDS);
+      position <= playbackBaseline + (player.playing ? ACCEPTED_SAMPLE_SECONDS : TIME_UPDATE_INTERVAL_SECONDS);
     const followsClamp = (start: number) =>
       player.duration > 0 && Math.abs(position - Math.min(start, player.duration)) <= TIME_UPDATE_INTERVAL_SECONDS;
     if (
@@ -512,6 +516,7 @@ export default function VideoPlayerScreen() {
                 if (position !== resumePosition) {
                   player.currentTime = position;
                   setCurrentPosition(position);
+                  // The exit save prefers the last timeUpdate, which still holds the pre-seek position.
                   lastObservedTimeRef.current = position;
                   if (isAtEnd) player.play();
                 }
@@ -615,26 +620,25 @@ export default function VideoPlayerScreen() {
           playbackAdvancedRef.current = true;
         }
         const baseline = previousObservedTimeRef.current;
-        const sample = 1;
-        const nearSavedResume = resumePosition > 0 && Math.abs(observed - resumePosition) <= 1;
-        const returnedBehindObservedTime =
-          baseline !== null &&
-          lastObservedTime !== null &&
-          lastObservedTime > baseline + sample &&
-          observed < lastObservedTime - TIME_UPDATE_INTERVAL_SECONDS;
+        const nearSavedResume = resumePosition > 0 && Math.abs(observed - resumePosition) <= ACCEPTED_SAMPLE_SECONDS;
+        // A return behind the last observed time is a scrub even when it lands near the stale baseline.
+        const returnedBehindPlayback = returnedBehindObservedTime(baseline, lastObservedTime, observed);
         if (
           player.playing &&
           baseline !== null &&
-          observed <= baseline + sample &&
+          observed <= baseline + ACCEPTED_SAMPLE_SECONDS &&
           observed >= baseline - TIME_UPDATE_INTERVAL_SECONDS &&
-          !returnedBehindObservedTime
+          !returnedBehindPlayback
         ) {
           previousObservedTimeRef.current = observed;
         } else if (player.playing && nearSavedResume && (baseline === null || baseline < resumePosition - 1)) {
+          // A touch that read zero before the provisional seek landed is still the saved resume.
           previousObservedTimeRef.current = observed;
         } else if (player.playing && restorePhaseRef.current === "pending" && touchAnchorRef.current) {
-          const aheadWhileDurationUnknown = baseline !== null && observed > baseline + sample && player.duration <= 0;
-          if (returnedBehindObservedTime) {
+          // A forward jump before duration is known cannot yet be separated from playback clamped at the end.
+          const aheadWhileDurationUnknown =
+            baseline !== null && observed > baseline + ACCEPTED_SAMPLE_SECONDS && player.duration <= 0;
+          if (returnedBehindPlayback) {
             observeNativeSeek();
           } else if (!aheadWhileDurationUnknown) {
             const alreadySeeked = nativeSeekObservedRef.current;
