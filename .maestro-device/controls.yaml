@@ -1,0 +1,17 @@
+appId: com.GRD.Gumroad
+---
+# Reveal the native AVPlayer controls only if they are hidden (a blind tap toggles them off).
+- runFlow:
+    when:
+      notVisible:
+        id: "Play/Pause"
+    commands:
+      - tapOn:
+          point: "50%,30%"
+- runFlow:
+    when:
+      notVisible:
+        id: "Play/Pause"
+    commands:
+      - tapOn:
+          point: "50%,50%"

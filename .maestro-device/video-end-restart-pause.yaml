@@ -1,0 +1,38 @@
+appId: com.GRD.Gumroad
+---
+# Precondition: purchase page open, saved position ~82s of 88s.
+# 1) open -> resumes ~1:22 and plays to the end; leave.  2) reopen -> must restart at 0:00 (finished video).
+# 3) play ~8s, pause, capture, leave -> the DB row must hold the paused second.
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow: controls.yaml
+- takeScreenshot: v6-resume
+- extendedWaitUntil:
+    visible: "never-shown"
+    timeout: 12000
+    optional: true
+- runFlow: controls.yaml
+- takeScreenshot: v6-ended
+- tapOn:
+    point: "5%,9%"
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow: controls.yaml
+- takeScreenshot: v6-restart
+- extendedWaitUntil:
+    visible: "never-shown"
+    timeout: 8000
+    optional: true
+- runFlow: controls.yaml
+- tapOn:
+    id: "Play/Pause"
+- runFlow: controls.yaml
+- takeScreenshot: v6-paused
+- tapOn:
+    point: "5%,9%"
+- waitForAnimationToEnd:
+    timeout: 4000

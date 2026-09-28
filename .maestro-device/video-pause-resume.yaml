@@ -1,0 +1,35 @@
+appId: com.GRD.Gumroad
+---
+# Precondition: purchase page of iOS QA Pack (gp#1427) open via deep link.
+# open, play ~10s, pause (confirmed progress), capture paused time, leave, reopen -> must resume at the paused spot.
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow: controls.yaml
+- takeScreenshot: v4-open
+- tapOn:
+    id: "Play/Pause"
+- extendedWaitUntil:
+    visible: "never-shown"
+    timeout: 10000
+    optional: true
+- runFlow: controls.yaml
+- tapOn:
+    id: "Play/Pause"
+- runFlow: controls.yaml
+- takeScreenshot: v4-paused
+- extendedWaitUntil:
+    visible: "never-shown"
+    timeout: 4000
+    optional: true
+- runFlow: controls.yaml
+- takeScreenshot: v4-still-paused
+- tapOn:
+    point: "5%,9%"
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow: controls.yaml
+- takeScreenshot: v4-reopen

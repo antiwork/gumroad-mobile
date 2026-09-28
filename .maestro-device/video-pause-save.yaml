@@ -1,0 +1,27 @@
+appId: com.GRD.Gumroad
+---
+# Precondition: purchase page open. Open video (autoplays from saved spot), jump back with -10s x3, let it play, pause, capture, leave.
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow: controls.yaml
+- tapOn:
+    id: "Skip Backward"
+- tapOn:
+    id: "Skip Backward"
+- tapOn:
+    id: "Skip Backward"
+- extendedWaitUntil:
+    visible: "never-shown"
+    timeout: 6000
+    optional: true
+- runFlow: controls.yaml
+- tapOn:
+    id: "Play/Pause"
+- runFlow: controls.yaml
+- takeScreenshot: v5-paused
+- tapOn:
+    point: "5%,9%"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: v5-left

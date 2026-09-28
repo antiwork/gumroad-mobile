@@ -1,0 +1,14 @@
+appId: com.GRD.Gumroad
+---
+# Precondition: purchase page open. Open video, reveal controls immediately, capture start position; wait 6s, capture again.
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow: controls.yaml
+- takeScreenshot: v7-open
+- extendedWaitUntil:
+    visible: "never-shown"
+    timeout: 6000
+    optional: true
+- runFlow: controls.yaml
+- takeScreenshot: v7-later
