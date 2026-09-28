@@ -149,7 +149,7 @@ export default function Index() {
       <Screen>
         <View className="flex-1 items-center justify-center gap-4 p-8">
           <Text className="text-center font-sans text-foreground">
-            Couldn&apos;t load your library. Please check your connection and try again.
+            Couldn&apos;t load your library. Please check your connection.
           </Text>
           <Button
             disabled={query.isFetching}
