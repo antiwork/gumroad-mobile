@@ -9,7 +9,6 @@ import {
   isMeaningfulLocation,
   isNearEndLocation,
   isResumableLocation,
-  RESTORE_DURATION_WAIT_MS,
   updateMediaLocation,
 } from "@/lib/media-location";
 import { requestAPI } from "@/lib/request";
@@ -38,6 +37,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const TIME_UPDATE_INTERVAL_SECONDS = 0.25;
+const ACCEPTED_SAMPLE_SECONDS = 1;
+
+const returnedBehindObservedTime = (baseline: number | null, lastObserved: number | null, position: number) =>
+  baseline !== null &&
+  lastObserved !== null &&
+  lastObserved > baseline + ACCEPTED_SAMPLE_SECONDS &&
+  position < lastObserved - TIME_UPDATE_INTERVAL_SECONDS;
+
 type ExternalSubtitleTrack = {
   url: string;
   language: string;
@@ -65,10 +73,6 @@ const withReleasedPlayerGuard = (operation: () => void) => {
     throw error;
   }
 };
-
-// Position deltas this large are the player jumping, not playing: playback advances by fractions of
-// a second between updates, so a bigger step came from a seek the buyer made.
-const SEEK_JUMP_TOLERANCE_SECONDS = 2;
 
 const restoreAppOrientation = () => {
   const request =
@@ -172,7 +176,11 @@ export default function VideoPlayerScreen() {
   );
   const resumePosition = savedPositionIsAtEnd ? 0 : (savedPosition ?? 0);
   const restorePhaseRef = useRef<"pending" | "resolved" | "cancelled">("pending");
-  const restoreDeadlineRef = useRef(0);
+  const touchAnchorRef = useRef<{ position: number; time: number; rate: number } | null>(null);
+  const nativeSeekObservedRef = useRef(false);
+  const lastObservedTimeRef = useRef<number | null>(null);
+  const previousObservedTimeRef = useRef<number | null>(null);
+  const playbackAdvancedRef = useRef(false);
 
   const queryClient = useQueryClient();
   const { top, bottom, left, right } = useSafeAreaInsets();
@@ -184,7 +192,6 @@ export default function VideoPlayerScreen() {
   const [playbackStarted, setPlaybackStarted] = useState(false);
   const playbackStartedRef = useRef(false);
   const currentPositionRef = useRefToLatest(currentPosition);
-  const lastSeenPositionRef = useRef(0);
 
   const [externalTracks, setExternalTracks] = useState<ExternalSubtitleTrack[]>([]);
   const [embeddedTracks, setEmbeddedTracks] = useState<SubtitleTrack[]>([]);
@@ -222,13 +229,6 @@ export default function VideoPlayerScreen() {
     return captionRequestIdRef.current;
   }, []);
 
-  const isRestoreDecisionOpen = useCallback(() => {
-    if (restorePhaseRef.current !== "pending") return false;
-    if (Date.now() < restoreDeadlineRef.current) return true;
-    restorePhaseRef.current = "cancelled";
-    return false;
-  }, []);
-
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -257,8 +257,11 @@ export default function VideoPlayerScreen() {
       const nextPositionIsAtEnd = savedPosition !== undefined && !isResumableLocation(savedPosition, videoLength);
       setSavedPositionIsAtEnd(nextPositionIsAtEnd);
       restorePhaseRef.current = "pending";
-      restoreDeadlineRef.current = Date.now() + RESTORE_DURATION_WAIT_MS;
-      lastSeenPositionRef.current = nextPositionIsAtEnd ? 0 : (savedPosition ?? 0);
+      touchAnchorRef.current = null;
+      nativeSeekObservedRef.current = false;
+      lastObservedTimeRef.current = null;
+      previousObservedTimeRef.current = null;
+      playbackAdvancedRef.current = false;
       // Progress state belongs to one video. Carrying it into the next one shows the previous
       // video's position on screen and, worse, lets a save write that position against the new
       // video's duration, so the replacement video reopens at the wrong place.
@@ -347,7 +350,7 @@ export default function VideoPlayerScreen() {
     player.loop = false;
     player.allowsExternalPlayback = true;
     player.staysActiveInBackground = Platform.OS === "ios";
-    player.timeUpdateEventInterval = 0.25;
+    player.timeUpdateEventInterval = TIME_UPDATE_INTERVAL_SECONDS;
     const pendingResume = pendingSourceResumeRef.current;
     pendingSourceResumeRef.current = null;
     if (pendingResume) {
@@ -449,6 +452,45 @@ export default function VideoPlayerScreen() {
     });
   }, [player, selection.type]);
 
+  const observeNativeSeek = useCallback(() => {
+    const anchor = touchAnchorRef.current;
+    if (!anchor || nativeSeekObservedRef.current) return;
+    const elapsedSeconds = (performance.now() - anchor.time) / 1000;
+    const playbackBaseline = previousObservedTimeRef.current;
+    const rate = Math.max(anchor.rate, player.playbackRate);
+    const wallAdvance = player.playing ? elapsedSeconds * rate : 0;
+    const position = player.currentTime;
+    const sample = TIME_UPDATE_INTERVAL_SECONDS * rate;
+    const nearElapsed = (start: number) => {
+      const expected = player.duration > 0 ? Math.min(start + wallAdvance, player.duration) : start + wallAdvance;
+      return Math.abs(position - expected) <= sample;
+    };
+    const matchesElapsedPlayback =
+      player.playing &&
+      (nearElapsed(anchor.position) ||
+        (resumePosition > 0 && anchor.position < resumePosition - sample && nearElapsed(resumePosition)));
+    const followsClamp = (start: number) =>
+      player.duration > 0 && Math.abs(position - Math.min(start, player.duration)) <= TIME_UPDATE_INTERVAL_SECONDS;
+    const returnedBehindPlayback = returnedBehindObservedTime(playbackBaseline, lastObservedTimeRef.current, position);
+    if (returnedBehindPlayback && !followsClamp(anchor.position) && !followsClamp(resumePosition)) {
+      nativeSeekObservedRef.current = true;
+      return;
+    }
+    const matchesAcceptedSample =
+      playbackBaseline !== null &&
+      !returnedBehindPlayback &&
+      position >= playbackBaseline - TIME_UPDATE_INTERVAL_SECONDS &&
+      position <= playbackBaseline + (player.playing ? ACCEPTED_SAMPLE_SECONDS : TIME_UPDATE_INTERVAL_SECONDS);
+    if (
+      !matchesElapsedPlayback &&
+      !matchesAcceptedSample &&
+      !followsClamp(anchor.position) &&
+      !followsClamp(resumePosition)
+    ) {
+      nativeSeekObservedRef.current = true;
+    }
+  }, [player, resumePosition]);
+
   useEffect(() => {
     const subscription = player.addListener(
       "statusChange",
@@ -487,17 +529,20 @@ export default function VideoPlayerScreen() {
             if (
               loadedMedia?.uri === uri &&
               loadedMedia.streamingUrl === streamingUrl &&
-              isRestoreDecisionOpen() &&
+              restorePhaseRef.current === "pending" &&
               player.duration > 0
             ) {
-              restorePhaseRef.current = "resolved";
-              if (savedPosition) {
+              observeNativeSeek();
+              const seeked = nativeSeekObservedRef.current;
+              restorePhaseRef.current = seeked ? "cancelled" : "resolved";
+              if (!seeked && savedPosition) {
                 const isAtEnd = !isResumableLocation(savedPosition, player.duration);
                 const position = isAtEnd ? 0 : savedPosition;
                 setSavedPositionIsAtEnd(isAtEnd);
                 if (position !== resumePosition) {
                   player.currentTime = position;
                   setCurrentPosition(position);
+                  lastObservedTimeRef.current = position;
                   if (isAtEnd) player.play();
                 }
               }
@@ -520,7 +565,7 @@ export default function VideoPlayerScreen() {
   }, [
     cancelCaptionRequest,
     externalFullscreenOpen,
-    isRestoreDecisionOpen,
+    observeNativeSeek,
     player,
     replayFromLastPosition,
     savedPosition,
@@ -575,16 +620,13 @@ export default function VideoPlayerScreen() {
     return () => subscription.remove();
   }, [player, externalCues]);
 
+  const loadedMediaMatchesParams = useCallback(() => {
+    const loadedMedia = resolvedMediaIdentityRef.current ?? fallbackMediaIdentityRef.current;
+    return loadedMedia?.uri === uri && loadedMedia.streamingUrl === streamingUrl;
+  }, [streamingUrl, uri]);
+
   useEffect(() => {
     const subscription = player.addListener("timeUpdate", ({ currentTime }: { currentTime: number }) => {
-      const previouslySeen = lastSeenPositionRef.current;
-      lastSeenPositionRef.current = currentTime;
-      if (
-        restorePhaseRef.current === "pending" &&
-        Math.abs(currentTime - previouslySeen) > SEEK_JUMP_TOLERANCE_SECONDS
-      ) {
-        restorePhaseRef.current = "cancelled";
-      }
       const recoveryStartedAt = recoveryStartedAtRef.current;
       if (recoveryStartedAt !== null && currentTime > recoveryStartedAt + 0.1) {
         playbackRetryCountRef.current = 0;
@@ -594,14 +636,56 @@ export default function VideoPlayerScreen() {
         playbackStartedRef.current = true;
         setPlaybackStarted(true);
       }
+      if (loadedMediaMatchesParams()) {
+        const livePosition = player.currentTime;
+        const observed =
+          Math.abs(currentTime - livePosition) <= TIME_UPDATE_INTERVAL_SECONDS ? currentTime : livePosition;
+        const lastObservedTime = lastObservedTimeRef.current;
+        if (lastObservedTime !== null && lastObservedTime > resumePosition && observed > lastObservedTime) {
+          playbackAdvancedRef.current = true;
+        }
+        const baseline = previousObservedTimeRef.current;
+        const nearSavedResume = resumePosition > 0 && Math.abs(observed - resumePosition) <= ACCEPTED_SAMPLE_SECONDS;
+        const returnedBehindPlayback = returnedBehindObservedTime(baseline, lastObservedTime, observed);
+        if (
+          player.playing &&
+          baseline !== null &&
+          observed <= baseline + ACCEPTED_SAMPLE_SECONDS &&
+          observed >= baseline - TIME_UPDATE_INTERVAL_SECONDS &&
+          !returnedBehindPlayback
+        ) {
+          previousObservedTimeRef.current = observed;
+        } else if (player.playing && nearSavedResume && (baseline === null || baseline < resumePosition - 1)) {
+          previousObservedTimeRef.current = observed;
+        } else if (player.playing && restorePhaseRef.current === "pending" && touchAnchorRef.current) {
+          const aheadWhileDurationUnknown =
+            baseline !== null && observed > baseline + ACCEPTED_SAMPLE_SECONDS && player.duration <= 0;
+          if (returnedBehindPlayback) {
+            nativeSeekObservedRef.current = true;
+          } else if (!aheadWhileDurationUnknown) {
+            const alreadySeeked = nativeSeekObservedRef.current;
+            observeNativeSeek();
+            if (!alreadySeeked && !nativeSeekObservedRef.current) {
+              previousObservedTimeRef.current = observed;
+            }
+          }
+        } else if (
+          !player.playing &&
+          restorePhaseRef.current === "pending" &&
+          touchAnchorRef.current &&
+          baseline !== null
+        ) {
+          if (nearSavedResume && baseline < resumePosition - 1) {
+            previousObservedTimeRef.current = observed;
+          } else if (Math.abs(observed - baseline) > TIME_UPDATE_INTERVAL_SECONDS) {
+            observeNativeSeek();
+          }
+        }
+        lastObservedTimeRef.current = observed;
+      }
     });
     return () => subscription.remove();
-  }, [resumePosition, player]);
-
-  const loadedMediaMatchesParams = useCallback(() => {
-    const loadedMedia = resolvedMediaIdentityRef.current ?? fallbackMediaIdentityRef.current;
-    return loadedMedia?.uri === uri && loadedMedia.streamingUrl === streamingUrl;
-  }, [streamingUrl, uri]);
+  }, [resumePosition, player, loadedMediaMatchesParams, observeNativeSeek]);
 
   const persistLocation = useCallback(
     (position: number, duration: number) => {
@@ -610,7 +694,7 @@ export default function VideoPlayerScreen() {
       // While the screen is switching to another video the player still holds the previous
       // source, so anything read off it now would be saved against the new video's file.
       if (!loadedMediaMatchesParams()) return null;
-      if (isRestoreDecisionOpen() && savedPosition) return null;
+      if (restorePhaseRef.current === "pending" && savedPosition && !playbackAdvancedRef.current) return null;
 
       const isEnd = isNearEndLocation(position, duration);
       // Below the threshold the position is indistinguishable from a player sitting at the
@@ -625,15 +709,7 @@ export default function VideoPlayerScreen() {
         accessToken,
       });
     },
-    [
-      urlRedirectId,
-      productFileId,
-      purchaseId,
-      accessToken,
-      loadedMediaMatchesParams,
-      savedPosition,
-      isRestoreDecisionOpen,
-    ],
+    [urlRedirectId, productFileId, purchaseId, accessToken, loadedMediaMatchesParams, savedPosition],
   );
 
   const persistLocationRef = useRefToLatest(persistLocation);
@@ -642,7 +718,7 @@ export default function VideoPlayerScreen() {
     () => () => {
       if (!urlRedirectId) return;
       persistLocationRef
-        .current(currentPositionRef.current, videoDurationRef.current)
+        .current(lastObservedTimeRef.current ?? currentPositionRef.current, videoDurationRef.current)
         ?.then(() => queryClient.invalidateQueries({ queryKey: ["purchase", urlRedirectId] }));
     },
     [urlRedirectId, currentPositionRef, videoDurationRef, persistLocationRef, queryClient],
@@ -656,6 +732,11 @@ export default function VideoPlayerScreen() {
         if (!loadedMediaMatchesParams()) return;
         const position = player.currentTime;
         const duration = player.duration || videoDurationRef.current;
+        const lastObservedTime = lastObservedTimeRef.current;
+        if (lastObservedTime !== null && lastObservedTime > resumePosition && position > lastObservedTime) {
+          playbackAdvancedRef.current = true;
+        }
+        lastObservedTimeRef.current = position;
         setCurrentPosition(position);
         setVideoDuration(duration);
         persistLocation(position, duration);
@@ -663,7 +744,7 @@ export default function VideoPlayerScreen() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [player, persistLocation, videoDurationRef, loadedMediaMatchesParams]);
+  }, [player, persistLocation, videoDurationRef, loadedMediaMatchesParams, resumePosition]);
 
   const selectCaptionTrack = async (nextSelection: CaptionSelection) => {
     setCaptionSheetOpen(false);
@@ -865,6 +946,18 @@ export default function VideoPlayerScreen() {
         player={player}
         allowsPictureInPicture={!externalCaptionSelected}
         surfaceType={videoSurfaceType}
+        onTouchStart={() => {
+          if (restorePhaseRef.current !== "pending") return;
+          withReleasedPlayerGuard(() => {
+            observeNativeSeek();
+            touchAnchorRef.current = {
+              position: player.currentTime,
+              time: performance.now(),
+              rate: player.playbackRate,
+            };
+            previousObservedTimeRef.current = player.currentTime;
+          });
+        }}
         onFullscreenEnter={() => {
           restorePhaseRef.current = "cancelled";
           handleNativeFullscreenEnter();

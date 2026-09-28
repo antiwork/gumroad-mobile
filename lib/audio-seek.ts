@@ -1,4 +1,4 @@
-import { isResumableLocation, RESTORE_DURATION_WAIT_MS } from "@/lib/media-location";
+import { isResumableLocation } from "@/lib/media-location";
 import TrackPlayer, { State } from "react-native-track-player";
 
 type PendingAudioRestore = {
@@ -8,21 +8,23 @@ type PendingAudioRestore = {
   resolving?: boolean;
   play?: boolean;
   cancelled?: boolean;
+  observedPosition?: number;
+  playbackAdvanced?: boolean;
 };
 
 let pendingRestore: PendingAudioRestore | null = null;
-let pendingRestoreRequestedAt = 0;
 let playbackIntentVersion = 0;
 
 export const getPendingAudioRestore = () => pendingRestore;
 export const setPendingAudioRestore = (restore: PendingAudioRestore | null) => {
   pendingRestore = restore;
-  pendingRestoreRequestedAt = restore ? Date.now() : 0;
 };
 export const invalidatePendingAudioRestore = (resourceId?: string) => {
   if (pendingRestore && pendingRestore.resourceId !== resourceId) pendingRestore.cancelled = true;
 };
 export const isAudioRestorePending = (resourceId: string) => pendingRestore?.resourceId === resourceId;
+export const isAudioProgressDeferred = (resourceId: string) =>
+  isAudioRestorePending(resourceId) && !pendingRestore?.playbackAdvanced;
 export const setPendingAudioPlaybackIntent = (play: boolean) => {
   if (pendingRestore) pendingRestore.play = play;
 };
@@ -50,6 +52,7 @@ export const resolvePendingAudioRestore = async (
   resourceId: string,
   progress: { position: number; duration: number },
   play: boolean,
+  confirmObservation = false,
 ) => {
   const pending = pendingRestore;
   if (pending?.resourceId !== resourceId) return { ...progress, restored: false };
@@ -57,12 +60,22 @@ export const resolvePendingAudioRestore = async (
     pendingRestore = null;
     return { ...progress, restored: false };
   }
-  if (!(progress.duration > 0)) {
-    if (Date.now() - pendingRestoreRequestedAt < RESTORE_DURATION_WAIT_MS) return null;
-    pendingRestore = null;
-    return { ...progress, restored: false };
-  }
   if (pending.resolving) return null;
+  if (!(progress.duration > 0)) {
+    const lastPosition = pending.observedPosition;
+    const movedPastProvisional = progress.position > pending.provisionalPosition;
+    if (
+      (play &&
+        lastPosition !== undefined &&
+        lastPosition > pending.provisionalPosition &&
+        progress.position > lastPosition) ||
+      (confirmObservation && movedPastProvisional && progress.position >= 3)
+    ) {
+      pending.playbackAdvanced = true;
+    }
+    pending.observedPosition = progress.position;
+    return pending.playbackAdvanced ? { ...progress, restored: false } : null;
+  }
   const position = isResumableLocation(pending.position, progress.duration) ? pending.position : 0;
   if (position === pending.provisionalPosition) {
     pendingRestore = null;
