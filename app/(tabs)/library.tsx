@@ -8,6 +8,7 @@ import {
   useSellers,
 } from "@/components/library/use-purchases";
 import { MAX_RECENT, useRecentPurchases } from "@/components/library/use-recent-products";
+import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
@@ -143,11 +144,24 @@ export default function Index() {
     }
   };
 
-  if (query.error) {
+  if (query.error && purchases.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center bg-body-bg">
-        <Text>Error: {query.error.message}</Text>
-      </View>
+      <Screen>
+        <View className="flex-1 items-center justify-center gap-4 p-8">
+          <Text className="text-center font-sans text-foreground">
+            Couldn&apos;t load your library. Please check your connection and try again.
+          </Text>
+          <Button
+            disabled={query.isFetching}
+            onPress={() => {
+              void query.refetch();
+              void recentPurchases.refetch();
+            }}
+          >
+            <Text>Retry</Text>
+          </Button>
+        </View>
+      </Screen>
     );
   }
 
@@ -276,6 +290,13 @@ export default function Index() {
               query.isFetchingNextPage ? (
                 <View className="w-full items-center py-4">
                   <LoadingSpinner size="small" />
+                </View>
+              ) : query.isFetchNextPageError ? (
+                <View className="w-full items-center gap-3 py-4">
+                  <Text className="text-center font-sans text-muted">Couldn&apos;t load more purchases.</Text>
+                  <Button onPress={() => void query.fetchNextPage()}>
+                    <Text>Retry</Text>
+                  </Button>
                 </View>
               ) : null
             }

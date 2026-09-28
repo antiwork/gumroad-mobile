@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import Library from "@/app/(tabs)/library";
 
 const imageProps: Record<string, unknown>[] = [];
@@ -56,16 +56,27 @@ jest.mock("@/components/library/use-library-filters", () => ({
   }),
 }));
 
+const mockRefetch = jest.fn();
+const mockRecentRefetch = jest.fn();
+const mockFetchNextPage = jest.fn();
+let mockPurchasesState: {
+  purchases: ReturnType<typeof mockMakePurchase>[];
+  error: Error | null;
+  isFetching: boolean;
+  isFetchNextPageError?: boolean;
+};
+
 jest.mock("@/components/library/use-purchases", () => ({
   usePurchases: () => ({
-    purchases: mockPurchases,
-    totalCount: mockPurchases.length,
-    error: null,
-    isFetching: false,
+    purchases: mockPurchasesState.purchases,
+    totalCount: mockPurchasesState.purchases.length,
+    error: mockPurchasesState.error,
+    isFetching: mockPurchasesState.isFetching,
     isFetchingNextPage: false,
+    isFetchNextPageError: mockPurchasesState.isFetchNextPageError ?? false,
     hasNextPage: false,
-    fetchNextPage: jest.fn(),
-    refetch: jest.fn(),
+    fetchNextPage: mockFetchNextPage,
+    refetch: mockRefetch,
   }),
   useSellers: () => [],
   useArchivePurchase: () => jest.fn(),
@@ -78,7 +89,7 @@ jest.mock("@/components/library/use-recent-products", () => ({
     purchases: [],
     isLoading: false,
     refresh: jest.fn(),
-    refetch: jest.fn(),
+    refetch: mockRecentRefetch,
   }),
 }));
 
@@ -99,9 +110,35 @@ jest.mock("@/components/ui/loading-spinner", () => {
   return { LoadingSpinner: () => <View /> };
 });
 
+jest.mock("@/components/ui/button", () => {
+  const { Pressable } = require("react-native");
+  return {
+    Button: ({
+      children,
+      onPress,
+      disabled,
+    }: {
+      children: React.ReactNode;
+      onPress: () => void;
+      disabled?: boolean;
+    }) => (
+      <Pressable accessibilityRole="button" onPress={onPress} disabled={disabled}>
+        {children}
+      </Pressable>
+    ),
+  };
+});
+
 jest.mock("@/components/ui/text", () => {
   const { Text } = require("react-native");
   return { Text };
+});
+
+beforeEach(() => {
+  mockPurchasesState = { purchases: mockPurchases, error: null, isFetching: false };
+  mockRefetch.mockClear();
+  mockRecentRefetch.mockClear();
+  mockFetchNextPage.mockClear();
 });
 
 describe("Library image autoplay", () => {
@@ -115,5 +152,52 @@ describe("Library image autoplay", () => {
     imageProps.forEach((props) => {
       expect(props.autoplay).toBe(false);
     });
+  });
+});
+
+describe("Library load error", () => {
+  it("shows a readable message and a retry button instead of the raw error", () => {
+    mockPurchasesState = { purchases: [], error: new Error("Aborted"), isFetching: false };
+    render(<Library />);
+
+    expect(screen.queryByText(/Aborted/)).toBeNull();
+    expect(screen.getByText(/Couldn't load your library/)).toBeTruthy();
+
+    fireEvent.press(screen.getByRole("button"));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    expect(mockRecentRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables retry while a refetch is in flight", () => {
+    mockPurchasesState = { purchases: [], error: new Error("Aborted"), isFetching: true };
+    render(<Library />);
+
+    fireEvent.press(screen.getByRole("button"));
+    expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps already-loaded purchases on screen when a later fetch fails", () => {
+    mockPurchasesState = { purchases: mockPurchases, error: new Error("Aborted"), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getAllByText("Product 1").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Couldn't load your library/)).toBeNull();
+    expect(screen.queryByText(/Couldn't load more purchases/)).toBeNull();
+  });
+
+  it("shows a retry footer when loading the next page fails", () => {
+    mockPurchasesState = {
+      purchases: mockPurchases,
+      error: new Error("Aborted"),
+      isFetching: false,
+      isFetchNextPageError: true,
+    };
+    render(<Library />);
+
+    expect(screen.getAllByText("Product 1").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Couldn't load more purchases/)).toBeTruthy();
+
+    fireEvent.press(screen.getByRole("button"));
+    expect(mockFetchNextPage).toHaveBeenCalledTimes(1);
   });
 });
