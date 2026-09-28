@@ -1,0 +1,18 @@
+appId: com.GRD.Gumroad
+---
+# Expects the "Connect Gumroad Mobile to Gumroad" auth sheet, or the app's login screen.
+- runFlow:
+    when:
+      visible: "Sign in with Gumroad"
+    commands:
+      - tapOn: "Sign in with Gumroad"
+- extendedWaitUntil:
+    visible: "Connect Gumroad Mobile to Gumroad"
+    timeout: 20000
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- tapOn:
+    text: "Email"
+    index: 0
+- inputText: ${GUMROAD_EMAIL}

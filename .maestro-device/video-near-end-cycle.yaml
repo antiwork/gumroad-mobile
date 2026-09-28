@@ -1,0 +1,27 @@
+appId: com.GRD.Gumroad
+---
+# Precondition: purchase page of the iOS QA Pack (gp#1427) open via deep link.
+# Open video, reveal controls, drag scrubber to ~1:25 of 1:28 (near end), capture, leave, reopen, capture.
+# Scrubber (402x874 pt): x ~12%..87%, y ~96%.
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    point: "50%,50%"
+- takeScreenshot: v2-before
+- swipe:
+    start: "76%,96%"
+    end: "90%,96%"
+    duration: 900
+- takeScreenshot: v2-near-end
+- tapOn:
+    point: "5%,9%"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: v2-purchase-page
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    point: "50%,50%"
+- takeScreenshot: v2-reopen

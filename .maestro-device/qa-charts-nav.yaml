@@ -1,0 +1,65 @@
+appId: com.GRD.Gumroad
+---
+# gp#2974 / mobile#372 device QA: chart scrubbing + navigation while gestures are live.
+- tapOn: "Analytics, tab.*"
+- tapOn: "1Y"
+- waitForAnimationToEnd:
+    timeout: 6000
+# Sales chart: taps + horizontal scrubs (Reanimated/GH pan -> runOnJS)
+- tapOn:
+    point: "60,700"
+- tapOn:
+    point: "200,700"
+- tapOn:
+    point: "340,700"
+- repeat:
+    times: 4
+    commands:
+      - swipe:
+          start: "45,700"
+          end: "355,700"
+          duration: 900
+      - swipe:
+          start: "355,700"
+          end: "45,700"
+          duration: 900
+# Scroll to Views chart and scrub it
+- scroll
+- repeat:
+    times: 3
+    commands:
+      - swipe:
+          start: "45,560"
+          end: "355,560"
+          duration: 700
+# Referrers tab charts (traffic-tab ChartGestureHandler)
+- scrollUntilVisible:
+    element: "Referrers"
+    direction: UP
+- tapOn: "Referrers"
+- waitForAnimationToEnd:
+    timeout: 6000
+- repeat:
+    times: 2
+    commands:
+      - swipe:
+          start: "45,450"
+          end: "355,450"
+          duration: 700
+- tapOn: "Sales"
+# Stress: rapid range switching + tab switches right after a scrub (stale event targets)
+- repeat:
+    times: 6
+    commands:
+      - tapOn: "1W"
+      - tapOn: "1Y"
+      - swipe:
+          start: "45,700"
+          end: "355,700"
+          duration: 250
+      - tapOn: "Dashboard, tab.*"
+      - tapOn: "Analytics, tab.*"
+      - tapOn: "Library, tab.*"
+      - tapOn: "Products, tab.*"
+      - tapOn: "Analytics, tab.*"
+- assertVisible: "Analytics"

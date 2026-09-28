@@ -1,0 +1,19 @@
+appId: com.GRD.Gumroad
+---
+# After submitting credentials: dismiss iOS "Save Password?", approve OAuth if asked.
+- tapOn:
+    text: "Not Now"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: "Authorize"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 10000

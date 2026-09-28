@@ -1,0 +1,6 @@
+appId: com.apple.mobilesafari
+---
+- tapOn:
+    point: "201,455"
+- waitForAnimationToEnd:
+    timeout: 20000

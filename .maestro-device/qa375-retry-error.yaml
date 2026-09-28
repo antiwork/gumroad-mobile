@@ -1,0 +1,6 @@
+appId: com.GRD.Gumroad
+---
+- assertVisible: ".*load your library.*"
+- tapOn: "Retry"
+- waitForAnimationToEnd:
+    timeout: 20000

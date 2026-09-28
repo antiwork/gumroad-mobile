@@ -1,0 +1,5 @@
+appId: com.apple.mobilesafari
+---
+- tapOn: "Open in app"
+- waitForAnimationToEnd:
+    timeout: 8000

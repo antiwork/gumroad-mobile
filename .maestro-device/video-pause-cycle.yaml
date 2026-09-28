@@ -1,0 +1,32 @@
+appId: com.GRD.Gumroad
+---
+# Open video, let it play ~12s, pause via center button, capture, leave, reopen, capture (should resume at the paused spot).
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "never-shown-12000"
+    timeout: 12000
+    optional: true
+- tapOn:
+    point: "50%,50%"
+- tapOn:
+    point: "50%,53%"
+- takeScreenshot: v3-paused
+- extendedWaitUntil:
+    visible: "never-shown-3000"
+    timeout: 3000
+    optional: true
+- tapOn:
+    point: "50%,50%"
+- takeScreenshot: v3-paused-later
+- tapOn:
+    point: "5%,9%"
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    point: "50%,50%"
+- takeScreenshot: v3-reopen

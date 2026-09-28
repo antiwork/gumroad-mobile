@@ -1,0 +1,5 @@
+appId: com.apple.mobilesafari
+---
+- tapOn: "Give as a gift?"
+- tapOn: "Recipient email"
+- inputText: "gumclaw@gumroad.com"

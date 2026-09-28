@@ -1,0 +1,11 @@
+appId: com.GRD.Gumroad
+---
+- tapOn:
+    text: "Login"
+- waitForAnimationToEnd:
+    timeout: 10000
+- tapOn:
+    text: "Not Now"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 8000

@@ -1,0 +1,8 @@
+appId: com.GRD.Gumroad
+---
+- tapOn: "Analytics, tab.*"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "1Y"
+- waitForAnimationToEnd:
+    timeout: 8000

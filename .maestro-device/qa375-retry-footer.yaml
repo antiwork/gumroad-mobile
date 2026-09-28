@@ -1,0 +1,6 @@
+appId: com.GRD.Gumroad
+---
+- assertVisible: ".*load more purchases.*"
+- tapOn: "Retry"
+- waitForAnimationToEnd:
+    timeout: 20000

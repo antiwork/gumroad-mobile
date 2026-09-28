@@ -1,0 +1,73 @@
+appId: com.gumroad.app.pr372test
+---
+# gp#2974 / mobile#372 Android device QA: chart scrubbing + navigation while gestures are live.
+# Coordinates are for the Galaxy Z Fold7 cover screen (1080x2520): Sales chart y~1740, Views chart after one scroll.
+- tapOn: "Analytics"
+- tapOn: "1Y"
+- waitForAnimationToEnd:
+    timeout: 6000
+- tapOn:
+    point: "10%,69%"
+- tapOn:
+    point: "50%,69%"
+- tapOn:
+    point: "88%,69%"
+- repeat:
+    times: 4
+    commands:
+      - swipe:
+          start: "8%,69%"
+          end: "92%,69%"
+          duration: 900
+      - swipe:
+          start: "92%,69%"
+          end: "8%,69%"
+          duration: 900
+- takeScreenshot: android-07-sales-scrub
+- scroll
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: android-08-views
+- repeat:
+    times: 3
+    commands:
+      - swipe:
+          start: "8%,60%"
+          end: "92%,60%"
+          duration: 700
+      - swipe:
+          start: "92%,60%"
+          end: "8%,60%"
+          duration: 700
+- tapOn: "Referrers"
+- waitForAnimationToEnd:
+    timeout: 4000
+- repeat:
+    times: 2
+    commands:
+      - swipe:
+          start: "8%,45%"
+          end: "92%,45%"
+          duration: 700
+- tapOn: "Sales"
+# Stress: range switch + fast scrub + immediate tab change (unmounts the gesture views mid-flight)
+- repeat:
+    times: 6
+    commands:
+      - tapOn: "1W"
+      - tapOn: "1Y"
+      - swipe:
+          start: "8%,69%"
+          end: "92%,69%"
+          duration: 150
+      - tapOn: "Dashboard"
+      - tapOn: "Analytics"
+      - swipe:
+          start: "92%,69%"
+          end: "8%,69%"
+          duration: 150
+      - tapOn: "Library"
+      - tapOn: "Products"
+      - tapOn: "Analytics"
+- assertVisible: "1Y"
+- takeScreenshot: android-09-after-stress

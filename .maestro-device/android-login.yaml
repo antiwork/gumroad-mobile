@@ -1,0 +1,20 @@
+appId: com.gumroad.app.pr372test
+---
+# Android: OAuth page is a Chrome Custom Tab already open on the Gumroad login form.
+- tapOn:
+    text: "Email"
+    index: 0
+- inputText: ${GUMROAD_EMAIL}
+- hideKeyboard
+- tapOn:
+    text: "Password"
+    index: 0
+- inputText: ${GUMROAD_PASSWORD}
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Login"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Login"
+- waitForAnimationToEnd:
+    timeout: 10000

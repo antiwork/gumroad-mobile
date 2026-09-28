@@ -1,0 +1,18 @@
+appId: com.apple.mobilesafari
+---
+# Claim the free "iOS QA Pack (gp#1185)" fixture (6.7-min audio) at $0 as gumclaw@.
+- launchApp:
+    appId: com.apple.mobilesafari
+- tapOn:
+    id: "TabBarItemTitle"
+    optional: true
+- tapOn:
+    text: "Search or enter website name"
+    optional: true
+- inputText: "https://gumclaw.gumroad.com/l/wcozr"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: ".*QA Pack.*"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000

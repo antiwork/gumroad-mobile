@@ -1,0 +1,8 @@
+appId: com.GRD.Gumroad
+---
+- swipe:
+    start: "1%,45%"
+    end: "90%,45%"
+    duration: 700
+- waitForAnimationToEnd:
+    timeout: 12000

@@ -1,0 +1,15 @@
+appId: com.apple.mobilesafari
+---
+- tapOn:
+    point: "200,203"
+- inputText: "gumclaw@gumroad.com"
+- tapOn:
+    point: "200,297"
+- inputText: "Gumclaw QA"
+- tapOn:
+    point: "289,391"
+- inputText: "10001"
+- tapOn: "Done"
+- tapOn: "Pay"
+- waitForAnimationToEnd:
+    timeout: 20000

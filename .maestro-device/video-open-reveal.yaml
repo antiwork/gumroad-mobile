@@ -1,0 +1,7 @@
+appId: com.GRD.Gumroad
+---
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    point: "50%,50%"

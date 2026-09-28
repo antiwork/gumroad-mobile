@@ -1,0 +1,20 @@
+appId: com.GRD.Gumroad
+---
+# Enter the emailed Gumroad 2FA token (${GUMROAD_2FA}) and submit.
+- tapOn:
+    text: "Authentication Token"
+    index: 0
+    optional: true
+- inputText: ${GUMROAD_2FA}
+- tapOn:
+    text: "Login"
+- waitForAnimationToEnd:
+    timeout: 10000
+- tapOn:
+    text: "Not Now"
+    optional: true
+- tapOn:
+    text: "Authorize"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 10000

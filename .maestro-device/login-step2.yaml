@@ -1,0 +1,12 @@
+appId: com.GRD.Gumroad
+---
+# Continues from login-step1 (email typed). Fills password via env, submits.
+- pressKey: Enter
+- tapOn:
+    text: "Password"
+    index: 0
+    optional: true
+- inputText: ${GUMROAD_PASSWORD}
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 8000

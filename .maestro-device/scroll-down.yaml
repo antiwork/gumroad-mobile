@@ -1,0 +1,10 @@
+appId: com.apple.mobilesafari
+---
+- swipe:
+    start: "200,700"
+    end: "200,150"
+    duration: 500
+- swipe:
+    start: "200,700"
+    end: "200,150"
+    duration: 500

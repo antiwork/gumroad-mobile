@@ -1,0 +1,8 @@
+appId: com.GRD.Gumroad
+---
+- repeat:
+    times: 3
+    commands:
+      - scroll
+- waitForAnimationToEnd:
+    timeout: 8000

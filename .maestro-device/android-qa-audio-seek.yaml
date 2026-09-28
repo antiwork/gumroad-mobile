@@ -1,0 +1,45 @@
+appId: com.gumroad.app.pr372test
+---
+# mobile#372 Android device QA: full audio player seek bar (GH pan+tap) + skips + minimize/reopen.
+# Precondition: full player open. Z Fold7 cover screen 1080x2520: seek track y~1780 (71%),
+# controls row y~2040 (81%), minimize chevron ~(94,180). The Android full player exposes no a11y labels.
+- tapOn:
+    point: "70%,81%"
+- tapOn:
+    point: "70%,81%"
+- tapOn:
+    point: "30%,81%"
+- takeScreenshot: android-31-player-open
+- repeat:
+    times: 3
+    commands:
+      - tapOn:
+          point: "75%,71%"
+      - tapOn:
+          point: "25%,71%"
+- repeat:
+    times: 4
+    commands:
+      - swipe:
+          start: "12%,71%"
+          end: "88%,71%"
+          duration: 800
+      - swipe:
+          start: "88%,71%"
+          end: "12%,71%"
+          duration: 800
+- takeScreenshot: android-32-after-seeks
+- repeat:
+    times: 2
+    commands:
+      - swipe:
+          start: "15%,71%"
+          end: "80%,71%"
+          duration: 150
+      - tapOn:
+          point: "94,180"
+      - tapOn:
+          id: "open-audio-player"
+      - waitForAnimationToEnd:
+          timeout: 3000
+- takeScreenshot: android-33-final

@@ -1,0 +1,8 @@
+appId: com.GRD.Gumroad
+---
+- tapOn: "Library, tab.*"
+- tapOn:
+    text: "Small Bets.*"
+    index: 1
+- waitForAnimationToEnd:
+    timeout: 10000

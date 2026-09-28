@@ -1,0 +1,19 @@
+appId: com.gumroad.app.pr372test
+---
+- tapOn:
+    text: "Authentication Token"
+    index: 0
+- inputText: ${GUMROAD_2FA}
+- hideKeyboard
+- tapOn:
+    text: "Login"
+    index: 0
+- waitForAnimationToEnd:
+    timeout: 10000
+- runFlow:
+    when:
+      visible: "Authorize"
+    commands:
+      - tapOn: "Authorize"
+- waitForAnimationToEnd:
+    timeout: 10000

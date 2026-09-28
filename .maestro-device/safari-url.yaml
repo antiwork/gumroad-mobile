@@ -1,0 +1,6 @@
+appId: com.apple.mobilesafari
+---
+- tapOn: "Close"
+  optional: true
+- tapOn:
+    id: "TabBarItemTitle"

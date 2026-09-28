@@ -1,0 +1,22 @@
+appId: com.GRD.Gumroad
+---
+# Leave the video, reopen it from the purchase page, reveal controls, capture the resume position.
+- tapOn:
+    id: "BackButton"
+    optional: true
+- tapOn:
+    point: "22,78"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element: "Watch"
+    direction: UP
+    timeout: 8000
+    optional: true
+- tapOn: "Watch"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    point: "50%,50%"
+- takeScreenshot: ${SHOT}

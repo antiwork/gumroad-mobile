@@ -1,0 +1,10 @@
+appId: com.GRD.Gumroad
+---
+- tapOn: "Library, tab.*"
+- waitForAnimationToEnd:
+    timeout: 6000
+- scroll
+- scrollUntilVisible:
+    element: ".*iOS QA Pack.*"
+    direction: UP
+    timeout: 15000

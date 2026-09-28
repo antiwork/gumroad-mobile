@@ -1,0 +1,4 @@
+appId: com.GRD.Gumroad
+---
+- tapOn:
+    point: "50%,50%"

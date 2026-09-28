@@ -1,0 +1,11 @@
+appId: com.GRD.Gumroad
+---
+- tapOn: "Analytics, tab.*"
+- tapOn: "Sales"
+- tapOn: "1Y"
+- waitForAnimationToEnd:
+    timeout: 6000
+- swipe:
+    start: "45,700"
+    end: "120,700"
+    duration: 600

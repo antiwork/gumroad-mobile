@@ -1,0 +1,10 @@
+appId: com.apple.mobilesafari
+---
+- tapOn:
+    point: "220,676"
+- inputText: "0"
+- tapOn:
+    text: "I want this!"
+    index: 1
+- waitForAnimationToEnd:
+    timeout: 8000

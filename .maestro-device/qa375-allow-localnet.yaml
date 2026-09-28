@@ -1,0 +1,7 @@
+appId: com.GRD.Gumroad
+---
+- tapOn:
+    text: "Allow"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 8000

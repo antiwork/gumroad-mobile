@@ -1,0 +1,5 @@
+appId: com.GRD.Gumroad
+---
+- tapOn: "Library, tab.*"
+- waitForAnimationToEnd:
+    timeout: 20000

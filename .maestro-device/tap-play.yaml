@@ -1,0 +1,6 @@
+appId: com.GRD.Gumroad
+---
+- tapOn:
+    point: "359,156"
+- waitForAnimationToEnd:
+    timeout: 8000

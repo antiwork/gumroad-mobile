@@ -1,0 +1,21 @@
+appId: com.apple.mobilesafari
+---
+# Gift "iOS QA Pack (gp#1185)" to gumclaw@ from the checkout page in iPhone Safari.
+- tapOn: "Give as a gift?"
+- tapOn: "Recipient email"
+- inputText: "gumclaw@gumroad.com"
+- tapOn: "Done"
+- scrollUntilVisible:
+    element: "Get"
+    direction: DOWN
+- tapOn:
+    text: "Email address"
+    index: 0
+- inputText: "gumclaw+qa-gifter@gumroad.com"
+- tapOn: "Done"
+- scrollUntilVisible:
+    element: "Get"
+    direction: DOWN
+- tapOn: "Get"
+- waitForAnimationToEnd:
+    timeout: 15000

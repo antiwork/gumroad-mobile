@@ -1,0 +1,10 @@
+appId: com.apple.mobilesafari
+---
+# Creator test purchase of the $0 audio fixture (gumclaw owns the product -> gifting is blocked).
+- tapOn:
+    point: "289,391"
+- inputText: "10001"
+- tapOn: "Done"
+- tapOn: "Pay"
+- waitForAnimationToEnd:
+    timeout: 20000

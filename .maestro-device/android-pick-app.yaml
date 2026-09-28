@@ -1,0 +1,13 @@
+appId: com.gumroad.app.pr372test
+---
+# After 2FA, Android asks which "Gumroad" app should take the OAuth redirect. Pick this build.
+- runFlow:
+    when:
+      visible: "Open with"
+    commands:
+      - tapOn:
+          text: "Gumroad"
+          index: ${PICK_INDEX}
+      - tapOn: "Just once"
+- waitForAnimationToEnd:
+    timeout: 8000

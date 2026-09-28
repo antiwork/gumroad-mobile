@@ -1,0 +1,15 @@
+appId: com.GRD.Gumroad
+---
+# Reveal controls, drag the native scrubber thumb to ~1:25 of 1:28 (near end), capture, leave.
+# Scrubber (iPhone 17 Pro Max, 402x874 pt): x ~12%..87%, y ~96%.
+- tapOn:
+    point: "50%,50%"
+- swipe:
+    start: "50%,96%"
+    end: "85%,96%"
+    duration: 900
+- takeScreenshot: ${SHOT}
+- tapOn:
+    point: "5%,9%"
+- waitForAnimationToEnd:
+    timeout: 4000

@@ -1,0 +1,14 @@
+appId: com.apple.mobilesafari
+---
+- tapOn:
+    point: "289,391"
+- inputText: "10001"
+- tapOn:
+    point: "200,120"
+- scrollUntilVisible:
+    element: "Pay"
+    direction: DOWN
+    optional: true
+- tapOn: "Pay"
+- waitForAnimationToEnd:
+    timeout: 20000

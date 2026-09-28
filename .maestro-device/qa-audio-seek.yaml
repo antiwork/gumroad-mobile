@@ -1,0 +1,58 @@
+appId: com.GRD.Gumroad
+---
+# mobile#372 device QA: audio seek bar (GH Pan+Tap on the full player) + skip buttons.
+# Precondition: app is on the "iOS QA Pack (gp#1185)" purchase screen (deep link gumroadmobile://purchase/<url_redirect>).
+- tapOn: "Play"
+- extendedWaitUntil:
+    visible:
+      id: "open-audio-player"
+    timeout: 20000
+- tapOn:
+    id: "open-audio-player"
+- extendedWaitUntil:
+    visible: "Playback position"
+    timeout: 10000
+- tapOn: "Skip forward 30 seconds"
+- tapOn: "Skip forward 30 seconds"
+- tapOn: "Skip back 15 seconds"
+- takeScreenshot: 31-player-open
+# Tap-seek to several points on the bar
+- repeat:
+    times: 3
+    commands:
+      - tapOn:
+          text: "Playback position"
+          point: "75%,50%"
+      - tapOn:
+          text: "Playback position"
+          point: "25%,50%"
+# Drag-seek (pan) back and forth, including releasing mid-drag and immediately closing
+- repeat:
+    times: 4
+    commands:
+      - swipe:
+          from: "Playback position"
+          direction: RIGHT
+          duration: 800
+      - swipe:
+          from: "Playback position"
+          direction: LEFT
+          duration: 800
+- takeScreenshot: 32-after-seeks
+- swipe:
+    from: "Playback position"
+    direction: RIGHT
+    duration: 200
+- tapOn: "Minimize player"
+- tapOn:
+    id: "open-audio-player"
+- swipe:
+    from: "Playback position"
+    direction: LEFT
+    duration: 200
+- tapOn: "Minimize player"
+- tapOn:
+    id: "open-audio-player"
+- assertVisible: "Playback position"
+- tapOn: "Pause"
+- takeScreenshot: 33-final

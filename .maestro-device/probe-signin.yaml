@@ -1,0 +1,6 @@
+appId: com.GRD.Gumroad
+---
+- tapOn: "Sign in with Gumroad"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: /Users/gumclaw/.hermes/artifacts/gp2974-ios-device/04-signin-tap
