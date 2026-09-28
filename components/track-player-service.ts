@@ -15,7 +15,7 @@ import { isPlayerInitialized } from "./use-audio-player-sync";
 
 let activeTrackVersion = 0;
 
-const syncCurrentPosition = async () => {
+const syncCurrentPosition = async (confirmObservation = false) => {
   const trackVersion = activeTrackVersion;
   const accessToken = getAudioAccessToken();
   if (!accessToken) return;
@@ -36,12 +36,15 @@ const syncCurrentPosition = async () => {
   const progress = await TrackPlayer.getProgress();
   const { state } = await TrackPlayer.getPlaybackState();
   if ((await TrackPlayer.getActiveTrack())?.id !== activeTrack?.id || trackVersion !== activeTrackVersion) return;
+  const isEnd = state === State.Ended;
   const resolved = await resolvePendingAudioRestore(
     productFileId,
     progress,
-    state === State.Playing || state === State.Ended,
+    state === State.Playing || isEnd,
+    confirmObservation,
   );
   if (!resolved) return;
+  if (isEnd && !confirmObservation && !(progress.duration > 0)) return;
   if ((await TrackPlayer.getActiveTrack())?.id !== activeTrack?.id || trackVersion !== activeTrackVersion) return;
   const { position } = resolved;
   if (!isMeaningfulLocation(position, false)) return;
@@ -72,13 +75,13 @@ export const playbackService = async () => {
   TrackPlayer.addEventListener(Event.RemotePause, async () => {
     setAudioPlaybackIntent(false);
     await TrackPlayer.pause();
-    await syncCurrentPosition();
+    await syncCurrentPosition(true);
   });
 
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
     setAudioPlaybackIntent(false);
     await TrackPlayer.stop();
-    await syncCurrentPosition();
+    await syncCurrentPosition(true);
   });
 
   TrackPlayer.addEventListener(Event.RemoteNext, async () => {
