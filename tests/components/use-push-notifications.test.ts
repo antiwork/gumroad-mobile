@@ -34,12 +34,30 @@ jest.mock("expo-application", () => ({ nativeApplicationVersion: "1.0" }));
 jest.mock("@sentry/react-native", () => ({ captureException: jest.fn() }));
 
 import { renderHook } from "@testing-library/react-native";
+import * as Notifications from "expo-notifications";
 import {
   __resetPushNotificationsModuleStateForTests,
   consumeNotificationRoute,
+  createAndroidNotificationChannels,
   markIndexInitialRoutingComplete,
+  SALES_NOTIFICATION_CHANNEL_ID,
   usePushNotifications,
 } from "@/components/use-push-notifications";
+
+describe("createAndroidNotificationChannels", () => {
+  it("creates a sales channel with the cha-ching sound alongside the legacy Purchases channel", async () => {
+    const setChannel = Notifications.setNotificationChannelAsync as jest.Mock;
+    setChannel.mockClear();
+
+    await createAndroidNotificationChannels();
+
+    const channels = Object.fromEntries(setChannel.mock.calls.map(([id, options]) => [id, options]));
+    expect(SALES_NOTIFICATION_CHANNEL_ID).not.toBe("Purchases");
+    expect(channels[SALES_NOTIFICATION_CHANNEL_ID]).toMatchObject({ sound: "chaching.wav", importance: 5 });
+    expect(channels.Purchases).toMatchObject({ sound: "chaching.wav" });
+    expect(channels.default).toBeDefined();
+  });
+});
 
 const makeResponse = (identifier: string, data: Record<string, string>) =>
   ({ notification: { request: { identifier, content: { data } } } }) as any;
