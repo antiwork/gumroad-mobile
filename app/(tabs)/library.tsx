@@ -291,6 +291,13 @@ export default function Index() {
                 <View className="w-full items-center py-4">
                   <LoadingSpinner size="small" />
                 </View>
+              ) : query.isFetchNextPageError ? (
+                <View className="w-full items-center gap-3 py-4">
+                  <Text className="text-center font-sans text-muted">Couldn&apos;t load more purchases.</Text>
+                  <Button onPress={() => void query.fetchNextPage()}>
+                    <Text>Retry</Text>
+                  </Button>
+                </View>
               ) : null
             }
           />

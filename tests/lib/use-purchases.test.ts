@@ -124,6 +124,21 @@ describe("usePurchases", () => {
     const { result } = renderHook(() => usePurchases(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.totalCount).toBe(42));
   });
+
+  it("drops the previous filter's purchases when the new filter's request fails", async () => {
+    mockRequestAPI.mockResolvedValueOnce(makeSearchResponse([{ name: "Old", url_redirect_token: "old" }]));
+    const { result, rerender } = renderHook(({ query }: { query: string }) => usePurchases({ q: query }), {
+      wrapper: createWrapper(),
+      initialProps: { query: "" },
+    });
+    await waitFor(() => expect(result.current.purchases).toHaveLength(1));
+
+    mockRequestAPI.mockRejectedValueOnce(new Error("Aborted"));
+    rerender({ query: "new" });
+
+    await waitFor(() => expect(result.current.error).toBeTruthy());
+    expect(result.current.purchases).toHaveLength(0);
+  });
 });
 
 describe("usePurchase", () => {

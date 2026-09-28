@@ -58,7 +58,13 @@ jest.mock("@/components/library/use-library-filters", () => ({
 
 const mockRefetch = jest.fn();
 const mockRecentRefetch = jest.fn();
-let mockPurchasesState: { purchases: ReturnType<typeof mockMakePurchase>[]; error: Error | null; isFetching: boolean };
+const mockFetchNextPage = jest.fn();
+let mockPurchasesState: {
+  purchases: ReturnType<typeof mockMakePurchase>[];
+  error: Error | null;
+  isFetching: boolean;
+  isFetchNextPageError?: boolean;
+};
 
 jest.mock("@/components/library/use-purchases", () => ({
   usePurchases: () => ({
@@ -67,8 +73,9 @@ jest.mock("@/components/library/use-purchases", () => ({
     error: mockPurchasesState.error,
     isFetching: mockPurchasesState.isFetching,
     isFetchingNextPage: false,
+    isFetchNextPageError: mockPurchasesState.isFetchNextPageError ?? false,
     hasNextPage: false,
-    fetchNextPage: jest.fn(),
+    fetchNextPage: mockFetchNextPage,
     refetch: mockRefetch,
   }),
   useSellers: () => [],
@@ -131,6 +138,7 @@ beforeEach(() => {
   mockPurchasesState = { purchases: mockPurchases, error: null, isFetching: false };
   mockRefetch.mockClear();
   mockRecentRefetch.mockClear();
+  mockFetchNextPage.mockClear();
 });
 
 describe("Library image autoplay", () => {
@@ -174,5 +182,22 @@ describe("Library load error", () => {
 
     expect(screen.getAllByText("Product 1").length).toBeGreaterThan(0);
     expect(screen.queryByText(/Couldn't load your library/)).toBeNull();
+    expect(screen.queryByText(/Couldn't load more purchases/)).toBeNull();
+  });
+
+  it("shows a retry footer when loading the next page fails", () => {
+    mockPurchasesState = {
+      purchases: mockPurchases,
+      error: new Error("Aborted"),
+      isFetching: false,
+      isFetchNextPageError: true,
+    };
+    render(<Library />);
+
+    expect(screen.getAllByText("Product 1").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Couldn't load more purchases/)).toBeTruthy();
+
+    fireEvent.press(screen.getByRole("button"));
+    expect(mockFetchNextPage).toHaveBeenCalledTimes(1);
   });
 });
