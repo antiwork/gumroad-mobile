@@ -97,6 +97,16 @@ describe("createAndroidNotificationChannels", () => {
     });
   });
 
+  it("carries over an importance the user picked on Purchases instead of raising it to MAX", async () => {
+    withExisting({ Purchases: { importance: Notifications.AndroidImportance.HIGH, sound: "custom" } });
+    await createAndroidNotificationChannels();
+
+    expect(channelsById()[SALES_NOTIFICATION_CHANNEL_ID]).toMatchObject({
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: "chaching.wav",
+    });
+  });
+
   it("stops copying from Purchases once the sales channel exists", async () => {
     withExisting({
       Purchases: { importance: Notifications.AndroidImportance.NONE, sound: null },

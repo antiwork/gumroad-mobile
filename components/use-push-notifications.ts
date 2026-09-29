@@ -44,10 +44,10 @@ export const createAndroidNotificationChannels = async () => {
     Notifications.getNotificationChannelAsync(SALES_NOTIFICATION_CHANNEL_ID),
   ]);
   const inherited = !existingSales && legacyPurchases ? legacyPurchases : null;
-  const salesImportance =
-    inherited && inherited.importance <= Notifications.AndroidImportance.LOW
-      ? inherited.importance
-      : Notifications.AndroidImportance.MAX;
+  // Carry over the level the user actually picked on "Purchases", including DEFAULT/HIGH — a sale
+  // alert should not be raised to MAX just because the replacement channel is new. Only a channel
+  // with no legacy choice to copy starts at MAX.
+  const salesImportance = inherited ? inherited.importance : Notifications.AndroidImportance.MAX;
   const salesSound = inherited && inherited.sound === null ? null : "chaching.wav";
 
   await Notifications.setNotificationChannelAsync("default", {
