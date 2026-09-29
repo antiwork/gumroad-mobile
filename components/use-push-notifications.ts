@@ -33,6 +33,39 @@ const registerDeviceToken = async (expoPushToken: string, accessToken: string) =
   });
 };
 
+export const SALES_NOTIFICATION_CHANNEL_ID = "sales";
+
+// Android keeps a channel's sound from first creation across updates, and installs upgraded from the
+// old native app hold a "Purchases" channel pointing at a resource id that no longer exists (silent).
+// The new channel starts from the user's "Purchases" choice so sales they muted stay muted.
+export const createAndroidNotificationChannels = async () => {
+  const [legacyPurchases, existingSales] = await Promise.all([
+    Notifications.getNotificationChannelAsync("Purchases"),
+    Notifications.getNotificationChannelAsync(SALES_NOTIFICATION_CHANNEL_ID),
+  ]);
+  const inherited = !existingSales && legacyPurchases ? legacyPurchases : null;
+  const salesImportance = inherited ? inherited.importance : Notifications.AndroidImportance.MAX;
+  const salesSound = inherited && inherited.sound === null ? null : "chaching.wav";
+
+  await Notifications.setNotificationChannelAsync("default", {
+    name: "Default",
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+  });
+  await Notifications.setNotificationChannelAsync("Purchases", {
+    name: "Purchases",
+    importance: Notifications.AndroidImportance.MAX,
+    sound: "chaching.wav",
+    vibrationPattern: [0, 250, 250, 250],
+  });
+  await Notifications.setNotificationChannelAsync(SALES_NOTIFICATION_CHANNEL_ID, {
+    name: "Sales",
+    importance: salesImportance,
+    sound: salesSound,
+    vibrationPattern: [0, 250, 250, 250],
+  });
+};
+
 const getExpoPushToken = async () => {
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -44,19 +77,7 @@ const getExpoPushToken = async () => {
 
   if (finalStatus !== "granted") return null;
 
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "Default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-    });
-    await Notifications.setNotificationChannelAsync("Purchases", {
-      name: "Purchases",
-      importance: Notifications.AndroidImportance.MAX,
-      sound: "chaching.wav",
-      vibrationPattern: [0, 250, 250, 250],
-    });
-  }
+  if (Platform.OS === "android") await createAndroidNotificationChannels();
 
   const tokenData = await Notifications.getDevicePushTokenAsync();
   return tokenData.data;

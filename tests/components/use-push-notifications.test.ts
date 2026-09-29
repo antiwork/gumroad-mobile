@@ -12,7 +12,8 @@ jest.mock("expo-notifications", () => ({
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: "denied" })),
   getDevicePushTokenAsync: jest.fn(),
   setNotificationChannelAsync: jest.fn(),
-  AndroidImportance: { MAX: 5 },
+  getNotificationChannelAsync: jest.fn(() => Promise.resolve(null)),
+  AndroidImportance: { NONE: 2, MIN: 3, LOW: 4, DEFAULT: 5, HIGH: 6, MAX: 7 },
 }));
 
 const mockRouterPush = jest.fn();
@@ -33,13 +34,112 @@ jest.mock("expo-application", () => ({ nativeApplicationVersion: "1.0" }));
 
 jest.mock("@sentry/react-native", () => ({ captureException: jest.fn() }));
 
-import { renderHook } from "@testing-library/react-native";
+import { renderHook, waitFor } from "@testing-library/react-native";
+import * as Notifications from "expo-notifications";
 import {
   __resetPushNotificationsModuleStateForTests,
   consumeNotificationRoute,
+  createAndroidNotificationChannels,
   markIndexInitialRoutingComplete,
+  SALES_NOTIFICATION_CHANNEL_ID,
   usePushNotifications,
 } from "@/components/use-push-notifications";
+import { Platform } from "react-native";
+
+describe("createAndroidNotificationChannels", () => {
+  const setChannel = Notifications.setNotificationChannelAsync as jest.Mock;
+  const getChannel = Notifications.getNotificationChannelAsync as jest.Mock;
+  const channelsById = () => Object.fromEntries(setChannel.mock.calls.map(([id, options]) => [id, options]));
+  const withExisting = (existing: Record<string, object>) =>
+    getChannel.mockImplementation((id: string) => Promise.resolve(existing[id] ?? null));
+
+  beforeEach(() => {
+    setChannel.mockClear();
+    withExisting({});
+  });
+
+  it("creates a sales channel with the cha-ching sound alongside the legacy Purchases channel", async () => {
+    await createAndroidNotificationChannels();
+
+    const channels = channelsById();
+    expect(SALES_NOTIFICATION_CHANNEL_ID).not.toBe("Purchases");
+    expect(channels[SALES_NOTIFICATION_CHANNEL_ID]).toMatchObject({
+      sound: "chaching.wav",
+      importance: Notifications.AndroidImportance.MAX,
+    });
+    expect(channels.Purchases).toMatchObject({ sound: "chaching.wav" });
+    expect(channels.default).toBeDefined();
+  });
+
+  it("gives upgraded installs the cha-ching when Purchases still has its broken custom sound", async () => {
+    withExisting({ Purchases: { importance: Notifications.AndroidImportance.MAX, sound: "custom" } });
+    await createAndroidNotificationChannels();
+
+    expect(channelsById()[SALES_NOTIFICATION_CHANNEL_ID]).toMatchObject({
+      sound: "chaching.wav",
+      importance: Notifications.AndroidImportance.MAX,
+    });
+  });
+
+  it("keeps sales muted when the user turned off or silenced the Purchases channel", async () => {
+    withExisting({ Purchases: { importance: Notifications.AndroidImportance.NONE, sound: "custom" } });
+    await createAndroidNotificationChannels();
+    expect(channelsById()[SALES_NOTIFICATION_CHANNEL_ID]).toMatchObject({
+      importance: Notifications.AndroidImportance.NONE,
+    });
+
+    setChannel.mockClear();
+    withExisting({ Purchases: { importance: Notifications.AndroidImportance.MAX, sound: null } });
+    await createAndroidNotificationChannels();
+    expect(channelsById()[SALES_NOTIFICATION_CHANNEL_ID]).toMatchObject({
+      importance: Notifications.AndroidImportance.MAX,
+      sound: null,
+    });
+  });
+
+  it("carries over an importance the user picked on Purchases instead of raising it to MAX", async () => {
+    withExisting({ Purchases: { importance: Notifications.AndroidImportance.HIGH, sound: "custom" } });
+    await createAndroidNotificationChannels();
+
+    expect(channelsById()[SALES_NOTIFICATION_CHANNEL_ID]).toMatchObject({
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: "chaching.wav",
+    });
+  });
+
+  it("stops copying from Purchases once the sales channel exists", async () => {
+    withExisting({
+      Purchases: { importance: Notifications.AndroidImportance.NONE, sound: null },
+      [SALES_NOTIFICATION_CHANNEL_ID]: { importance: Notifications.AndroidImportance.MAX, sound: "custom" },
+    });
+    await createAndroidNotificationChannels();
+
+    expect(channelsById()[SALES_NOTIFICATION_CHANNEL_ID]).toMatchObject({
+      sound: "chaching.wav",
+      importance: Notifications.AndroidImportance.MAX,
+    });
+  });
+
+  it("creates the sales channel before registering the push token on Android", async () => {
+    const originalOS = Platform.OS;
+    Object.defineProperty(Platform, "OS", { configurable: true, get: () => "android" });
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: "granted" });
+    const getToken = Notifications.getDevicePushTokenAsync as jest.Mock;
+    getToken.mockResolvedValueOnce({ data: "token-1" });
+    mockUseAuth.mockReturnValue({ accessToken: "access", isAuthenticated: true });
+
+    try {
+      renderHook(() => usePushNotifications());
+      await waitFor(() => expect(getToken).toHaveBeenCalled());
+
+      const salesCall = setChannel.mock.calls.findIndex(([id]) => id === SALES_NOTIFICATION_CHANNEL_ID);
+      expect(salesCall).toBeGreaterThanOrEqual(0);
+      expect(setChannel.mock.invocationCallOrder[salesCall]).toBeLessThan(getToken.mock.invocationCallOrder[0]);
+    } finally {
+      Object.defineProperty(Platform, "OS", { configurable: true, get: () => originalOS });
+    }
+  });
+});
 
 const makeResponse = (identifier: string, data: Record<string, string>) =>
   ({ notification: { request: { identifier, content: { data } } } }) as any;
