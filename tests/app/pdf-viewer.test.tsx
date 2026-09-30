@@ -296,4 +296,14 @@ describe("PdfViewerScreen", () => {
     await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalledWith("file:///cache/test.pdf"));
     expect(File.downloadFileAsync).toHaveBeenCalledTimes(1);
   });
+
+  it("labels the header actions so the icons are not the only cue", async () => {
+    renderWithProviders();
+
+    await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
+
+    expect(screen.getByText("Share")).toBeTruthy();
+    expect(screen.getByText("Pages")).toBeTruthy();
+    expect(screen.getByText("View")).toBeTruthy();
+  });
 });
