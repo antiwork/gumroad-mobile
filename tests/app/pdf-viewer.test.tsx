@@ -31,6 +31,12 @@ jest.mock("expo-sharing", () => ({
   shareAsync: jest.fn(),
 }));
 
+let mockFontScale = 1;
+jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
+  __esModule: true,
+  default: () => ({ width: 390, height: 844, scale: 3, fontScale: mockFontScale }),
+}));
+
 jest.mock("expo-file-system", () => {
   const Paths = { cache: "/cache" };
   class Directory {
@@ -305,5 +311,22 @@ describe("PdfViewerScreen", () => {
     expect(screen.getByText("Share")).toBeTruthy();
     expect(screen.getByText("Pages")).toBeTruthy();
     expect(screen.getByText("View")).toBeTruthy();
+  });
+
+  it("drops the header labels when system text is enlarged so the title keeps its room", async () => {
+    mockFontScale = 2;
+
+    try {
+      renderWithProviders();
+
+      await waitFor(() => expect(screen.getByTestId("pdf-component")).toBeTruthy());
+
+      expect(screen.queryByText("Share")).toBeNull();
+      expect(screen.queryByText("Pages")).toBeNull();
+      expect(screen.queryByText("View")).toBeNull();
+      expect(screen.getByTestId("share-pdf-button")).toBeTruthy();
+    } finally {
+      mockFontScale = 1;
+    }
   });
 });

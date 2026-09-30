@@ -17,7 +17,7 @@ import { shareFile } from "@/lib/share";
 import { useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Dimensions, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Dimensions, Platform, StyleSheet, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
 import { safeOpenURL } from "@/lib/open-url";
@@ -53,6 +53,10 @@ export default function PdfViewerScreen() {
   const [cachedUri, setCachedUri] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState(false);
   const [isDownloading, setIsDownloading] = useState(true);
+  // The labels need header width; at enlarged system text the header keeps the icons
+  // alone, which still carry accessibilityLabels.
+  const { fontScale } = useWindowDimensions();
+  const showActionLabels = fontScale <= 1;
 
   const downloadDestination = useCallback(
     () => cacheFileDestination(productFileId ?? "pdf-viewer", fileName ?? DEFAULT_PDF_FILE_NAME),
@@ -183,7 +187,7 @@ export default function PdfViewerScreen() {
                   size={24}
                   className={cn("text-accent", Platform.OS === "ios" && "-rotate-90")}
                 />
-                <Text className="font-sans text-accent">Share</Text>
+                {showActionLabels ? <Text className="font-sans text-accent">Share</Text> : null}
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
@@ -192,7 +196,7 @@ export default function PdfViewerScreen() {
                 className="flex-row items-center gap-1 p-2"
               >
                 <SolidIcon name="book-content" size={24} className="text-accent" />
-                <Text className="font-sans text-accent">Pages</Text>
+                {showActionLabels ? <Text className="font-sans text-accent">Pages</Text> : null}
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
@@ -205,7 +209,7 @@ export default function PdfViewerScreen() {
                 ) : (
                   <SolidIcon name="gallery-horizontal" size={24} className="text-accent" />
                 )}
-                <Text className="font-sans text-accent">View</Text>
+                {showActionLabels ? <Text className="font-sans text-accent">View</Text> : null}
               </TouchableOpacity>
             </View>
           ),
