@@ -44,6 +44,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "./plugins/gradle-memory",
     "./plugins/android-large-heap",
     "./plugins/android-portrait-orientation",
+    "./plugins/ios-pod-deployment-target",
     "expo-router",
     [
       "expo-screen-orientation",
