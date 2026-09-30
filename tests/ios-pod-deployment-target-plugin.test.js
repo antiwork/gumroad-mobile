@@ -1,4 +1,5 @@
-const { raisePodDeploymentTargets } = require("../plugins/ios-pod-deployment-target");
+const withIosPodDeploymentTarget = require("../plugins/ios-pod-deployment-target");
+const { raisePodDeploymentTargets } = withIosPodDeploymentTarget;
 
 const PODFILE = `platform :ios, '15.1'
 
@@ -28,5 +29,13 @@ describe("ios pod deployment target plugin", () => {
 
   it("fails loudly when the generated Podfile has no post_install hook", () => {
     expect(() => raisePodDeploymentTargets("platform :ios, '15.1'\n")).toThrow(/post_install/);
+  });
+
+  it("patches the Podfile through the podfile mod the plugin registers", async () => {
+    const config = withIosPodDeploymentTarget({ name: "gumroad", slug: "gumroad" });
+    const result = await config.mods.ios.podfile({ modRequest: {}, modResults: { contents: PODFILE } });
+
+    expect(result.modResults.contents).toContain("# Raise pod deployment targets for Xcode 27+");
+    expect(result.modResults.contents).toContain("current.to_f < 15.1");
   });
 });
