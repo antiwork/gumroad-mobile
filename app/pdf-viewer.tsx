@@ -53,8 +53,6 @@ export default function PdfViewerScreen() {
   const [cachedUri, setCachedUri] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState(false);
   const [isDownloading, setIsDownloading] = useState(true);
-  // The labels need header width; at enlarged system text the header keeps the icons
-  // alone, which still carry accessibilityLabels.
   const { fontScale } = useWindowDimensions();
   const showActionLabels = fontScale <= 1;
 
