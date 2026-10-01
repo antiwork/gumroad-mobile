@@ -1,7 +1,7 @@
 diff --git a/node_modules/react-native-context-menu-view/ios/ContextMenuView.m b/node_modules/react-native-context-menu-view/ios/ContextMenuView.m
 --- a/node_modules/react-native-context-menu-view/ios/ContextMenuView.m
 +++ b/node_modules/react-native-context-menu-view/ios/ContextMenuView.m
-@@ -159,10 +159,16 @@
+@@ -159,10 +159,15 @@
  }
  
  - (UITargetedPreview *)contextMenuInteraction:(UIContextMenuInteraction *)interaction previewForHighlightingMenuWithConfiguration:(UIContextMenuConfiguration *)configuration API_AVAILABLE(ios(13.0)) {
@@ -12,7 +12,6 @@ diff --git a/node_modules/react-native-context-menu-view/ios/ContextMenuView.m b
 +    UIView *hostView = self.reactSubviews.firstObject;
 +
 +    if (!hostView.window) {
-+        // The view is no longer available; it was unmounted.
 +        return nil;
 +    }
 +
