@@ -57,18 +57,19 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 `;
 
+const STARTUP_MOVED = `    // React Native startup lives in SceneDelegate; see ios-scene-lifecycle.`;
+
 const moveStartupToSceneDelegate = (contents) => {
+  // prebuild without --clean re-runs mods, so the migration has to be idempotent.
+  if (contents.includes(STARTUP_MOVED)) {
+    return contents;
+  }
   if (!contents.includes(WINDOW_START)) {
     throw new Error(
       "ios-scene-lifecycle: AppDelegate.swift does not match the expected Expo template — re-check the scene migration before building"
     );
   }
-  return (
-    contents.replace(
-      WINDOW_START,
-      `    // React Native startup lives in SceneDelegate; see ios-scene-lifecycle.`
-    ) + SCENE_DELEGATE
-  );
+  return contents.replace(WINDOW_START, STARTUP_MOVED) + SCENE_DELEGATE;
 };
 
 const withIosSceneLifecycle = (config) => {
