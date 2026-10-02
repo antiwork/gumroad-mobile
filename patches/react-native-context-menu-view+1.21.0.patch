@@ -1,0 +1,23 @@
+diff --git a/node_modules/react-native-context-menu-view/ios/ContextMenuView.m b/node_modules/react-native-context-menu-view/ios/ContextMenuView.m
+--- a/node_modules/react-native-context-menu-view/ios/ContextMenuView.m
++++ b/node_modules/react-native-context-menu-view/ios/ContextMenuView.m
+@@ -159,10 +159,15 @@
+ }
+ 
+ - (UITargetedPreview *)contextMenuInteraction:(UIContextMenuInteraction *)interaction previewForHighlightingMenuWithConfiguration:(UIContextMenuConfiguration *)configuration API_AVAILABLE(ios(13.0)) {
+-    UIPreviewTarget* previewTarget = [[UIPreviewTarget alloc] initWithContainer:self center:self.reactSubviews.firstObject.center];
+-    
+-    
+-    return [[UITargetedPreview alloc] initWithView:self.reactSubviews.firstObject
++    UIView *hostView = self.reactSubviews.firstObject;
++
++    if (!hostView.window) {
++        return nil;
++    }
++
++    UIPreviewTarget* previewTarget = [[UIPreviewTarget alloc] initWithContainer:self center:hostView.center];
++
++    return [[UITargetedPreview alloc] initWithView:hostView
+                                         parameters:[self getPreviewParams]
+                                             target:previewTarget];
+ }
