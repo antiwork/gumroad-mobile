@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react-native";
+import { act, renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
 import * as Sentry from "@sentry/react-native";
 
@@ -182,6 +182,20 @@ describe("usePurchases library load failure reporting", () => {
 
     await waitFor(() => expect(result.current).toBeDefined());
     await waitFor(() => expect(mockRequestAPI).toHaveBeenCalled());
+    expect(captureEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not report a next-page failure as a library load failure", async () => {
+    mockRequestAPI.mockResolvedValueOnce(makeSearchResponse([{ name: "P1", url_redirect_token: "t1" }], { next: 2 }));
+    const { result } = renderHook(() => usePurchases(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.purchases).toHaveLength(1));
+
+    mockRequestAPI.mockRejectedValueOnce(abortError());
+    await act(async () => {
+      await result.current.fetchNextPage().catch(() => {});
+    });
+
+    await waitFor(() => expect(result.current.isFetchNextPageError).toBe(true));
     expect(captureEvent).not.toHaveBeenCalled();
   });
 

@@ -116,10 +116,6 @@ export const buildSearchPath = (page: number, filters: ApiFilters) => {
 export const usePurchases = (filters: ApiFilters = {}, options: { reportLoadFailure?: boolean } = {}) => {
   const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
   const reportLoadFailure = options.reportLoadFailure ?? true;
-
-  // Time each attempt so a failed library load can report how long it ran — the 30s
-  // REQUEST_TIMEOUT_MS abort is the symptom gp#3224 is about — without making the request
-  // layer carry the clock.
   const lastAttemptMs = useRef<number | null>(null);
 
   const query = useInfiniteQuery<SearchResponse, Error>({
@@ -140,13 +136,11 @@ export const usePurchases = (filters: ApiFilters = {}, options: { reportLoadFail
     placeholderData: keepPreviousData,
   });
 
-  // gp#3224: the Library screen shows a generic "Couldn't load your library" and lib/sentry.ts
-  // drops AbortError, so a failed load left no app-side trace. Report one sanitized, deduped
-  // signal per failure (reason + endpoint + elapsed, no payload) so these are visible again.
   useEffect(() => {
-    if (!reportLoadFailure || !query.isError || !query.error) return;
+    const loadedPages = query.data?.pages.length ?? 0;
+    if (!reportLoadFailure || !query.isError || !query.error || loadedPages > 0) return;
     reportLibraryLoadFailure(query.error, lastAttemptMs.current, query.failureCount);
-  }, [reportLoadFailure, query.isError, query.error, query.failureCount]);
+  }, [reportLoadFailure, query.isError, query.error, query.failureCount, query.data]);
 
   const purchases = useMemo(() => query.data?.pages.flatMap((page) => page.purchases) ?? [], [query.data]);
 
@@ -162,9 +156,6 @@ export const usePurchases = (filters: ApiFilters = {}, options: { reportLoadFail
 };
 
 export const useSellers = ({ seller, ...filtersWithoutSeller }: ApiFilters = {}) => {
-  // Silenced: the sellers query is a second `purchases` query keyed on the filters without
-  // `seller`, so it would double-report the same library load failure. Only the Library
-  // screen's primary usePurchases call reports.
   const { sellers } = usePurchases(filtersWithoutSeller, { reportLoadFailure: false });
   return sellers;
 };
