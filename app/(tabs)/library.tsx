@@ -1,3 +1,4 @@
+import { EmailUnconfirmedState } from "@/components/library/email-unconfirmed-state";
 import { LibraryFilters } from "@/components/library/library-filters";
 import { useLibraryFilters } from "@/components/library/use-library-filters";
 import {
@@ -13,6 +14,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import { isEmailUnconfirmedError } from "@/lib/email-confirmation";
 import { cn } from "@/lib/utils";
 import { StyledImage as Image } from "@/components/styled";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -145,6 +147,17 @@ export default function Index() {
   };
 
   if (query.error && purchases.length === 0) {
+    if (isEmailUnconfirmedError(query.error)) {
+      return (
+        <EmailUnconfirmedState
+          isRefreshing={query.isFetching}
+          onRefresh={() => {
+            void query.refetch();
+            void recentPurchases.refetch();
+          }}
+        />
+      );
+    }
     return (
       <Screen>
         <View className="flex-1 items-center justify-center gap-4 p-8">

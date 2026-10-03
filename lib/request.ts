@@ -35,10 +35,14 @@ export class ServerError extends Error {
 
 export class RequestError extends Error {
   statusCode: number;
-  constructor(statusCode: number, message: string) {
+  serverMessage?: string;
+  retryAfterSeconds?: number;
+  constructor(statusCode: number, message: string, serverMessage?: string, retryAfterSeconds?: number) {
     super(message);
     this.name = "RequestError";
     this.statusCode = statusCode;
+    this.serverMessage = serverMessage;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -118,6 +122,20 @@ const isRedirectToLogin = (requestedUrl: string, finalUrl: string | undefined): 
 // Android, where the XHR responseURL is always just the URL that was requested.
 const isHtmlResponse = (response: Response): boolean =>
   response.headers.get("content-type")?.toLowerCase().includes("text/html") ?? false;
+
+const MAX_SERVER_MESSAGE_LENGTH = 200;
+
+const parseErrorDetails = (text: string): { serverMessage?: string; retryAfterSeconds?: number } => {
+  try {
+    const body = JSON.parse(text);
+    return {
+      serverMessage: typeof body?.message === "string" ? body.message.slice(0, MAX_SERVER_MESSAGE_LENGTH) : undefined,
+      retryAfterSeconds: typeof body?.retry_after === "number" ? body.retry_after : undefined,
+    };
+  } catch {
+    return {};
+  }
+};
 
 export const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
@@ -215,14 +233,18 @@ const requestOnce = async <T>(
       throw new ServerError(response.status, `Request failed: ${response.status}`);
     }
     if (!response.ok) {
+      const errorText = response.status === 404 ? "" : await readBody(() => response.text());
+      const { serverMessage, retryAfterSeconds } =
+        response.status === 403 || response.status === 429 ? parseErrorDetails(errorText) : {};
       const error =
-        response.status === 403
-          ? "Access denied"
-          : response.status === 404
-            ? "Not found"
-            : (await readBody(() => response.text())).slice(0, 10000);
+        response.status === 403 ? "Access denied" : response.status === 404 ? "Not found" : errorText.slice(0, 10000);
       console.info("HTTP request", { ...details, error });
-      throw new RequestError(response.status, `Request failed: ${response.status} ${error}`);
+      throw new RequestError(
+        response.status,
+        `Request failed: ${response.status} ${error}`,
+        serverMessage,
+        retryAfterSeconds,
+      );
     }
     if (options?.skipResponseBody) {
       console.info("HTTP request", details);
