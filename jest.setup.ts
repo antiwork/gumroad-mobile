@@ -13,6 +13,7 @@ jest.mock("react-native-safe-area-context", () => ({
 jest.mock("@sentry/react-native", () => ({
   init: jest.fn(),
   captureException: jest.fn(),
+  captureEvent: jest.fn(),
   captureMessage: jest.fn(),
   setUser: jest.fn(),
   withScope: jest.fn(),

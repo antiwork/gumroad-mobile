@@ -1,8 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react-native";
 import React from "react";
+import * as Sentry from "@sentry/react-native";
 
-import { usePurchase, usePurchases } from "@/components/library/use-purchases";
+import { usePurchase, usePurchases, useSellers } from "@/components/library/use-purchases";
+
+const captureEvent = Sentry.captureEvent as jest.Mock;
 
 const mockRequestAPI = jest.fn();
 jest.mock("@/lib/request", () => ({
@@ -138,6 +141,58 @@ describe("usePurchases", () => {
 
     await waitFor(() => expect(result.current.error).toBeTruthy());
     expect(result.current.purchases).toHaveLength(0);
+  });
+});
+
+describe("usePurchases library load failure reporting", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const abortError = () => Object.assign(new Error("Aborted"), { name: "AbortError" });
+
+  it("reports a sanitized event when the library load fails", async () => {
+    mockRequestAPI.mockRejectedValue(abortError());
+    const { result } = renderHook(() => usePurchases(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await waitFor(() => expect(captureEvent).toHaveBeenCalled());
+
+    const event = captureEvent.mock.calls[0][0];
+    expect(event.message).toBe("library_load_failed");
+    expect(event.tags).toMatchObject({
+      library_load_failed: "true",
+      reason: "abort",
+      endpoint: "mobile/purchases/search",
+    });
+    expect(event.extra.failure_count).toBe(1);
+  });
+
+  it("does not report when the library loads", async () => {
+    mockRequestAPI.mockResolvedValue(makeSearchResponse([{ name: "P1", url_redirect_token: "t1" }]));
+    const { result } = renderHook(() => usePurchases(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.purchases).toHaveLength(1));
+    expect(captureEvent).not.toHaveBeenCalled();
+  });
+
+  it("stays silent for the sellers query so one failure reports once", async () => {
+    mockRequestAPI.mockRejectedValue(abortError());
+    const { result } = renderHook(() => useSellers(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current).toBeDefined());
+    await waitFor(() => expect(mockRequestAPI).toHaveBeenCalled());
+    expect(captureEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not report when the caller opts out", async () => {
+    mockRequestAPI.mockRejectedValue(abortError());
+    const { result } = renderHook(() => usePurchases({}, { reportLoadFailure: false }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(captureEvent).not.toHaveBeenCalled();
   });
 });
 

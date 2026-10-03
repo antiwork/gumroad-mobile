@@ -1,8 +1,9 @@
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
+import { reportLibraryLoadFailure } from "@/lib/library-load-report";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { InfiniteData, keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 export interface PostFile {
   id: string;
@@ -112,20 +113,40 @@ export const buildSearchPath = (page: number, filters: ApiFilters) => {
   return `mobile/purchases/search?${params.toString()}`;
 };
 
-export const usePurchases = (filters: ApiFilters = {}) => {
+export const usePurchases = (filters: ApiFilters = {}, options: { reportLoadFailure?: boolean } = {}) => {
   const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
+  const reportLoadFailure = options.reportLoadFailure ?? true;
+
+  // Time each attempt so a failed library load can report how long it ran — the 30s
+  // REQUEST_TIMEOUT_MS abort is the symptom gp#3224 is about — without making the request
+  // layer carry the clock.
+  const lastAttemptMs = useRef<number | null>(null);
 
   const query = useInfiniteQuery<SearchResponse, Error>({
     queryKey: ["purchases", filters],
-    queryFn: ({ pageParam }) =>
-      requestAPI<SearchResponse>(buildSearchPath(pageParam as number, filters), {
-        accessToken: assertDefined(accessToken),
-      }),
+    queryFn: async ({ pageParam }) => {
+      const startedAt = Date.now();
+      try {
+        return await requestAPI<SearchResponse>(buildSearchPath(pageParam as number, filters), {
+          accessToken: assertDefined(accessToken),
+        });
+      } finally {
+        lastAttemptMs.current = Date.now() - startedAt;
+      }
+    },
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.meta.pagination.next ?? undefined,
     enabled: !!accessToken,
     placeholderData: keepPreviousData,
   });
+
+  // gp#3224: the Library screen shows a generic "Couldn't load your library" and lib/sentry.ts
+  // drops AbortError, so a failed load left no app-side trace. Report one sanitized, deduped
+  // signal per failure (reason + endpoint + elapsed, no payload) so these are visible again.
+  useEffect(() => {
+    if (!reportLoadFailure || !query.isError || !query.error) return;
+    reportLibraryLoadFailure(query.error, lastAttemptMs.current, query.failureCount);
+  }, [reportLoadFailure, query.isError, query.error, query.failureCount]);
 
   const purchases = useMemo(() => query.data?.pages.flatMap((page) => page.purchases) ?? [], [query.data]);
 
@@ -141,7 +162,10 @@ export const usePurchases = (filters: ApiFilters = {}) => {
 };
 
 export const useSellers = ({ seller, ...filtersWithoutSeller }: ApiFilters = {}) => {
-  const { sellers } = usePurchases(filtersWithoutSeller);
+  // Silenced: the sellers query is a second `purchases` query keyed on the filters without
+  // `seller`, so it would double-report the same library load failure. Only the Library
+  // screen's primary usePurchases call reports.
+  const { sellers } = usePurchases(filtersWithoutSeller, { reportLoadFailure: false });
   return sellers;
 };
 
