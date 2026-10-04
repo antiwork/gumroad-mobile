@@ -1,6 +1,7 @@
 import {
   InvalidResponseError,
   request,
+  REQUEST_TIMEOUT_MS,
   RequestError,
   ServerError,
   StaleResponseError,
@@ -277,11 +278,29 @@ describe("request", () => {
       }),
     );
     const promise = request("https://api.example.com/test").catch((e) => e);
-    await jest.advanceTimersByTimeAsync(5_000);
+    await jest.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
     const error = (await promise) as RequestError;
     expect(error).toBeInstanceOf(RequestError);
     expect(error.statusCode).toBe(403);
     expect(error.serverMessage).toBeUndefined();
+  });
+
+  it("keeps the server's message when a 403 body arrives slowly", async () => {
+    const body = JSON.stringify({ success: false, message: "Please confirm your email address first." });
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        headers: headers("application/json"),
+        json: () => Promise.resolve(JSON.parse(body)),
+        text: () => new Promise((resolve) => setTimeout(() => resolve(body), 10_000)),
+      }),
+    );
+    const promise = request("https://api.example.com/test").catch((e) => e);
+    await jest.advanceTimersByTimeAsync(10_000);
+    const error = (await promise) as RequestError;
+    expect(error.statusCode).toBe(403);
+    expect(error.serverMessage).toBe("Please confirm your email address first.");
   });
 
   it("still throws the 403 error when reading the response body fails", async () => {

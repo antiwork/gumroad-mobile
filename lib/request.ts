@@ -154,7 +154,6 @@ const parseErrorDetails = (text: string): { serverMessage?: string; retryAfterSe
 };
 
 export const REQUEST_TIMEOUT_MS = 30_000;
-const ERROR_BODY_TIMEOUT_MS = 5_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 30_000;
 const SERVER_ERROR_RETRY_DELAY_MS = 2_000;
@@ -255,7 +254,7 @@ const requestOnce = async <T>(
         response.status === 404
           ? ""
           : hasErrorDetails
-            ? await readErrorBodyWithin(response, ERROR_BODY_TIMEOUT_MS)
+            ? await readErrorBodyWithin(response, REQUEST_TIMEOUT_MS)
             : await readBody(() => response.text());
       const { serverMessage, retryAfterSeconds } = hasErrorDetails ? parseErrorDetails(errorText) : {};
       const error =
