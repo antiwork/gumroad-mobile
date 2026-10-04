@@ -1,5 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import Library from "@/app/(tabs)/library";
+import { resendConfirmationEmail } from "@/lib/email-confirmation";
+import { RequestError } from "@/lib/request";
+
+jest.mock("@/lib/email-confirmation", () => {
+  const actual = jest.requireActual("@/lib/email-confirmation");
+  return { ...actual, resendConfirmationEmail: jest.fn() };
+});
+
+const mockResendConfirmationEmail = resendConfirmationEmail as jest.Mock;
 
 const imageProps: Record<string, unknown>[] = [];
 
@@ -139,6 +148,7 @@ beforeEach(() => {
   mockRefetch.mockClear();
   mockRecentRefetch.mockClear();
   mockFetchNextPage.mockClear();
+  mockResendConfirmationEmail.mockReset();
 });
 
 describe("Library image autoplay", () => {
@@ -199,5 +209,48 @@ describe("Library load error", () => {
 
     fireEvent.press(screen.getByRole("button"));
     expect(mockFetchNextPage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Library unconfirmed email", () => {
+  const unconfirmedError = () => new RequestError(403, "Request failed: 403 Access denied");
+
+  it("explains the email needs confirming instead of showing the generic connection error", () => {
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.queryByText(/Couldn't load your library/)).toBeNull();
+    expect(screen.getByText(/confirm your email address/i)).toBeTruthy();
+    expect(screen.getByText(/Resend confirmation email/)).toBeTruthy();
+  });
+
+  it("keeps the generic error for other failures", () => {
+    mockPurchasesState = { purchases: [], error: new RequestError(500, "Request failed: 500"), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText(/Couldn't load your library/)).toBeTruthy();
+    expect(screen.queryByText(/confirm your email address/i)).toBeNull();
+  });
+
+  it("sends a fresh confirmation email when the buyer taps resend", async () => {
+    mockResendConfirmationEmail.mockResolvedValue("sent");
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    fireEvent.press(screen.getByText(/Resend confirmation email/));
+
+    await waitFor(() => expect(mockResendConfirmationEmail).toHaveBeenCalledWith("test-token"));
+    expect(await screen.findByText("Confirmation email sent")).toBeTruthy();
+  });
+
+  it("does not claim success when the resend is throttled", async () => {
+    mockResendConfirmationEmail.mockResolvedValue("throttled");
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    fireEvent.press(screen.getByText(/Resend confirmation email/));
+
+    expect(await screen.findByText(/wait a minute/i)).toBeTruthy();
+    expect(screen.queryByText("Confirmation email sent")).toBeNull();
   });
 });

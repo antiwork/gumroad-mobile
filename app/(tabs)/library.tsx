@@ -13,10 +13,11 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import { isUnconfirmedEmailError, resendConfirmationEmail, UNCONFIRMED_EMAIL_MESSAGE } from "@/lib/email-confirmation";
 import { cn } from "@/lib/utils";
 import { StyledImage as Image } from "@/components/styled";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -55,7 +56,7 @@ const CarouselItem = ({ item, onPress }: { item: Purchase; onPress: () => void }
 );
 
 export default function Index() {
-  const { isLoading } = useAuth();
+  const { isLoading, accessToken } = useAuth();
   const router = useRouter();
 
   const filters = useLibraryFilters();
@@ -65,6 +66,21 @@ export default function Index() {
 
   const archivePurchase = useArchivePurchase();
   const deletePurchase = useDeletePurchase();
+
+  // Shown only when the library fetch is refused because the account's email is unconfirmed.
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "throttled" | "error">("idle");
+
+  const handleResendConfirmation = useCallback(async () => {
+    if (!accessToken || resendState === "sending") return;
+    setResendState("sending");
+    try {
+      const result = await resendConfirmationEmail(accessToken);
+      setResendState(result === "throttled" ? "throttled" : "sent");
+    } catch (e) {
+      Sentry.captureException(e);
+      setResendState("error");
+    }
+  }, [accessToken, resendState]);
 
   const handleArchive = useCallback(
     async (item: Purchase) => {
@@ -143,6 +159,41 @@ export default function Index() {
       query.fetchNextPage();
     }
   };
+
+  if (isUnconfirmedEmailError(query.error) && purchases.length === 0) {
+    return (
+      <Screen>
+        <View className="flex-1 items-center justify-center gap-4 p-8">
+          <Text className="text-center font-sans text-foreground">{UNCONFIRMED_EMAIL_MESSAGE}</Text>
+          {resendState === "throttled" ? (
+            <Text className="text-center font-sans text-sm text-muted-foreground">
+              We just sent a confirmation email. Please wait a minute before asking again.
+            </Text>
+          ) : null}
+          {resendState === "error" ? (
+            <Text className="text-center font-sans text-sm text-muted-foreground">
+              We couldn&apos;t send the email. Please try again.
+            </Text>
+          ) : null}
+          <Button
+            disabled={resendState === "sending" || resendState === "sent"}
+            onPress={() => void handleResendConfirmation()}
+          >
+            <Text>{resendState === "sent" ? "Confirmation email sent" : "Resend confirmation email"}</Text>
+          </Button>
+          <Button
+            disabled={query.isFetching}
+            onPress={() => {
+              void query.refetch();
+              void recentPurchases.refetch();
+            }}
+          >
+            <Text>Retry</Text>
+          </Button>
+        </View>
+      </Screen>
+    );
+  }
 
   if (query.error && purchases.length === 0) {
     return (
@@ -255,7 +306,12 @@ export default function Index() {
                     className={cn("flex-row items-center gap-4", isFilterLoading && "opacity-50")}
                   >
                     {item.thumbnail_url ? (
-                      <Image source={{ uri: item.thumbnail_url }} className="size-17 bg-muted" contentFit="cover" autoplay={false} />
+                      <Image
+                        source={{ uri: item.thumbnail_url }}
+                        className="size-17 bg-muted"
+                        contentFit="cover"
+                        autoplay={false}
+                      />
                     ) : (
                       <View className="size-17 items-center justify-center bg-muted">
                         <Text className="text-2xl">📦</Text>
@@ -266,7 +322,11 @@ export default function Index() {
                         {item.name}
                       </Text>
                       <View className="flex-row items-center gap-1.5">
-                        <Image source={{ uri: item.creator_profile_picture_url }} className="size-4 rounded-full" autoplay={false} />
+                        <Image
+                          source={{ uri: item.creator_profile_picture_url }}
+                          className="size-4 rounded-full"
+                          autoplay={false}
+                        />
                         <Text className="text-sm text-muted" numberOfLines={1}>
                           {item.creator_name}
                         </Text>
