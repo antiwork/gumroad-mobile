@@ -102,12 +102,13 @@ export default function Index() {
     [deletePurchase],
   );
 
+  const isEmailUnconfirmed = isEmailUnconfirmedError(query.error);
   const recentPurchases = useRecentPurchases();
   useFocusEffect(
     useCallback(() => {
-      recentPurchases.refresh();
+      if (!isEmailUnconfirmed) recentPurchases.refresh();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [recentPurchases.refresh]),
+    }, [recentPurchases.refresh, isEmailUnconfirmed]),
   );
 
   const carouselItems = useMemo(() => {
@@ -146,18 +147,19 @@ export default function Index() {
     }
   };
 
+  if (isEmailUnconfirmed) {
+    return (
+      <EmailUnconfirmedState
+        isRefreshing={query.isFetching}
+        onRefresh={() => {
+          void query.refetch();
+          void recentPurchases.refetch();
+        }}
+      />
+    );
+  }
+
   if (query.error && purchases.length === 0) {
-    if (isEmailUnconfirmedError(query.error)) {
-      return (
-        <EmailUnconfirmedState
-          isRefreshing={query.isFetching}
-          onRefresh={() => {
-            void query.refetch();
-            void recentPurchases.refetch();
-          }}
-        />
-      );
-    }
     return (
       <Screen>
         <View className="flex-1 items-center justify-center gap-4 p-8">

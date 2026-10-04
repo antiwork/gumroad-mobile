@@ -266,6 +266,39 @@ describe("request", () => {
     expect(error.serverMessage).toBeUndefined();
   });
 
+  it("still throws the 403 error when the response body never arrives", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        headers: headers("application/json"),
+        json: () => new Promise(() => {}),
+        text: () => new Promise(() => {}),
+      }),
+    );
+    const promise = request("https://api.example.com/test").catch((e) => e);
+    await jest.advanceTimersByTimeAsync(5_000);
+    const error = (await promise) as RequestError;
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.statusCode).toBe(403);
+    expect(error.serverMessage).toBeUndefined();
+  });
+
+  it("still throws the 403 error when reading the response body fails", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        headers: headers("application/json"),
+        json: () => Promise.reject(new Error("read failed")),
+        text: () => Promise.reject(new Error("read failed")),
+      }),
+    );
+    const error = (await request("https://api.example.com/test").catch((e) => e)) as RequestError;
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.statusCode).toBe(403);
+  });
+
   it("keeps the retry delay and message from a 429 JSON body", async () => {
     mockFetch.mockReturnValueOnce(
       jsonResponse({ success: false, status: "throttled", retry_after: 42, message: "Please wait." }, 429),

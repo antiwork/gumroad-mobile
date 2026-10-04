@@ -19,7 +19,10 @@ jest.mock("@/lib/auth-context", () => ({
 
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: jest.fn() }),
-  useFocusEffect: jest.fn(),
+  useFocusEffect: (callback: () => void) => {
+    const { useEffect } = require("react");
+    useEffect(callback, [callback]);
+  },
 }));
 
 jest.mock("@sentry/react-native", () => ({ captureException: jest.fn() }));
@@ -68,6 +71,7 @@ jest.mock("@/components/library/use-library-filters", () => ({
 
 const mockRefetch = jest.fn();
 const mockRecentRefetch = jest.fn();
+const mockRecentRefresh = jest.fn();
 const mockFetchNextPage = jest.fn();
 let mockPurchasesState: {
   purchases: ReturnType<typeof mockMakePurchase>[];
@@ -98,7 +102,7 @@ jest.mock("@/components/library/use-recent-products", () => ({
   useRecentPurchases: () => ({
     purchases: [],
     isLoading: false,
-    refresh: jest.fn(),
+    refresh: mockRecentRefresh,
     refetch: mockRecentRefetch,
   }),
 }));
@@ -148,6 +152,7 @@ beforeEach(() => {
   mockPurchasesState = { purchases: mockPurchases, error: null, isFetching: false };
   mockRefetch.mockClear();
   mockRecentRefetch.mockClear();
+  mockRecentRefresh.mockClear();
   mockFetchNextPage.mockClear();
 });
 
@@ -233,6 +238,21 @@ describe("Library with an unconfirmed email", () => {
     expect(screen.queryByText(/Couldn't load your library/)).toBeNull();
     expect(screen.queryByText("Retry")).toBeNull();
     expect(screen.getByText("Send the email again")).toBeTruthy();
+  });
+
+  it("asks the buyer to confirm their email even when purchases are still cached", () => {
+    mockPurchasesState = { purchases: mockPurchases, error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("Confirm your email to see your library")).toBeTruthy();
+    expect(screen.queryByText("Product 1")).toBeNull();
+  });
+
+  it("does not reload recent purchases on focus while the email is unconfirmed", () => {
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(mockRecentRefresh).not.toHaveBeenCalled();
   });
 
   it("reloads the library when the buyer says they confirmed", () => {

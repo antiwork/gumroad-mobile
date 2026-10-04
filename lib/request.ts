@@ -125,6 +125,22 @@ const isHtmlResponse = (response: Response): boolean =>
 
 const MAX_SERVER_MESSAGE_LENGTH = 200;
 
+const readErrorBodyWithin = async (response: Response, timeoutMs: number): Promise<string> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      response.text(),
+      new Promise<string>((resolve) => {
+        timer = setTimeout(() => resolve(""), timeoutMs);
+      }),
+    ]);
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 const parseErrorDetails = (text: string): { serverMessage?: string; retryAfterSeconds?: number } => {
   try {
     const body = JSON.parse(text);
@@ -138,6 +154,7 @@ const parseErrorDetails = (text: string): { serverMessage?: string; retryAfterSe
 };
 
 export const REQUEST_TIMEOUT_MS = 30_000;
+const ERROR_BODY_TIMEOUT_MS = 5_000;
 const RETRY_BASE_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 30_000;
 const SERVER_ERROR_RETRY_DELAY_MS = 2_000;
@@ -233,9 +250,14 @@ const requestOnce = async <T>(
       throw new ServerError(response.status, `Request failed: ${response.status}`);
     }
     if (!response.ok) {
-      const errorText = response.status === 404 ? "" : await readBody(() => response.text());
-      const { serverMessage, retryAfterSeconds } =
-        response.status === 403 || response.status === 429 ? parseErrorDetails(errorText) : {};
+      const hasErrorDetails = response.status === 403 || response.status === 429;
+      const errorText =
+        response.status === 404
+          ? ""
+          : hasErrorDetails
+            ? await readErrorBodyWithin(response, ERROR_BODY_TIMEOUT_MS)
+            : await readBody(() => response.text());
+      const { serverMessage, retryAfterSeconds } = hasErrorDetails ? parseErrorDetails(errorText) : {};
       const error =
         response.status === 403 ? "Access denied" : response.status === 404 ? "Not found" : errorText.slice(0, 10000);
       console.info("HTTP request", { ...details, error });
