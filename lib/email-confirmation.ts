@@ -1,10 +1,8 @@
 import { RequestError, requestAPI } from "@/lib/request";
 
-// The mobile purchases endpoints answer 403 only when the account's email is unconfirmed
-// (`Api::Mobile::PurchasesController#require_confirmed_user`, added in gumroad#8140). Every
-// other way this app can be refused — a bad mobile token, a missing or expired session —
-// comes back 401 and is handled by the auth-refresh path, so a 403 from the library means
-// exactly one thing: the buyer has to confirm their email address.
+// A 403 from the mobile purchases endpoints means the account's email is unconfirmed
+// (`Api::Mobile::PurchasesController#require_confirmed_user`); every other refusal is a 401
+// handled by the auth-refresh path.
 export const isUnconfirmedEmailError = (error: unknown): boolean =>
   error instanceof RequestError && error.statusCode === 403;
 
@@ -13,9 +11,7 @@ export const UNCONFIRMED_EMAIL_MESSAGE =
 
 export type ResendConfirmationResult = "sent" | "already_confirmed" | "throttled";
 
-// `Api::Mobile::SessionsController#resend_confirmation_email`. It answers 429 with a retry
-// window when the buyer asks again within the throttle, which is a normal outcome for a
-// double-tap, not a failure — surface it as "throttled" instead of throwing.
+// A 429 is the server's throttle window, a normal outcome for a double-tap rather than a failure.
 export const resendConfirmationEmail = async (accessToken: string): Promise<ResendConfirmationResult> => {
   try {
     const response = await requestAPI<{ status?: string }>("mobile/sessions/resend_confirmation_email", {

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import Library from "@/app/(tabs)/library";
 import { resendConfirmationEmail } from "@/lib/email-confirmation";
-import { RequestError } from "@/lib/request";
+import { RequestError, UnauthorizedError } from "@/lib/request";
 
 jest.mock("@/lib/email-confirmation", () => {
   const actual = jest.requireActual("@/lib/email-confirmation");
@@ -22,8 +22,16 @@ jest.mock("@/components/styled", () => {
   };
 });
 
+const mockRefreshToken = jest.fn();
+const mockLogout = jest.fn();
+
 jest.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ isLoading: false, accessToken: "test-token" }),
+  useAuth: () => ({
+    isLoading: false,
+    accessToken: "test-token",
+    refreshToken: mockRefreshToken,
+    logout: mockLogout,
+  }),
 }));
 
 jest.mock("expo-router", () => ({
@@ -149,6 +157,8 @@ beforeEach(() => {
   mockRecentRefetch.mockClear();
   mockFetchNextPage.mockClear();
   mockResendConfirmationEmail.mockReset();
+  mockRefreshToken.mockReset();
+  mockLogout.mockReset();
 });
 
 describe("Library image autoplay", () => {
@@ -240,7 +250,35 @@ describe("Library unconfirmed email", () => {
     fireEvent.press(screen.getByText(/Resend confirmation email/));
 
     await waitFor(() => expect(mockResendConfirmationEmail).toHaveBeenCalledWith("test-token"));
-    expect(await screen.findByText("Confirmation email sent")).toBeTruthy();
+    expect(await screen.findByText(/Confirmation email sent/)).toBeTruthy();
+  });
+
+  it("lets the buyer ask for another email after a successful send", async () => {
+    mockResendConfirmationEmail.mockResolvedValue("sent");
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    fireEvent.press(screen.getByText(/Resend confirmation email/));
+    expect(await screen.findByText(/Confirmation email sent/)).toBeTruthy();
+
+    fireEvent.press(screen.getByText(/Resend confirmation email/));
+    await waitFor(() => expect(mockResendConfirmationEmail).toHaveBeenCalledTimes(2));
+  });
+
+  it("refreshes an expired session and retries instead of reporting a send failure", async () => {
+    mockResendConfirmationEmail
+      .mockRejectedValueOnce(new UnauthorizedError("Unauthorized"))
+      .mockResolvedValueOnce("sent");
+    mockRefreshToken.mockResolvedValue("fresh-token");
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    fireEvent.press(screen.getByText(/Resend confirmation email/));
+
+    expect(await screen.findByText(/Confirmation email sent/)).toBeTruthy();
+    expect(mockRefreshToken).toHaveBeenCalledTimes(1);
+    expect(mockResendConfirmationEmail).toHaveBeenLastCalledWith("fresh-token");
+    expect(screen.queryByText(/We couldn't send the email/)).toBeNull();
   });
 
   it("does not claim success when the resend is throttled", async () => {
@@ -250,7 +288,18 @@ describe("Library unconfirmed email", () => {
 
     fireEvent.press(screen.getByText(/Resend confirmation email/));
 
-    expect(await screen.findByText(/wait a minute/i)).toBeTruthy();
-    expect(screen.queryByText("Confirmation email sent")).toBeNull();
+    expect(await screen.findByText(/try again in a minute/i)).toBeTruthy();
+    expect(screen.queryByText(/Confirmation email sent/)).toBeNull();
+  });
+
+  it("points an already-confirmed account at the retry instead of claiming an email was sent", async () => {
+    mockResendConfirmationEmail.mockResolvedValue("already_confirmed");
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    fireEvent.press(screen.getByText(/Resend confirmation email/));
+
+    expect(await screen.findByText(/already confirmed/i)).toBeTruthy();
+    expect(screen.queryByText(/Confirmation email sent/)).toBeNull();
   });
 });

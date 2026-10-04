@@ -13,7 +13,13 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
-import { isUnconfirmedEmailError, resendConfirmationEmail, UNCONFIRMED_EMAIL_MESSAGE } from "@/lib/email-confirmation";
+import { useAuthedRequest } from "@/lib/authed-request";
+import {
+  isUnconfirmedEmailError,
+  resendConfirmationEmail,
+  ResendConfirmationResult,
+  UNCONFIRMED_EMAIL_MESSAGE,
+} from "@/lib/email-confirmation";
 import { cn } from "@/lib/utils";
 import { StyledImage as Image } from "@/components/styled";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -67,20 +73,19 @@ export default function Index() {
   const archivePurchase = useArchivePurchase();
   const deletePurchase = useDeletePurchase();
 
-  // Shown only when the library fetch is refused because the account's email is unconfirmed.
-  const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "throttled" | "error">("idle");
+  const [resendState, setResendState] = useState<"idle" | "sending" | ResendConfirmationResult | "error">("idle");
+  const authedRequest = useAuthedRequest();
 
   const handleResendConfirmation = useCallback(async () => {
     if (!accessToken || resendState === "sending") return;
     setResendState("sending");
     try {
-      const result = await resendConfirmationEmail(accessToken);
-      setResendState(result === "throttled" ? "throttled" : "sent");
+      setResendState(await authedRequest((token) => resendConfirmationEmail(token)));
     } catch (e) {
       Sentry.captureException(e);
       setResendState("error");
     }
-  }, [accessToken, resendState]);
+  }, [accessToken, resendState, authedRequest]);
 
   const handleArchive = useCallback(
     async (item: Purchase) => {
@@ -165,9 +170,17 @@ export default function Index() {
       <Screen>
         <View className="flex-1 items-center justify-center gap-4 p-8">
           <Text className="text-center font-sans text-foreground">{UNCONFIRMED_EMAIL_MESSAGE}</Text>
+          {resendState === "sent" ? (
+            <Text className="text-center font-sans text-sm text-muted-foreground">Confirmation email sent.</Text>
+          ) : null}
+          {resendState === "already_confirmed" ? (
+            <Text className="text-center font-sans text-sm text-muted-foreground">
+              Your email is already confirmed. Try loading your library again.
+            </Text>
+          ) : null}
           {resendState === "throttled" ? (
             <Text className="text-center font-sans text-sm text-muted-foreground">
-              We just sent a confirmation email. Please wait a minute before asking again.
+              We can&apos;t send another confirmation email yet. Please try again in a minute.
             </Text>
           ) : null}
           {resendState === "error" ? (
@@ -175,11 +188,8 @@ export default function Index() {
               We couldn&apos;t send the email. Please try again.
             </Text>
           ) : null}
-          <Button
-            disabled={resendState === "sending" || resendState === "sent"}
-            onPress={() => void handleResendConfirmation()}
-          >
-            <Text>{resendState === "sent" ? "Confirmation email sent" : "Resend confirmation email"}</Text>
+          <Button disabled={resendState === "sending"} onPress={() => void handleResendConfirmation()}>
+            <Text>Resend confirmation email</Text>
           </Button>
           <Button
             disabled={query.isFetching}
