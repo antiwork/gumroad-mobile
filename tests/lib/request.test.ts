@@ -303,6 +303,24 @@ describe("request", () => {
     expect(error.serverMessage).toBe("Please confirm your email address first.");
   });
 
+  it("gives up on a stalled 429 body after five seconds and still throws the 429 error", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 429,
+        headers: headers("application/json"),
+        json: () => Promise.resolve({}),
+        text: () => new Promise(() => {}),
+      }),
+    );
+    const promise = request("https://api.example.com/test", { method: "POST" }).catch((e) => e);
+    await jest.advanceTimersByTimeAsync(5_000);
+    const error = (await promise) as RequestError;
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.statusCode).toBe(429);
+    expect(error.retryAfterSeconds).toBeUndefined();
+  });
+
   it("still throws the 403 error when reading the response body fails", async () => {
     mockFetch.mockReturnValueOnce(
       Promise.resolve({

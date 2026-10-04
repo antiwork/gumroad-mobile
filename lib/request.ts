@@ -124,6 +124,7 @@ const isHtmlResponse = (response: Response): boolean =>
   response.headers.get("content-type")?.toLowerCase().includes("text/html") ?? false;
 
 const MAX_SERVER_MESSAGE_LENGTH = 200;
+const THROTTLED_BODY_TIMEOUT_MS = 5_000;
 
 const readErrorBodyWithin = async (response: Response, timeoutMs: number): Promise<string> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -254,7 +255,10 @@ const requestOnce = async <T>(
         response.status === 404
           ? ""
           : hasErrorDetails
-            ? await readErrorBodyWithin(response, REQUEST_TIMEOUT_MS)
+            ? await readErrorBodyWithin(
+                response,
+                response.status === 429 ? THROTTLED_BODY_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+              )
             : await readBody(() => response.text());
       const { serverMessage, retryAfterSeconds } = hasErrorDetails ? parseErrorDetails(errorText) : {};
       const error =
