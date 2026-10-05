@@ -4,7 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Gumroad",
   slug: "gumroad",
-  version: "2026.10.04",
+  version: "2026.10.05",
   orientation: "default",
   icon: "./assets/images/icon.png",
   scheme: "gumroadmobile",
