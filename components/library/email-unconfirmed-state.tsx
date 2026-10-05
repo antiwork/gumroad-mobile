@@ -4,8 +4,10 @@ import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { View } from "react-native";
 
+const INTRO_MESSAGE = "We emailed you a confirmation link. Open it, then come back here.";
+const SENT_MESSAGE = "We sent you a new email. Check your inbox and spam folder.";
+
 const statusMessage = (state: ReturnType<typeof useResendConfirmationEmail>["state"]) => {
-  if (state === "sent") return "We sent you a new email. Check your inbox and spam folder.";
   if (state === "throttled") return "We just sent you an email. Please wait a minute before asking for another.";
   if (state === "failed") return "We couldn't send the email. Check your connection and try again.";
   return null;
@@ -18,8 +20,9 @@ export const EmailUnconfirmedState = ({
   isRefreshing: boolean;
   onRefresh: () => void;
 }) => {
-  const { resend, state, secondsLeft, isSending } = useResendConfirmationEmail(onRefresh);
+  const { resend, state, secondsLeft, hasSent, isSending } = useResendConfirmationEmail(onRefresh);
   const message = statusMessage(state);
+  const intro = hasSent ? SENT_MESSAGE : INTRO_MESSAGE;
   const resendDisabled = isSending || secondsLeft > 0;
 
   return (
@@ -28,8 +31,8 @@ export const EmailUnconfirmedState = ({
         <Text className="text-center font-sans text-lg font-bold text-foreground">
           Confirm your email to see your library
         </Text>
-        <Text className="text-center font-sans text-foreground">
-          We emailed you a confirmation link. Open it, then come back here.
+        <Text className="text-center font-sans text-foreground" accessibilityLiveRegion="polite">
+          {intro}
         </Text>
         {message ? (
           <Text className="text-center font-sans text-sm text-muted-foreground" accessibilityLiveRegion="polite">

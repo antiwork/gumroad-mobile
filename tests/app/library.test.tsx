@@ -28,7 +28,7 @@ jest.mock("expo-router", () => ({
 jest.mock("@sentry/react-native", () => ({ captureException: jest.fn() }));
 
 const mockResend = jest.fn();
-let mockResendState: { state: string; secondsLeft: number; isSending: boolean } = {
+let mockResendState: { state: string; secondsLeft: number; isSending: boolean; hasSent?: boolean } = {
   state: "idle",
   secondsLeft: 0,
   isSending: false,
@@ -273,13 +273,75 @@ describe("Library with an unconfirmed email", () => {
   });
 
   it("shows the wait time and blocks another resend during the cooldown", () => {
-    mockResendState = { state: "sent", secondsLeft: 42, isSending: false };
+    mockResendState = { state: "sent", secondsLeft: 42, isSending: false, hasSent: true };
     mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
     render(<Library />);
 
     expect(screen.getByText("We sent you a new email. Check your inbox and spam folder.")).toBeTruthy();
     fireEvent.press(screen.getByText("Send again in 42s"));
     expect(mockResend).not.toHaveBeenCalled();
+  });
+
+  it("replaces the first line with the sent message instead of showing both", () => {
+    mockResendState = { state: "sent", secondsLeft: 60, isSending: false, hasSent: true };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getAllByText(/emailed you|sent you/)).toHaveLength(1);
+    expect(screen.queryByText("We emailed you a confirmation link. Open it, then come back here.")).toBeNull();
+  });
+
+  it("keeps the sent message while a second resend is in flight", () => {
+    mockResendState = { state: "sending", secondsLeft: 0, isSending: true, hasSent: true };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("We sent you a new email. Check your inbox and spam folder.")).toBeTruthy();
+    expect(screen.queryByText("We emailed you a confirmation link. Open it, then come back here.")).toBeNull();
+  });
+
+  it("keeps the first line while the first resend is in flight", () => {
+    mockResendState = { state: "sending", secondsLeft: 0, isSending: true, hasSent: false };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("We emailed you a confirmation link. Open it, then come back here.")).toBeTruthy();
+  });
+
+  it("announces the sent message to screen readers", () => {
+    mockResendState = { state: "sent", secondsLeft: 60, isSending: false, hasSent: true };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    const sent = screen.getByText("We sent you a new email. Check your inbox and spam folder.");
+    expect(sent.props.accessibilityLiveRegion).toBe("polite");
+  });
+
+  it("keeps the sent message next to the wait message when asked again too soon", () => {
+    mockResendState = { state: "throttled", secondsLeft: 42, isSending: false, hasSent: true };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("We sent you a new email. Check your inbox and spam folder.")).toBeTruthy();
+    expect(screen.queryByText("We emailed you a confirmation link. Open it, then come back here.")).toBeNull();
+  });
+
+  it("keeps the sent message next to the failure message when a later resend fails", () => {
+    mockResendState = { state: "failed", secondsLeft: 0, isSending: false, hasSent: true };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("We sent you a new email. Check your inbox and spam folder.")).toBeTruthy();
+    expect(screen.getByText("We couldn't send the email. Check your connection and try again.")).toBeTruthy();
+  });
+
+  it("keeps the first line next to the wait message when asked too soon", () => {
+    mockResendState = { state: "throttled", secondsLeft: 42, isSending: false };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("We emailed you a confirmation link. Open it, then come back here.")).toBeTruthy();
+    expect(screen.getByText("We just sent you an email. Please wait a minute before asking for another.")).toBeTruthy();
   });
 
   it("explains a failed resend", () => {

@@ -11,6 +11,7 @@ export const useResendConfirmationEmail = (onAlreadyConfirmed: () => void) => {
   const authedRequest = useAuthedRequest();
   const [state, setState] = useState<ResendState>("idle");
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [hasSent, setHasSent] = useState(false);
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -30,6 +31,7 @@ export const useResendConfirmationEmail = (onAlreadyConfirmed: () => void) => {
         setSecondsLeft(Math.max(1, Math.ceil(result.retryAfterSeconds)));
       } else {
         setState("sent");
+        setHasSent(true);
         setSecondsLeft(SENT_COOLDOWN_SECONDS);
       }
     } catch {
@@ -37,5 +39,5 @@ export const useResendConfirmationEmail = (onAlreadyConfirmed: () => void) => {
     }
   }, [authedRequest, onAlreadyConfirmed]);
 
-  return { resend, state, secondsLeft, isSending: state === "sending" };
+  return { resend, state, secondsLeft, hasSent, isSending: state === "sending" };
 };

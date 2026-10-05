@@ -26,6 +26,33 @@ describe("useResendConfirmationEmail", () => {
     expect(result.current.secondsLeft).toBe(0);
   });
 
+  it("does not mark an email as sent after a failure", async () => {
+    mockResendConfirmationEmail.mockRejectedValue(new Error("offline"));
+    const { result } = renderHook(() => useResendConfirmationEmail(jest.fn()));
+
+    await act(async () => {
+      await result.current.resend();
+    });
+    expect(result.current.hasSent).toBe(false);
+  });
+
+  it("remembers a sent email through a later resend attempt", async () => {
+    mockResendConfirmationEmail.mockResolvedValueOnce({ status: "sent" }).mockResolvedValueOnce({
+      status: "throttled",
+      retryAfterSeconds: 5,
+    });
+    const { result } = renderHook(() => useResendConfirmationEmail(jest.fn()));
+
+    await act(async () => {
+      await result.current.resend();
+    });
+    await act(async () => {
+      await result.current.resend();
+    });
+    expect(result.current.state).toBe("throttled");
+    expect(result.current.hasSent).toBe(true);
+  });
+
   it("starts a one-minute cooldown after a sent email and counts it down", async () => {
     mockResendConfirmationEmail.mockResolvedValue({ status: "sent" });
     const { result } = renderHook(() => useResendConfirmationEmail(jest.fn()));
@@ -35,6 +62,7 @@ describe("useResendConfirmationEmail", () => {
     });
     expect(mockResendConfirmationEmail).toHaveBeenCalledWith("test-token");
     expect(result.current.state).toBe("sent");
+    expect(result.current.hasSent).toBe(true);
     expect(result.current.secondsLeft).toBe(60);
 
     for (let second = 0; second < 3; second++) {
