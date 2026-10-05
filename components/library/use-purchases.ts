@@ -1,5 +1,6 @@
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
+import { isEmailUnconfirmedError, shouldRetry } from "@/lib/email-confirmation";
 import { reportLibraryLoadFailure } from "@/lib/library-load-report";
 import { requestAPI, UnauthorizedError } from "@/lib/request";
 import { InfiniteData, keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -115,8 +116,10 @@ export const buildSearchPath = (page: number, filters: ApiFilters) => {
 
 export const usePurchases = (filters: ApiFilters = {}, options: { reportLoadFailure?: boolean } = {}) => {
   const { accessToken, logout, isLoading: isAuthLoading } = useAuth();
+  const queryClient = useQueryClient();
   const reportLoadFailure = options.reportLoadFailure ?? true;
   const lastAttemptMs = useRef<number | null>(null);
+  const defaultRetry = queryClient.getDefaultOptions().queries?.retry;
 
   const query = useInfiniteQuery<SearchResponse, Error>({
     queryKey: ["purchases", filters],
@@ -134,11 +137,13 @@ export const usePurchases = (filters: ApiFilters = {}, options: { reportLoadFail
     getNextPageParam: (lastPage) => lastPage.meta.pagination.next ?? undefined,
     enabled: !!accessToken,
     placeholderData: keepPreviousData,
+    retry: (failureCount, error) => !isEmailUnconfirmedError(error) && shouldRetry(defaultRetry, failureCount, error),
   });
 
   useEffect(() => {
     const loadedPages = query.data?.pages.length ?? 0;
     if (!reportLoadFailure || !query.isError || !query.error || loadedPages > 0) return;
+    if (isEmailUnconfirmedError(query.error)) return;
     reportLibraryLoadFailure(query.error, lastAttemptMs.current, query.failureCount);
   }, [reportLoadFailure, query.isError, query.error, query.failureCount, query.data]);
 

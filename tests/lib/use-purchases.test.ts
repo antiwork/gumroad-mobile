@@ -210,6 +210,64 @@ describe("usePurchases library load failure reporting", () => {
   });
 });
 
+describe("usePurchases unconfirmed email", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const unconfirmedError = () =>
+    Object.assign(new Error("Request failed: 403 Access denied"), {
+      name: "RequestError",
+      statusCode: 403,
+      serverMessage: "Please confirm your email address before you can see your purchases.",
+    });
+
+  const createRetryingWrapper = () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { gcTime: 0, retry: 2, retryDelay: 1 } } });
+    const RetryingWrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(QueryClientProvider, { client: queryClient }, children);
+    return RetryingWrapper;
+  };
+
+  it("does not report the expected 403 to Sentry", async () => {
+    mockRequestAPI.mockRejectedValue(unconfirmedError());
+    const { result } = renderHook(() => usePurchases(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(captureEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not retry the expected 403", async () => {
+    mockRequestAPI.mockRejectedValue(unconfirmedError());
+    const { result } = renderHook(() => usePurchases(), { wrapper: createRetryingWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockRequestAPI).toHaveBeenCalledTimes(1);
+  });
+
+  it("still retries and reports other failures", async () => {
+    mockRequestAPI.mockRejectedValue(new Error("Aborted"));
+    const { result } = renderHook(() => usePurchases(), { wrapper: createRetryingWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await waitFor(() => expect(captureEvent).toHaveBeenCalled());
+    expect(mockRequestAPI).toHaveBeenCalledTimes(3);
+  });
+
+  it("still retries and reports a 403 without the confirm-your-email message", async () => {
+    const forbidden = Object.assign(new Error("Request failed: 403 Access denied"), {
+      name: "RequestError",
+      statusCode: 403,
+    });
+    mockRequestAPI.mockRejectedValue(forbidden);
+    const { result } = renderHook(() => usePurchases(), { wrapper: createRetryingWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await waitFor(() => expect(captureEvent).toHaveBeenCalled());
+    expect(mockRequestAPI).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe("usePurchase", () => {
   beforeEach(() => {
     jest.clearAllMocks();

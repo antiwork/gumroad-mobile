@@ -19,10 +19,23 @@ jest.mock("@/lib/auth-context", () => ({
 
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: jest.fn() }),
-  useFocusEffect: jest.fn(),
+  useFocusEffect: (callback: () => void) => {
+    const { useEffect } = require("react");
+    useEffect(callback, [callback]);
+  },
 }));
 
 jest.mock("@sentry/react-native", () => ({ captureException: jest.fn() }));
+
+const mockResend = jest.fn();
+let mockResendState: { state: string; secondsLeft: number; isSending: boolean } = {
+  state: "idle",
+  secondsLeft: 0,
+  isSending: false,
+};
+jest.mock("@/components/library/use-resend-confirmation-email", () => ({
+  useResendConfirmationEmail: () => ({ resend: mockResend, ...mockResendState }),
+}));
 
 jest.mock("react-native-context-menu-view", () => {
   const { View } = require("react-native");
@@ -58,6 +71,7 @@ jest.mock("@/components/library/use-library-filters", () => ({
 
 const mockRefetch = jest.fn();
 const mockRecentRefetch = jest.fn();
+const mockRecentRefresh = jest.fn();
 const mockFetchNextPage = jest.fn();
 let mockPurchasesState: {
   purchases: ReturnType<typeof mockMakePurchase>[];
@@ -88,7 +102,7 @@ jest.mock("@/components/library/use-recent-products", () => ({
   useRecentPurchases: () => ({
     purchases: [],
     isLoading: false,
-    refresh: jest.fn(),
+    refresh: mockRecentRefresh,
     refetch: mockRecentRefetch,
   }),
 }));
@@ -138,6 +152,7 @@ beforeEach(() => {
   mockPurchasesState = { purchases: mockPurchases, error: null, isFetching: false };
   mockRefetch.mockClear();
   mockRecentRefetch.mockClear();
+  mockRecentRefresh.mockClear();
   mockFetchNextPage.mockClear();
 });
 
@@ -199,5 +214,99 @@ describe("Library load error", () => {
 
     fireEvent.press(screen.getByRole("button"));
     expect(mockFetchNextPage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Library with an unconfirmed email", () => {
+  beforeEach(() => {
+    mockResendState = { state: "idle", secondsLeft: 0, isSending: false };
+    mockResend.mockClear();
+  });
+
+  const unconfirmedError = () =>
+    Object.assign(new Error("Request failed: 403 Access denied"), {
+      name: "RequestError",
+      statusCode: 403,
+      serverMessage: "Please confirm your email address before you can see your purchases.",
+    });
+
+  it("asks the buyer to confirm their email instead of showing the generic load error", () => {
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("Confirm your email to see your library")).toBeTruthy();
+    expect(screen.queryByText(/Couldn't load your library/)).toBeNull();
+    expect(screen.queryByText("Retry")).toBeNull();
+    expect(screen.getByText("Send the email again")).toBeTruthy();
+  });
+
+  it("asks the buyer to confirm their email even when purchases are still cached", () => {
+    mockPurchasesState = { purchases: mockPurchases, error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("Confirm your email to see your library")).toBeTruthy();
+    expect(screen.queryByText("Product 1")).toBeNull();
+  });
+
+  it("does not reload recent purchases on focus while the email is unconfirmed", () => {
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(mockRecentRefresh).not.toHaveBeenCalled();
+  });
+
+  it("reloads the library when the buyer says they confirmed", () => {
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    fireEvent.press(screen.getByText("I've confirmed my email"));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    expect(mockRecentRefetch).toHaveBeenCalledTimes(1);
+  });
+  it("sends a new confirmation email when the buyer asks for one", () => {
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    fireEvent.press(screen.getByText("Send the email again"));
+    expect(mockResend).toHaveBeenCalledTimes(1);
+    expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
+  it("shows the wait time and blocks another resend during the cooldown", () => {
+    mockResendState = { state: "sent", secondsLeft: 42, isSending: false };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("We sent you a new email. Check your inbox and spam folder.")).toBeTruthy();
+    fireEvent.press(screen.getByText("Send again in 42s"));
+    expect(mockResend).not.toHaveBeenCalled();
+  });
+
+  it("explains a failed resend", () => {
+    mockResendState = { state: "failed", secondsLeft: 0, isSending: false };
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText("We couldn't send the email. Check your connection and try again.")).toBeTruthy();
+  });
+
+  it("disables the button while a reload is in flight", () => {
+    mockPurchasesState = { purchases: [], error: unconfirmedError(), isFetching: true };
+    render(<Library />);
+
+    fireEvent.press(screen.getByText("I've confirmed my email"));
+    expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the generic error and Retry for other 403 responses", () => {
+    const forbidden = Object.assign(new Error("Request failed: 403 Access denied"), {
+      name: "RequestError",
+      statusCode: 403,
+    });
+    mockPurchasesState = { purchases: [], error: forbidden, isFetching: false };
+    render(<Library />);
+
+    expect(screen.getByText(/Couldn't load your library/)).toBeTruthy();
+    expect(screen.queryByText("Confirm your email to see your library")).toBeNull();
   });
 });

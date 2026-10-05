@@ -35,10 +35,14 @@ export class ServerError extends Error {
 
 export class RequestError extends Error {
   statusCode: number;
-  constructor(statusCode: number, message: string) {
+  serverMessage?: string;
+  retryAfterSeconds?: number;
+  constructor(statusCode: number, message: string, serverMessage?: string, retryAfterSeconds?: number) {
     super(message);
     this.name = "RequestError";
     this.statusCode = statusCode;
+    this.serverMessage = serverMessage;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -118,6 +122,37 @@ const isRedirectToLogin = (requestedUrl: string, finalUrl: string | undefined): 
 // Android, where the XHR responseURL is always just the URL that was requested.
 const isHtmlResponse = (response: Response): boolean =>
   response.headers.get("content-type")?.toLowerCase().includes("text/html") ?? false;
+
+const MAX_SERVER_MESSAGE_LENGTH = 200;
+const THROTTLED_BODY_TIMEOUT_MS = 5_000;
+
+const readErrorBodyWithin = async (response: Response, timeoutMs: number): Promise<string> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      response.text(),
+      new Promise<string>((resolve) => {
+        timer = setTimeout(() => resolve(""), timeoutMs);
+      }),
+    ]);
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const parseErrorDetails = (text: string): { serverMessage?: string; retryAfterSeconds?: number } => {
+  try {
+    const body = JSON.parse(text);
+    return {
+      serverMessage: typeof body?.message === "string" ? body.message.slice(0, MAX_SERVER_MESSAGE_LENGTH) : undefined,
+      retryAfterSeconds: typeof body?.retry_after === "number" ? body.retry_after : undefined,
+    };
+  } catch {
+    return {};
+  }
+};
 
 export const REQUEST_TIMEOUT_MS = 30_000;
 const RETRY_BASE_DELAY_MS = 1_000;
@@ -215,14 +250,26 @@ const requestOnce = async <T>(
       throw new ServerError(response.status, `Request failed: ${response.status}`);
     }
     if (!response.ok) {
+      const hasErrorDetails = response.status === 403 || response.status === 429;
+      const errorText =
+        response.status === 404
+          ? ""
+          : hasErrorDetails
+            ? await readErrorBodyWithin(
+                response,
+                response.status === 429 ? THROTTLED_BODY_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+              )
+            : await readBody(() => response.text());
+      const { serverMessage, retryAfterSeconds } = hasErrorDetails ? parseErrorDetails(errorText) : {};
       const error =
-        response.status === 403
-          ? "Access denied"
-          : response.status === 404
-            ? "Not found"
-            : (await readBody(() => response.text())).slice(0, 10000);
+        response.status === 403 ? "Access denied" : response.status === 404 ? "Not found" : errorText.slice(0, 10000);
       console.info("HTTP request", { ...details, error });
-      throw new RequestError(response.status, `Request failed: ${response.status} ${error}`);
+      throw new RequestError(
+        response.status,
+        `Request failed: ${response.status} ${error}`,
+        serverMessage,
+        retryAfterSeconds,
+      );
     }
     if (options?.skipResponseBody) {
       console.info("HTTP request", details);

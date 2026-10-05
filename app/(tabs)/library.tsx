@@ -1,3 +1,4 @@
+import { EmailUnconfirmedState } from "@/components/library/email-unconfirmed-state";
 import { LibraryFilters } from "@/components/library/library-filters";
 import { useLibraryFilters } from "@/components/library/use-library-filters";
 import {
@@ -13,6 +14,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import { isEmailUnconfirmedError } from "@/lib/email-confirmation";
 import { cn } from "@/lib/utils";
 import { StyledImage as Image } from "@/components/styled";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -100,12 +102,13 @@ export default function Index() {
     [deletePurchase],
   );
 
+  const isEmailUnconfirmed = isEmailUnconfirmedError(query.error);
   const recentPurchases = useRecentPurchases();
   useFocusEffect(
     useCallback(() => {
-      recentPurchases.refresh();
+      if (!isEmailUnconfirmed) recentPurchases.refresh();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [recentPurchases.refresh]),
+    }, [recentPurchases.refresh, isEmailUnconfirmed]),
   );
 
   const carouselItems = useMemo(() => {
@@ -143,6 +146,18 @@ export default function Index() {
       query.fetchNextPage();
     }
   };
+
+  if (isEmailUnconfirmed) {
+    return (
+      <EmailUnconfirmedState
+        isRefreshing={query.isFetching}
+        onRefresh={() => {
+          void query.refetch();
+          void recentPurchases.refetch();
+        }}
+      />
+    );
+  }
 
   if (query.error && purchases.length === 0) {
     return (

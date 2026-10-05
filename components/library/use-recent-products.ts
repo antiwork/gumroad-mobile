@@ -1,5 +1,6 @@
 import { assertDefined } from "@/lib/assert";
 import { useAuth } from "@/lib/auth-context";
+import { isEmailUnconfirmedError, shouldRetry } from "@/lib/email-confirmation";
 import { requestAPI } from "@/lib/request";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
@@ -41,6 +42,8 @@ export const useAddRecentPurchase = () => {
 
 export const useRecentPurchases = () => {
   const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+  const defaultRetry = queryClient.getDefaultOptions().queries?.retry;
 
   const query = useQuery<Purchase[]>({
     queryKey: QUERY_KEY,
@@ -56,6 +59,7 @@ export const useRecentPurchases = () => {
       );
     },
     enabled: !!accessToken,
+    retry: (failureCount, error) => !isEmailUnconfirmedError(error) && shouldRetry(defaultRetry, failureCount, error),
   });
 
   return {

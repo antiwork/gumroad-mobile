@@ -1,4 +1,12 @@
-import { InvalidResponseError, request, ServerError, StaleResponseError, UnauthorizedError } from "@/lib/request";
+import {
+  InvalidResponseError,
+  request,
+  REQUEST_TIMEOUT_MS,
+  RequestError,
+  ServerError,
+  StaleResponseError,
+  UnauthorizedError,
+} from "@/lib/request";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -224,6 +232,126 @@ describe("request", () => {
       }),
     );
     await expect(request("https://api.example.com/test")).rejects.toThrow("Request failed: 403 Access denied");
+  });
+
+  it("keeps the server's JSON message on a 403 without changing the error text", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        headers: headers("application/json; charset=utf-8"),
+        json: () => Promise.resolve({ success: false, message: "Please confirm your email address first." }),
+        text: () =>
+          Promise.resolve(JSON.stringify({ success: false, message: "Please confirm your email address first." })),
+      }),
+    );
+    const error = (await request("https://api.example.com/test").catch((e) => e)) as RequestError;
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.statusCode).toBe(403);
+    expect(error.message).toBe("Request failed: 403 Access denied");
+    expect(error.serverMessage).toBe("Please confirm your email address first.");
+  });
+
+  it("leaves serverMessage empty when a 403 body is not JSON", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        headers: headers("text/html"),
+        json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+        text: () => Promise.resolve("<html>denied</html>"),
+      }),
+    );
+    const error = (await request("https://api.example.com/test").catch((e) => e)) as RequestError;
+    expect(error.statusCode).toBe(403);
+    expect(error.serverMessage).toBeUndefined();
+  });
+
+  it("still throws the 403 error when the response body never arrives", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        headers: headers("application/json"),
+        json: () => new Promise(() => {}),
+        text: () => new Promise(() => {}),
+      }),
+    );
+    const promise = request("https://api.example.com/test").catch((e) => e);
+    await jest.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+    const error = (await promise) as RequestError;
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.statusCode).toBe(403);
+    expect(error.serverMessage).toBeUndefined();
+  });
+
+  it("keeps the server's message when a 403 body arrives slowly", async () => {
+    const body = JSON.stringify({ success: false, message: "Please confirm your email address first." });
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        headers: headers("application/json"),
+        json: () => Promise.resolve(JSON.parse(body)),
+        text: () => new Promise((resolve) => setTimeout(() => resolve(body), 10_000)),
+      }),
+    );
+    const promise = request("https://api.example.com/test").catch((e) => e);
+    await jest.advanceTimersByTimeAsync(10_000);
+    const error = (await promise) as RequestError;
+    expect(error.statusCode).toBe(403);
+    expect(error.serverMessage).toBe("Please confirm your email address first.");
+  });
+
+  it("gives up on a stalled 429 body after five seconds and still throws the 429 error", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 429,
+        headers: headers("application/json"),
+        json: () => Promise.resolve({}),
+        text: () => new Promise(() => {}),
+      }),
+    );
+    const promise = request("https://api.example.com/test", { method: "POST" }).catch((e) => e);
+    await jest.advanceTimersByTimeAsync(5_000);
+    const error = (await promise) as RequestError;
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.statusCode).toBe(429);
+    expect(error.retryAfterSeconds).toBeUndefined();
+  });
+
+  it("still throws the 403 error when reading the response body fails", async () => {
+    mockFetch.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        headers: headers("application/json"),
+        json: () => Promise.reject(new Error("read failed")),
+        text: () => Promise.reject(new Error("read failed")),
+      }),
+    );
+    const error = (await request("https://api.example.com/test").catch((e) => e)) as RequestError;
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.statusCode).toBe(403);
+  });
+
+  it("keeps the retry delay and message from a 429 JSON body", async () => {
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({ success: false, status: "throttled", retry_after: 42, message: "Please wait." }, 429),
+    );
+    const error = (await request("https://api.example.com/test", { method: "POST" }).catch((e) => e)) as RequestError;
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.statusCode).toBe(429);
+    expect(error.retryAfterSeconds).toBe(42);
+    expect(error.serverMessage).toBe("Please wait.");
+  });
+
+  it("ignores a retry delay that is not a number", async () => {
+    mockFetch.mockReturnValueOnce(jsonResponse({ retry_after: "soon" }, 429));
+    const error = (await request("https://api.example.com/test", { method: "POST" }).catch((e) => e)) as RequestError;
+    expect(error.statusCode).toBe(429);
+    expect(error.retryAfterSeconds).toBeUndefined();
   });
 
   it("throws a clean error on 404 without leaking the response body", async () => {
