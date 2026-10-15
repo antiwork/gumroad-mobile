@@ -13,6 +13,7 @@ export interface PostFile {
   streaming_url?: string;
   latest_media_location?: { location: number };
   content_length?: number;
+  created_at?: string;
 }
 
 export interface Post {
