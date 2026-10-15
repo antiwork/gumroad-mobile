@@ -362,4 +362,37 @@ describe("DownloadScreen", () => {
       }),
     );
   });
+
+  it("queues the audio files oldest first while the list keeps the seller's page order", async () => {
+    mockUsePurchase.mockReturnValue({
+      ...purchaseWithMixedFiles,
+      file_data: [
+        { id: "a3", filegroup: "audio", name: "Episode 3.mp3", created_at: "2026-03-01T00:00:00.000Z" },
+        { id: "a2", filegroup: "audio", name: "Episode 2.mp3", created_at: "2026-02-01T00:00:00.000Z" },
+        { id: "a1", filegroup: "audio", name: "Episode 1.mp3", created_at: "2026-01-01T00:00:00.000Z" },
+      ],
+    });
+    render(<DownloadScreen />);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+
+    expect(screen.getAllByTestId(/^purchase-audio-file-/).map((node) => node.props.testID)).toEqual([
+      "purchase-audio-file-a3",
+      "purchase-audio-file-a2",
+      "purchase-audio-file-a1",
+    ]);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-file-a2"));
+
+    expect(mockPlayAudio).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resourceId: "a2",
+        tracks: [
+          expect.objectContaining({ resourceId: "a1", title: "Episode 1" }),
+          expect.objectContaining({ resourceId: "a2", title: "Episode 2" }),
+          expect.objectContaining({ resourceId: "a3", title: "Episode 3" }),
+        ],
+      }),
+    );
+  });
 });
