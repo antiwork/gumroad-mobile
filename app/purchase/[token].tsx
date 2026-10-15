@@ -8,7 +8,7 @@ import { Screen } from "@/components/ui/screen";
 import { useAddRecentPurchase } from "@/components/library/use-recent-products";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { assertDefined } from "@/lib/assert";
-import { orderAudioFilesChronologically } from "@/lib/audio-playlist";
+import { orderAudioFilesForPlayback } from "@/lib/audio-playlist";
 import { productFileDownloadUrl } from "@/lib/download-url";
 import { env } from "@/lib/env";
 import { cacheFileDestination, downloadFileWithRetry, fileDisplayNames, FileUnavailableError } from "@/lib/file-utils";
@@ -145,7 +145,7 @@ export default function DownloadScreen() {
       }
       const allAudioFiles = purchase?.file_data?.filter((fileData) => fileData.filegroup === "audio") ?? [];
       const audioFileNamesById = new Map(allAudioFiles.map((file, index) => [file.id, audioFileNames[index]]));
-      const allAudioTracks = orderAudioFilesChronologically(allAudioFiles).map((fileData) => ({
+      const allAudioTracks = orderAudioFilesForPlayback(allAudioFiles).map((fileData) => ({
         uri: productFileDownloadUrl(token, fileData.id),
         resourceId: fileData.id,
         title: audioFileNamesById.get(fileData.id) ?? purchase?.name,

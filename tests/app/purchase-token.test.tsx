@@ -363,7 +363,7 @@ describe("DownloadScreen", () => {
     );
   });
 
-  it("queues the audio files oldest first while the list keeps the seller's page order", async () => {
+  it("queues a newest-first catalog oldest first while the list keeps the seller's page order", async () => {
     mockUsePurchase.mockReturnValue({
       ...purchaseWithMixedFiles,
       file_data: [
@@ -394,5 +394,22 @@ describe("DownloadScreen", () => {
         ],
       }),
     );
+  });
+
+  it("keeps the seller's track order when the purchase lists its audio oldest first", async () => {
+    mockUsePurchase.mockReturnValue({
+      ...purchaseWithMixedFiles,
+      file_data: [
+        { id: "a1", filegroup: "audio", name: "Track 1.mp3", created_at: "2026-01-01T00:00:00.000Z" },
+        { id: "a2", filegroup: "audio", name: "Track 2.mp3", created_at: "2026-02-01T00:00:00.000Z" },
+        { id: "a3", filegroup: "audio", name: "Track 3.mp3", created_at: "2026-03-01T00:00:00.000Z" },
+      ],
+    });
+    render(<DownloadScreen />);
+
+    fireEvent.press(screen.getByTestId("purchase-audio-files"));
+    fireEvent.press(screen.getByTestId("purchase-audio-file-a1"));
+
+    expect(titlesFor(mockPlayAudio.mock.calls[0][0])).toEqual(["Track 1", "Track 2", "Track 3"]);
   });
 });

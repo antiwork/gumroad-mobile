@@ -1,31 +1,46 @@
-import { orderAudioFilesChronologically } from "@/lib/audio-playlist";
+import { orderAudioFilesForPlayback } from "@/lib/audio-playlist";
 
-describe("orderAudioFilesChronologically", () => {
-  it("orders files oldest first, whatever order the API sent them in", () => {
+describe("orderAudioFilesForPlayback", () => {
+  it("orders a newest-first catalog by upload time so playback runs forward", () => {
     const files = [
       { id: "c", created_at: "2026-09-28T15:33:52.000Z" },
-      { id: "a", created_at: "2019-08-08T01:01:52.000Z" },
       { id: "b", created_at: "2026-09-17T20:33:35.000Z" },
+      { id: "a", created_at: "2019-08-08T01:01:52.000Z" },
     ];
 
-    expect(orderAudioFilesChronologically(files).map((file) => file.id)).toEqual(["a", "b", "c"]);
+    expect(orderAudioFilesForPlayback(files).map((file) => file.id)).toEqual(["a", "b", "c"]);
   });
 
-  it("treats a file with no upload time as the oldest, keeping their relative order", () => {
+  it("keeps the seller's order when the layout already runs oldest first", () => {
     const files = [
-      { id: "a", created_at: "2026-01-01T00:00:00.000Z" },
+      { id: "a", created_at: "2019-08-08T01:01:52.000Z" },
       { id: "b", created_at: "2026-01-01T00:00:00.000Z" },
-      { id: "c" },
-      { id: "d" },
+      { id: "c", created_at: "2026-09-28T15:33:52.000Z" },
     ];
 
-    expect(orderAudioFilesChronologically(files).map((file) => file.id)).toEqual(["c", "d", "a", "b"]);
+    expect(orderAudioFilesForPlayback(files)).toBe(files);
+  });
+
+  it("leaves a single file and an empty list alone", () => {
+    const single = [{ id: "a", created_at: "2026-01-01T00:00:00.000Z" }];
+
+    expect(orderAudioFilesForPlayback(single)).toBe(single);
+    expect(orderAudioFilesForPlayback([])).toEqual([]);
+  });
+
+  it("treats a file with no upload time as the oldest", () => {
+    const files = [{ id: "b", created_at: "2026-01-01T00:00:00.000Z" }, { id: "a" }];
+
+    expect(orderAudioFilesForPlayback(files).map((file) => file.id)).toEqual(["a", "b"]);
   });
 
   it("leaves the caller's array untouched", () => {
-    const files = [{ id: "b", created_at: "2026-02-01T00:00:00.000Z" }, { id: "a", created_at: "2026-01-01T00:00:00.000Z" }];
+    const files = [
+      { id: "b", created_at: "2026-02-01T00:00:00.000Z" },
+      { id: "a", created_at: "2026-01-01T00:00:00.000Z" },
+    ];
 
-    orderAudioFilesChronologically(files);
+    orderAudioFilesForPlayback(files);
 
     expect(files.map((file) => file.id)).toEqual(["b", "a"]);
   });
