@@ -1,0 +1,72 @@
+appId: com.GRD.Gumroad
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Sign in with Gumroad|.*Library.*|Logout"
+    timeout: 60000
+- takeScreenshot: qa389-01-launch
+# An existing session would skip the OAuth path entirely: sign out first.
+- runFlow:
+    when:
+      visible: ".*Library.*"
+    commands:
+      - tapOn:
+          id: settings-button
+      - extendedWaitUntil:
+          visible: Logout
+          timeout: 15000
+      - takeScreenshot: qa389-02-settings
+      - tapOn: Logout
+      - extendedWaitUntil:
+          visible: Sign in with Gumroad
+          timeout: 20000
+- takeScreenshot: qa389-03-login
+- tapOn: Sign in with Gumroad
+# iOS first-run prompt for the ASWebAuthenticationSession sheet
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+- extendedWaitUntil:
+    visible: "Email|Sign up|Authorize|Use a different account|Couldn.t save your sign-in"
+    timeout: 60000
+- takeScreenshot: qa389-04-oauth
+# Browser may still hold a session from an earlier run: "Authorize" appears directly.
+- runFlow:
+    when:
+      visible: "Use a different account"
+    commands:
+      - tapOn: "Use a different account"
+- runFlow:
+    when:
+      visible: Email
+    commands:
+      - tapOn: Email
+      - inputText: ${GUMROAD_EMAIL}
+      - tapOn: Next
+      - inputText: ${GUMROAD_PASSWORD}
+      - hideKeyboard
+      - tapOn:
+          text: Never for This Website
+          optional: true
+      - tapOn:
+          text: Not Now
+          optional: true
+      - scrollUntilVisible:
+          element: "^Login$"
+      - tapOn: "^Login$"
+- extendedWaitUntil:
+    visible: "Authorize|Authentication Token|Couldn.t save your sign-in|.*Library.*"
+    timeout: 60000
+- takeScreenshot: qa389-05-post-login
+- runFlow:
+    when:
+      visible: Authorize
+    commands:
+      - tapOn: Authorize
+- extendedWaitUntil:
+    visible: "Couldn.t save your sign-in|.*Library.*|OK"
+    timeout: 60000
+- takeScreenshot: qa389-06-after-exchange
