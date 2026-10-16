@@ -140,19 +140,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const storeTokens = useCallback(async (accessToken: string, refreshToken?: string) => {
-    try {
-      await SecureStore.deleteItemAsync(accessTokenKey);
-      await SecureStore.setItemAsync(accessTokenKey, accessToken, secureStoreOptions);
-      if (refreshToken) {
-        await SecureStore.deleteItemAsync(refreshTokenKey);
-        await SecureStore.setItemAsync(refreshTokenKey, refreshToken, secureStoreOptions);
-      }
-    } catch (error) {
-      await Promise.allSettled([
-        SecureStore.deleteItemAsync(accessTokenKey),
-        SecureStore.deleteItemAsync(refreshTokenKey),
-      ]);
-      throw error;
+    await SecureStore.deleteItemAsync(accessTokenKey);
+    await SecureStore.setItemAsync(accessTokenKey, accessToken, secureStoreOptions);
+    if (refreshToken) {
+      await SecureStore.deleteItemAsync(refreshTokenKey);
+      await SecureStore.setItemAsync(refreshTokenKey, refreshToken, secureStoreOptions);
     }
     setAccessToken(accessToken);
   }, []);
@@ -172,17 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               code_verifier: authRequest.codeVerifier,
             },
           });
-          try {
-            await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
-          } catch (error) {
-            console.error("Failed to store tokens:", error);
-            Sentry.captureException(error, { tags: { auth_path: "token_storage_failed" } });
-            Alert.alert(
-              "Couldn't save your sign-in",
-              "Gumroad couldn't save your sign-in securely on this device. Please try again.",
-            );
-            return;
-          }
+          await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
         } catch (error) {
