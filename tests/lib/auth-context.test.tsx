@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/react-native";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import * as AuthSession from "expo-auth-session";
 import React from "react";
+import { Alert } from "react-native";
 
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { request } from "@/lib/request";
@@ -520,6 +521,143 @@ describe("storeTokens ACL", () => {
         "new-refresh",
         expect.objectContaining({ keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK }),
       );
+    });
+  });
+});
+
+describe("token storage failures", () => {
+  const keystoreError = new Error(
+    "An error occurred when writing to key: 'gumroad_access_token' under keychain: 'key_v1'. Caused by: Keystore key generation failed",
+  );
+  let store: Map<string, string>;
+
+  const failWritesTo = (failingKey: string) =>
+    mockSetItemAsync.mockImplementation(async (key: string, value: string) => {
+      if (key === failingKey) throw keystoreError;
+      store.set(key, value);
+    });
+
+  const failWritesAndCleanupTo = (failingKey: string) => {
+    let writeFailed = false;
+    mockSetItemAsync.mockImplementation(async (key: string, value: string) => {
+      if (key === failingKey) {
+        writeFailed = true;
+        throw keystoreError;
+      }
+      store.set(key, value);
+    });
+    mockDeleteItemAsync.mockImplementation(async (key: string) => {
+      if (writeFailed) throw new Error(`Could not delete ${key}`);
+      store.delete(key);
+    });
+  };
+
+  const renderForSuccessfulOAuth = () =>
+    renderWithProvider({
+      type: "success",
+      params: { code: "auth-code" },
+      authentication: null,
+      errorCode: null,
+      url: "",
+    } as unknown as AuthSession.AuthSessionResult);
+
+  beforeEach(() => {
+    store = new Map();
+    mockGetItemAsync.mockImplementation(async (key: string) => store.get(key) ?? null);
+    mockSetItemAsync.mockImplementation(async (key: string, value: string) => {
+      store.set(key, value);
+    });
+    mockDeleteItemAsync.mockImplementation(async (key: string) => {
+      store.delete(key);
+    });
+    jest.spyOn(Alert, "alert").mockImplementation(() => {});
+  });
+
+  it.each(["gumroad_access_token", "gumroad_refresh_token"])(
+    "keeps the user signed out across a restart and reports the failure when writing %s after sign-in fails",
+    async (failingKey) => {
+      failWritesTo(failingKey);
+      mockRequest.mockResolvedValue({ access_token: "new-access", refresh_token: "new-refresh" });
+
+      const { result, unmount } = renderForSuccessfulOAuth();
+      await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(store.size).toBe(0);
+      expect(Sentry.captureException).toHaveBeenCalledWith(keystoreError, {
+        tags: { auth_path: "token_storage_failed" },
+      });
+      expect(Alert.alert).toHaveBeenCalledWith(
+        "Couldn't save your sign-in",
+        "Gumroad couldn't save your sign-in securely on this device. Please try again.",
+      );
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+
+      unmount();
+      const { result: restarted } = renderWithProvider(null);
+      await waitFor(() => expect(restarted.current.isLoading).toBe(false));
+      expect(restarted.current.isAuthenticated).toBe(false);
+    },
+  );
+
+  it.each(["gumroad_access_token", "gumroad_refresh_token"])(
+    "rejects the refresh and leaves no stored tokens behind when writing %s fails",
+    async (failingKey) => {
+      store.set("gumroad_access_token", "old-access");
+      store.set("gumroad_refresh_token", "old-refresh");
+      mockRequest.mockResolvedValueOnce({ products: [] });
+
+      const { result, unmount } = renderWithProvider(null);
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.accessToken).toBe("old-access");
+
+      failWritesTo(failingKey);
+      mockRequest.mockResolvedValueOnce({ access_token: "new-access", refresh_token: "new-refresh" });
+      await expect(result.current.refreshToken()).rejects.toBe(keystoreError);
+
+      expect(store.size).toBe(0);
+      expect(result.current.accessToken).toBe("old-access");
+
+      unmount();
+      const { result: restarted } = renderWithProvider(null);
+      await waitFor(() => expect(restarted.current.isLoading).toBe(false));
+      expect(restarted.current.isAuthenticated).toBe(false);
+    },
+  );
+
+  describe("when the cleanup deletes also fail", () => {
+    it("reports the original write error and still shows the alert after sign-in", async () => {
+      failWritesAndCleanupTo("gumroad_refresh_token");
+      mockRequest.mockResolvedValue({ access_token: "new-access", refresh_token: "new-refresh" });
+
+      const { result } = renderForSuccessfulOAuth();
+      await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledWith(keystoreError, {
+        tags: { auth_path: "token_storage_failed" },
+      });
+      expect(Alert.alert).toHaveBeenCalledWith(
+        "Couldn't save your sign-in",
+        "Gumroad couldn't save your sign-in securely on this device. Please try again.",
+      );
+    });
+
+    it("rejects the refresh with the original write error", async () => {
+      store.set("gumroad_access_token", "old-access");
+      store.set("gumroad_refresh_token", "old-refresh");
+      mockRequest.mockResolvedValueOnce({ products: [] });
+
+      const { result } = renderWithProvider(null);
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      failWritesAndCleanupTo("gumroad_refresh_token");
+      mockRequest.mockResolvedValueOnce({ access_token: "new-access", refresh_token: "new-refresh" });
+      await expect(result.current.refreshToken()).rejects.toBe(keystoreError);
+      expect(result.current.accessToken).toBe("old-access");
     });
   });
 });
