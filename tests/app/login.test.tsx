@@ -85,7 +85,7 @@ describe("LoginScreen token storage failure", () => {
     await waitFor(() =>
       expect(Alert.alert).toHaveBeenCalledWith(
         "Couldn't save your sign-in",
-        "Gumroad couldn't save your sign-in securely on this device. Please try again.",
+        "Tap Sign in with Gumroad to try again. If it keeps happening, restart your phone and try once more.",
       ),
     );
     await waitFor(() => expect(screen.getByText("Sign in with Gumroad")).toBeTruthy());

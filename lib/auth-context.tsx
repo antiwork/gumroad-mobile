@@ -179,7 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             Sentry.captureException(error, { tags: { auth_path: "token_storage_failed" } });
             Alert.alert(
               "Couldn't save your sign-in",
-              "Gumroad couldn't save your sign-in securely on this device. Please try again.",
+              "Tap Sign in with Gumroad to try again. If it keeps happening, restart your phone and try once more.",
             );
             return;
           }

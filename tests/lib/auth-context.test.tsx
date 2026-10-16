@@ -590,7 +590,7 @@ describe("token storage failures", () => {
       });
       expect(Alert.alert).toHaveBeenCalledWith(
         "Couldn't save your sign-in",
-        "Gumroad couldn't save your sign-in securely on this device. Please try again.",
+        "Tap Sign in with Gumroad to try again. If it keeps happening, restart your phone and try once more.",
       );
       expect(mockRequest).toHaveBeenCalledTimes(1);
 
@@ -642,7 +642,7 @@ describe("token storage failures", () => {
       });
       expect(Alert.alert).toHaveBeenCalledWith(
         "Couldn't save your sign-in",
-        "Gumroad couldn't save your sign-in securely on this device. Please try again.",
+        "Tap Sign in with Gumroad to try again. If it keeps happening, restart your phone and try once more.",
       );
     });
 
