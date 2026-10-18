@@ -482,4 +482,58 @@ describe("DownloadScreen stall recovery", () => {
 
     expect(screen.queryByText("This product didn't load")).toBeNull();
   });
+
+  it("treats a load followed by an error as a failed load", () => {
+    render(<DownloadScreen />);
+    const webView = screen.getByTestId("purchase-webview");
+    fireEvent(webView, "load", { nativeEvent: { url: expectedUrl } });
+    fireEvent(webView, "error", { nativeEvent: {} });
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
+    });
+
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      "Purchase WebView stalled, reloading once",
+      expect.anything(),
+    );
+  });
+
+  it("does not start the watchdog while auth is still loading", () => {
+    mockUseAuth.mockReturnValue({ isLoading: true, accessToken: "test-access-token" });
+    render(<DownloadScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS * 3);
+    });
+
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+    expect(screen.queryByText("This product didn't load")).toBeNull();
+  });
+
+  it("remounts the WebView on each retry and re-arms the watchdog after Try again", () => {
+    render(<DownloadScreen />);
+    const first = screen.getByTestId("purchase-webview");
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
+    });
+    const second = screen.getByTestId("purchase-webview");
+    expect(second).not.toBe(first);
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
+    });
+    fireEvent.press(screen.getByText("Try again"));
+    const third = screen.getByTestId("purchase-webview");
+    expect(third).not.toBe(second);
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
+    });
+    expect(Sentry.captureMessage).toHaveBeenLastCalledWith(
+      "Purchase WebView stalled, reloading once",
+      expect.anything(),
+    );
+  });
 });

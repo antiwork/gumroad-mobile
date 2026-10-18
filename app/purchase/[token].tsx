@@ -122,7 +122,7 @@ export default function DownloadScreen() {
   }, [purchase?.unique_permalink]);
 
   useEffect(() => {
-    if (url === null || loadFailed) return;
+    if (url === null || isLoading || loadFailed) return;
     webViewLoadedRef.current = false;
     const timeout = setTimeout(() => {
       if (webViewLoadedRef.current) return;
@@ -142,7 +142,7 @@ export default function DownloadScreen() {
       setReloadCount((count) => count + 1);
     }, WEBVIEW_STALL_TIMEOUT_MS);
     return () => clearTimeout(timeout);
-  }, [url, reloadCount, loadFailed]);
+  }, [url, isLoading, reloadCount, loadFailed]);
 
   const handleWebViewRetry = useCallback(() => {
     webViewLoadedRef.current = false;
@@ -336,6 +336,7 @@ export default function DownloadScreen() {
           handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
         }}
         onError={() => {
+          webViewLoadedRef.current = false;
           handleSessionLoadError({ token: accessToken });
         }}
         onHttpError={(event: WebViewHttpErrorEvent) => {
