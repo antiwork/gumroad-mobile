@@ -3,8 +3,10 @@ import { fetchPurchaseDetail, usePurchase } from "@/components/library/use-purch
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { PurchaseAudioFiles } from "@/components/purchase-audio-files";
 import { StyledWebView } from "@/components/styled";
+import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Screen } from "@/components/ui/screen";
+import { Text } from "@/components/ui/text";
 import { useAddRecentPurchase } from "@/components/library/use-recent-products";
 import { useAudioPlayerSync } from "@/components/use-audio-player-sync";
 import { assertDefined } from "@/lib/assert";
@@ -15,6 +17,7 @@ import { cacheFileDestination, downloadFileWithRetry, fileDisplayNames, FileUnav
 import { safeOpenURL } from "@/lib/open-url";
 import { shareFile } from "@/lib/share";
 import { useWebViewSession } from "@/lib/use-webview-session";
+import { WEBVIEW_STALL_TIMEOUT_MS } from "@/lib/webview-stall";
 import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -59,6 +62,10 @@ const isWebViewInternalUrl = (url: string) => {
 export default function DownloadScreen() {
   const { token, urlRedirectExternalId } = useLocalSearchParams<{ token: string; urlRedirectExternalId: string }>();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
+  const webViewLoadedRef = useRef(false);
+  const automaticRetryUsedRef = useRef(false);
   const [tocPages, setTocPages] = useState<TocDataMessage["payload"]["pages"]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
   const purchase = usePurchase(urlRedirectExternalId);
@@ -113,6 +120,36 @@ export default function DownloadScreen() {
     if (purchase) addRecentPurchase(purchase);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purchase?.unique_permalink]);
+
+  useEffect(() => {
+    if (url === null || loadFailed) return;
+    webViewLoadedRef.current = false;
+    const timeout = setTimeout(() => {
+      if (webViewLoadedRef.current) return;
+      if (automaticRetryUsedRef.current) {
+        Sentry.captureMessage("Purchase WebView stalled after the automatic retry", {
+          level: "error",
+          tags: { screen: "purchase" },
+        });
+        setLoadFailed(true);
+        return;
+      }
+      automaticRetryUsedRef.current = true;
+      Sentry.captureMessage("Purchase WebView stalled, reloading once", {
+        level: "warning",
+        tags: { screen: "purchase" },
+      });
+      setReloadCount((count) => count + 1);
+    }, WEBVIEW_STALL_TIMEOUT_MS);
+    return () => clearTimeout(timeout);
+  }, [url, reloadCount, loadFailed]);
+
+  const handleWebViewRetry = useCallback(() => {
+    webViewLoadedRef.current = false;
+    automaticRetryUsedRef.current = false;
+    setLoadFailed(false);
+    setReloadCount((count) => count + 1);
+  }, []);
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; navigationType: string; mainDocumentURL?: string }) => {
@@ -279,7 +316,7 @@ export default function DownloadScreen() {
     <Screen>
       <Stack.Screen options={{ title: purchase?.name ?? "" }} />
       <StyledWebView
-        key={webViewKey}
+        key={`${webViewKey}-${reloadCount}`}
         ref={webViewRef}
         source={{ uri: url }}
         className="flex-1 bg-transparent"
@@ -295,6 +332,7 @@ export default function DownloadScreen() {
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onLoad={(event) => {
+          webViewLoadedRef.current = true;
           handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });
         }}
         onError={() => {
@@ -310,6 +348,17 @@ export default function DownloadScreen() {
           <LoadingSpinner size="large" />
         </View>
       )}
+      {loadFailed ? (
+        <View className="absolute inset-0 items-center justify-center gap-4 bg-body-bg p-6">
+          <Text className="text-center text-lg font-bold text-foreground">This product didn&apos;t load</Text>
+          <Text className="text-center font-sans text-muted">
+            Check your connection and try again. If it keeps happening, close and reopen the app.
+          </Text>
+          <Button onPress={handleWebViewRetry}>
+            <Text>Try again</Text>
+          </Button>
+        </View>
+      ) : null}
       {showAudioFiles ? (
         <PurchaseAudioFiles
           files={audioFiles.map((file, index) => ({ id: file.id, name: audioFileNames[index] }))}

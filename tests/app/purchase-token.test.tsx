@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { WEBVIEW_STALL_TIMEOUT_MS } from "@/lib/webview-stall";
 import * as Sentry from "@sentry/react-native";
 import { Alert as NativeAlert } from "react-native";
 
@@ -411,5 +412,74 @@ describe("DownloadScreen", () => {
     fireEvent.press(screen.getByTestId("purchase-audio-file-a1"));
 
     expect(titlesFor(mockPlayAudio.mock.calls[0][0])).toEqual(["Track 1", "Track 2", "Track 3"]);
+  });
+});
+
+describe("DownloadScreen stall recovery", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({ isLoading: false, accessToken: "test-access-token" });
+    mockUsePurchase.mockReturnValue(undefined);
+    mockPlayerState = { activeResourceId: null, isPlaying: false };
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("reloads once and then offers a retry when the WebView never finishes loading", () => {
+    render(<DownloadScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
+    });
+
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      "Purchase WebView stalled, reloading once",
+      expect.objectContaining({ tags: { screen: "purchase" } }),
+    );
+    expect(screen.queryByText("This product didn't load")).toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
+    });
+
+    expect(screen.getByText("This product didn't load")).toBeTruthy();
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      "Purchase WebView stalled after the automatic retry",
+      expect.objectContaining({ level: "error" }),
+    );
+  });
+
+  it("stays quiet when the WebView finishes loading", () => {
+    render(<DownloadScreen />);
+
+    fireEvent(screen.getByTestId("purchase-webview"), "load", {
+      nativeEvent: { url: expectedUrl },
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS * 3);
+    });
+
+    expect(screen.queryByText("This product didn't load")).toBeNull();
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it("clears the retry panel when the buyer taps Try again", () => {
+    render(<DownloadScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
+    });
+    act(() => {
+      jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
+    });
+    expect(screen.getByText("This product didn't load")).toBeTruthy();
+
+    fireEvent.press(screen.getByText("Try again"));
+
+    expect(screen.queryByText("This product didn't load")).toBeNull();
   });
 });

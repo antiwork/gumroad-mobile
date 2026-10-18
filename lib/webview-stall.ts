@@ -1,0 +1,1 @@
+export const WEBVIEW_STALL_TIMEOUT_MS = 15_000;
