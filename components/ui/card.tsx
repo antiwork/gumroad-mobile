@@ -1,8 +1,8 @@
 import { Text, TextClassContext } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
-import { View, type ViewProps } from "react-native";
+import { View, type ViewProps, type ViewInstance, type TextInstance } from "react-native";
 
-function Card({ className, ...props }: ViewProps & React.RefAttributes<View>) {
+function Card({ className, ...props }: ViewProps & React.RefAttributes<ViewInstance>) {
   return (
     <TextClassContext.Provider value="text-card-foreground">
       <View
@@ -13,23 +13,23 @@ function Card({ className, ...props }: ViewProps & React.RefAttributes<View>) {
   );
 }
 
-function CardHeader({ className, ...props }: ViewProps & React.RefAttributes<View>) {
+function CardHeader({ className, ...props }: ViewProps & React.RefAttributes<ViewInstance>) {
   return <View className={cn("flex flex-col gap-1.5 border-b border-border p-4", className)} {...props} />;
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<typeof Text> & React.RefAttributes<Text>) {
+function CardTitle({ className, ...props }: React.ComponentProps<typeof Text> & React.RefAttributes<TextInstance>) {
   return <Text role="heading" aria-level={3} className={cn("text-lg leading-tight", className)} {...props} />;
 }
 
-function CardDescription({ className, ...props }: React.ComponentProps<typeof Text> & React.RefAttributes<Text>) {
+function CardDescription({ className, ...props }: React.ComponentProps<typeof Text> & React.RefAttributes<TextInstance>) {
   return <Text className={cn("text-sm text-muted-foreground", className)} {...props} />;
 }
 
-function CardContent({ className, ...props }: ViewProps & React.RefAttributes<View>) {
+function CardContent({ className, ...props }: ViewProps & React.RefAttributes<ViewInstance>) {
   return <View className={cn("p-4", className)} {...props} />;
 }
 
-function CardFooter({ className, ...props }: ViewProps & React.RefAttributes<View>) {
+function CardFooter({ className, ...props }: ViewProps & React.RefAttributes<ViewInstance>) {
   return <View className={cn("flex flex-row items-center p-4", className)} {...props} />;
 }
 

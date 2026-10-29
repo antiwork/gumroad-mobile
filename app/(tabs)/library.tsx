@@ -299,7 +299,7 @@ export default function Index() {
                     {filters.searchText || filters.hasActiveFilters ? "No matching products" : "No purchases yet"}
                   </Text>
                 </View>
-              ) : null
+              ) : undefined
             }
             ListFooterComponent={
               query.isFetchingNextPage ? (
@@ -313,7 +313,7 @@ export default function Index() {
                     <Text>Retry</Text>
                   </Button>
                 </View>
-              ) : null
+              ) : undefined
             }
           />
         )}

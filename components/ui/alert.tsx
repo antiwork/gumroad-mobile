@@ -2,7 +2,7 @@ import { Text, TextClassContext } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
-import { View, type ViewProps } from "react-native";
+import { View, type ViewProps, type ViewInstance, type TextInstance } from "react-native";
 
 const alertVariants = cva("relative w-full rounded-lg border px-4 py-3", {
   variants: {
@@ -37,7 +37,7 @@ function Alert({
   icon,
   ...props
 }: ViewProps &
-  React.RefAttributes<View> &
+  React.RefAttributes<ViewInstance> &
   VariantProps<typeof alertVariants> & {
     icon: React.ReactNode;
   }) {
@@ -51,11 +51,11 @@ function Alert({
   );
 }
 
-function AlertTitle({ className, ...props }: React.ComponentProps<typeof Text> & React.RefAttributes<Text>) {
+function AlertTitle({ className, ...props }: React.ComponentProps<typeof Text> & React.RefAttributes<TextInstance>) {
   return <Text className={cn("ml-0.5 pl-6 font-medium", className)} {...props} />;
 }
 
-function AlertDescription({ className, ...props }: React.ComponentProps<typeof Text> & React.RefAttributes<Text>) {
+function AlertDescription({ className, ...props }: React.ComponentProps<typeof Text> & React.RefAttributes<TextInstance>) {
   return <Text className={cn("ml-0.5 pl-6 text-sm leading-relaxed", className)} {...props} />;
 }
 

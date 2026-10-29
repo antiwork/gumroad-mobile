@@ -1,0 +1,185 @@
+diff --git a/node_modules/react-native-pdf/android/src/main/java/com/github/barteksc/pdfviewer/RenderingDrain.java b/node_modules/react-native-pdf/android/src/main/java/com/github/barteksc/pdfviewer/RenderingDrain.java
+new file mode 100644
+index 0000000..a4879b5
+--- /dev/null
++++ b/node_modules/react-native-pdf/android/src/main/java/com/github/barteksc/pdfviewer/RenderingDrain.java
+@@ -0,0 +1,45 @@
++package com.github.barteksc.pdfviewer;
++
++import java.util.concurrent.CountDownLatch;
++
++public final class RenderingDrain {
++    private RenderingDrain() {}
++
++    public static void stopAndWait(PDFView view) {
++        RenderingHandler handler = view.renderingHandler;
++        if (handler == null) {
++            return;
++        }
++
++        Thread renderer = handler.getLooper().getThread();
++        if (renderer == Thread.currentThread()) {
++            throw new IllegalStateException("Cannot recycle a PDF from its rendering thread");
++        }
++
++        handler.stop();
++        handler.removeMessages(RenderingHandler.MSG_RENDER_TASK);
++        CountDownLatch drained = new CountDownLatch(1);
++        boolean posted = handler.post(drained::countDown);
++        boolean interrupted = false;
++        try {
++            while (true) {
++                try {
++                    // Removing queued work cannot stop a native render already using the document.
++                    // Never close on a timeout or interrupt while that render can still be running.
++                    if (posted) {
++                        drained.await();
++                    } else {
++                        renderer.join();
++                    }
++                    return;
++                } catch (InterruptedException exception) {
++                    interrupted = true;
++                }
++            }
++        } finally {
++            if (interrupted) {
++                Thread.currentThread().interrupt();
++            }
++        }
++    }
++}
+diff --git a/node_modules/react-native-pdf/android/build.gradle b/node_modules/react-native-pdf/android/build.gradle
+index 0000000..0000000 100644
+--- a/node_modules/react-native-pdf/android/build.gradle
++++ b/node_modules/react-native-pdf/android/build.gradle
+@@ -143,6 +143,6 @@ dependencies {
+     // The repo from zacharee is based on PdfiumAndroidKt, a much newer fork of PdfiumAndroid, with better maintenance and updated native libraries.
+     implementation 'com.github.zacharee:AndroidPdfViewer:4.0.1'
+     // Depend on PdfiumAndroidKt directly so this can be updated independently of AndroidPdfViewer as updates are provided.
+-    implementation 'io.legere:pdfiumandroid:1.0.32'
++    implementation 'io.legere:pdfiumandroid:1.0.34'
+     implementation 'com.google.code.gson:gson:2.13.2'
+ }
+diff --git a/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java b/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
+index e9a1d16..af6fcec 100644
+--- a/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
++++ b/node_modules/react-native-pdf/android/src/main/java/org/wonday/pdf/PdfView.java
+@@ -99,6 +99,12 @@ public class PdfView extends PDFView implements OnPageChangeListener,OnLoadCompl
+         ConfigKt.setPdfiumConfig(new Config(new DefaultLogger(), AlreadyClosedBehavior.IGNORE));
+     }
+
++    @Override
++    public void recycle() {
++        com.github.barteksc.pdfviewer.RenderingDrain.stopAndWait(this);
++        super.recycle();
++    }
++
+     @Override
+     public void onPageChanged(int page, int numberOfPages) {
+         // pdf lib page start from 0, convert it to our page (start from 1)
+diff --git a/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm b/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
+index de46c98..ddc97f2 100644
+--- a/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
++++ b/node_modules/react-native-pdf/ios/RNPDFPdf/RNPDFPdfView.mm
+@@ -390,7 +390,11 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+                     return;
+                 }
+ 
+-                _pdfView.document = _pdfDocument;
++                @try {
++                    _pdfView.document = _pdfDocument;
++                } @catch (NSException *exception) {
++                    NSLog(@"[RNPDFPdfView] Exception setting PDF document: %@", exception);
++                }
+             } else {
+ 
+                 [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"error|Load pdf failed. path=%s",_path.UTF8String]]];
+@@ -540,13 +544,17 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+             PDFPage *pdfPage = [_pdfDocument pageAtIndex:_page-1];
+             if (pdfPage && _page == 1) {
+                 dispatch_async(dispatch_get_main_queue(), ^{
+-                    [self->_pdfView goToFirstPage:nil];
+-                    for (UIView *subview in self->_pdfView.subviews) {
+-                        if ([subview isKindOfClass:[UIScrollView class]]) {
+-                            UIScrollView *scrollView = (UIScrollView *)subview;
+-                            [scrollView setContentOffset:CGPointMake(0, 0) animated:NO];
+-                            break;
++                    @try {
++                        [self->_pdfView goToFirstPage:nil];
++                        for (UIView *subview in self->_pdfView.subviews) {
++                            if ([subview isKindOfClass:[UIScrollView class]]) {
++                                UIScrollView *scrollView = (UIScrollView *)subview;
++                                [scrollView setContentOffset:CGPointMake(0, 0) animated:NO];
++                                break;
++                            }
+                         }
++                    } @catch (NSException *exception) {
++                        NSLog(@"[RNPDFPdfView] Exception navigating to first page: %@", exception);
+                     }
+                 });
+             } else if (pdfPage) {
+@@ -559,8 +567,12 @@ - (void)didSetProps:(NSArray<NSString *> *)changedProps
+ 
+                 CGPoint pointLeftTop = CGPointMake(0, pdfPageRect.size.height);
+                 PDFDestination *pdfDest = [[PDFDestination alloc] initWithPage:pdfPage atPoint:pointLeftTop];
+-                [_pdfView goToDestination:pdfDest];
+-                _pdfView.scaleFactor = _fixScaleFactor*_scale;
++                @try {
++                    [_pdfView goToDestination:pdfDest];
++                    _pdfView.scaleFactor = _fixScaleFactor*_scale;
++                } @catch (NSException *exception) {
++                    NSLog(@"[RNPDFPdfView] Exception navigating to page: %@", exception);
++                }
+             }
+         }
+ 
+@@ -620,15 +632,19 @@ - (void)dealloc{
+ - (void)onDocumentChanged:(NSNotification *)noti
+ {
+ 
+-    if (_pdfDocument) {
++    @try {
++        if (_pdfDocument) {
+ 
+-        unsigned long numberOfPages = _pdfDocument.pageCount;
+-        PDFPage *page = [_pdfDocument pageAtIndex:_pdfDocument.pageCount-1];
+-        CGSize pageSize = [_pdfView rowSizeForPage:page];
+-        NSString *jsonString = [self getTableContents];
++            unsigned long numberOfPages = _pdfDocument.pageCount;
++            PDFPage *page = [_pdfDocument pageAtIndex:_pdfDocument.pageCount-1];
++            CGSize pageSize = [_pdfView rowSizeForPage:page];
++            NSString *jsonString = [self getTableContents];
+ 
+-        [self notifyOnChangeWithMessage:
+-         [[NSString alloc] initWithString:[NSString stringWithFormat:@"loadComplete|%lu|%f|%f|%@", numberOfPages, pageSize.width, pageSize.height,jsonString]]];
++            [self notifyOnChangeWithMessage:
++             [[NSString alloc] initWithString:[NSString stringWithFormat:@"loadComplete|%lu|%f|%f|%@", numberOfPages, pageSize.width, pageSize.height,jsonString]]];
++        }
++    } @catch (NSException *exception) {
++        NSLog(@"[RNPDFPdfView] Exception in onDocumentChanged: %@", exception);
+     }
+ 
+ }
+@@ -722,12 +738,16 @@ -(NSString *) getTableContents
+ - (void)onPageChanged:(NSNotification *)noti
+ {
+ 
+-    if (_pdfDocument) {
+-        PDFPage *currentPage = _pdfView.currentPage;
+-        unsigned long page = [_pdfDocument indexForPage:currentPage];
+-        unsigned long numberOfPages = _pdfDocument.pageCount;
++    @try {
++        if (_pdfDocument) {
++            PDFPage *currentPage = _pdfView.currentPage;
++            unsigned long page = [_pdfDocument indexForPage:currentPage];
++            unsigned long numberOfPages = _pdfDocument.pageCount;
+ 
+-        [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"pageChanged|%lu|%lu", page+1, numberOfPages]]];
++            [self notifyOnChangeWithMessage:[[NSString alloc] initWithString:[NSString stringWithFormat:@"pageChanged|%lu|%lu", page+1, numberOfPages]]];
++        }
++    } @catch (NSException *exception) {
++        NSLog(@"[RNPDFPdfView] Exception in onPageChanged: %@", exception);
+     }
+ 
+ }
