@@ -29,7 +29,7 @@ jest.mock("@/lib/request", () => {
   return {
     request: jest.fn(),
     requestAPI: jest.fn(),
-    isInvalidGrantError: () => false,
+    isInvalidGrantError: (error: unknown) => error instanceof Error && error.message.includes("invalid_grant"),
     UnauthorizedError,
     SessionExpiredError,
     KeychainUnavailableError,
@@ -439,5 +439,161 @@ describe("account session consistency", () => {
     expect(result.current.activeAccountId).toBe("brand");
     expect(store.get("gumroad_access_token")).toBe("brand-access");
     expect(store.get("gumroad_refresh_token")).toBe("brand-refresh");
+  });
+});
+
+describe("account snapshot storage failures", () => {
+  const snapshotWithMember = (accessToken: string, refreshToken: string) =>
+    JSON.stringify({
+      accounts: [storedAccount("member", "Member", accessToken, refreshToken)],
+      activeAccountId: "member",
+      ownAccountId: "member",
+    });
+
+  it("stays signed out on launch when only the account snapshot holds tokens", async () => {
+    store.set("gumroad_accounts", snapshotWithMember("member-access", "member-refresh"));
+
+    const { result } = renderAuth();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.accessToken).toBeNull();
+    expect(store.has("gumroad_access_token")).toBe(false);
+    expect(store.has("gumroad_accounts")).toBe(false);
+  });
+
+  it("reports a failed account snapshot delete on logout and stays signed out on the next launch", async () => {
+    seedStore();
+    mockRequestAPI.mockResolvedValue({
+      accounts: [apiAccount("member", "Member", true), apiAccount("brand", "Brand", false)],
+    });
+    const { result, unmount } = renderAuth();
+    await waitFor(() => expect(storedAccounts()).toHaveLength(2));
+    const deleteError = new Error("Keychain delete failed");
+    (SecureStore.deleteItemAsync as jest.Mock).mockImplementation(async (key: string) => {
+      if (key === "gumroad_accounts") throw deleteError;
+      store.delete(key);
+    });
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(result.current.accessToken).toBeNull();
+    expect(store.has("gumroad_accounts")).toBe(true);
+    expect(Sentry.captureException).toHaveBeenCalledWith(deleteError);
+    unmount();
+
+    const relaunched = renderAuth();
+
+    await waitFor(() => expect(relaunched.result.current.isLoading).toBe(false));
+    expect(relaunched.result.current.isAuthenticated).toBe(false);
+    expect(store.has("gumroad_access_token")).toBe(false);
+  });
+
+  it("keeps newer token items on launch when the account snapshot could not be updated", async () => {
+    seedStore();
+    store.set("gumroad_accounts", snapshotWithMember("member-access", "member-refresh"));
+    mockRequestAPI.mockReturnValue(new Promise(() => {}));
+    mockRequest.mockImplementation(async (url: string) =>
+      url.includes("/oauth/token")
+        ? { access_token: "member-access-2", refresh_token: "member-refresh-2" }
+        : { products: [{ id: "p" }] },
+    );
+    const { result, unmount } = renderAuth();
+    await waitFor(() => expect(result.current.accessToken).toBe("member-access"));
+    const writeError = new Error("Keychain write failed");
+    (SecureStore.setItemAsync as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      if (key === "gumroad_accounts") throw writeError;
+      store.set(key, value);
+    });
+    (SecureStore.deleteItemAsync as jest.Mock).mockImplementation(async (key: string) => {
+      if (key === "gumroad_accounts") throw writeError;
+      store.delete(key);
+    });
+
+    await act(async () => {
+      await result.current.refreshToken();
+    });
+
+    expect(store.get("gumroad_access_token")).toBe("member-access-2");
+    expect(storedAccounts()).toEqual([expect.objectContaining({ accessToken: "member-access" })]);
+    expect(Sentry.captureException).toHaveBeenCalledWith(writeError);
+    unmount();
+
+    const relaunched = renderAuth();
+
+    await waitFor(() => expect(relaunched.result.current.isLoading).toBe(false));
+    expect(relaunched.result.current.accessToken).toBe("member-access-2");
+    expect(store.get("gumroad_access_token")).toBe("member-access-2");
+    expect(store.get("gumroad_refresh_token")).toBe("member-refresh-2");
+  });
+});
+
+describe("losing access to a brand account", () => {
+  const invalidGrant = () => new Error('Request failed: 400 {"error":"invalid_grant"}');
+
+  const switchToBrand = async () => {
+    seedStore();
+    mockRequestAPI.mockImplementation(async (_path: string, options: { method?: string; accessToken: string }) =>
+      options.method === "POST" ? switchResponse : accountsFor(options.accessToken),
+    );
+    const rendered = renderAuth();
+    await waitFor(() => expect(rendered.result.current.accounts).toHaveLength(2));
+    await act(async () => {
+      await rendered.result.current.switchAccount("brand");
+    });
+    await waitFor(() => expect(storedSnapshot().ownAccountId).toBe("member"));
+    jest.clearAllMocks();
+    return rendered;
+  };
+
+  const mockRefreshGrants = (memberGrant: () => Promise<unknown>) =>
+    mockRequest.mockImplementation(async (url: string, options: { data?: { refresh_token?: string } }) => {
+      if (!url.includes("/oauth/token")) return { products: [{ id: "p" }] };
+      if (options.data?.refresh_token === "member-refresh") return memberGrant();
+      throw invalidGrant();
+    });
+
+  it("switches back to the member's own account when the brand's refresh token is revoked", async () => {
+    const { result } = await switchToBrand();
+    mockRefreshGrants(async () => ({ access_token: "member-access-2", refresh_token: "member-refresh-2" }));
+
+    let refreshedToken = "";
+    await act(async () => {
+      refreshedToken = await result.current.refreshToken();
+    });
+
+    expect(refreshedToken).toBe("member-access-2");
+    expect(result.current.accessToken).toBe("member-access-2");
+    expect(result.current.activeAccountId).toBe("member");
+    expect(result.current.accounts.map((account) => account.accountId)).toEqual(["member"]);
+    expect(store.get("gumroad_access_token")).toBe("member-access-2");
+    expect(store.get("gumroad_refresh_token")).toBe("member-refresh-2");
+    expect(storedSnapshot()).toEqual({
+      accounts: [expect.objectContaining({ accountId: "member", accessToken: "member-access-2" })],
+      activeAccountId: "member",
+      ownAccountId: "member",
+    });
+    expect(queryClient.clear).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
+    expect(Alert.alert).toHaveBeenCalledWith("You no longer have access to Brand.");
+  });
+
+  it("reports an expired session when the member's own refresh token is also revoked", async () => {
+    const { SessionExpiredError } = jest.requireMock("@/lib/request");
+    const { result } = await switchToBrand();
+    mockRefreshGrants(async () => {
+      throw invalidGrant();
+    });
+
+    await act(async () => {
+      await expect(result.current.refreshToken()).rejects.toBeInstanceOf(SessionExpiredError);
+    });
+
+    expect(result.current.activeAccountId).toBe("brand");
+    expect(store.get("gumroad_access_token")).toBe("brand-access");
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
   });
 });

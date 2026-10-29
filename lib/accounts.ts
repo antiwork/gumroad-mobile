@@ -16,6 +16,7 @@ export interface StoredAccount extends AccountProfile {
 export interface AccountsState {
   accounts: StoredAccount[];
   activeAccountId: string | null;
+  ownAccountId: string | null;
 }
 
 interface ApiAccount {
@@ -56,7 +57,7 @@ const isStoredAccount = (value: unknown): value is StoredAccount =>
   typeof (value as StoredAccount).accountId === "string" &&
   typeof (value as StoredAccount).name === "string";
 
-const emptyAccountsState: AccountsState = { accounts: [], activeAccountId: null };
+const emptyAccountsState: AccountsState = { accounts: [], activeAccountId: null, ownAccountId: null };
 
 const parseAccountsState = (raw: string | null): AccountsState => {
   if (!raw) return emptyAccountsState;
@@ -64,10 +65,13 @@ const parseAccountsState = (raw: string | null): AccountsState => {
     const parsed: unknown = JSON.parse(raw);
     const snapshot = typeof parsed === "object" && parsed !== null ? (parsed as Partial<AccountsState>) : {};
     const accounts = Array.isArray(snapshot.accounts) ? snapshot.accounts.filter(isStoredAccount) : [];
-    const activeAccountId = accounts.some((account) => account.accountId === snapshot.activeAccountId)
-      ? (snapshot.activeAccountId ?? null)
-      : null;
-    return { accounts, activeAccountId };
+    const storedAccountId = (accountId: unknown) =>
+      typeof accountId === "string" && accounts.some((account) => account.accountId === accountId) ? accountId : null;
+    return {
+      accounts,
+      activeAccountId: storedAccountId(snapshot.activeAccountId),
+      ownAccountId: storedAccountId(snapshot.ownAccountId),
+    };
   } catch {
     return emptyAccountsState;
   }
@@ -76,13 +80,15 @@ const parseAccountsState = (raw: string | null): AccountsState => {
 export const loadAccounts = async (): Promise<AccountsState> =>
   parseAccountsState(await SecureStore.getItemAsync(accountsKey));
 
-export const saveAccounts = async ({ accounts, activeAccountId }: AccountsState) => {
-  await SecureStore.setItemAsync(accountsKey, JSON.stringify({ accounts, activeAccountId }), secureStoreOptions);
+export const saveAccounts = async ({ accounts, activeAccountId, ownAccountId }: AccountsState) => {
+  await SecureStore.setItemAsync(
+    accountsKey,
+    JSON.stringify({ accounts, activeAccountId, ownAccountId }),
+    secureStoreOptions,
+  );
 };
 
-export const clearAccounts = async () => {
-  await SecureStore.deleteItemAsync(accountsKey).catch(() => undefined);
-};
+export const clearAccounts = () => SecureStore.deleteItemAsync(accountsKey);
 
 export const findAccount = (state: AccountsState, accountId: string | null) =>
   state.accounts.find((account) => account.accountId === accountId);
@@ -107,6 +113,9 @@ export const mergeServerAccounts = (
 ): AccountsState => {
   const serverActive = serverAccounts.find((account) => account.is_active);
   const activeAccountId = serverActive?.id ?? state.activeAccountId;
+  const ownAccountId =
+    state.ownAccountId ??
+    (state.activeAccountId === null && serverAccounts[0]?.is_active ? serverAccounts[0].id : null);
   const accounts = serverAccounts.map((serverAccount): StoredAccount => {
     const stored = findAccount(state, serverAccount.id);
     const isActive = serverAccount.id === activeAccountId;
@@ -116,7 +125,7 @@ export const mergeServerAccounts = (
       refreshToken: isActive ? activeTokens.refreshToken : (stored?.refreshToken ?? null),
     };
   });
-  return { accounts, activeAccountId };
+  return { accounts, activeAccountId, ownAccountId };
 };
 
 export const fetchAccounts = async (accessToken: string) =>

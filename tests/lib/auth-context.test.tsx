@@ -359,7 +359,8 @@ describe("refreshToken", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await expect(result.current.refreshToken()).rejects.toThrow("Network error");
-    expect(mockDeleteItemAsync).not.toHaveBeenCalled();
+    expect(mockDeleteItemAsync).not.toHaveBeenCalledWith("gumroad_access_token");
+    expect(mockDeleteItemAsync).not.toHaveBeenCalledWith("gumroad_refresh_token");
   });
 
   it("dedupes concurrent calls into a single network request", async () => {

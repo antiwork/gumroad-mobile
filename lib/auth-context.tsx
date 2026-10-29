@@ -12,6 +12,7 @@ import {
   SwitchAccountResponse,
   withAccountTokens,
 } from "@/lib/accounts";
+import { useRefToLatest } from "@/components/use-ref-to-latest";
 import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
@@ -108,13 +109,29 @@ const secureStoreOptions: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
 };
 
-const emptyAccountsState: AccountsState = { accounts: [], activeAccountId: null };
+const emptyAccountsState: AccountsState = { accounts: [], activeAccountId: null, ownAccountId: null };
 
 const isKeychainUnavailableError = (error: unknown): boolean =>
   error instanceof Error &&
   (error.message.includes("User interaction is not allowed") || error.message.includes("No keychain is available"));
 
+const reportAccountsStorageError = (error: unknown) => {
+  if (!isKeychainUnavailableError(error)) Sentry.captureException(error);
+};
+
 type SessionTokens = { accessToken: string; refreshToken?: string | null };
+
+type TokenResponse = { access_token: string; refresh_token?: string };
+
+const requestRefreshGrant = (refreshToken: string) =>
+  request<TokenResponse>(tokenEndpoint, {
+    method: "POST",
+    data: {
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
+    },
+  });
 
 const writeTokens = async ({ accessToken, refreshToken }: SessionTokens) => {
   try {
@@ -134,8 +151,9 @@ const writeTokens = async ({ accessToken, refreshToken }: SessionTokens) => {
 };
 
 const persistSession = async (state: AccountsState, tokens: SessionTokens) => {
-  if (state.activeAccountId) await saveAccounts(state).catch(clearAccounts);
-  else await clearAccounts();
+  await (state.activeAccountId ? saveAccounts(state).catch(clearAccounts) : clearAccounts()).catch(
+    reportAccountsStorageError,
+  );
   await writeTokens(tokens);
 };
 
@@ -151,6 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const sessionRef = useRef(0);
   const storageQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const router = useRouter();
+  const routerRef = useRefToLatest(router);
 
   const withStorageLock = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
     const run = storageQueueRef.current.then(task);
@@ -178,6 +197,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [applyAccountsState, withStorageLock],
   );
 
+  const readCurrentAccessToken = useCallback(async () => {
+    const currentAccessToken = await withStorageLock(() => SecureStore.getItemAsync(accessTokenKey));
+    if (!currentAccessToken) throw new SessionExpiredError("Signed out while the token was refreshing");
+    return currentAccessToken;
+  }, [withStorageLock]);
+
+  const restoreOwnAccount = useCallback(
+    async (session: number): Promise<string | null> => {
+      const state = accountsStateRef.current;
+      const ownAccount = findAccount(state, state.ownAccountId);
+      const lostAccount = findAccount(state, state.activeAccountId);
+      if (!ownAccount?.refreshToken || !lostAccount || lostAccount === ownAccount) return null;
+
+      let tokenResponse: TokenResponse;
+      try {
+        tokenResponse = await requestRefreshGrant(ownAccount.refreshToken);
+      } catch (error) {
+        if (isInvalidGrantError(error)) return null;
+        throw error;
+      }
+      const tokens = { accessToken: tokenResponse.access_token, refreshToken: tokenResponse.refresh_token };
+
+      const restoredSession = await withStorageLock(async () => {
+        if (sessionRef.current !== session) return null;
+        const current = accountsStateRef.current;
+        const nextState = withAccountTokens(
+          {
+            ...current,
+            accounts: current.accounts.filter((account) => account.accountId !== lostAccount.accountId),
+            activeAccountId: ownAccount.accountId,
+          },
+          ownAccount.accountId,
+          tokens,
+        );
+        await persistSession(nextState, tokens);
+        if (sessionRef.current !== session) return null;
+        sessionRef.current += 1;
+        applyAccountsState(nextState);
+        setAccessToken(tokens.accessToken);
+        return sessionRef.current;
+      });
+      if (restoredSession === null) return readCurrentAccessToken();
+
+      await clearSavedTab();
+      queryClient.clear();
+      if (sessionRef.current === restoredSession) {
+        routerRef.current.replace("/(tabs)/dashboard");
+        Alert.alert(`You no longer have access to ${lostAccount.name}.`);
+      }
+      void fetchCreatorStatus(tokens.accessToken).then((creatorStatus) => {
+        if (sessionRef.current === restoredSession) setIsCreator(creatorStatus);
+      });
+      return tokens.accessToken;
+    },
+    [applyAccountsState, readCurrentAccessToken, routerRef, withStorageLock],
+  );
+
   const refreshTokenFn = useCallback(async (): Promise<string> => {
     const session = sessionRef.current;
     if (inflightRefresh.current?.session === session) return inflightRefresh.current.promise;
@@ -193,27 +269,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         if (!storedRefreshToken) throw new SessionExpiredError("No refresh token available");
 
-        let tokenResponse: { access_token: string; refresh_token?: string };
+        let tokenResponse: TokenResponse;
         try {
-          tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
-            method: "POST",
-            data: {
-              grant_type: "refresh_token",
-              refresh_token: storedRefreshToken,
-              client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-            },
-          });
+          tokenResponse = await requestRefreshGrant(storedRefreshToken);
         } catch (requestError) {
           if (isInvalidGrantError(requestError)) {
+            const ownAccessToken = await restoreOwnAccount(session);
+            if (ownAccessToken) return ownAccessToken;
             throw new SessionExpiredError("Refresh token is invalid or expired");
           }
           throw requestError;
         }
         const tokens = { accessToken: tokenResponse.access_token, refreshToken: tokenResponse.refresh_token };
         if (await commitTokens(session, tokens)) return tokenResponse.access_token;
-        const currentAccessToken = await withStorageLock(() => SecureStore.getItemAsync(accessTokenKey));
-        if (!currentAccessToken) throw new SessionExpiredError("Signed out while the token was refreshing");
-        return currentAccessToken;
+        return readCurrentAccessToken();
       } finally {
         if (inflightRefresh.current?.session === session) inflightRefresh.current = null;
       }
@@ -221,7 +290,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     inflightRefresh.current = { session, promise };
 
     return promise;
-  }, [commitTokens, withStorageLock]);
+  }, [commitTokens, readCurrentAccessToken, restoreOwnAccount]);
 
   const refreshAccountsWithToken = useCallback(
     async (token: string) => {
@@ -245,11 +314,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             refreshToken: currentRefreshToken,
           });
           applyAccountsState(next);
-          try {
-            await saveAccounts(next);
-          } catch (error) {
-            if (!isKeychainUnavailableError(error)) Sentry.captureException(error);
-          }
+          await saveAccounts(next).catch(reportAccountsStorageError);
         });
       } catch (error) {
         console.warn("Failed to load accounts:", error);
@@ -277,26 +342,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     async function loadStoredAuth() {
       try {
-        const storedToken = await SecureStore.getItemAsync(accessTokenKey);
+        const token = await SecureStore.getItemAsync(accessTokenKey);
+        if (!token) {
+          await clearAccounts().catch(reportAccountsStorageError);
+          return;
+        }
         const storedAccounts = await loadAccounts().catch(() => emptyAccountsState);
         const snapshotAccount = findAccount(storedAccounts, storedAccounts.activeAccountId);
-        let token = storedToken;
-        if (snapshotAccount?.accessToken) {
-          token = snapshotAccount.accessToken;
+        if (snapshotAccount?.accessToken === token && snapshotAccount.refreshToken) {
           const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
-          const refreshTokenDiffers =
-            !!snapshotAccount.refreshToken && snapshotAccount.refreshToken !== storedRefreshToken;
-          if (token !== storedToken || refreshTokenDiffers) {
+          if (snapshotAccount.refreshToken !== storedRefreshToken) {
             await writeTokens({ accessToken: token, refreshToken: snapshotAccount.refreshToken });
           }
         }
-        if (token) {
-          setAccessToken(token);
-          applyAccountsState(storedAccounts);
-          const creatorStatus = await fetchCreatorStatus(token);
-          setIsCreator(creatorStatus);
-          void refreshAccountsWithToken(token);
-        }
+        setAccessToken(token);
+        applyAccountsState(storedAccounts);
+        const creatorStatus = await fetchCreatorStatus(token);
+        setIsCreator(creatorStatus);
+        void refreshAccountsWithToken(token);
       } catch (error) {
         if (isKeychainUnavailableError(error)) {
           console.warn("Keychain unavailable (device may be locked):", error);
@@ -382,7 +445,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
       await withStorageLock(async () => {
-        await clearAccounts();
+        await clearAccounts().catch(reportAccountsStorageError);
         await SecureStore.deleteItemAsync(accessTokenKey);
         await SecureStore.deleteItemAsync(refreshTokenKey);
       });
@@ -465,6 +528,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 )
               : [...previousState.accounts, switchedAccount],
             activeAccountId: switchedAccount.accountId,
+            ownAccountId: previousState.ownAccountId,
           };
 
           try {
