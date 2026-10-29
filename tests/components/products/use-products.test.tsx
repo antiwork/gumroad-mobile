@@ -12,6 +12,7 @@ jest.mock("@/lib/auth-context", () => ({
     accessToken: "token",
     refreshToken: mockRefreshToken,
     logout: mockLogout,
+    getActiveAccountId: () => "account-1",
     isLoading: false,
   }),
 }));
