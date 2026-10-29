@@ -38,7 +38,6 @@ export interface SwitchAccountResponse {
 }
 
 const accountsKey = "gumroad_accounts";
-const activeAccountIdKey = "gumroad_active_account_id";
 
 const secureStoreOptions: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
@@ -57,37 +56,32 @@ const isStoredAccount = (value: unknown): value is StoredAccount =>
   typeof (value as StoredAccount).accountId === "string" &&
   typeof (value as StoredAccount).name === "string";
 
-const parseAccounts = (raw: string | null): StoredAccount[] => {
-  if (!raw) return [];
+const emptyAccountsState: AccountsState = { accounts: [], activeAccountId: null };
+
+const parseAccountsState = (raw: string | null): AccountsState => {
+  if (!raw) return emptyAccountsState;
   try {
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isStoredAccount) : [];
+    const snapshot = typeof parsed === "object" && parsed !== null ? (parsed as Partial<AccountsState>) : {};
+    const accounts = Array.isArray(snapshot.accounts) ? snapshot.accounts.filter(isStoredAccount) : [];
+    const activeAccountId = accounts.some((account) => account.accountId === snapshot.activeAccountId)
+      ? (snapshot.activeAccountId ?? null)
+      : null;
+    return { accounts, activeAccountId };
   } catch {
-    return [];
+    return emptyAccountsState;
   }
 };
 
-export const loadAccounts = async (): Promise<AccountsState> => {
-  const [rawAccounts, activeAccountId] = await Promise.all([
-    SecureStore.getItemAsync(accountsKey),
-    SecureStore.getItemAsync(activeAccountIdKey),
-  ]);
-  const accounts = parseAccounts(rawAccounts);
-  const active = accounts.some((account) => account.accountId === activeAccountId) ? activeAccountId : null;
-  return { accounts, activeAccountId: active };
-};
+export const loadAccounts = async (): Promise<AccountsState> =>
+  parseAccountsState(await SecureStore.getItemAsync(accountsKey));
 
 export const saveAccounts = async ({ accounts, activeAccountId }: AccountsState) => {
-  await SecureStore.setItemAsync(accountsKey, JSON.stringify(accounts), secureStoreOptions);
-  if (activeAccountId) {
-    await SecureStore.setItemAsync(activeAccountIdKey, activeAccountId, secureStoreOptions);
-  } else {
-    await SecureStore.deleteItemAsync(activeAccountIdKey);
-  }
+  await SecureStore.setItemAsync(accountsKey, JSON.stringify({ accounts, activeAccountId }), secureStoreOptions);
 };
 
 export const clearAccounts = async () => {
-  await Promise.allSettled([SecureStore.deleteItemAsync(accountsKey), SecureStore.deleteItemAsync(activeAccountIdKey)]);
+  await SecureStore.deleteItemAsync(accountsKey).catch(() => undefined);
 };
 
 export const findAccount = (state: AccountsState, accountId: string | null) =>

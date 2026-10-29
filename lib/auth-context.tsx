@@ -114,43 +114,148 @@ const isKeychainUnavailableError = (error: unknown): boolean =>
   error instanceof Error &&
   (error.message.includes("User interaction is not allowed") || error.message.includes("No keychain is available"));
 
+type SessionTokens = { accessToken: string; refreshToken?: string | null };
+
+const writeTokens = async ({ accessToken, refreshToken }: SessionTokens) => {
+  try {
+    await SecureStore.deleteItemAsync(accessTokenKey);
+    await SecureStore.setItemAsync(accessTokenKey, accessToken, secureStoreOptions);
+    if (refreshToken) {
+      await SecureStore.deleteItemAsync(refreshTokenKey);
+      await SecureStore.setItemAsync(refreshTokenKey, refreshToken, secureStoreOptions);
+    }
+  } catch (error) {
+    await Promise.allSettled([
+      SecureStore.deleteItemAsync(accessTokenKey),
+      SecureStore.deleteItemAsync(refreshTokenKey),
+    ]);
+    throw error;
+  }
+};
+
+const persistSession = async (state: AccountsState, tokens: SessionTokens) => {
+  if (state.activeAccountId) await saveAccounts(state).catch(clearAccounts);
+  else await clearAccounts();
+  await writeTokens(tokens);
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isCreator, setIsCreator] = useState<boolean | null>(false);
-  const inflightRefresh = useRef<Promise<string> | null>(null);
+  const inflightRefresh = useRef<{ session: number; promise: Promise<string> } | null>(null);
   const [accountsState, setAccountsState] = useState<AccountsState>(emptyAccountsState);
   const accountsStateRef = useRef<AccountsState>(emptyAccountsState);
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
   const switchingRef = useRef(false);
+  const sessionRef = useRef(0);
+  const storageQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const router = useRouter();
 
-  const updateAccountsState = useCallback(async (next: AccountsState) => {
+  const withStorageLock = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
+    const run = storageQueueRef.current.then(task);
+    storageQueueRef.current = run.catch(() => undefined);
+    return run;
+  }, []);
+
+  const applyAccountsState = useCallback((next: AccountsState) => {
     accountsStateRef.current = next;
     setAccountsState(next);
-    try {
-      await saveAccounts(next);
-    } catch (error) {
-      if (!isKeychainUnavailableError(error)) Sentry.captureException(error);
-    }
   }, []);
+
+  const commitTokens = useCallback(
+    (session: number, tokens: SessionTokens) =>
+      withStorageLock(async () => {
+        if (sessionRef.current !== session) return false;
+        const current = accountsStateRef.current;
+        const next = current.activeAccountId ? withAccountTokens(current, current.activeAccountId, tokens) : current;
+        await persistSession(next, tokens);
+        if (sessionRef.current !== session) return false;
+        applyAccountsState(next);
+        setAccessToken(tokens.accessToken);
+        return true;
+      }),
+    [applyAccountsState, withStorageLock],
+  );
+
+  const refreshTokenFn = useCallback(async (): Promise<string> => {
+    const session = sessionRef.current;
+    if (inflightRefresh.current?.session === session) return inflightRefresh.current.promise;
+
+    const promise = (async () => {
+      try {
+        let storedRefreshToken: string | null;
+        try {
+          storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+        } catch (readError) {
+          if (isKeychainUnavailableError(readError)) throw new KeychainUnavailableError();
+          throw readError;
+        }
+        if (!storedRefreshToken) throw new SessionExpiredError("No refresh token available");
+
+        let tokenResponse: { access_token: string; refresh_token?: string };
+        try {
+          tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
+            method: "POST",
+            data: {
+              grant_type: "refresh_token",
+              refresh_token: storedRefreshToken,
+              client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
+            },
+          });
+        } catch (requestError) {
+          if (isInvalidGrantError(requestError)) {
+            throw new SessionExpiredError("Refresh token is invalid or expired");
+          }
+          throw requestError;
+        }
+        const tokens = { accessToken: tokenResponse.access_token, refreshToken: tokenResponse.refresh_token };
+        if (await commitTokens(session, tokens)) return tokenResponse.access_token;
+        const currentAccessToken = await withStorageLock(() => SecureStore.getItemAsync(accessTokenKey));
+        if (!currentAccessToken) throw new SessionExpiredError("Signed out while the token was refreshing");
+        return currentAccessToken;
+      } finally {
+        if (inflightRefresh.current?.session === session) inflightRefresh.current = null;
+      }
+    })();
+    inflightRefresh.current = { session, promise };
+
+    return promise;
+  }, [commitTokens, withStorageLock]);
 
   const refreshAccountsWithToken = useCallback(
     async (token: string) => {
+      const session = sessionRef.current;
       try {
-        const serverAccounts = await fetchAccounts(token);
-        const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
-        await updateAccountsState(
-          mergeServerAccounts(accountsStateRef.current, serverAccounts, {
-            accessToken: token,
-            refreshToken: storedRefreshToken,
-          }),
-        );
+        let serverAccounts: Awaited<ReturnType<typeof fetchAccounts>>;
+        try {
+          serverAccounts = await fetchAccounts(token);
+        } catch (error) {
+          if (!(error instanceof UnauthorizedError) || sessionRef.current !== session) throw error;
+          serverAccounts = await fetchAccounts(await refreshTokenFn());
+        }
+        await withStorageLock(async () => {
+          const [currentAccessToken, currentRefreshToken] = await Promise.all([
+            SecureStore.getItemAsync(accessTokenKey),
+            SecureStore.getItemAsync(refreshTokenKey),
+          ]);
+          if (sessionRef.current !== session || !currentAccessToken) return;
+          const next = mergeServerAccounts(accountsStateRef.current, serverAccounts, {
+            accessToken: currentAccessToken,
+            refreshToken: currentRefreshToken,
+          });
+          applyAccountsState(next);
+          try {
+            await saveAccounts(next);
+          } catch (error) {
+            if (!isKeychainUnavailableError(error)) Sentry.captureException(error);
+          }
+        });
       } catch (error) {
         console.warn("Failed to load accounts:", error);
       }
     },
-    [updateAccountsState],
+    [applyAccountsState, refreshTokenFn, withStorageLock],
   );
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
@@ -173,14 +278,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     async function loadStoredAuth() {
       try {
         const storedToken = await SecureStore.getItemAsync(accessTokenKey);
-        if (storedToken) {
-          setAccessToken(storedToken);
-          const storedAccounts = await loadAccounts().catch(() => emptyAccountsState);
-          accountsStateRef.current = storedAccounts;
-          setAccountsState(storedAccounts);
-          const creatorStatus = await fetchCreatorStatus(storedToken);
+        const storedAccounts = await loadAccounts().catch(() => emptyAccountsState);
+        const snapshotAccount = findAccount(storedAccounts, storedAccounts.activeAccountId);
+        let token = storedToken;
+        if (snapshotAccount?.accessToken) {
+          token = snapshotAccount.accessToken;
+          const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+          const refreshTokenDiffers =
+            !!snapshotAccount.refreshToken && snapshotAccount.refreshToken !== storedRefreshToken;
+          if (token !== storedToken || refreshTokenDiffers) {
+            await writeTokens({ accessToken: token, refreshToken: snapshotAccount.refreshToken });
+          }
+        }
+        if (token) {
+          setAccessToken(token);
+          applyAccountsState(storedAccounts);
+          const creatorStatus = await fetchCreatorStatus(token);
           setIsCreator(creatorStatus);
-          void refreshAccountsWithToken(storedToken);
+          void refreshAccountsWithToken(token);
         }
       } catch (error) {
         if (isKeychainUnavailableError(error)) {
@@ -194,32 +309,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     loadStoredAuth();
-  }, [refreshAccountsWithToken]);
-
-  const storeTokens = useCallback(async (accessToken: string, refreshToken?: string) => {
-    try {
-      await SecureStore.deleteItemAsync(accessTokenKey);
-      await SecureStore.setItemAsync(accessTokenKey, accessToken, secureStoreOptions);
-      if (refreshToken) {
-        await SecureStore.deleteItemAsync(refreshTokenKey);
-        await SecureStore.setItemAsync(refreshTokenKey, refreshToken, secureStoreOptions);
-      }
-    } catch (error) {
-      await Promise.allSettled([
-        SecureStore.deleteItemAsync(accessTokenKey),
-        SecureStore.deleteItemAsync(refreshTokenKey),
-      ]);
-      throw error;
-    }
-    setAccessToken(accessToken);
-    const { activeAccountId } = accountsStateRef.current;
-    if (activeAccountId) {
-      const next = withAccountTokens(accountsStateRef.current, activeAccountId, { accessToken, refreshToken });
-      accountsStateRef.current = next;
-      setAccountsState(next);
-      saveAccounts(next).catch(() => {});
-    }
-  }, []);
+  }, [applyAccountsState, refreshAccountsWithToken]);
 
   useEffect(() => {
     async function handleAuthResponse() {
@@ -236,8 +326,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               code_verifier: authRequest.codeVerifier,
             },
           });
+          sessionRef.current += 1;
+          const session = sessionRef.current;
           try {
-            await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
+            const tokens = { accessToken: tokenResponse.access_token, refreshToken: tokenResponse.refresh_token };
+            if (!(await commitTokens(session, tokens))) return;
           } catch (error) {
             console.error("Failed to store tokens:", error);
             Sentry.captureException(error, { tags: { auth_path: "token_storage_failed" } });
@@ -271,7 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     handleAuthResponse();
-  }, [response, redirectUri, authRequest?.codeVerifier, storeTokens, refreshAccountsWithToken]);
+  }, [response, redirectUri, authRequest?.codeVerifier, commitTokens, refreshAccountsWithToken]);
 
   const login = useCallback(async () => {
     if (authRequest) {
@@ -285,14 +378,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [authRequest, promptAsync]);
 
   const logout = useCallback(async () => {
+    sessionRef.current += 1;
     try {
       setIsLoading(true);
-      await SecureStore.deleteItemAsync(accessTokenKey);
-      await SecureStore.deleteItemAsync(refreshTokenKey);
-      await clearAccounts();
+      await withStorageLock(async () => {
+        await clearAccounts();
+        await SecureStore.deleteItemAsync(accessTokenKey);
+        await SecureStore.deleteItemAsync(refreshTokenKey);
+      });
       await clearSavedTab();
-      accountsStateRef.current = emptyAccountsState;
-      setAccountsState(emptyAccountsState);
+      applyAccountsState(emptyAccountsState);
       setAccessToken(null);
       setIsCreator(false);
       queryClient.clear();
@@ -303,47 +398,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
-
-  const refreshTokenFn = useCallback(async (): Promise<string> => {
-    if (inflightRefresh.current) return inflightRefresh.current;
-
-    inflightRefresh.current = (async () => {
-      try {
-        let storedRefreshToken: string | null;
-        try {
-          storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
-        } catch (readError) {
-          if (isKeychainUnavailableError(readError)) throw new KeychainUnavailableError();
-          throw readError;
-        }
-        if (!storedRefreshToken) throw new SessionExpiredError("No refresh token available");
-
-        let tokenResponse: { access_token: string; refresh_token?: string };
-        try {
-          tokenResponse = await request<{ access_token: string; refresh_token?: string }>(tokenEndpoint, {
-            method: "POST",
-            data: {
-              grant_type: "refresh_token",
-              refresh_token: storedRefreshToken,
-              client_id: env.EXPO_PUBLIC_GUMROAD_CLIENT_ID,
-            },
-          });
-        } catch (requestError) {
-          if (isInvalidGrantError(requestError)) {
-            throw new SessionExpiredError("Refresh token is invalid or expired");
-          }
-          throw requestError;
-        }
-        await storeTokens(tokenResponse.access_token, tokenResponse.refresh_token);
-        return tokenResponse.access_token;
-      } finally {
-        inflightRefresh.current = null;
-      }
-    })();
-
-    return inflightRefresh.current;
-  }, [storeTokens]);
+  }, [applyAccountsState, router, withStorageLock]);
 
   const refreshCreatorStatus = useCallback(async () => {
     const token = accessToken;
@@ -374,8 +429,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (accountId === accountsStateRef.current.activeAccountId) return true;
       switchingRef.current = true;
       setIsSwitchingAccount(true);
+      const session = sessionRef.current;
       try {
-        if (inflightRefresh.current) await inflightRefresh.current.catch(() => undefined);
+        if (inflightRefresh.current) await inflightRefresh.current.promise.catch(() => undefined);
         let switchResponse: SwitchAccountResponse;
         try {
           switchResponse = await requestAccountSwitch(
@@ -386,44 +442,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (!(error instanceof UnauthorizedError)) throw error;
           switchResponse = await requestAccountSwitch(await refreshTokenFn(), accountId);
         }
-        const previousAccessToken = assertDefined(await SecureStore.getItemAsync(accessTokenKey));
-        const previousRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
 
-        const base = accountsStateRef.current;
-        const previousState = base.activeAccountId
-          ? withAccountTokens(base, base.activeAccountId, {
-              accessToken: previousAccessToken,
-              refreshToken: previousRefreshToken,
-            })
-          : base;
-        const switchedAccount: StoredAccount = {
-          ...profileFromApi(switchResponse.account),
-          accessToken: switchResponse.access_token,
-          refreshToken: switchResponse.refresh_token,
-        };
-        const nextState: AccountsState = {
-          accounts: findAccount(previousState, switchedAccount.accountId)
-            ? previousState.accounts.map((account) =>
-                account.accountId === switchedAccount.accountId ? switchedAccount : account,
-              )
-            : [...previousState.accounts, switchedAccount],
-          activeAccountId: switchedAccount.accountId,
-        };
+        const switchedSession = await withStorageLock(async () => {
+          if (sessionRef.current !== session) return null;
+          const previousTokens: SessionTokens = {
+            accessToken: assertDefined(await SecureStore.getItemAsync(accessTokenKey)),
+            refreshToken: await SecureStore.getItemAsync(refreshTokenKey),
+          };
+          const base = accountsStateRef.current;
+          const previousState = base.activeAccountId
+            ? withAccountTokens(base, base.activeAccountId, previousTokens)
+            : base;
+          const switchedTokens = {
+            accessToken: switchResponse.access_token,
+            refreshToken: switchResponse.refresh_token,
+          };
+          const switchedAccount: StoredAccount = { ...profileFromApi(switchResponse.account), ...switchedTokens };
+          const nextState: AccountsState = {
+            accounts: findAccount(previousState, switchedAccount.accountId)
+              ? previousState.accounts.map((account) =>
+                  account.accountId === switchedAccount.accountId ? switchedAccount : account,
+                )
+              : [...previousState.accounts, switchedAccount],
+            activeAccountId: switchedAccount.accountId,
+          };
 
-        accountsStateRef.current = nextState;
-        try {
-          await storeTokens(switchResponse.access_token, switchResponse.refresh_token);
-        } catch (error) {
-          accountsStateRef.current = previousState;
-          await storeTokens(previousAccessToken, previousRefreshToken ?? undefined).catch(() => undefined);
-          throw error;
-        }
-        await updateAccountsState(nextState);
+          try {
+            await persistSession(nextState, switchedTokens);
+          } catch (error) {
+            await persistSession(previousState, previousTokens).catch(() => undefined);
+            throw error;
+          }
+          if (sessionRef.current !== session) return null;
+          sessionRef.current += 1;
+          applyAccountsState(nextState);
+          setAccessToken(switchResponse.access_token);
+          return sessionRef.current;
+        });
+        if (switchedSession === null) return false;
+
         await clearSavedTab();
         queryClient.clear();
+        if (sessionRef.current !== switchedSession) return false;
         router.replace("/(tabs)/dashboard");
-        setIsCreator(await fetchCreatorStatus(switchResponse.access_token));
         void refreshAccountsWithToken(switchResponse.access_token);
+        const creatorStatus = await fetchCreatorStatus(switchResponse.access_token);
+        if (sessionRef.current === switchedSession) setIsCreator(creatorStatus);
         return true;
       } catch (error) {
         console.warn("Failed to switch account:", error);
@@ -437,7 +501,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsSwitchingAccount(false);
       }
     },
-    [accessToken, refreshAccountsWithToken, refreshTokenFn, router, storeTokens, updateAccountsState],
+    [accessToken, applyAccountsState, refreshAccountsWithToken, refreshTokenFn, router, withStorageLock],
   );
 
   return (

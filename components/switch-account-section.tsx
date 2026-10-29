@@ -15,7 +15,7 @@ const AccountAvatar = ({ account }: { account: StoredAccount }) =>
     </View>
   );
 
-export const SwitchAccountSection = ({ onSwitchStart }: { onSwitchStart?: () => void }) => {
+export const SwitchAccountSection = ({ onSwitched }: { onSwitched?: () => void }) => {
   const { accounts, activeAccountId, isSwitchingAccount, switchAccount } = useAuth();
   const otherAccounts = accounts.filter((account) => account.accountId !== activeAccountId);
 
@@ -32,9 +32,8 @@ export const SwitchAccountSection = ({ onSwitchStart }: { onSwitchStart?: () => 
           className="mb-2 justify-start"
           disabled={isSwitchingAccount}
           accessibilityLabel={`Switch to ${account.name}`}
-          onPress={() => {
-            onSwitchStart?.();
-            void switchAccount(account.accountId);
+          onPress={async () => {
+            if (await switchAccount(account.accountId)) onSwitched?.();
           }}
         >
           <AccountAvatar account={account} />
@@ -48,7 +47,7 @@ export const SwitchAccountSection = ({ onSwitchStart }: { onSwitchStart?: () => 
           </View>
         </Button>
       ))}
-      {isSwitchingAccount ? <LoadingSpinner size="small" /> : null}
+      {isSwitchingAccount ? <LoadingSpinner testID="switch-account-progress" size="small" /> : null}
     </View>
   );
 };
