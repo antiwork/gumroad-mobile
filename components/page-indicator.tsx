@@ -1,7 +1,7 @@
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
-import { Keyboard, Platform, TextInput, TouchableOpacity, View } from "react-native";
+import { Keyboard, Platform, TextInput, TouchableOpacity, View, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export const PageIndicator = ({
@@ -15,7 +15,7 @@ export const PageIndicator = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState("");
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { bottom: safeAreaBottom } = useSafeAreaInsets();
 

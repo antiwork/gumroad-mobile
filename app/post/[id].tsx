@@ -97,7 +97,7 @@ export default function PostScreen() {
   const post = useInstallment(id, { purchaseId, subscriptionId, followerId });
   const purchase = usePurchase(post?.url_redirect_external_id);
   const { accessToken } = useAuth();
-  const webViewRef = useRef<BaseWebView>(null);
+  const webViewRef = useRef<BaseWebView<undefined>>(null);
   const { playAudio, pauseAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -277,7 +277,9 @@ export default function PostScreen() {
           {htmlContent && (
             <View style={{ height: bodyHeight, marginTop: 16 }}>
               <BaseWebView
-                ref={webViewRef}
+                // react-native-webview@14 types the component as a plain FunctionComponent, so its
+                // imperative ref is missing from the types even though the runtime provides it.
+                ref={webViewRef as unknown as never}
                 source={{ html: htmlContent }}
                 style={{ height: bodyHeight, width: width - 32, backgroundColor: "transparent" }}
                 scrollEnabled={false}

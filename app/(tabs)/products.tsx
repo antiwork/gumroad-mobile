@@ -104,7 +104,7 @@ export default function Products() {
             <View className="items-center py-4">
               <LoadingSpinner />
             </View>
-          ) : null
+          ) : undefined
         }
       />
     </Screen>

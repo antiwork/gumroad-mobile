@@ -36,6 +36,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 
 const TIME_UPDATE_INTERVAL_SECONDS = 0.25;
 const ACCEPTED_SAMPLE_SECONDS = 1;
@@ -1067,7 +1068,10 @@ export default function VideoPlayerScreen() {
       onRequestClose={exitExternalFullscreen}
       onDismiss={handleExternalFullscreenDismiss}
     >
-      <View style={styles.container}>{renderVideoSurface(true)}</View>
+      <View style={styles.container}>
+        <ExpoStatusBar verticalBarBehaviorIOS="disabled" />
+        {renderVideoSurface(true)}
+      </View>
     </Modal>
   );
 
@@ -1125,6 +1129,7 @@ export default function VideoPlayerScreen() {
   return (
     <>
       <View style={[styles.container, { paddingBottom: bottom }]} testID="video-player-container">
+        <ExpoStatusBar verticalBarBehaviorIOS="disabled" />
         <Stack.Screen
           options={{
             title: title ?? "Video",
@@ -1213,7 +1218,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   fullscreenCaptionPicker: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.75)",
     alignItems: "center",
