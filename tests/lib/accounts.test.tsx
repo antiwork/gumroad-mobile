@@ -442,6 +442,137 @@ describe("account session consistency", () => {
   });
 });
 
+describe("launching after a switch was interrupted before the token items were saved", () => {
+  const seedInterruptedSwitch = (activeAccountId: string, tokenItems: { access: string; refresh: string }) => {
+    store.set("gumroad_access_token", tokenItems.access);
+    store.set("gumroad_refresh_token", tokenItems.refresh);
+    store.set(
+      "gumroad_accounts",
+      JSON.stringify({
+        accounts: [
+          storedAccount("member", "Member", "member-access", "member-refresh"),
+          storedAccount("brand", "Brand", "brand-access", "brand-refresh"),
+        ],
+        activeAccountId,
+        ownAccountId: "member",
+      }),
+    );
+    mockRequestAPI.mockRejectedValue(new Error("Request failed: 503"));
+    mockRequest.mockImplementation(async (url: string, options: { data?: { refresh_token?: string } }) => {
+      if (!url.includes("/oauth/token")) return { products: [{ id: "p" }] };
+      const accountId = options.data?.refresh_token?.split("-")[0];
+      return { access_token: `${accountId}-access-2`, refresh_token: `${accountId}-refresh-2` };
+    });
+  };
+
+  it("keeps the member active and saves refreshed tokens to the member when a switch to the brand was interrupted", async () => {
+    seedInterruptedSwitch("brand", { access: "member-access", refresh: "member-refresh" });
+
+    const { result } = renderAuth();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(mockRequestAPI).toHaveBeenCalled());
+    expect(result.current.accessToken).toBe("member-access");
+    expect(result.current.activeAccountId).toBe("member");
+
+    await act(async () => {
+      await result.current.refreshToken();
+    });
+
+    expect(result.current.activeAccountId).toBe("member");
+    expect(store.get("gumroad_access_token")).toBe("member-access-2");
+    expect(store.get("gumroad_refresh_token")).toBe("member-refresh-2");
+    expect(storedSnapshot()).toEqual({
+      accounts: [
+        expect.objectContaining({
+          accountId: "member",
+          accessToken: "member-access-2",
+          refreshToken: "member-refresh-2",
+        }),
+        expect.objectContaining({ accountId: "brand", accessToken: "brand-access", refreshToken: "brand-refresh" }),
+      ],
+      activeAccountId: "member",
+      ownAccountId: "member",
+    });
+  });
+
+  it("keeps the brand active and saves refreshed tokens to the brand when a switch to the member was interrupted", async () => {
+    seedInterruptedSwitch("member", { access: "brand-access", refresh: "brand-refresh" });
+
+    const { result } = renderAuth();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(mockRequestAPI).toHaveBeenCalled());
+    expect(result.current.accessToken).toBe("brand-access");
+    expect(result.current.activeAccountId).toBe("brand");
+
+    await act(async () => {
+      await result.current.refreshToken();
+    });
+
+    expect(result.current.activeAccountId).toBe("brand");
+    expect(store.get("gumroad_access_token")).toBe("brand-access-2");
+    expect(store.get("gumroad_refresh_token")).toBe("brand-refresh-2");
+    expect(storedSnapshot()).toEqual({
+      accounts: [
+        expect.objectContaining({ accountId: "member", accessToken: "member-access", refreshToken: "member-refresh" }),
+        expect.objectContaining({ accountId: "brand", accessToken: "brand-access-2", refreshToken: "brand-refresh-2" }),
+      ],
+      activeAccountId: "brand",
+      ownAccountId: "member",
+    });
+  });
+
+  it("leaves no account active when the stored access token belongs to none of the saved accounts", async () => {
+    seedInterruptedSwitch("brand", { access: "unknown-access", refresh: "unknown-refresh" });
+
+    const { result } = renderAuth();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(mockRequestAPI).toHaveBeenCalled());
+    expect(result.current.accessToken).toBe("unknown-access");
+    expect(result.current.activeAccountId).toBeNull();
+    expect(result.current.accounts).toEqual([
+      expect.objectContaining({ accountId: "member", accessToken: "member-access" }),
+      expect.objectContaining({ accountId: "brand", accessToken: "brand-access" }),
+    ]);
+  });
+
+  it("keeps the saved accounts and own account across a refresh and relaunch when the stored access token belongs to none of them", async () => {
+    seedInterruptedSwitch("brand", { access: "unknown-access", refresh: "unknown-refresh" });
+
+    const { result, unmount } = renderAuth();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(mockRequestAPI).toHaveBeenCalled());
+    expect(result.current.activeAccountId).toBeNull();
+
+    await act(async () => {
+      await result.current.refreshToken();
+    });
+
+    expect(result.current.accessToken).toBe("unknown-access-2");
+    expect(store.get("gumroad_access_token")).toBe("unknown-access-2");
+    expect(store.get("gumroad_refresh_token")).toBe("unknown-refresh-2");
+    const savedAccounts = [
+      expect.objectContaining({ accountId: "member", accessToken: "member-access", refreshToken: "member-refresh" }),
+      expect.objectContaining({ accountId: "brand", accessToken: "brand-access", refreshToken: "brand-refresh" }),
+    ];
+    expect(storedSnapshot()).toEqual({ accounts: savedAccounts, activeAccountId: null, ownAccountId: "member" });
+
+    unmount();
+    mockRequestAPI.mockClear();
+    const { result: relaunched } = renderAuth();
+
+    await waitFor(() => expect(relaunched.current.isLoading).toBe(false));
+    await waitFor(() => expect(mockRequestAPI).toHaveBeenCalled());
+    expect(relaunched.current.accessToken).toBe("unknown-access-2");
+    expect(relaunched.current.activeAccountId).toBeNull();
+    expect(relaunched.current.accounts).toEqual(savedAccounts);
+    expect(storedSnapshot()).toEqual({ accounts: savedAccounts, activeAccountId: null, ownAccountId: "member" });
+  });
+});
+
 describe("account snapshot storage failures", () => {
   const snapshotWithMember = (accessToken: string, refreshToken: string) =>
     JSON.stringify({

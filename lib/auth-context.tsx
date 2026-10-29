@@ -151,7 +151,7 @@ const writeTokens = async ({ accessToken, refreshToken }: SessionTokens) => {
 };
 
 const persistSession = async (state: AccountsState, tokens: SessionTokens) => {
-  await (state.activeAccountId ? saveAccounts(state).catch(clearAccounts) : clearAccounts()).catch(
+  await (state.accounts.length > 0 ? saveAccounts(state).catch(clearAccounts) : clearAccounts()).catch(
     reportAccountsStorageError,
   );
   await writeTokens(tokens);
@@ -347,12 +347,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await clearAccounts().catch(reportAccountsStorageError);
           return;
         }
-        const storedAccounts = await loadAccounts().catch(() => emptyAccountsState);
-        const snapshotAccount = findAccount(storedAccounts, storedAccounts.activeAccountId);
-        if (snapshotAccount?.accessToken === token && snapshotAccount.refreshToken) {
+        const snapshot = await loadAccounts().catch(() => emptyAccountsState);
+        // The snapshot is saved before the token items, so if the app was killed in between, the snapshot's
+        // active account can differ from the account the stored access token belongs to.
+        const tokenAccount = snapshot.accounts.find((account) => account.accessToken === token);
+        const storedAccounts = { ...snapshot, activeAccountId: tokenAccount?.accountId ?? null };
+        if (tokenAccount?.refreshToken) {
           const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
-          if (snapshotAccount.refreshToken !== storedRefreshToken) {
-            await writeTokens({ accessToken: token, refreshToken: snapshotAccount.refreshToken });
+          if (tokenAccount.refreshToken !== storedRefreshToken) {
+            await writeTokens({ accessToken: token, refreshToken: tokenAccount.refreshToken });
           }
         }
         setAccessToken(token);
