@@ -8,6 +8,7 @@ import { Alert } from "react-native";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { queryClient } from "@/lib/query-client";
 import { request, requestAPI } from "@/lib/request";
+import { clearSavedTab } from "@/lib/tab-preference";
 
 const mockReplace = jest.fn();
 
@@ -71,6 +72,8 @@ const deferred = <T,>() => {
   });
   return { promise, resolve };
 };
+
+const invalidGrant = () => new Error('Request failed: 400 {"error":"invalid_grant"}');
 
 const storedAccount = (accountId: string, name: string, accessToken: string, refreshToken: string) => ({
   accountId,
@@ -293,6 +296,128 @@ describe("account session consistency", () => {
     expect(storedAccounts()).toContainEqual(
       expect.objectContaining({ accountId: "brand", accessToken: "brand-access", refreshToken: "brand-refresh" }),
     );
+    expect(storedAccounts()).toContainEqual(
+      expect.objectContaining({
+        accountId: "member",
+        accessToken: "member-access-2",
+        refreshToken: "member-refresh-2",
+      }),
+    );
+    expect(storedSnapshot()).toEqual(expect.objectContaining({ activeAccountId: "brand", ownAccountId: "member" }));
+
+    mockRequest.mockImplementation(async (url: string, options: { data?: { refresh_token?: string } }) => {
+      if (!url.includes("/oauth/token")) return { products: [{ id: "p" }] };
+      if (options.data?.refresh_token === "member-refresh-2") {
+        return { access_token: "member-access-3", refresh_token: "member-refresh-3" };
+      }
+      throw invalidGrant();
+    });
+    let recoveredToken = "";
+    await act(async () => {
+      recoveredToken = await result.current.refreshToken();
+    });
+
+    expect(recoveredToken).toBe("member-access-3");
+    expect(result.current.activeAccountId).toBe("member");
+    expect(store.get("gumroad_access_token")).toBe("member-access-3");
+    expect(store.get("gumroad_refresh_token")).toBe("member-refresh-3");
+    expect(storedSnapshot()).toEqual({
+      accounts: [expect.objectContaining({ accountId: "member", refreshToken: "member-refresh-3" })],
+      activeAccountId: "member",
+      ownAccountId: "member",
+    });
+  });
+
+  it("waits for a switch to finish saving its tokens before reading the refresh token", async () => {
+    seedStore();
+    mockAccountsApi();
+    const { result } = renderAuth();
+    await waitFor(() => expect(result.current.accounts).toHaveLength(2));
+    mockRequest.mockClear();
+
+    const brandRefreshWrite = deferred<void>();
+    const releaseBrandRefreshWrite = deferred<void>();
+    (SecureStore.setItemAsync as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      if (key === "gumroad_refresh_token" && value === "brand-refresh") {
+        brandRefreshWrite.resolve();
+        await releaseBrandRefreshWrite.promise;
+      }
+      store.set(key, value);
+    });
+
+    let switchPromise: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      switchPromise = result.current.switchAccount("brand");
+    });
+    await brandRefreshWrite.promise;
+    expect(store.has("gumroad_refresh_token")).toBe(false);
+
+    const refreshResult = result.current.refreshToken().then(
+      (token) => ({ token }),
+      (error: unknown) => ({ error }),
+    );
+    await act(async () => {
+      releaseBrandRefreshWrite.resolve();
+      await switchPromise;
+    });
+
+    expect(await refreshResult).toEqual({ token: "brand-access" });
+    expect(result.current.accessToken).toBe("brand-access");
+    expect(result.current.activeAccountId).toBe("brand");
+    expect(store.get("gumroad_access_token")).toBe("brand-access");
+    expect(store.get("gumroad_refresh_token")).toBe("brand-refresh");
+    expect(mockRequest).not.toHaveBeenCalledWith(expect.stringContaining("/oauth/token"), expect.anything());
+  });
+
+  it("does not save tokens from a refresh that finishes while the user is logging out", async () => {
+    const { SessionExpiredError } = jest.requireMock("@/lib/request");
+    seedStore();
+    const pendingSwitch = deferred<typeof switchResponse>();
+    const pendingRefresh = deferred<{ access_token: string; refresh_token: string }>();
+    mockAccountsApi(pendingSwitch.promise);
+    mockRequest.mockImplementation(async (url: string) =>
+      url.includes("/oauth/token") ? pendingRefresh.promise : { products: [{ id: "p" }] },
+    );
+    const { result } = renderAuth();
+    await waitFor(() => expect(result.current.accounts).toHaveLength(2));
+
+    let switchPromise: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      switchPromise = result.current.switchAccount("brand");
+    });
+    await waitFor(() =>
+      expect(mockRequestAPI).toHaveBeenCalledWith("mobile/accounts", expect.objectContaining({ method: "POST" })),
+    );
+    const refreshPromise = result.current.refreshToken();
+    await waitFor(() =>
+      expect(mockRequest).toHaveBeenCalledWith(expect.stringContaining("/oauth/token"), expect.anything()),
+    );
+    await act(async () => {
+      pendingSwitch.resolve(switchResponse);
+      await switchPromise;
+    });
+    await waitFor(() => expect(storedSnapshot().ownAccountId).toBe("member"));
+
+    const logoutTabClear = deferred<void>();
+    (clearSavedTab as jest.Mock).mockImplementationOnce(() => logoutTabClear.promise);
+    let logoutPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      logoutPromise = result.current.logout();
+    });
+    await waitFor(() => expect(store.has("gumroad_accounts")).toBe(false));
+
+    await act(async () => {
+      pendingRefresh.resolve({ access_token: "member-access-2", refresh_token: "member-refresh-2" });
+      await expect(refreshPromise).rejects.toBeInstanceOf(SessionExpiredError);
+      logoutTabClear.resolve();
+      await logoutPromise;
+    });
+
+    expect(result.current.accessToken).toBeNull();
+    expect(result.current.accounts).toEqual([]);
+    expect(store.has("gumroad_accounts")).toBe(false);
+    expect(store.has("gumroad_access_token")).toBe(false);
+    expect(store.has("gumroad_refresh_token")).toBe(false);
   });
 
   it("does not sign the user back in when they log out while a switch is being saved", async () => {
@@ -662,8 +787,6 @@ describe("account snapshot storage failures", () => {
 });
 
 describe("losing access to a brand account", () => {
-  const invalidGrant = () => new Error('Request failed: 400 {"error":"invalid_grant"}');
-
   const switchToBrand = async () => {
     seedStore();
     mockRequestAPI.mockImplementation(async (_path: string, options: { method?: string; accessToken: string }) =>
@@ -725,6 +848,127 @@ describe("losing access to a brand account", () => {
     expect(result.current.activeAccountId).toBe("brand");
     expect(store.get("gumroad_access_token")).toBe("brand-access");
     expect(mockReplace).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+
+  it("keeps the member's rotated tokens when a switch finishes while switching back to the member", async () => {
+    const { result } = await switchToBrand();
+    const pendingSwitch = deferred<typeof switchResponse>();
+    const pendingMemberGrant = deferred<{ access_token: string; refresh_token: string }>();
+    mockRequestAPI.mockImplementation(async (_path: string, options: { method?: string; accessToken: string }) => {
+      if (options.method === "POST") return pendingSwitch.promise;
+      return options.accessToken === "other-brand-access"
+        ? {
+            accounts: [
+              apiAccount("member", "Member", false),
+              apiAccount("brand", "Brand", false),
+              apiAccount("other-brand", "Other brand", true),
+            ],
+          }
+        : accountsFor(options.accessToken);
+    });
+    mockRefreshGrants(() => pendingMemberGrant.promise);
+
+    let switchPromise: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      switchPromise = result.current.switchAccount("other-brand");
+    });
+    await waitFor(() =>
+      expect(mockRequestAPI).toHaveBeenCalledWith("mobile/accounts", expect.objectContaining({ method: "POST" })),
+    );
+    const refreshPromise = result.current.refreshToken();
+    await waitFor(() =>
+      expect(mockRequest).toHaveBeenCalledWith(
+        expect.stringContaining("/oauth/token"),
+        expect.objectContaining({ data: expect.objectContaining({ refresh_token: "member-refresh" }) }),
+      ),
+    );
+    await act(async () => {
+      pendingSwitch.resolve({
+        access_token: "other-brand-access",
+        refresh_token: "other-brand-refresh",
+        expires_in: null,
+        account: apiAccount("other-brand", "Other brand", true),
+      });
+      await switchPromise;
+    });
+    await waitFor(() => expect(storedAccounts()).toHaveLength(3));
+
+    let refreshedToken = "";
+    await act(async () => {
+      pendingMemberGrant.resolve({ access_token: "member-access-2", refresh_token: "member-refresh-2" });
+      refreshedToken = await refreshPromise;
+    });
+
+    expect(refreshedToken).toBe("other-brand-access");
+    expect(result.current.accessToken).toBe("other-brand-access");
+    expect(result.current.activeAccountId).toBe("other-brand");
+    expect(store.get("gumroad_access_token")).toBe("other-brand-access");
+    expect(store.get("gumroad_refresh_token")).toBe("other-brand-refresh");
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(storedSnapshot()).toEqual(
+      expect.objectContaining({ activeAccountId: "other-brand", ownAccountId: "member" }),
+    );
+    expect(storedAccounts()).toContainEqual(
+      expect.objectContaining({
+        accountId: "member",
+        accessToken: "member-access-2",
+        refreshToken: "member-refresh-2",
+      }),
+    );
+
+    mockRequest.mockImplementation(async (url: string, options: { data?: { refresh_token?: string } }) => {
+      if (!url.includes("/oauth/token")) return { products: [{ id: "p" }] };
+      if (options.data?.refresh_token === "member-refresh-2") {
+        return { access_token: "member-access-3", refresh_token: "member-refresh-3" };
+      }
+      throw invalidGrant();
+    });
+    let recoveredToken = "";
+    await act(async () => {
+      recoveredToken = await result.current.refreshToken();
+    });
+
+    expect(recoveredToken).toBe("member-access-3");
+    expect(result.current.activeAccountId).toBe("member");
+    expect(store.get("gumroad_access_token")).toBe("member-access-3");
+    expect(store.get("gumroad_refresh_token")).toBe("member-refresh-3");
+  });
+
+  it("does not save the member's tokens when switching back to the member finishes while the user is logging out", async () => {
+    const { SessionExpiredError } = jest.requireMock("@/lib/request");
+    const { result } = await switchToBrand();
+    const pendingMemberGrant = deferred<{ access_token: string; refresh_token: string }>();
+    mockRefreshGrants(() => pendingMemberGrant.promise);
+
+    const refreshPromise = result.current.refreshToken();
+    await waitFor(() =>
+      expect(mockRequest).toHaveBeenCalledWith(
+        expect.stringContaining("/oauth/token"),
+        expect.objectContaining({ data: expect.objectContaining({ refresh_token: "member-refresh" }) }),
+      ),
+    );
+
+    const logoutTabClear = deferred<void>();
+    (clearSavedTab as jest.Mock).mockImplementationOnce(() => logoutTabClear.promise);
+    let logoutPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      logoutPromise = result.current.logout();
+    });
+    await waitFor(() => expect(store.has("gumroad_accounts")).toBe(false));
+
+    await act(async () => {
+      pendingMemberGrant.resolve({ access_token: "member-access-2", refresh_token: "member-refresh-2" });
+      await expect(refreshPromise).rejects.toBeInstanceOf(SessionExpiredError);
+      logoutTabClear.resolve();
+      await logoutPromise;
+    });
+
+    expect(result.current.accessToken).toBeNull();
+    expect(result.current.accounts).toEqual([]);
+    expect(store.has("gumroad_accounts")).toBe(false);
+    expect(store.has("gumroad_access_token")).toBe(false);
+    expect(store.has("gumroad_refresh_token")).toBe(false);
     expect(Alert.alert).not.toHaveBeenCalled();
   });
 });

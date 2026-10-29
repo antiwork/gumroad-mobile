@@ -167,6 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
   const switchingRef = useRef(false);
   const sessionRef = useRef(0);
+  const signInRef = useRef(0);
   const storageQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const router = useRouter();
   const routerRef = useRefToLatest(router);
@@ -197,6 +198,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [applyAccountsState, withStorageLock],
   );
 
+  // The server revokes a refresh token as soon as it's used. If the user switched accounts while a refresh
+  // was in flight, the new tokens belong to an account that's no longer active, so they're saved to that
+  // account in the list. Otherwise it would be left with a revoked token and couldn't be switched back to.
+  const keepRotatedTokens = useCallback(
+    (signIn: number, grantRefreshToken: string, tokens: SessionTokens) =>
+      withStorageLock(async () => {
+        if (signInRef.current !== signIn) return;
+        const current = accountsStateRef.current;
+        const account = current.accounts.find((stored) => stored.refreshToken === grantRefreshToken);
+        if (!account || account.accountId === current.activeAccountId) return;
+        const next = withAccountTokens(current, account.accountId, tokens);
+        await saveAccounts(next).catch(reportAccountsStorageError);
+        if (signInRef.current === signIn) applyAccountsState(next);
+      }),
+    [applyAccountsState, withStorageLock],
+  );
+
   const readCurrentAccessToken = useCallback(async () => {
     const currentAccessToken = await withStorageLock(() => SecureStore.getItemAsync(accessTokenKey));
     if (!currentAccessToken) throw new SessionExpiredError("Signed out while the token was refreshing");
@@ -204,7 +222,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [withStorageLock]);
 
   const restoreOwnAccount = useCallback(
-    async (session: number): Promise<string | null> => {
+    async (session: number, signIn: number): Promise<string | null> => {
       const state = accountsStateRef.current;
       const ownAccount = findAccount(state, state.ownAccountId);
       const lostAccount = findAccount(state, state.activeAccountId);
@@ -238,7 +256,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAccessToken(tokens.accessToken);
         return sessionRef.current;
       });
-      if (restoredSession === null) return readCurrentAccessToken();
+      if (restoredSession === null) {
+        await keepRotatedTokens(signIn, ownAccount.refreshToken, tokens);
+        return readCurrentAccessToken();
+      }
 
       await clearSavedTab();
       queryClient.clear();
@@ -251,18 +272,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       return tokens.accessToken;
     },
-    [applyAccountsState, readCurrentAccessToken, routerRef, withStorageLock],
+    [applyAccountsState, keepRotatedTokens, readCurrentAccessToken, routerRef, withStorageLock],
   );
 
   const refreshTokenFn = useCallback(async (): Promise<string> => {
     const session = sessionRef.current;
+    const signIn = signInRef.current;
     if (inflightRefresh.current?.session === session) return inflightRefresh.current.promise;
 
     const promise = (async () => {
       try {
         let storedRefreshToken: string | null;
         try {
-          storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+          const stored = await withStorageLock(async () =>
+            sessionRef.current === session ? { refreshToken: await SecureStore.getItemAsync(refreshTokenKey) } : null,
+          );
+          if (!stored) return readCurrentAccessToken();
+          storedRefreshToken = stored.refreshToken;
         } catch (readError) {
           if (isKeychainUnavailableError(readError)) throw new KeychainUnavailableError();
           throw readError;
@@ -274,7 +300,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           tokenResponse = await requestRefreshGrant(storedRefreshToken);
         } catch (requestError) {
           if (isInvalidGrantError(requestError)) {
-            const ownAccessToken = await restoreOwnAccount(session);
+            const ownAccessToken = await restoreOwnAccount(session, signIn);
             if (ownAccessToken) return ownAccessToken;
             throw new SessionExpiredError("Refresh token is invalid or expired");
           }
@@ -282,6 +308,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         const tokens = { accessToken: tokenResponse.access_token, refreshToken: tokenResponse.refresh_token };
         if (await commitTokens(session, tokens)) return tokenResponse.access_token;
+        await keepRotatedTokens(signIn, storedRefreshToken, tokens);
         return readCurrentAccessToken();
       } finally {
         if (inflightRefresh.current?.session === session) inflightRefresh.current = null;
@@ -290,7 +317,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     inflightRefresh.current = { session, promise };
 
     return promise;
-  }, [commitTokens, readCurrentAccessToken, restoreOwnAccount]);
+  }, [commitTokens, keepRotatedTokens, readCurrentAccessToken, restoreOwnAccount, withStorageLock]);
 
   const refreshAccountsWithToken = useCallback(
     async (token: string) => {
@@ -393,6 +420,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             },
           });
           sessionRef.current += 1;
+          signInRef.current += 1;
           const session = sessionRef.current;
           try {
             const tokens = { accessToken: tokenResponse.access_token, refreshToken: tokenResponse.refresh_token };
@@ -445,6 +473,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(async () => {
     sessionRef.current += 1;
+    signInRef.current += 1;
     try {
       setIsLoading(true);
       await withStorageLock(async () => {
