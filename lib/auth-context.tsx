@@ -1,3 +1,17 @@
+import {
+  AccountsState,
+  clearAccounts,
+  fetchAccounts,
+  findAccount,
+  loadAccounts,
+  mergeServerAccounts,
+  profileFromApi,
+  requestAccountSwitch,
+  saveAccounts,
+  StoredAccount,
+  SwitchAccountResponse,
+  withAccountTokens,
+} from "@/lib/accounts";
 import { assertDefined } from "@/lib/assert";
 import { queryClient } from "@/lib/query-client";
 import { env } from "@/lib/env";
@@ -36,6 +50,11 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshToken: () => Promise<string>;
   refreshCreatorStatus: () => Promise<void>;
+  accounts: StoredAccount[];
+  activeAccountId: string | null;
+  isSwitchingAccount: boolean;
+  switchAccount: (accountId: string) => Promise<boolean>;
+  refreshAccounts: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,6 +108,8 @@ const secureStoreOptions: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
 };
 
+const emptyAccountsState: AccountsState = { accounts: [], activeAccountId: null };
+
 const isKeychainUnavailableError = (error: unknown): boolean =>
   error instanceof Error &&
   (error.message.includes("User interaction is not allowed") || error.message.includes("No keychain is available"));
@@ -98,7 +119,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isCreator, setIsCreator] = useState<boolean | null>(false);
   const inflightRefresh = useRef<Promise<string> | null>(null);
+  const [accountsState, setAccountsState] = useState<AccountsState>(emptyAccountsState);
+  const accountsStateRef = useRef<AccountsState>(emptyAccountsState);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
+  const switchingRef = useRef(false);
   const router = useRouter();
+
+  const updateAccountsState = useCallback(async (next: AccountsState) => {
+    accountsStateRef.current = next;
+    setAccountsState(next);
+    try {
+      await saveAccounts(next);
+    } catch (error) {
+      if (!isKeychainUnavailableError(error)) Sentry.captureException(error);
+    }
+  }, []);
+
+  const refreshAccountsWithToken = useCallback(
+    async (token: string) => {
+      try {
+        const serverAccounts = await fetchAccounts(token);
+        const storedRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+        await updateAccountsState(
+          mergeServerAccounts(accountsStateRef.current, serverAccounts, {
+            accessToken: token,
+            refreshToken: storedRefreshToken,
+          }),
+        );
+      } catch (error) {
+        console.warn("Failed to load accounts:", error);
+      }
+    },
+    [updateAccountsState],
+  );
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "gumroadmobile" });
 
@@ -122,8 +175,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const storedToken = await SecureStore.getItemAsync(accessTokenKey);
         if (storedToken) {
           setAccessToken(storedToken);
+          const storedAccounts = await loadAccounts().catch(() => emptyAccountsState);
+          accountsStateRef.current = storedAccounts;
+          setAccountsState(storedAccounts);
           const creatorStatus = await fetchCreatorStatus(storedToken);
           setIsCreator(creatorStatus);
+          void refreshAccountsWithToken(storedToken);
         }
       } catch (error) {
         if (isKeychainUnavailableError(error)) {
@@ -137,7 +194,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     loadStoredAuth();
-  }, []);
+  }, [refreshAccountsWithToken]);
 
   const storeTokens = useCallback(async (accessToken: string, refreshToken?: string) => {
     try {
@@ -155,6 +212,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw error;
     }
     setAccessToken(accessToken);
+    const { activeAccountId } = accountsStateRef.current;
+    if (activeAccountId) {
+      const next = withAccountTokens(accountsStateRef.current, activeAccountId, { accessToken, refreshToken });
+      accountsStateRef.current = next;
+      setAccountsState(next);
+      saveAccounts(next).catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -185,6 +249,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           const creatorStatus = await fetchCreatorStatus(tokenResponse.access_token);
           setIsCreator(creatorStatus);
+          void refreshAccountsWithToken(tokenResponse.access_token);
         } catch (error) {
           if (isInvalidGrantError(error)) {
             console.warn("Authorization code expired or already used:", error);
@@ -206,7 +271,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     handleAuthResponse();
-  }, [response, redirectUri, authRequest?.codeVerifier, storeTokens]);
+  }, [response, redirectUri, authRequest?.codeVerifier, storeTokens, refreshAccountsWithToken]);
 
   const login = useCallback(async () => {
     if (authRequest) {
@@ -224,7 +289,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       await SecureStore.deleteItemAsync(accessTokenKey);
       await SecureStore.deleteItemAsync(refreshTokenKey);
+      await clearAccounts();
       await clearSavedTab();
+      accountsStateRef.current = emptyAccountsState;
+      setAccountsState(emptyAccountsState);
       setAccessToken(null);
       setIsCreator(false);
       queryClient.clear();
@@ -296,6 +364,82 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsCreator((current) => current === true || result.isCreator);
   }, [accessToken, refreshTokenFn]);
 
+  const refreshAccounts = useCallback(async () => {
+    if (accessToken) await refreshAccountsWithToken(accessToken);
+  }, [accessToken, refreshAccountsWithToken]);
+
+  const switchAccount = useCallback(
+    async (accountId: string): Promise<boolean> => {
+      if (switchingRef.current || !accessToken) return false;
+      if (accountId === accountsStateRef.current.activeAccountId) return true;
+      switchingRef.current = true;
+      setIsSwitchingAccount(true);
+      try {
+        if (inflightRefresh.current) await inflightRefresh.current.catch(() => undefined);
+        let switchResponse: SwitchAccountResponse;
+        try {
+          switchResponse = await requestAccountSwitch(
+            assertDefined(await SecureStore.getItemAsync(accessTokenKey)),
+            accountId,
+          );
+        } catch (error) {
+          if (!(error instanceof UnauthorizedError)) throw error;
+          switchResponse = await requestAccountSwitch(await refreshTokenFn(), accountId);
+        }
+        const previousAccessToken = assertDefined(await SecureStore.getItemAsync(accessTokenKey));
+        const previousRefreshToken = await SecureStore.getItemAsync(refreshTokenKey);
+
+        const base = accountsStateRef.current;
+        const previousState = base.activeAccountId
+          ? withAccountTokens(base, base.activeAccountId, {
+              accessToken: previousAccessToken,
+              refreshToken: previousRefreshToken,
+            })
+          : base;
+        const switchedAccount: StoredAccount = {
+          ...profileFromApi(switchResponse.account),
+          accessToken: switchResponse.access_token,
+          refreshToken: switchResponse.refresh_token,
+        };
+        const nextState: AccountsState = {
+          accounts: findAccount(previousState, switchedAccount.accountId)
+            ? previousState.accounts.map((account) =>
+                account.accountId === switchedAccount.accountId ? switchedAccount : account,
+              )
+            : [...previousState.accounts, switchedAccount],
+          activeAccountId: switchedAccount.accountId,
+        };
+
+        accountsStateRef.current = nextState;
+        try {
+          await storeTokens(switchResponse.access_token, switchResponse.refresh_token);
+        } catch (error) {
+          accountsStateRef.current = previousState;
+          await storeTokens(previousAccessToken, previousRefreshToken ?? undefined).catch(() => undefined);
+          throw error;
+        }
+        await updateAccountsState(nextState);
+        await clearSavedTab();
+        queryClient.clear();
+        router.replace("/(tabs)/dashboard");
+        setIsCreator(await fetchCreatorStatus(switchResponse.access_token));
+        void refreshAccountsWithToken(switchResponse.access_token);
+        return true;
+      } catch (error) {
+        console.warn("Failed to switch account:", error);
+        if (!(error instanceof UnauthorizedError) && !(error instanceof SessionExpiredError)) {
+          Sentry.captureException(error);
+        }
+        Alert.alert("Something went wrong.");
+        return false;
+      } finally {
+        switchingRef.current = false;
+        setIsSwitchingAccount(false);
+      }
+    },
+    [accessToken, refreshAccountsWithToken, refreshTokenFn, router, storeTokens, updateAccountsState],
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -307,6 +451,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logout,
         refreshToken: refreshTokenFn,
         refreshCreatorStatus,
+        accounts: accountsState.accounts,
+        activeAccountId: accountsState.activeAccountId,
+        isSwitchingAccount,
+        switchAccount,
+        refreshAccounts,
       }}
     >
       {children}
