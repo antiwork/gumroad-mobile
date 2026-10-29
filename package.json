@@ -87,7 +87,7 @@
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-android-widget": "^0.20.1",
-    "react-native-blob-util": "0.24.7",
+    "react-native-blob-util": "^0.25.1",
     "react-native-context-menu-view": "^1.21.0",
     "react-native-css": "^3.0.1",
     "react-native-drawer-layout": "^4.2.1",
