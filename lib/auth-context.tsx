@@ -56,6 +56,8 @@ interface AuthContextType {
   isSwitchingAccount: boolean;
   switchAccount: (accountId: string) => Promise<boolean>;
   refreshAccounts: () => Promise<void>;
+  /** Live read of the active account, for callers that must not act after a refresh moved it. */
+  getActiveAccountId: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -518,6 +520,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (accessToken) await refreshAccountsWithToken(accessToken);
   }, [accessToken, refreshAccountsWithToken]);
 
+  const getActiveAccountId = useCallback(() => accountsStateRef.current.activeAccountId, []);
+
   const switchAccount = useCallback(
     async (accountId: string): Promise<boolean> => {
       if (switchingRef.current || !accessToken) return false;
@@ -616,6 +620,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isSwitchingAccount,
         switchAccount,
         refreshAccounts,
+        getActiveAccountId,
       }}
     >
       {children}
