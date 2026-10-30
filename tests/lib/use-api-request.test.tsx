@@ -13,11 +13,13 @@ import {
 
 const mockRefreshToken = jest.fn();
 const mockLogout = jest.fn();
+const mockGetActiveAccountId = jest.fn();
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => ({
     accessToken: "stale-token",
     refreshToken: mockRefreshToken,
     logout: mockLogout,
+    getActiveAccountId: mockGetActiveAccountId,
   }),
 }));
 
@@ -94,6 +96,8 @@ beforeEach(() => {
   mockFetch.mockReset();
   mockRefreshToken.mockReset();
   mockLogout.mockReset();
+  mockGetActiveAccountId.mockReset();
+  mockGetActiveAccountId.mockReturnValue("brand-account");
   (Sentry.captureException as jest.Mock).mockClear();
 });
 
@@ -119,6 +123,21 @@ describe("useAPIRequest", () => {
     expect(mockRefreshToken).toHaveBeenCalledTimes(1);
     expect(authHeaderOf(mockFetch.mock.calls[0])).toBe("Bearer stale-token");
     expect(authHeaderOf(mockFetch.mock.calls[1])).toBe("Bearer fresh-token");
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("does not replay the query when the refresh recovered a different account", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 401)).mockResolvedValueOnce(jsonResponse({ ok: true }));
+    mockRefreshToken.mockImplementationOnce(async () => {
+      mockGetActiveAccountId.mockReturnValue("own-account");
+      return "own-account-token";
+    });
+
+    const { result } = renderUseAPIRequest();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(UnauthorizedError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockLogout).not.toHaveBeenCalled();
   });
 

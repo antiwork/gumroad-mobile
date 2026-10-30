@@ -2,10 +2,12 @@ import logoG from "@/assets/images/logo-g.svg";
 import { LineIcon, SolidIcon } from "@/components/icon";
 import { MiniAudioPlayer } from "@/components/mini-audio-player";
 import { StyledImage } from "@/components/styled";
+import { SwitchAccountSection } from "@/components/switch-account-section";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
+import { useActiveAccountTitle } from "@/components/use-active-account-title";
 import { useUser } from "@/components/use-user";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
@@ -16,7 +18,7 @@ import * as Application from "expo-application";
 import Constants from "expo-constants";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Alert, Pressable, TouchableOpacity, View } from "react-native";
+import { Alert, Pressable, ScrollView, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
 
 interface SearchContextValue {
@@ -133,7 +135,7 @@ const SettingsSheet = () => {
       <SheetHeader onClose={() => setSettingsOpen(false)}>
         <SheetTitle>Settings</SheetTitle>
       </SheetHeader>
-      <SheetContent>
+      <ScrollView testID="settings-scroll-view" className="flex-1">
         <View className="border-b border-border p-4">
           <Text className="mb-2 font-sans text-lg text-foreground">Feedback</Text>
           <Text className="mb-4 text-sm text-muted-foreground">Report a bug or suggest an improvement.</Text>
@@ -182,6 +184,7 @@ const SettingsSheet = () => {
             <LineIcon name="arrow-out-left-square-half" size={20} className="text-primary-foreground" />
           </Button>
         </View>
+        <SwitchAccountSection onSwitched={() => setSettingsOpen(false)} />
         <View className="border-b border-border p-4">
           <Text className="mb-2 font-sans text-lg text-foreground">Danger Zone</Text>
           <Text className="mb-4 text-sm text-muted-foreground">
@@ -193,7 +196,7 @@ const SettingsSheet = () => {
             <LineIcon name="arrow-right-stroke" size={20} className="text-destructive-foreground" />
           </Button>
         </View>
-      </SheetContent>
+      </ScrollView>
     </Sheet>
   );
 };
@@ -239,6 +242,7 @@ export default function TabsLayout() {
   const [accent, muted, border] = useCSSVariable(["--color-accent", "--color-muted", "--color-border"]);
   const headerTitleStyle = useResolveClassNames("font-sans text-white");
   const tabBarLabelStyle = useResolveClassNames("font-sans font-normal text-xs");
+  const dashboardHeaderTitle = useActiveAccountTitle("Dashboard");
   return (
     <SearchContext.Provider value={{ isSearchActive, setSearchActive }}>
       <SettingsSheetContext.Provider value={{ isSettingsOpen, setSettingsOpen }}>
@@ -267,6 +271,7 @@ export default function TabsLayout() {
             name="dashboard"
             options={{
               title: "Dashboard",
+              headerTitle: dashboardHeaderTitle,
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
               tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={(color as string | undefined) ?? (muted as string)} />,

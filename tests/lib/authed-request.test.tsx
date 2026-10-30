@@ -4,12 +4,14 @@ import { renderHook } from "@testing-library/react-native";
 
 const mockRefreshToken = jest.fn();
 const mockLogout = jest.fn();
+const mockGetActiveAccountId = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => ({
     accessToken: "test-token",
     refreshToken: mockRefreshToken,
     logout: mockLogout,
+    getActiveAccountId: mockGetActiveAccountId,
   }),
 }));
 
@@ -22,6 +24,7 @@ import { KeychainUnavailableError, SessionExpiredError, UnauthorizedError } from
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGetActiveAccountId.mockReturnValue("owner");
 });
 
 const renderAuthedRequest = () => renderHook(() => useAuthedRequest()).result.current;
@@ -68,5 +71,20 @@ describe("useAuthedRequest", () => {
     await expect(authedRequest(run)).resolves.toBe("result");
     expect(run).toHaveBeenNthCalledWith(1, "test-token");
     expect(run).toHaveBeenNthCalledWith(2, "new-token");
+  });
+
+  it("does not replay the request when the refresh recovered a different account", async () => {
+    const authedRequest = renderAuthedRequest();
+    const unauthorized = new UnauthorizedError("Unauthorized");
+    mockRefreshToken.mockImplementationOnce(async () => {
+      mockGetActiveAccountId.mockReturnValue("own-account");
+      return "owner-token";
+    });
+    const run = jest.fn().mockRejectedValueOnce(unauthorized);
+
+    await expect(authedRequest(run)).rejects.toBe(unauthorized);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledWith("test-token");
+    expect(mockLogout).not.toHaveBeenCalled();
   });
 });
