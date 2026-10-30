@@ -269,7 +269,7 @@ export default function TabsLayout() {
               title: "Dashboard",
               headerLeft: () => <LogoIcon />,
               headerRight: () => <DashboardHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={(color as string | undefined) ?? "#000"} />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="home-alt-2" size={size} color={(color as string | undefined) ?? (muted as string)} />,
             }}
           />
           <Tabs.Screen
@@ -278,7 +278,7 @@ export default function TabsLayout() {
               title: "Products",
               headerLeft: () => <LogoIcon />,
               headerRight: () => <ProductsHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="package" size={size} color={(color as string | undefined) ?? "#000"} />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="package" size={size} color={(color as string | undefined) ?? (muted as string)} />,
             }}
           />
           <Tabs.Screen
@@ -287,7 +287,7 @@ export default function TabsLayout() {
               title: "Analytics",
               headerLeft: () => <LogoIcon />,
               headerRight: () => <LibraryHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-big" size={size} color={(color as string | undefined) ?? "#000"} />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="bar-chart-big" size={size} color={(color as string | undefined) ?? (muted as string)} />,
             }}
           />
           <Tabs.Screen
@@ -296,7 +296,7 @@ export default function TabsLayout() {
               title: "Agent",
               headerLeft: () => <LogoIcon />,
               headerRight: () => <LibraryHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="message-bubble-dots" size={size} color={(color as string | undefined) ?? "#000"} />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="message-bubble-dots" size={size} color={(color as string | undefined) ?? (muted as string)} />,
             }}
           />
           <Tabs.Screen
@@ -305,7 +305,7 @@ export default function TabsLayout() {
               title: "Library",
               headerLeft: () => <LogoIcon />,
               headerRight: () => <LibraryHeaderRight />,
-              tabBarIcon: ({ color, size }) => <SolidIcon name="bookmark-heart" size={size} color={(color as string | undefined) ?? "#000"} />,
+              tabBarIcon: ({ color, size }) => <SolidIcon name="bookmark-heart" size={size} color={(color as string | undefined) ?? (muted as string)} />,
             }}
           />
         </Tabs>
