@@ -307,7 +307,7 @@ export const requestAPI = async <T>(
 export const useAPIRequest = <TResponse, TData = TResponse>(
   options: Omit<UseQueryOptions<TResponse, Error, TData>, "queryFn"> & { url: string },
 ) => {
-  const { accessToken, refreshToken, logout } = useAuth();
+  const { accessToken, refreshToken, logout, getActiveAccountId } = useAuth();
 
   return useQuery<TResponse, Error, TData>({
     queryFn: async () => {
@@ -315,6 +315,7 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
         return await requestAPI<TResponse>(options.url, { accessToken: assertDefined(accessToken) });
       } catch (error) {
         if (!(error instanceof UnauthorizedError)) throw error;
+        const accountId = getActiveAccountId();
         let newAccessToken: string;
         try {
           newAccessToken = await refreshToken();
@@ -328,6 +329,10 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
           await logout();
           throw error;
         }
+        // A refresh that lost a revoked brand recovers the member's own account, so the new token can
+        // belong to a different account than the one this query was started for. Retrying with it would
+        // read another account's data into this view, so fail the query instead.
+        if (getActiveAccountId() !== accountId) throw error;
         return await requestAPI<TResponse>(options.url, { accessToken: newAccessToken });
       }
     },
