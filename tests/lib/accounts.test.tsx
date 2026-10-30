@@ -841,7 +841,7 @@ describe("losing access to a brand account", () => {
   it("closes the brand's screens stacked over the tabs before opening the member's Dashboard", async () => {
     const { result } = await switchToBrand();
     mockRefreshGrants(async () => ({ access_token: "member-access-2", refresh_token: "member-refresh-2" }));
-    mockCanDismiss.mockReturnValue(true);
+    mockCanDismiss.mockReturnValueOnce(true);
 
     await act(async () => {
       await result.current.refreshToken();
