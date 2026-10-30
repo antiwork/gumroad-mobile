@@ -17,7 +17,7 @@ import { shareFile } from "@/lib/share";
 import { useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Dimensions, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Pdf, { PdfRef, TableContent } from "react-native-pdf";
 import { cn } from "@/lib/utils";
 import { safeOpenURL } from "@/lib/open-url";
@@ -316,8 +316,7 @@ export default function PdfViewerScreen() {
 
 const styles = StyleSheet.create({
   pdf: {
+    // Fills Screen's rail-inset content box; window dimensions would run under the rail.
     flex: 1,
-    width: Dimensions.get("window").width,
-    height: Dimensions.get("window").height,
   },
 });

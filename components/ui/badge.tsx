@@ -2,7 +2,7 @@ import { TextClassContext } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import * as Slot from "@rn-primitives/slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Platform, View, ViewProps } from "react-native";
+import { Platform, View, ViewProps, type ViewInstance } from "react-native";
 
 const badgeVariants = cva(
   cn(
@@ -41,7 +41,7 @@ const badgeTextVariants = cva("text-xs", {
 });
 
 type BadgeProps = ViewProps &
-  React.RefAttributes<View> & {
+  React.RefAttributes<ViewInstance> & {
     asChild?: boolean;
   } & VariantProps<typeof badgeVariants>;
 

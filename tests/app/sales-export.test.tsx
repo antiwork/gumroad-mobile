@@ -67,7 +67,7 @@ describe("SalesExportScreen", () => {
       delete: mockDelete,
     });
     mockOpen.mockReturnValue({ readBytes: mockReadBytes, close: mockClose });
-    mockReadBytes.mockReturnValue(new Uint8Array([80]));
+    mockReadBytes.mockResolvedValue(new Uint8Array([80]));
     mockDownloadFileAsync.mockResolvedValue({ uri: "file:///cache/sales.csv" });
     mockIsSharingAvailableAsync.mockResolvedValue(true);
   });
@@ -129,9 +129,34 @@ describe("SalesExportScreen", () => {
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
+  it("closes the file handle only after the first-byte read resolves", async () => {
+    let resolveRead: (bytes: Uint8Array) => void = () => {};
+    mockReadBytes.mockReturnValueOnce(
+      new Promise<Uint8Array>((resolve) => {
+        resolveRead = resolve;
+      }),
+    );
+
+    render(<SalesExportScreen />);
+
+    fireEvent.press(screen.getByText("Download CSV"));
+
+    await waitFor(() => {
+      expect(mockReadBytes).toHaveBeenCalled();
+    });
+    expect(mockClose).not.toHaveBeenCalled();
+
+    resolveRead(new Uint8Array([80]));
+
+    await waitFor(() => {
+      expect(mockShareAsync).toHaveBeenCalled();
+    });
+    expect(mockClose).toHaveBeenCalled();
+  });
+
   it("shows an info alert without reporting to Sentry when the export is too large", async () => {
     jest.spyOn(NativeAlert, "alert");
-    mockReadBytes.mockReturnValueOnce(new Uint8Array([60]));
+    mockReadBytes.mockResolvedValueOnce(new Uint8Array([60]));
 
     render(<SalesExportScreen />);
 
@@ -146,7 +171,7 @@ describe("SalesExportScreen", () => {
   });
 
   it("retries once when the download produces an empty file and shares the successful retry", async () => {
-    mockReadBytes.mockReturnValueOnce(new Uint8Array([]));
+    mockReadBytes.mockResolvedValueOnce(new Uint8Array([]));
 
     render(<SalesExportScreen />);
 
@@ -165,7 +190,7 @@ describe("SalesExportScreen", () => {
 
   it("treats a download that stays empty after the retry as a failure and deletes the file", async () => {
     jest.spyOn(NativeAlert, "alert");
-    mockReadBytes.mockReturnValueOnce(new Uint8Array([])).mockReturnValueOnce(new Uint8Array([]));
+    mockReadBytes.mockResolvedValueOnce(new Uint8Array([])).mockResolvedValueOnce(new Uint8Array([]));
 
     render(<SalesExportScreen />);
 
@@ -182,7 +207,7 @@ describe("SalesExportScreen", () => {
 
   it("still surfaces the large-export notice even if deleting the temp file fails", async () => {
     jest.spyOn(NativeAlert, "alert");
-    mockReadBytes.mockReturnValueOnce(new Uint8Array([60]));
+    mockReadBytes.mockResolvedValueOnce(new Uint8Array([60]));
     mockDelete.mockImplementationOnce(() => {
       throw new Error("delete failed");
     });

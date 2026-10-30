@@ -18,7 +18,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { shareFile } from "@/lib/share";
 import { Asset } from "expo-asset";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { Alert, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView } from "react-native-webview";
 import { useCSSVariable } from "uniwind";
@@ -97,10 +97,9 @@ export default function PostScreen() {
   const post = useInstallment(id, { purchaseId, subscriptionId, followerId });
   const purchase = usePurchase(post?.url_redirect_external_id);
   const { accessToken } = useAuth();
-  const webViewRef = useRef<BaseWebView>(null);
+  const webViewRef = useRef<BaseWebView<undefined>>(null);
   const { playAudio, pauseAudio, activeResourceId, isPlaying } = useAudioPlayerSync(webViewRef);
   const { bottom } = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
   const [bodyHeight, setBodyHeight] = useState(0);
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [fontFaces, setFontFaces] = useState("");
@@ -277,9 +276,13 @@ export default function PostScreen() {
           {htmlContent && (
             <View style={{ height: bodyHeight, marginTop: 16 }}>
               <BaseWebView
-                ref={webViewRef}
+                // react-native-webview@14 types the component as a plain FunctionComponent, so its
+                // imperative ref is missing from the types even though the runtime provides it.
+                ref={webViewRef as unknown as never}
                 source={{ html: htmlContent }}
-                style={{ height: bodyHeight, width: width - 32, backgroundColor: "transparent" }}
+                // Stretch to the padded content box: a width derived from the window would run under
+                // the rail once Screen insets the content.
+                style={{ height: bodyHeight, backgroundColor: "transparent" }}
                 scrollEnabled={false}
                 showsVerticalScrollIndicator={false}
                 allowsInlineMediaPlayback

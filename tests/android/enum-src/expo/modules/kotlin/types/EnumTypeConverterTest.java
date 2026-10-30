@@ -6,12 +6,13 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import android.content.Context;
+import android.view.View;
 import com.facebook.react.bridge.Dynamic;
 import com.facebook.react.bridge.DynamicFromObject;
+import expo.modules.kotlin.runtime.Runtime;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import kotlin.jvm.JvmClassMappingKt;
-import kotlin.reflect.KClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -59,10 +60,29 @@ public class EnumTypeConverterTest {
     }
   }
 
-  @SuppressWarnings("unchecked")
+  private static final ConverterContext CONTEXT =
+      new ConverterContext() {
+        @Override
+        public Context getApplicationContext() {
+          return null;
+        }
+
+        @Override
+        public Runtime getRuntime() {
+          return null;
+        }
+
+        @Override
+        public <T extends View> T findView(int viewTag) {
+          return null;
+        }
+
+        @Override
+        public void assertMainThread() {}
+      };
+
   private static EnumTypeConverter converterFor(Class<? extends Enum<?>> cls) {
-    KClass<?> kClass = JvmClassMappingKt.getKotlinClass(cls);
-    return new EnumTypeConverter((KClass<Enum<?>>) kClass);
+    return new EnumTypeConverter(cls);
   }
 
   private static Dynamic dynamic(Object value) {
@@ -72,15 +92,15 @@ public class EnumTypeConverterTest {
   @Test
   public void nameOnlyEnumConvertsByCaseName() {
     EnumTypeConverter converter = converterFor(NameOnly.class);
-    assertEquals(NameOnly.ALPHA, converter.convertFromAny("ALPHA", null, false));
-    assertEquals(NameOnly.BETA, converter.convertFromAny("BETA", null, false));
+    assertEquals(NameOnly.ALPHA, converter.convertFromAny("ALPHA", CONTEXT, false));
+    assertEquals(NameOnly.BETA, converter.convertFromAny("BETA", CONTEXT, false));
   }
 
   @Test
   public void nameOnlyEnumRejectsUnknownCaseName() {
     EnumTypeConverter converter = converterFor(NameOnly.class);
     try {
-      converter.convertFromAny("NOPE", null, false);
+      converter.convertFromAny("NOPE", CONTEXT, false);
       fail("expected unknown name to throw");
     } catch (Exception error) {
       assertTrue(error.getMessage(), error.getMessage().contains("NOPE"));
@@ -90,28 +110,28 @@ public class EnumTypeConverterTest {
   @Test
   public void intValueEnumConvertsByUserField() {
     EnumTypeConverter converter = converterFor(IntValue.class);
-    assertEquals(IntValue.LOW, converter.convertFromAny(1, null, false));
-    assertEquals(IntValue.HIGH, converter.convertFromAny(2, null, false));
+    assertEquals(IntValue.LOW, converter.convertFromAny(1, CONTEXT, false));
+    assertEquals(IntValue.HIGH, converter.convertFromAny(2, CONTEXT, false));
   }
 
   @Test
   public void intValueEnumAcceptsDoubleFromJsNumber() {
     EnumTypeConverter converter = converterFor(IntValue.class);
-    assertEquals(IntValue.HIGH, converter.convertFromAny(2.0, null, false));
+    assertEquals(IntValue.HIGH, converter.convertFromAny(2.0, CONTEXT, false));
   }
 
   @Test
   public void stringValueEnumConvertsByUserField() {
     EnumTypeConverter converter = converterFor(StringValue.class);
-    assertEquals(StringValue.ADMIN, converter.convertFromAny("admin", null, false));
-    assertEquals(StringValue.USER, converter.convertFromAny("user", null, false));
+    assertEquals(StringValue.ADMIN, converter.convertFromAny("admin", CONTEXT, false));
+    assertEquals(StringValue.USER, converter.convertFromAny("user", CONTEXT, false));
   }
 
   @Test
   public void twoFieldEnumIsIncompatible() {
     EnumTypeConverter converter = converterFor(TwoField.class);
     try {
-      converter.convertFromAny(1, null, false);
+      converter.convertFromAny(1, CONTEXT, false);
       fail("expected two-field enum to be incompatible");
     } catch (Exception error) {
       assertTrue(error.getMessage(), error.getMessage().contains("not compatible"));
@@ -121,29 +141,29 @@ public class EnumTypeConverterTest {
   @Test
   public void nameOnlyEnumConvertsFromDynamicByCaseName() {
     EnumTypeConverter converter = converterFor(NameOnly.class);
-    assertEquals(NameOnly.ALPHA, converter.convertFromDynamic(dynamic("ALPHA"), null, false));
-    assertEquals(NameOnly.BETA, converter.convertFromDynamic(dynamic("BETA"), null, false));
+    assertEquals(NameOnly.ALPHA, converter.convertFromDynamic(dynamic("ALPHA"), CONTEXT, false));
+    assertEquals(NameOnly.BETA, converter.convertFromDynamic(dynamic("BETA"), CONTEXT, false));
   }
 
   @Test
   public void intValueEnumConvertsFromDynamicJsNumber() {
     EnumTypeConverter converter = converterFor(IntValue.class);
-    assertEquals(IntValue.LOW, converter.convertFromDynamic(dynamic(1.0), null, false));
-    assertEquals(IntValue.HIGH, converter.convertFromDynamic(dynamic(2.0), null, false));
+    assertEquals(IntValue.LOW, converter.convertFromDynamic(dynamic(1.0), CONTEXT, false));
+    assertEquals(IntValue.HIGH, converter.convertFromDynamic(dynamic(2.0), CONTEXT, false));
   }
 
   @Test
   public void stringValueEnumConvertsFromDynamicByUserField() {
     EnumTypeConverter converter = converterFor(StringValue.class);
-    assertEquals(StringValue.ADMIN, converter.convertFromDynamic(dynamic("admin"), null, false));
-    assertEquals(StringValue.USER, converter.convertFromDynamic(dynamic("user"), null, false));
+    assertEquals(StringValue.ADMIN, converter.convertFromDynamic(dynamic("admin"), CONTEXT, false));
+    assertEquals(StringValue.USER, converter.convertFromDynamic(dynamic("user"), CONTEXT, false));
   }
 
   @Test
   public void twoFieldEnumIsIncompatibleFromDynamic() {
     EnumTypeConverter converter = converterFor(TwoField.class);
     try {
-      converter.convertFromDynamic(dynamic(1.0), null, false);
+      converter.convertFromDynamic(dynamic(1.0), CONTEXT, false);
       fail("expected two-field enum to be incompatible");
     } catch (Exception error) {
       assertTrue(error.getMessage(), error.getMessage().contains("not compatible"));

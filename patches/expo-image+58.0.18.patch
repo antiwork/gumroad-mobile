@@ -1,6 +1,5 @@
 diff --git a/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java b/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java
 new file mode 100644
-index 0000000..02d7d99
 --- /dev/null
 +++ b/node_modules/expo-image/android/src/main/java/expo/modules/image/AsyncConnectivityMonitorFactory.java
 @@ -0,0 +1,131 @@
@@ -136,29 +135,27 @@ index 0000000..02d7d99
 +  }
 +}
 diff --git a/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt b/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
-index 5735515..008f796 100644
 --- a/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
 +++ b/node_modules/expo-image/android/src/main/java/expo/modules/image/ExpoImageAppGlideModule.kt
-@@ -14,6 +14,7 @@ import com.bumptech.glide.module.AppGlideModule
+@@ -22,6 +22,7 @@
  class ExpoImageAppGlideModule : AppGlideModule() {
    override fun applyOptions(context: Context, builder: GlideBuilder) {
      super.applyOptions(context, builder)
 +    builder.setConnectivityMonitorFactory(AsyncConnectivityMonitorFactory())
  
-     builder.setLogLevel(
-       if (BuildConfig.ALLOW_GLIDE_LOGS) {
+     builder.setDiskCache(
+       ExpoImageDiskCache.Factory(InternalCacheDiskCacheFactory(context))
 diff --git a/node_modules/expo-image/ios/ImageView.swift b/node_modules/expo-image/ios/ImageView.swift
-index adcf377..9bc3480 100644
 --- a/node_modules/expo-image/ios/ImageView.swift
 +++ b/node_modules/expo-image/ios/ImageView.swift
-@@ -122,6 +122,10 @@ public final class ImageView: ExpoView {
+@@ -141,6 +141,10 @@
+     sdImageView.contentMode = contentFit.toContentMode()
      sdImageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
      sdImageView.layer.masksToBounds = false
- 
++
 +    // Disable progressive animated image loading to prevent main-thread hangs
 +    // in -[SDAnimatedImageView progressiveAnimatedCoderForImage:]
 +    sdImageView.shouldIncrementalLoad = false
-+
+ 
      // Apply trilinear filtering to smooth out mis-sized images.
      sdImageView.layer.magnificationFilter = .trilinear
-     sdImageView.layer.minificationFilter = .trilinear

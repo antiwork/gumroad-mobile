@@ -12,7 +12,7 @@ import { Screen } from "@/components/ui/screen";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { useEffect, useRef, useState } from "react";
-import { FlatList, Pressable, RefreshControl, TextInput, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, TextInput, View, type TextInputInstance } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 const TimeRangeButton = ({
@@ -50,7 +50,7 @@ export default function Dashboard() {
   const isAllRange = timeRange === "all";
   const salesSearch = useSales(searchText, isCreator !== false && isSearchActive, { requireQuery: true });
   const allSales = useSales("", isCreator !== false && isAllRange && !isSearchActive);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     if (isCreator === null) void refreshCreatorStatus();
@@ -227,7 +227,7 @@ export default function Dashboard() {
               <View className="items-center py-4">
                 <LoadingSpinner size="small" />
               </View>
-            ) : null
+            ) : undefined
           }
           keyboardShouldPersistTaps="handled"
         />

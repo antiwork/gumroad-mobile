@@ -498,7 +498,7 @@ export const AgentChat = ({ greeting, suggestions }: Props) => {
                 <Text className="text-sm text-muted">Working on it...</Text>
               </View>
             )
-          ) : null
+          ) : undefined
         }
       />
 
