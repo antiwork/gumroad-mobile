@@ -7,7 +7,7 @@ import { FlatList, KeyboardAvoidingView, Platform } from "react-native";
 import { renderWithQueryClient } from "../../render-with-query-client";
 
 jest.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ accessToken: "test-token" }),
+  useAuth: () => ({ accessToken: "test-token", getActiveAccountId: () => "account-1" }),
 }));
 
 jest.mock("@react-navigation/elements", () => ({

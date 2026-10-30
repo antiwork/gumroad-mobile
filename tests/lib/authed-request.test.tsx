@@ -87,4 +87,18 @@ describe("useAuthedRequest", () => {
     expect(run).toHaveBeenCalledWith("test-token");
     expect(mockLogout).not.toHaveBeenCalled();
   });
+
+  it("does not replay the request when another request recovered a different account before its 401 arrived", async () => {
+    const authedRequest = renderAuthedRequest();
+    const unauthorized = new UnauthorizedError("Unauthorized");
+    mockRefreshToken.mockResolvedValueOnce("owner-token");
+    const run = jest.fn().mockImplementationOnce(async () => {
+      mockGetActiveAccountId.mockReturnValue("own-account");
+      throw unauthorized;
+    });
+
+    await expect(authedRequest(run)).rejects.toBe(unauthorized);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
 });

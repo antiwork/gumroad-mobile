@@ -311,11 +311,11 @@ export const useAPIRequest = <TResponse, TData = TResponse>(
 
   return useQuery<TResponse, Error, TData>({
     queryFn: async () => {
+      const accountId = getActiveAccountId();
       try {
         return await requestAPI<TResponse>(options.url, { accessToken: assertDefined(accessToken) });
       } catch (error) {
         if (!(error instanceof UnauthorizedError)) throw error;
-        const accountId = getActiveAccountId();
         let newAccessToken: string;
         try {
           newAccessToken = await refreshToken();
