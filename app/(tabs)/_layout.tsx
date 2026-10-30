@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Sheet, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Text } from "@/components/ui/text";
+import { useActiveAccountTitle } from "@/components/use-active-account-title";
 import { useUser } from "@/components/use-user";
 import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
@@ -198,12 +199,6 @@ const SettingsSheet = () => {
       </ScrollView>
     </Sheet>
   );
-};
-
-const useActiveAccountTitle = (fallback: string) => {
-  const { accounts, activeAccountId } = useAuth();
-  if (accounts.length < 2) return fallback;
-  return accounts.find((account) => account.accountId === activeAccountId)?.name ?? fallback;
 };
 
 const DashboardHeaderRight = () => (
