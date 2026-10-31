@@ -13,8 +13,8 @@ import {
   streamAgentMessage,
 } from "@/lib/agent";
 import { useAuthedRequest } from "@/lib/authed-request";
-import { useHeaderHeight } from "@react-navigation/elements";
 import { useMutation } from "@tanstack/react-query";
+import { useHeaderHeight } from "expo-router/react-navigation";
 import { useEffect, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, type NativeScrollEvent, Platform, TextInput, View } from "react-native";
 import { useCSSVariable } from "uniwind";

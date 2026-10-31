@@ -10,8 +10,8 @@ jest.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ accessToken: "test-token" }),
 }));
 
-jest.mock("@react-navigation/elements", () => ({
-  ...jest.requireActual("@react-navigation/elements"),
+jest.mock("expo-router/react-navigation", () => ({
+  ...jest.requireActual("expo-router/react-navigation"),
   useHeaderHeight: () => 104,
 }));
 

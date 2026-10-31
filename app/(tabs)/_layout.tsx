@@ -13,10 +13,10 @@ import { useAuth } from "@/lib/auth-context";
 import { env } from "@/lib/env";
 import { safeOpenURL } from "@/lib/open-url";
 import { saveLastTab } from "@/lib/tab-preference";
-import { BottomTabBar, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
 import { Tabs, usePathname, useRouter } from "expo-router";
+import { BottomTabBar } from "expo-router/tabs";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, TouchableOpacity, View } from "react-native";
 import { useCSSVariable, useResolveClassNames } from "uniwind";
@@ -250,7 +250,7 @@ export default function TabsLayout() {
           tabBar={(props) => (
             <View>
               <MiniAudioPlayer />
-              <BottomTabBar {...(props as unknown as BottomTabBarProps)} />
+              <BottomTabBar {...props} />
             </View>
           )}
           screenOptions={{

@@ -14,7 +14,6 @@ jest.mock("expo-router", () => {
 });
 const BRAND_ACCOUNT_COUNT = 12;
 
-jest.mock("@react-navigation/bottom-tabs", () => ({ BottomTabBar: () => null }));
 jest.mock("@/components/mini-audio-player", () => ({ MiniAudioPlayer: () => null }));
 jest.mock("@/components/use-user", () => ({ useUser: () => ({ data: undefined, isLoading: false }) }));
 jest.mock("@/lib/tab-preference", () => ({ saveLastTab: jest.fn() }));
