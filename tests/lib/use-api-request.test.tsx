@@ -141,6 +141,23 @@ describe("useAPIRequest", () => {
     expect(mockLogout).not.toHaveBeenCalled();
   });
 
+  it("does not replay the query when another request recovered a different account before its 401 arrived", async () => {
+    mockFetch
+      .mockImplementationOnce(async () => {
+        mockGetActiveAccountId.mockReturnValue("own-account");
+        return jsonResponse({}, 401);
+      })
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+    mockRefreshToken.mockResolvedValueOnce("own-account-token");
+
+    const { result } = renderUseAPIRequest();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(UnauthorizedError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
   it("propagates the original 401 without logging out when refresh fails with KeychainUnavailableError", async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
     mockRefreshToken.mockRejectedValueOnce(new KeychainUnavailableError());

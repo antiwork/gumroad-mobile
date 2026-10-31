@@ -11,6 +11,8 @@ import { request, requestAPI } from "@/lib/request";
 import { clearSavedTab } from "@/lib/tab-preference";
 
 const mockReplace = jest.fn();
+const mockCanDismiss = jest.fn();
+const mockDismissAll = jest.fn();
 
 jest.mock("expo-auth-session");
 jest.mock("expo-secure-store", () => ({
@@ -20,7 +22,9 @@ jest.mock("expo-secure-store", () => ({
   AFTER_FIRST_UNLOCK: "after_first_unlock_sentinel",
 }));
 jest.mock("expo-web-browser", () => ({ maybeCompleteAuthSession: jest.fn() }));
-jest.mock("expo-router", () => ({ useRouter: () => ({ replace: mockReplace }) }));
+jest.mock("expo-router", () => ({
+  useRouter: () => ({ replace: mockReplace, canDismiss: mockCanDismiss, dismissAll: mockDismissAll }),
+}));
 jest.mock("@/lib/tab-preference", () => ({ clearSavedTab: jest.fn().mockResolvedValue(undefined) }));
 jest.mock("@/lib/query-client", () => ({ queryClient: { clear: jest.fn() } }));
 jest.mock("@/lib/request", () => {
@@ -834,6 +838,20 @@ describe("losing access to a brand account", () => {
     expect(Alert.alert).toHaveBeenCalledWith("You no longer have access to Brand.");
   });
 
+  it("closes the brand's screens stacked over the tabs before opening the member's Dashboard", async () => {
+    const { result } = await switchToBrand();
+    mockRefreshGrants(async () => ({ access_token: "member-access-2", refresh_token: "member-refresh-2" }));
+    mockCanDismiss.mockReturnValueOnce(true);
+
+    await act(async () => {
+      await result.current.refreshToken();
+    });
+
+    expect(mockDismissAll).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith("/(tabs)/dashboard");
+    expect(mockDismissAll.mock.invocationCallOrder[0]).toBeLessThan(mockReplace.mock.invocationCallOrder[0]);
+  });
+
   it("reports an expired session when the member's own refresh token is also revoked", async () => {
     const { SessionExpiredError } = jest.requireMock("@/lib/request");
     const { result } = await switchToBrand();
@@ -847,6 +865,7 @@ describe("losing access to a brand account", () => {
 
     expect(result.current.activeAccountId).toBe("brand");
     expect(store.get("gumroad_access_token")).toBe("brand-access");
+    expect(mockDismissAll).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
     expect(Alert.alert).not.toHaveBeenCalled();
   });
