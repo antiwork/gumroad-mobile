@@ -30,6 +30,10 @@ const TRANSIENT_MARKERS = [
   "A server with the specified hostname could not be found.",
   "Unable to download asset from url:",
   "SERVICE_NOT_AVAILABLE",
+  // FCM refused to issue a device token because this installation has reached
+  // the per-device registration limit (common on emulators and restored
+  // devices). Device state, not an app defect; retried on the next launch.
+  "TOO_MANY_REGISTRATIONS",
   // Firebase Installations failed to authenticate the device (clock skew,
   // restored backups reusing another device's installation ID, flaky Play
   // Services). The push-token fetch is re-attempted on the next app launch,

@@ -118,6 +118,16 @@ describe("sentry beforeSend", () => {
         ]),
       ],
       [
+        "Android FCM token registration over the per-device registration limit",
+        errorEvent([
+          {
+            type: "Error",
+            value:
+              "Fetching the token failed: java.util.concurrent.ExecutionException: java.io.IOException: TOO_MANY_REGISTRATIONS",
+          },
+        ]),
+      ],
+      [
         "Android FCM token registration via Firebase Installations auth (FIS_AUTH_ERROR)",
         errorEvent([
           {
