@@ -266,6 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await clearSavedTab();
       queryClient.clear();
       if (sessionRef.current === restoredSession) {
+        if (routerRef.current.canDismiss()) routerRef.current.dismissAll();
         routerRef.current.replace("/(tabs)/dashboard");
         Alert.alert(`You no longer have access to ${lostAccount.name}.`);
       }

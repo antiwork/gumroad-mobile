@@ -7,11 +7,11 @@ export const useAuthedRequest = () => {
   const { accessToken, refreshToken, logout, getActiveAccountId } = useAuth();
 
   return async <T>(run: (token: string) => Promise<T>): Promise<T> => {
+    const accountId = getActiveAccountId();
     try {
       return await run(assertDefined(accessToken));
     } catch (error) {
       if (!(error instanceof UnauthorizedError)) throw error;
-      const accountId = getActiveAccountId();
       let newToken: string;
       try {
         newToken = await refreshToken();
