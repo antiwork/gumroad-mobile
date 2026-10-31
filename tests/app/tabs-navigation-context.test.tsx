@@ -37,7 +37,7 @@ const Stub = () => <Text>stub</Text>;
 
 describe("(tabs) layout", () => {
   it("renders the custom tab bar inside the navigator's own theme", async () => {
-    await renderRouter(
+    const { getByText } = await renderRouter(
       {
         "(tabs)/_layout": TabsLayout,
         "(tabs)/dashboard": Stub,
@@ -48,5 +48,10 @@ describe("(tabs) layout", () => {
       },
       { initialUrl: "/dashboard" },
     );
+
+    // Reaching the labels proves the bar read the navigator's own theme: a bar from the
+    // installed @react-navigation/bottom-tabs throws "Couldn't find a theme" here.
+    expect(getByText("Products")).toBeTruthy();
+    expect(getByText("Library")).toBeTruthy();
   });
 });
