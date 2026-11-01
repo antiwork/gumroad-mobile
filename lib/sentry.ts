@@ -80,8 +80,12 @@ const hasAppFrames = (event: ErrorEvent) =>
 const isNonActionableError = (event: ErrorEvent) => {
   const values = event.exception?.values;
   if (!values) return false;
+  // A session that ended — a revoked or expired refresh token, or a sign-out racing an in-flight
+  // refresh — is an expected state, not a defect: the request paths already turn it into a sign-out.
+  // Match the type rather than the message so a new variant of it is covered too.
   const primaryType = values[0]?.type;
-  if (primaryType === "AbortError" || primaryType === "UnauthorizedError") return true;
+  if (primaryType === "AbortError" || primaryType === "UnauthorizedError" || primaryType === "SessionExpiredError")
+    return true;
   const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
   if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
   if (STALE_BLOB_MARKERS.some((marker) => text.includes(marker)) && !hasAppFrames(event)) return true;

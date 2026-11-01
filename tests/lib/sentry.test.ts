@@ -145,6 +145,14 @@ describe("sentry beforeSend", () => {
       ["aborted request", errorEvent([{ type: "AbortError", value: "Aborted" }])],
       ["user interaction not allowed", errorEvent([{ type: "Error", value: "User interaction is not allowed" }])],
       ["expired session (UnauthorizedError)", errorEvent([{ type: "UnauthorizedError", value: "Unauthorized" }])],
+      [
+        "refresh token revoked or expired (SessionExpiredError)",
+        errorEvent([{ type: "SessionExpiredError", value: "Refresh token is invalid or expired" }]),
+      ],
+      [
+        "sign-out racing an in-flight refresh (SessionExpiredError variant)",
+        errorEvent([{ type: "SessionExpiredError", value: "Signed out while the token was refreshing" }]),
+      ],
     ];
 
     it.each(dropped)("drops: %s", (_label, event) => {
