@@ -1,7 +1,7 @@
 package expo.modules.webbrowser;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -77,10 +77,6 @@ public class CustomTabsActivitiesHelperTest {
   }
 
   private void expectHandlerError(OpenBrowserOptions options) {
-    try {
-      helper.startCustomTabs(tabsIntent(), options);
-      fail("expected NoMatchingActivityException");
-    } catch (NoMatchingActivityException expected) {
-    }
+    assertThrows(NoMatchingActivityException.class, () -> helper.startCustomTabs(tabsIntent(), options));
   }
 }
