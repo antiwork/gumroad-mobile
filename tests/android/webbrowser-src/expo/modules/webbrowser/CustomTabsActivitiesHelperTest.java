@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.net.Uri;
+import android.os.Build;
 import androidx.browser.customtabs.CustomTabsIntent;
 import expo.modules.kotlin.AppContext;
 import org.junit.After;
