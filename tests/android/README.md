@@ -43,3 +43,14 @@ cd android
 ```
 
 These tests compile patched `expo-modules-core` and convert name-only, int, and string enum props on Android API 24 and 34. They also assert the converter class file does not reference `kotlin.reflect.full`. They do not prove ANR frequency on physical low-end devices.
+
+## Custom tabs launch
+
+```sh
+cd android
+./gradlew -I ../tests/android/webbrowser-tests.gradle :expo-web-browser:testDebugUnitTest --no-daemon
+```
+
+These tests compile the patched Expo Web Browser module and run on Android API 24 and 34 with Robolectric. They verify that a Custom Tabs launch denied by the platform (`SecurityException`) or unresolvable (`ActivityNotFoundException`) finishes the proxy activity and rejects with `NoMatchingActivityException` instead of killing the process, that the proxy stays alive when the tab does launch, and that the direct launch paths behave the same way. Android autolinking must keep `expo-web-browser` in `buildFromSource`; otherwise Expo uses a precompiled artifact that omits the patch.
+
+The denial is simulated with a `CustomTabsIntent` shadow and no third-party app is installed, so these tests do not prove the crash is gone on a device that actually carries a misbehaving browser handler; installing an app whose URL handler activity is not exported is what shows that.
