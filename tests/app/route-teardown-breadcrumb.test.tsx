@@ -6,20 +6,21 @@ jest.mock("@/lib/sentry", () => ({
 
 jest.mock("react-native-safe-area-context", () => jest.requireActual("react-native-safe-area-context"));
 
-import { RouteTeardownBreadcrumb, recordFocusedPathname } from "@/components/route-teardown-breadcrumb";
-import { Stack, usePathname, useRouter } from "expo-router";
+import { RouteTeardownBreadcrumb, recordFocusedRoutePattern } from "@/components/route-teardown-breadcrumb";
+import { Text } from "@/components/ui/text";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { renderRouter } from "expo-router/testing-library";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { act, fireEvent } from "@testing-library/react-native";
 
 const hostRef: { current: unknown } = { current: null };
 
 const Layout = () => {
-  recordFocusedPathname(usePathname());
+  recordFocusedRoutePattern(useSegments());
   return <Stack screenLayout={(props) => <RouteTeardownBreadcrumb {...props} />} />;
 };
 
-const Index = () => {
+const Start = () => {
   const router = useRouter();
   return (
     <Pressable onPress={() => router.push("/detail")}>
@@ -43,8 +44,11 @@ const Detail = () => {
   );
 };
 
-const openAndPopDetail = async () => {
-  const view = await renderRouter({ _layout: Layout, index: Index, detail: Detail }, { initialUrl: "/" });
+const openAndPopDetail = async (initialUrl: string) => {
+  const view = await renderRouter(
+    { _layout: Layout, index: Start, "purchase/[token]": Start, detail: Detail },
+    { initialUrl },
+  );
 
   fireEvent.press(view.getByText("open detail"));
   await act(async () => {});
@@ -63,7 +67,7 @@ describe("RouteTeardownBreadcrumb", () => {
   });
 
   it("records the route pair when a stack screen unmounts", async () => {
-    await openAndPopDetail();
+    await openAndPopDetail("/");
 
     expect(mockAddBreadcrumb).toHaveBeenCalledTimes(1);
     expect(mockAddBreadcrumb).toHaveBeenCalledWith({
@@ -74,13 +78,22 @@ describe("RouteTeardownBreadcrumb", () => {
     });
   });
 
+  it("records the route pattern rather than the resolved path", async () => {
+    await openAndPopDetail("/purchase/abc123");
+
+    expect(mockAddBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { from: "detail", to: "/purchase/[token]" } }),
+    );
+    expect(JSON.stringify(mockAddBreadcrumb.mock.calls)).not.toContain("abc123");
+  });
+
   it("records it while the screen's native view is still attached", async () => {
     let nativeViewAttachedWhenRecorded: boolean | undefined;
     mockAddBreadcrumb.mockImplementation(() => {
       nativeViewAttachedWhenRecorded = hostRef.current !== null;
     });
 
-    await openAndPopDetail();
+    await openAndPopDetail("/");
 
     expect(nativeViewAttachedWhenRecorded).toBe(true);
   });
