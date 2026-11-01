@@ -16,9 +16,9 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = {24, 34}, shadows = {TestCustomTabsIntentShadow.class})
+@Config(sdk = {Build.VERSION_CODES.N, Build.VERSION_CODES.UPSIDE_DOWN_CAKE}, shadows = {TestCustomTabsIntentShadow.class})
 public class BrowserProxyActivityTest {
-  private static final String URL = "https://gumroad.com/login";
+  private static final String URL = "https://example.com/login";
 
   @After
   public void resetShadow() {
