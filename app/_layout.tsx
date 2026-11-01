@@ -1,8 +1,9 @@
 import { ForceUpdateScreen } from "@/components/force-update-screen";
 import { HeaderCloseButton } from "@/components/header-close-button";
+import { RouteTeardownBreadcrumb, recordFocusedPathname } from "@/components/route-teardown-breadcrumb";
 import { useMinimumVersion } from "@/components/use-minimum-version";
 import { PortalHost } from "@rn-primitives/portal";
-import { useNavigationContainerRef, Stack } from "expo-router";
+import { useNavigationContainerRef, usePathname, Stack } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -41,6 +42,8 @@ const RootLayout = () => {
   const ref = useNavigationContainerRef();
   const [background, accent] = useCSSVariable(["--color-background", "--color-accent"]);
 
+  recordFocusedPathname(usePathname());
+
   useEffect(() => {
     if (ref?.current) {
       navigationIntegration.registerNavigationContainer(ref);
@@ -71,6 +74,7 @@ const RootLayout = () => {
           <RevenueWidgetUpdater />
           <ForceUpdateGuard />
           <Stack
+            screenLayout={(props) => <RouteTeardownBreadcrumb {...props} />}
             screenOptions={{
               headerStyle: { backgroundColor: "black" },
               headerShadowVisible: false,
