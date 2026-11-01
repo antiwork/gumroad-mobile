@@ -119,6 +119,11 @@ jobs:
         timeout-minutes: 10
         run: ./gradlew -I ../tests/android/webview-startup-tests.gradle :webview-startup:testDebugUnitTest --no-daemon
 
+      - name: Test native custom tabs launch
+        working-directory: android
+        timeout-minutes: 10
+        run: ./gradlew -I ../tests/android/webbrowser-tests.gradle :expo-web-browser:testDebugUnitTest --no-daemon
+
       - name: Validate generated config
         run: |
           npx expo config --type prebuild --json > /tmp/expo-config.json
@@ -189,5 +194,7 @@ jobs:
             node_modules/expo-image/android/build/test-results/testDebugUnitTest/**
             node_modules/expo-modules-core/android/build/reports/tests/testDebugUnitTest/**
             node_modules/expo-modules-core/android/build/test-results/testDebugUnitTest/**
+            node_modules/expo-web-browser/android/build/reports/tests/testDebugUnitTest/**
+            node_modules/expo-web-browser/android/build/test-results/testDebugUnitTest/**
           retention-days: 14
           if-no-files-found: warn

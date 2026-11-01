@@ -129,7 +129,8 @@
     "autolinking": {
       "android": {
         "buildFromSource": [
-          "expo-image"
+          "expo-image",
+          "expo-web-browser"
         ]
       }
     },
