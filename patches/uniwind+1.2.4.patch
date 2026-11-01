@@ -1,0 +1,30 @@
+diff --git a/node_modules/uniwind/src/components/index.ts b/node_modules/uniwind/src/components/index.ts
+index b822a30..6a7a850 100644
+--- a/node_modules/uniwind/src/components/index.ts
++++ b/node_modules/uniwind/src/components/index.ts
+@@ -1,4 +1,6 @@
+-module.exports = {
++const ReactNative = require('react-native')
++
++const components = {
+     get ActivityIndicator() {
+         return require('./native/ActivityIndicator').ActivityIndicator
+     },
+@@ -311,3 +313,17 @@ module.exports = {
+         return require('react-native').XamlHost
+     },
+ }
++
++Object.keys(ReactNative).forEach((key) => {
++    if (key in components) {
++        return
++    }
++
++    Object.defineProperty(components, key, {
++        configurable: true,
++        enumerable: true,
++        get: () => ReactNative[key],
++    })
++})
++
++module.exports = components
