@@ -164,6 +164,17 @@ describe("BuildPlayerScreen", () => {
     expect(mockRouterBack).toHaveBeenCalled();
   });
 
+  it("hands a new-window link inside the build to the OS", () => {
+    render(<BuildPlayerScreen />);
+    const onOpenWindow = screen.getByTestId("build-player-webview").props.onOpenWindow as (event: {
+      nativeEvent: { targetUrl: string };
+    }) => void;
+
+    onOpenWindow({ nativeEvent: { targetUrl: "https://external.example/store" } });
+
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/store");
+  });
+
   it("opens links that are not the build outside the WebView", () => {
     render(<BuildPlayerScreen />);
     const shouldStart = getShouldStart();

@@ -121,6 +121,9 @@ export default function BuildPlayerScreen() {
         allowsFullscreenVideo
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onOpenWindow={(event) =>
+          handleShouldStartLoadWithRequest({ url: event.nativeEvent.targetUrl, navigationType: "click" })
+        }
         onHttpError={(event: WebViewHttpErrorEvent) => {
           handleAuthenticationHttpError(event.nativeEvent);
         }}

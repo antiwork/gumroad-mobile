@@ -335,6 +335,9 @@ export default function DownloadScreen() {
         allowsFullscreenVideo
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onOpenWindow={(event) =>
+          handleShouldStartLoadWithRequest({ url: event.nativeEvent.targetUrl, navigationType: "click" })
+        }
         onLoad={(event) => {
           webViewLoadedRef.current = true;
           handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });

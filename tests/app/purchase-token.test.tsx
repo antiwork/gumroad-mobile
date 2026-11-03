@@ -125,6 +125,20 @@ describe("DownloadScreen", () => {
     expect(mockSafeOpenURL).not.toHaveBeenCalled();
   });
 
+  it("takes a build's player page from a new-window link too", () => {
+    render(<DownloadScreen />);
+    const onOpenWindow = screen.getByTestId("purchase-webview").props.onOpenWindow as (event: {
+      nativeEvent: { targetUrl: string };
+    }) => void;
+
+    onOpenWindow({ nativeEvent: { targetUrl: "https://example.com/d/test-token/play" } });
+
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      pathname: "/web-build-player",
+      params: { token: "test-token", title: "" },
+    });
+  });
+
   it("opens external web links outside the WebView", () => {
     render(<DownloadScreen />);
     const shouldStart = getShouldStart();
