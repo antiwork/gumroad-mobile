@@ -6,16 +6,28 @@ const nativeSettingsScreens: Record<string, string> = {
   "/settings/payments": "/settings/payments",
 };
 
-export const nativeScreenForWebViewUrl = (url: string) => {
+const gumroadPathname = (url: string) => {
   try {
     const { origin, pathname } = new URL(url);
-    if (origin !== gumroadOrigin) return null;
-    const normalized = pathname.replace(/\/+$/, "") || "/";
-    return nativeSettingsScreens[normalized] ?? null;
+    return origin === gumroadOrigin ? pathname.replace(/\/+$/, "") || "/" : null;
   } catch {
     return null;
   }
 };
+
+export const nativeScreenForWebViewUrl = (url: string) => {
+  const normalized = gumroadPathname(url);
+  return normalized === null ? null : (nativeSettingsScreens[normalized] ?? null);
+};
+
+// The player page for a purchase's build. A build is a game: it wants the whole display and
+// landscape, which the portrait-locked content WebView cannot give it, so the app opens the page in
+// its own screen.
+export const isWebBuildPlayerUrl = (url: string, token: string) => gumroadPathname(url) === `/d/${token}/play`;
+
+// The player page's own "Back to content" link, which closes the app's player instead of loading the
+// content page inside it.
+export const isWebBuildContentPageUrl = (url: string, token: string) => gumroadPathname(url) === `/d/${token}`;
 
 export const buildAuthenticatedWebViewUrl = (
   path: string,
