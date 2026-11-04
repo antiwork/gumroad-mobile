@@ -9,6 +9,7 @@ const mockSafeOpenURL = jest.fn();
 const mockUseAuth = jest.fn();
 const mockRefreshToken = jest.fn();
 const mockLogout = jest.fn();
+const mockScreen = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -19,7 +20,12 @@ jest.mock("@/lib/open-url", () => ({
 }));
 
 jest.mock("expo-router", () => ({
-  Stack: { Screen: () => null },
+  Stack: {
+    Screen: (props: Record<string, unknown>) => {
+      mockScreen(props);
+      return null;
+    },
+  },
   useLocalSearchParams: () => ({ token: "test-token", title: "My Game" }),
   useRouter: () => ({ back: mockRouterBack }),
 }));
@@ -36,7 +42,8 @@ jest.mock("expo-navigation-bar", () => ({
 
 jest.mock("uniwind", () => ({
   ...jest.requireActual("uniwind"),
-  useCSSVariable: () => ["#000000", "#ffffff"],
+  useCSSVariable: (names: string[]) =>
+    names.map((name) => ({ "--color-player": "#101820", "--color-player-foreground": "#f0f8ff" })[name]),
 }));
 
 jest.mock("@/components/styled", () => {
@@ -128,6 +135,19 @@ describe("BuildPlayerScreen", () => {
     expect(webView.allowsInlineMediaPlayback).toBe(true);
     expect(webView.allowsFullscreenVideo).toBe(true);
     expect(webView.mediaPlaybackRequiresUserAction).toBe(false);
+  });
+
+  it("draws the header in the player's named colours", () => {
+    render(<BuildPlayerScreen />);
+
+    expect(mockScreen).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          headerStyle: { backgroundColor: "#101820" },
+          headerTintColor: "#f0f8ff",
+        }),
+      }),
+    );
   });
 
   it("waits for the session before loading the page", () => {
