@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { Platform, StatusBar } from "react-native";
 
 const mockRouterBack = jest.fn();
@@ -7,6 +7,8 @@ const mockUnlockAsync = jest.fn().mockResolvedValue(undefined);
 const mockSetNavigationBarVisibilityAsync = jest.fn().mockResolvedValue(undefined);
 const mockSafeOpenURL = jest.fn();
 const mockUseAuth = jest.fn();
+const mockRefreshToken = jest.fn();
+const mockLogout = jest.fn();
 
 jest.mock("@/lib/auth-context", () => ({
   useAuth: () => mockUseAuth(),
@@ -32,6 +34,11 @@ jest.mock("expo-navigation-bar", () => ({
   setVisibilityAsync: (...args: unknown[]) => mockSetNavigationBarVisibilityAsync(...args),
 }));
 
+jest.mock("uniwind", () => ({
+  ...jest.requireActual("uniwind"),
+  useCSSVariable: () => ["#000000", "#ffffff"],
+}));
+
 jest.mock("@/components/styled", () => {
   const React = require("react");
   const { View } = require("react-native");
@@ -45,8 +52,14 @@ jest.mock("@/components/styled", () => {
 
 import BuildPlayerScreen from "@/app/web-build-player";
 
-const expectedUrl =
-  "https://example.com/d/test-token/play?display=mobile_app&access_token=test-access-token&mobile_token=test-mobile-token";
+const playerUrl = (accessToken: string) =>
+  `https://example.com/d/test-token/play?display=mobile_app&access_token=${accessToken}&mobile_token=test-mobile-token`;
+const expectedUrl = playerUrl("test-access-token");
+const originalPlatform = Platform.OS;
+
+const setPlatform = (os: typeof Platform.OS) => {
+  Object.defineProperty(Platform, "OS", { configurable: true, value: os });
+};
 
 const getShouldStart = () =>
   screen.getByTestId("build-player-webview").props.onShouldStartLoadWithRequest as (request: {
@@ -61,11 +74,44 @@ const enterFullscreen = async () => {
   });
 };
 
+const mockRefreshingAuth = () => {
+  const auth = {
+    isLoading: false,
+    accessToken: "test-access-token",
+    refreshToken: mockRefreshToken,
+    logout: mockLogout,
+  };
+  let refreshCount = 0;
+  mockUseAuth.mockImplementation(() => auth);
+  mockRefreshToken.mockImplementation(async () => {
+    refreshCount += 1;
+    auth.accessToken = `refreshed-token-${refreshCount}`;
+    return auth.accessToken;
+  });
+  mockLogout.mockResolvedValue(undefined);
+};
+
+const reachLogin = () => {
+  act(() => {
+    getShouldStart()({ url: "https://example.com/login", navigationType: "other" });
+  });
+};
+
+const flushSessionTimers = async () => {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+};
+
 describe("BuildPlayerScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(StatusBar, "setHidden").mockImplementation();
     mockUseAuth.mockReturnValue({ isLoading: false, accessToken: "test-access-token" });
+  });
+
+  afterEach(() => {
+    setPlatform(originalPlatform);
   });
 
   it("loads the purchase's player page with the app session", () => {
@@ -209,12 +255,93 @@ describe("BuildPlayerScreen", () => {
 
   it("restores portrait when the system bars cannot be hidden", async () => {
     mockSetNavigationBarVisibilityAsync.mockRejectedValueOnce(new Error("no bar"));
-    Platform.OS = "android";
+    setPlatform("android");
     render(<BuildPlayerScreen />);
 
     await enterFullscreen();
 
     expect(mockLockAsync).toHaveBeenLastCalledWith("portrait-up");
     expect(screen.getByTestId("fullscreen-button")).toBeTruthy();
+  });
+
+  it("stays out of fullscreen without hiding the system bars when landscape cannot be locked", async () => {
+    mockLockAsync.mockRejectedValueOnce(new Error("orientation locked"));
+    setPlatform("android");
+    render(<BuildPlayerScreen />);
+
+    await enterFullscreen();
+
+    expect(StatusBar.setHidden).not.toHaveBeenCalledWith(true, "fade");
+    expect(mockSetNavigationBarVisibilityAsync).not.toHaveBeenCalledWith("hidden");
+    expect(screen.getByTestId("fullscreen-button")).toBeTruthy();
+  });
+
+  it("restores portrait and the system bars when the player is left before landscape is applied", async () => {
+    let resolveLandscape: () => void = () => {};
+    mockLockAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveLandscape = resolve;
+        }),
+    );
+    setPlatform("android");
+    const { unmount } = render(<BuildPlayerScreen />);
+    await enterFullscreen();
+
+    unmount();
+    jest.clearAllMocks();
+    await act(async () => {
+      resolveLandscape();
+    });
+
+    expect(mockLockAsync).toHaveBeenLastCalledWith("portrait-up");
+    expect(StatusBar.setHidden).toHaveBeenLastCalledWith(false, "fade");
+    expect(mockSetNavigationBarVisibilityAsync).toHaveBeenLastCalledWith("visible");
+  });
+
+  it("refreshes the session again on a later expiry once the refreshed player page has loaded", async () => {
+    mockRefreshingAuth();
+    render(<BuildPlayerScreen />);
+
+    reachLogin();
+    await waitFor(() => {
+      expect(screen.getByTestId("build-player-webview").props.source).toEqual({ uri: playerUrl("refreshed-token-1") });
+    });
+    fireEvent(screen.getByTestId("build-player-webview"), "load", {
+      nativeEvent: { url: playerUrl("refreshed-token-1") },
+    });
+    await flushSessionTimers();
+    reachLogin();
+
+    await waitFor(() => {
+      expect(mockRefreshToken).toHaveBeenCalledTimes(2);
+    });
+    expect(mockLogout).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByTestId("build-player-webview").props.source).toEqual({ uri: playerUrl("refreshed-token-2") });
+    });
+  });
+
+  it("does not count a load that Android follows with an error as a successful session", async () => {
+    mockRefreshingAuth();
+    render(<BuildPlayerScreen />);
+
+    reachLogin();
+    await waitFor(() => {
+      expect(screen.getByTestId("build-player-webview").props.source).toEqual({ uri: playerUrl("refreshed-token-1") });
+    });
+    fireEvent(screen.getByTestId("build-player-webview"), "load", {
+      nativeEvent: { url: playerUrl("refreshed-token-1") },
+    });
+    fireEvent(screen.getByTestId("build-player-webview"), "error", {
+      nativeEvent: { url: playerUrl("refreshed-token-1"), code: -2, description: "net::ERR_INTERNET_DISCONNECTED" },
+    });
+    await flushSessionTimers();
+    reachLogin();
+
+    await waitFor(() => {
+      expect(mockLogout).toHaveBeenCalledTimes(1);
+    });
+    expect(mockRefreshToken).toHaveBeenCalledTimes(1);
   });
 });

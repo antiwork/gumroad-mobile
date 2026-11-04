@@ -137,7 +137,33 @@ describe("DownloadScreen", () => {
       pathname: "/web-build-player",
       params: { token: "test-token", title: "" },
     });
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["another Gumroad page", "https://example.com/l/other"],
+    ["an external site", "https://example.org/store"],
+  ])("opens a new-window link to %s outside the WebView exactly once", (_, targetUrl) => {
+    render(<DownloadScreen />);
+
+    fireEvent(screen.getByTestId("purchase-webview"), "openWindow", { nativeEvent: { targetUrl } });
+
+    expect(mockSafeOpenURL).toHaveBeenCalledTimes(1);
+    expect(mockSafeOpenURL).toHaveBeenCalledWith(targetUrl);
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it.each(["about:blank", "blob:https://example.com/build", "data:text/html,build", "javascript:void(0)"])(
+    "ignores a new-window request for the WebView-internal URL %s",
+    (targetUrl) => {
+      render(<DownloadScreen />);
+
+      fireEvent(screen.getByTestId("purchase-webview"), "openWindow", { nativeEvent: { targetUrl } });
+
+      expect(mockSafeOpenURL).not.toHaveBeenCalled();
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    },
+  );
 
   it("opens external web links outside the WebView", () => {
     render(<DownloadScreen />);
