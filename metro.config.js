@@ -19,6 +19,22 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
-module.exports = withUniwindConfig(config, {
+const uniwindConfig = withUniwindConfig(config, {
   cssEntryFile: "./app/global.css",
 });
+
+// Uniwind's resolver rewrites every `react-native` import outside react-native itself to
+// `uniwind/components`, whose styled wrappers are not constructible — react-native-pdf
+// subclasses FlatList, so that rewrite makes app/pdf-viewer.tsx throw at require time and the
+// PDF screen never loads. Hand react-native-pdf the real module instead.
+const resolvesWithUniwind = uniwindConfig.resolver.resolveRequest;
+
+uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === "react-native" && context.originModulePath.includes("node_modules/react-native-pdf/")) {
+    return context.resolveRequest(context, moduleName, platform);
+  }
+
+  return resolvesWithUniwind(context, moduleName, platform);
+};
+
+module.exports = uniwindConfig;
