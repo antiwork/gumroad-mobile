@@ -1,0 +1,17 @@
+env: load .env
+env: export ANDROID_BUNDLE_NAME EXPO_NO_CAPABILITY_SYNC EXPO_PUBLIC_GUMROAD_API_URL EXPO_PUBLIC_GUMROAD_CLIENT_ID EXPO_PUBLIC_GUMROAD_URL EXPO_PUBLIC_MOBILE_TOKEN IOS_BUNDLE_NAME SENTRY_ALLOW_FAILURE
+React Compiler enabled
+Starting Metro Bundler
+
+ WARN  The package /Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router contains an invalid package.json configuration. Consider raising this issue with the package maintainer(s).
+Reason: The resolution for "/Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router/build/global-state/router-store" defined in "exports" is /Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router/build/global-state/router-store.js, however this file does not exist. Falling back to file-based resolution.
+ WARN  The package /Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router contains an invalid package.json configuration. Consider raising this issue with the package maintainer(s).
+Reason: The resolution for "/Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router/build/global-state/router-store" defined in "exports" is /Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router/build/global-state/router-store.js, however this file does not exist. Falling back to file-based resolution.
+ WARN  The package /Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router contains an invalid package.json configuration. Consider raising this issue with the package maintainer(s).
+Reason: The resolution for "/Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router/build/global-state/router-store" defined in "exports" is /Users/gumclaw/repos/gumroad-mobile/node_modules/expo-router/build/global-state/router-store.js, however this file does not exist. Falling back to file-based resolution.
+iOS Bundled 76949ms index.js (3280 modules)
+Writing bundle output to: /Users/gumclaw/work/gp4291-bundle/main.jsbundle
+Writing sourcemap output to: /Users/gumclaw/work/gp4291-bundle/main.jsbundle.map
+Copying 33 asset files
+Done writing bundle output
+Done writing sourcemap output
