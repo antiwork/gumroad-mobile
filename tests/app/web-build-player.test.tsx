@@ -170,16 +170,51 @@ describe("BuildPlayerScreen", () => {
       nativeEvent: { targetUrl: string };
     }) => void;
 
-    onOpenWindow({ nativeEvent: { targetUrl: "https://external.example/store" } });
+    onOpenWindow({ nativeEvent: { targetUrl: "https://example.org/store" } });
 
-    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/store");
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://example.org/store");
   });
 
   it("opens links that are not the build outside the WebView", () => {
     render(<BuildPlayerScreen />);
     const shouldStart = getShouldStart();
 
-    expect(shouldStart({ url: "https://external.example/test", navigationType: "click" })).toBe(false);
-    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://external.example/test");
+    expect(shouldStart({ url: "https://example.org/test", navigationType: "click" })).toBe(false);
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://example.org/test");
+  });
+
+  it("opens a new-window link to another Gumroad page outside the WebView", () => {
+    render(<BuildPlayerScreen />);
+    const onOpenWindow = screen.getByTestId("build-player-webview").props.onOpenWindow as (event: {
+      nativeEvent: { targetUrl: string };
+    }) => void;
+
+    onOpenWindow({ nativeEvent: { targetUrl: "https://example.com/l/other" } });
+    onOpenWindow({ nativeEvent: { targetUrl: "about:blank" } });
+
+    expect(mockSafeOpenURL).toHaveBeenCalledTimes(1);
+    expect(mockSafeOpenURL).toHaveBeenCalledWith("https://example.com/l/other");
+  });
+
+  it("ignores a second Full screen tap while the first is applying", async () => {
+    render(<BuildPlayerScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("fullscreen-button"));
+      fireEvent.press(screen.getByTestId("fullscreen-button"));
+    });
+
+    expect(mockLockAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores portrait when the system bars cannot be hidden", async () => {
+    mockSetNavigationBarVisibilityAsync.mockRejectedValueOnce(new Error("no bar"));
+    Platform.OS = "android";
+    render(<BuildPlayerScreen />);
+
+    await enterFullscreen();
+
+    expect(mockLockAsync).toHaveBeenLastCalledWith("portrait-up");
+    expect(screen.getByTestId("fullscreen-button")).toBeTruthy();
   });
 });

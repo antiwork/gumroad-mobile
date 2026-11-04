@@ -18,7 +18,7 @@ describe("nativeScreenForWebViewUrl", () => {
     expect(nativeScreenForWebViewUrl("https://example.com/products/abc123/edit")).toBeNull();
     expect(nativeScreenForWebViewUrl("https://example.com/settings/profile")).toBeNull();
     expect(nativeScreenForWebViewUrl("https://example.com/settings/payments/other")).toBeNull();
-    expect(nativeScreenForWebViewUrl("https://external.example/settings/payments")).toBeNull();
+    expect(nativeScreenForWebViewUrl("https://example.org/settings/payments")).toBeNull();
     expect(nativeScreenForWebViewUrl("about:blank")).toBeNull();
     expect(nativeScreenForWebViewUrl("mailto:support@example.com")).toBeNull();
   });
@@ -40,7 +40,7 @@ describe("isWebBuildPlayerUrl", () => {
     expect(isWebBuildPlayerUrl("https://example.com/d/token-1", "token-1")).toBe(false);
     expect(isWebBuildPlayerUrl("https://example.com/d/token-1/play/grant/", "token-1")).toBe(false);
     expect(isWebBuildPlayerUrl("https://example.com/d/token-2/play", "token-1")).toBe(false);
-    expect(isWebBuildPlayerUrl("https://external.example/d/token-1/play", "token-1")).toBe(false);
+    expect(isWebBuildPlayerUrl("https://example.org/d/token-1/play", "token-1")).toBe(false);
     expect(isWebBuildPlayerUrl("about:blank", "token-1")).toBe(false);
   });
 });
@@ -54,6 +54,6 @@ describe("isWebBuildContentPageUrl", () => {
   it("does not claim the player page or another purchase", () => {
     expect(isWebBuildContentPageUrl("https://example.com/d/token-1/play", "token-1")).toBe(false);
     expect(isWebBuildContentPageUrl("https://example.com/d/token-2", "token-1")).toBe(false);
-    expect(isWebBuildContentPageUrl("https://external.example/d/token-1", "token-1")).toBe(false);
+    expect(isWebBuildContentPageUrl("https://example.org/d/token-1", "token-1")).toBe(false);
   });
 });

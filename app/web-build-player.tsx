@@ -8,6 +8,7 @@ import {
   restoreAppOrientation,
   restoreFullscreenSystemBars,
 } from "@/lib/fullscreen";
+import { useAuth } from "@/lib/auth-context";
 import { safeOpenURL } from "@/lib/open-url";
 import { useWebViewSession } from "@/lib/use-webview-session";
 import { buildAuthenticatedWebViewUrl, isWebBuildContentPageUrl, isWebBuildPlayerUrl } from "@/lib/webview-url";
@@ -25,13 +26,15 @@ const isWebViewInternalUrl = (url: string) => {
   return webViewInternalSchemes.some((scheme) => lower.startsWith(scheme));
 };
 
-export default function BuildPlayerScreen() {
+const BuildPlayerScreen = () => {
   const { token, title } = useLocalSearchParams<{ token: string; title?: string }>();
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
   const webViewRef = useRef<BaseWebView>(null);
   const mountedRef = useRef(true);
   const fullscreenRef = useRef(false);
+  const fullscreenRequestIdRef = useRef(0);
+  const fullscreenPendingRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const buildPlayerUrl = useCallback(
@@ -39,8 +42,16 @@ export default function BuildPlayerScreen() {
       buildAuthenticatedWebViewUrl(`/d/${encodeURIComponent(token)}/play`, accessToken, { display: "mobile_app" }),
     [token],
   );
-  const { handleAuthenticationHttpError, handleAuthenticationNavigation, isLoading, url, webViewKey } =
-    useWebViewSession(buildPlayerUrl);
+  const {
+    handleAuthenticationHttpError,
+    handleAuthenticationNavigation,
+    handleSessionLoad,
+    handleSessionLoadError,
+    isLoading,
+    url,
+    webViewKey,
+  } = useWebViewSession(buildPlayerUrl);
+  const { accessToken } = useAuth();
 
   useEffect(() => {
     mountedRef.current = true;
@@ -52,6 +63,7 @@ export default function BuildPlayerScreen() {
   }, []);
 
   const exitFullscreen = useCallback(() => {
+    fullscreenRequestIdRef.current += 1;
     fullscreenRef.current = false;
     restoreFullscreenSystemBars();
     restoreAppOrientation();
@@ -59,20 +71,23 @@ export default function BuildPlayerScreen() {
   }, []);
 
   const enterFullscreen = useCallback(async () => {
+    if (fullscreenPendingRef.current) return;
+    fullscreenPendingRef.current = true;
+    const requestId = ++fullscreenRequestIdRef.current;
     const orientationApplied = await prepareFullscreenOrientation();
     const barsHidden = orientationApplied ? await hideFullscreenSystemBars() : false;
-    if (!mountedRef.current) {
+    fullscreenPendingRef.current = false;
+    if (!mountedRef.current || fullscreenRequestIdRef.current !== requestId || !orientationApplied || !barsHidden) {
       if (orientationApplied) restoreAppOrientation();
       if (barsHidden) restoreFullscreenSystemBars();
       return;
     }
-    fullscreenRef.current = orientationApplied && barsHidden;
-    setIsFullscreen(orientationApplied && barsHidden);
+    fullscreenRef.current = true;
+    setIsFullscreen(true);
   }, []);
 
   const handleShouldStartLoadWithRequest = useCallback(
     (request: { url: string; navigationType: string; mainDocumentURL?: string }) => {
-      // Allow loading iframes, e.g. the frame the build itself runs in
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
       if (handleAuthenticationNavigation(request.url)) return false;
       if (isWebBuildPlayerUrl(request.url, token) || isWebViewInternalUrl(request.url)) return true;
@@ -88,7 +103,7 @@ export default function BuildPlayerScreen() {
 
   if (isLoading || url === null) {
     return (
-      <View className="flex-1 items-center justify-center bg-black">
+      <View className="flex-1 items-center justify-center bg-player">
         <Stack.Screen options={{ title: title ?? "", headerShown: false }} />
         <LoadingSpinner size="large" />
       </View>
@@ -96,13 +111,13 @@ export default function BuildPlayerScreen() {
   }
 
   return (
-    <View className="flex-1 bg-black">
+    <View className="flex-1 bg-player">
       <Stack.Screen
         options={{
           title: title ?? "",
           headerShown: !isFullscreen,
-          headerStyle: { backgroundColor: "#000" },
-          headerTintColor: "#fff",
+          headerStyle: { backgroundColor: "#000000" },
+          headerTintColor: "#ffffff",
         }}
       />
       <StyledWebView
@@ -110,7 +125,7 @@ export default function BuildPlayerScreen() {
         ref={webViewRef}
         testID="build-player-webview"
         source={{ uri: url }}
-        className="flex-1 bg-black"
+        className="flex-1 bg-player"
         webviewDebuggingEnabled
         incognito
         thirdPartyCookiesEnabled
@@ -121,9 +136,16 @@ export default function BuildPlayerScreen() {
         allowsFullscreenVideo
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-        onOpenWindow={(event) =>
-          handleShouldStartLoadWithRequest({ url: event.nativeEvent.targetUrl, navigationType: "click" })
-        }
+        onOpenWindow={(event) => {
+          const targetUrl = event.nativeEvent.targetUrl;
+          if (
+            handleShouldStartLoadWithRequest({ url: targetUrl, navigationType: "click" }) &&
+            !isWebViewInternalUrl(targetUrl)
+          )
+            safeOpenURL(targetUrl);
+        }}
+        onLoad={(event) => handleSessionLoad({ token: accessToken, url: event.nativeEvent.url })}
+        onError={() => handleSessionLoadError({ token: accessToken })}
         onHttpError={(event: WebViewHttpErrorEvent) => {
           handleAuthenticationHttpError(event.nativeEvent);
         }}
@@ -134,12 +156,18 @@ export default function BuildPlayerScreen() {
           accessibilityRole="button"
           accessibilityLabel={isFullscreen ? "Exit full screen" : "Full screen"}
           testID={isFullscreen ? "exit-fullscreen-button" : "fullscreen-button"}
-          className="mr-4 flex-row items-center gap-2 rounded-full bg-black/60 px-4 py-2"
+          className="mr-4 flex-row items-center gap-2 rounded-full bg-player-overlay px-4 py-2"
         >
-          <LineIcon name={isFullscreen ? "fullscreen-exit" : "fullscreen"} size={20} className="text-white" />
-          <Text className="font-sans text-sm text-white">{isFullscreen ? "Exit" : "Full screen"}</Text>
+          <LineIcon
+            name={isFullscreen ? "fullscreen-exit" : "fullscreen"}
+            size={20}
+            className="text-player-foreground"
+          />
+          <Text className="font-sans text-sm text-player-foreground">{isFullscreen ? "Exit" : "Full screen"}</Text>
         </Pressable>
       </View>
     </View>
   );
-}
+};
+
+export default BuildPlayerScreen;
