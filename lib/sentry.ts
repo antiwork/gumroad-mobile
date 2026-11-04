@@ -131,4 +131,31 @@ const options: ReactNativeOptions & NativeAppHangOptions = {
 
 Sentry.init(options);
 
+// Metro's guarded require reports a module factory that throws through
+// `global.ErrorUtils.reportFatalError` and then returns `undefined` for that module:
+//   function d(r,t,o){if(!a&&e.ErrorUtils){var n;a=!0;try{n=p(r,t,o)}catch(r){e.ErrorUtils.reportFatalError(r)}return a=!1,n}...}
+// The error never reaches Sentry as its own event — the app dies later, from the missing
+// module, and the crash report names a downstream symptom instead of the module that failed
+// to initialise. Report the real error here, then hand it to the RN fatal handler unchanged.
+type FatalErrorReporter = {
+  reportFatalError?: (error: unknown) => void;
+  __gumroadReportsFatalErrors?: true;
+};
+
+const errorUtils = (globalThis as typeof globalThis & { ErrorUtils?: FatalErrorReporter }).ErrorUtils;
+
+if (errorUtils?.reportFatalError && !errorUtils.__gumroadReportsFatalErrors) {
+  const reportFatalError = errorUtils.reportFatalError.bind(errorUtils);
+  errorUtils.__gumroadReportsFatalErrors = true;
+  errorUtils.reportFatalError = (error: unknown) => {
+    try {
+      Sentry.captureException(error, { level: "fatal" });
+    } catch {
+      // Reporting must never change how a fatal error is handled.
+    } finally {
+      reportFatalError(error);
+    }
+  };
+}
+
 export { Sentry };
