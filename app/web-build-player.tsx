@@ -18,6 +18,7 @@ import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView as BaseWebView } from "react-native-webview";
 import type { WebViewHttpErrorEvent } from "react-native-webview/lib/WebViewTypes";
+import { useCSSVariable } from "uniwind";
 
 const webViewInternalSchemes = ["about:", "data:", "blob:", "javascript:"];
 
@@ -52,6 +53,7 @@ const BuildPlayerScreen = () => {
     webViewKey,
   } = useWebViewSession(buildPlayerUrl);
   const { accessToken } = useAuth();
+  const [playerColor, playerForegroundColor] = useCSSVariable(["--color-player", "--color-player-foreground"]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -116,8 +118,8 @@ const BuildPlayerScreen = () => {
         options={{
           title: title ?? "",
           headerShown: !isFullscreen,
-          headerStyle: { backgroundColor: "#000000" },
-          headerTintColor: "#ffffff",
+          headerStyle: { backgroundColor: playerColor as string },
+          headerTintColor: playerForegroundColor as string,
         }}
       />
       <StyledWebView
