@@ -45,6 +45,7 @@ describe("Sentry reporting of a module factory that throws at require time", () 
   it("wraps the fatal handler once", () => {
     const wrapped = fatal().reportFatalError;
 
+    jest.resetModules();
     require("@/lib/sentry");
 
     expect(fatal().reportFatalError).toBe(wrapped);
