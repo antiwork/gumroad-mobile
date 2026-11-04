@@ -113,6 +113,32 @@ describe("DownloadScreen", () => {
     expect(mockSafeOpenURL).not.toHaveBeenCalled();
   });
 
+  it("opens a build's player page in the app's own player screen", () => {
+    render(<DownloadScreen />);
+    const shouldStart = getShouldStart();
+
+    expect(shouldStart({ url: "https://example.com/d/test-token/play", navigationType: "click" })).toBe(false);
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      pathname: "/web-build-player",
+      params: { token: "test-token", title: "" },
+    });
+    expect(mockSafeOpenURL).not.toHaveBeenCalled();
+  });
+
+  it("takes a build's player page from a new-window link too", () => {
+    render(<DownloadScreen />);
+    const onOpenWindow = screen.getByTestId("purchase-webview").props.onOpenWindow as (event: {
+      nativeEvent: { targetUrl: string };
+    }) => void;
+
+    onOpenWindow({ nativeEvent: { targetUrl: "https://example.com/d/test-token/play" } });
+
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      pathname: "/web-build-player",
+      params: { token: "test-token", title: "" },
+    });
+  });
+
   it("opens external web links outside the WebView", () => {
     render(<DownloadScreen />);
     const shouldStart = getShouldStart();
@@ -493,10 +519,7 @@ describe("DownloadScreen stall recovery", () => {
       jest.advanceTimersByTime(WEBVIEW_STALL_TIMEOUT_MS);
     });
 
-    expect(Sentry.captureMessage).toHaveBeenCalledWith(
-      "Purchase WebView stalled, reloading once",
-      expect.anything(),
-    );
+    expect(Sentry.captureMessage).toHaveBeenCalledWith("Purchase WebView stalled, reloading once", expect.anything());
   });
 
   it("does not start the watchdog while auth is still loading", () => {

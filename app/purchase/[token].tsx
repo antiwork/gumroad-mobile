@@ -18,7 +18,7 @@ import { safeOpenURL } from "@/lib/open-url";
 import { shareFile } from "@/lib/share";
 import { useWebViewSession } from "@/lib/use-webview-session";
 import { WEBVIEW_STALL_TIMEOUT_MS } from "@/lib/webview-stall";
-import { buildAuthenticatedWebViewUrl } from "@/lib/webview-url";
+import { buildAuthenticatedWebViewUrl, isWebBuildPlayerUrl } from "@/lib/webview-url";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Sentry from "@sentry/react-native";
@@ -156,6 +156,10 @@ export default function DownloadScreen() {
       // Allow loading iframes, e.g. video embeds
       if (request.mainDocumentURL && request.url !== request.mainDocumentURL) return true;
       if (handleAuthenticationNavigation(request.url)) return false;
+      if (isWebBuildPlayerUrl(request.url, token)) {
+        router.push({ pathname: "/web-build-player", params: { token, title: purchase?.name ?? "" } });
+        return false;
+      }
       if (
         request.url === url ||
         request.url.startsWith(env.EXPO_PUBLIC_GUMROAD_URL) ||
@@ -167,7 +171,7 @@ export default function DownloadScreen() {
       safeOpenURL(request.url);
       return false;
     },
-    [handleAuthenticationNavigation, url],
+    [handleAuthenticationNavigation, purchase?.name, router, token, url],
   );
 
   const handleNativePageChange = useCallback((pageIndex: number) => {
@@ -331,6 +335,14 @@ export default function DownloadScreen() {
         allowsFullscreenVideo
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+        onOpenWindow={(event) => {
+          const targetUrl = event.nativeEvent.targetUrl;
+          if (
+            handleShouldStartLoadWithRequest({ url: targetUrl, navigationType: "click" }) &&
+            !isWebViewInternalUrl(targetUrl)
+          )
+            safeOpenURL(targetUrl);
+        }}
         onLoad={(event) => {
           webViewLoadedRef.current = true;
           handleSessionLoad({ token: accessToken, url: event.nativeEvent.url });

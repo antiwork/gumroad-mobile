@@ -27,6 +27,9 @@
   --color-muted-foreground: var(--color-muted);
   --color-input: var(--color-border);
   --color-ring: var(--color-accent);
+  --color-player: #000000;
+  --color-player-foreground: #ffffff;
+  --color-player-overlay: rgba(0, 0, 0, 0.6);
 
   --font-sans: "ABC Favorit";
 }
@@ -56,6 +59,9 @@
       --color-muted-foreground: var(--color-muted);
       --color-input: var(--color-border);
       --color-ring: var(--color-accent);
+      --color-player: #000000;
+      --color-player-foreground: #ffffff;
+      --color-player-overlay: rgba(0, 0, 0, 0.6);
     }
 
     @variant dark {
@@ -81,6 +87,9 @@
       --color-muted-foreground: var(--color-muted);
       --color-input: var(--color-border);
       --color-ring: var(--color-accent);
+      --color-player: #000000;
+      --color-player-foreground: #ffffff;
+      --color-player-overlay: rgba(0, 0, 0, 0.6);
     }
   }
 }

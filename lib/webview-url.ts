@@ -6,16 +6,23 @@ const nativeSettingsScreens: Record<string, string> = {
   "/settings/payments": "/settings/payments",
 };
 
-export const nativeScreenForWebViewUrl = (url: string) => {
+const gumroadPathname = (url: string) => {
   try {
     const { origin, pathname } = new URL(url);
-    if (origin !== gumroadOrigin) return null;
-    const normalized = pathname.replace(/\/+$/, "") || "/";
-    return nativeSettingsScreens[normalized] ?? null;
+    return origin === gumroadOrigin ? pathname.replace(/\/+$/, "") || "/" : null;
   } catch {
     return null;
   }
 };
+
+export const nativeScreenForWebViewUrl = (url: string) => {
+  const normalized = gumroadPathname(url);
+  return normalized === null ? null : (nativeSettingsScreens[normalized] ?? null);
+};
+
+export const isWebBuildPlayerUrl = (url: string, token: string) => gumroadPathname(url) === `/d/${token}/play`;
+
+export const isWebBuildContentPageUrl = (url: string, token: string) => gumroadPathname(url) === `/d/${token}`;
 
 export const buildAuthenticatedWebViewUrl = (
   path: string,
