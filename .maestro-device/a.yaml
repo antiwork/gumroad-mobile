@@ -1,0 +1,6 @@
+appId: com.GRD.Gumroad
+---
+- tapOn:
+    text: "Later"
+    optional: true
+- takeScreenshot: lib
