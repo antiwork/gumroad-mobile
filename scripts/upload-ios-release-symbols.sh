@@ -17,6 +17,10 @@ SYMBOLS_DIR="$ARCHIVE/dSYMs"
 WORK_DIR=ios/build/symbols
 MAVEN=https://repo1.maven.org/maven2/com/facebook/react/react-native-artifacts
 RN_VERSION=$(node -p "require('./package.json').dependencies['react-native']")
+case "$RN_VERSION" in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *) echo "react-native is pinned as '$RN_VERSION'; this script needs an exact version" >&2; exit 1 ;;
+esac
 ORG=$(sed -n 's/^defaults\.org=//p' ios/sentry.properties)
 PROJECT=$(sed -n 's/^defaults\.project=//p' ios/sentry.properties)
 SENTRY_CLI=node_modules/.bin/sentry-cli
@@ -62,7 +66,7 @@ fetch_dsym() {
     return 0
   fi
 
-  [ -f "$tarball" ] || curl -sSL -o "$tarball" "$url"
+  [ -f "$tarball" ] || curl -fsSL -o "$tarball" "$url"
   mkdir -p "$WORK_DIR/$label"
   tar xzf "$tarball" -C "$WORK_DIR/$label" "$member"
   dsym="$WORK_DIR/$label/$member"
