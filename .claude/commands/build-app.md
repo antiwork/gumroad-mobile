@@ -151,18 +151,18 @@ IMPORTANT: The archive step may take a while. Run it with a generous timeout (10
 
 4. Upload the release symbols to Sentry. Crashes inside the prebuilt React Native frameworks
    (`React.framework`, `hermesvm.framework`, `ReactNativeDependencies.framework`) have no file,
-   no line, and unresolved template frames until their dSYMs are in Sentry. The archive's own
-   "Upload Debug Symbols to Sentry" phase uploads whatever dSYMs the archive holds, and the
-   `ios-prebuilt-framework-symbols` plugin makes CocoaPods fetch React.framework's; the other two
-   ship without dSYMs, so fetch and upload them explicitly:
+   no line, and unresolved template frames until their dSYMs are in Sentry. Upload all three
+   explicitly:
 
    ```
    set -a && source .env.build.local && set +a
    scripts/upload-ios-release-symbols.sh
    ```
 
-   The script reads the React Native and Hermes versions from the project, downloads each dSYM,
-   checks its uuid against the framework in the archive, and fails if they differ. Do this before
+   For each framework, the script uses the archive's dSYM when its uuid matches the framework.
+   Otherwise it downloads the dSYM for the project's React Native and Hermes versions and checks
+   its uuid. Then it uploads the dSYM. It fails if any of the
+   three frameworks is missing from the archive or a uuid doesn't match. Do this before
    submitting: symbolication only applies to crashes reported after the upload.
 
 #### Android

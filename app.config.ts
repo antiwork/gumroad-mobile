@@ -45,7 +45,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "./plugins/android-large-heap",
     "./plugins/android-portrait-orientation",
     "./plugins/ios-pod-deployment-target",
-    "./plugins/ios-prebuilt-framework-symbols",
     "expo-router",
     [
       "expo-screen-orientation",

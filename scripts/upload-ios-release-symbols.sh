@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Upload the dSYMs of the prebuilt React Native frameworks an iOS Release archive ships, so Sentry
-# can symbolicate crashes that happen inside them. RCT_SYMBOLICATE_PREBUILT_FRAMEWORKS covers only
-# React.framework; hermesvm and ReactNativeDependencies ship without dSYMs and are not in the
-# archive, so their frames stay unresolved without this step.
-#
 # Usage: scripts/upload-ios-release-symbols.sh [path/to/Gumroad.xcarchive]
 # Needs SENTRY_AUTH_TOKEN in the environment.
 set -euo pipefail
@@ -21,8 +16,6 @@ case "$RN_VERSION" in
   [0-9]*.[0-9]*.[0-9]*) ;;
   *) echo "react-native is pinned as '$RN_VERSION'; this script needs an exact version" >&2; exit 1 ;;
 esac
-ORG=$(sed -n 's/^defaults\.org=//p' ios/sentry.properties)
-PROJECT=$(sed -n 's/^defaults\.project=//p' ios/sentry.properties)
 SENTRY_CLI=node_modules/.bin/sentry-cli
 
 if [ ! -d "$ARCHIVE" ]; then
@@ -33,6 +26,8 @@ if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
   echo "SENTRY_AUTH_TOKEN is not set" >&2
   exit 1
 fi
+ORG=$(sed -n 's/^defaults\.org=//p' ios/sentry.properties)
+PROJECT=$(sed -n 's/^defaults\.project=//p' ios/sentry.properties)
 
 HERMES_TARBALL=$(ls ios/Pods/hermes-engine-artifacts/hermes-ios-*-release.tar.gz 2>/dev/null | head -1 || true)
 if [ -z "$HERMES_TARBALL" ]; then
@@ -43,9 +38,15 @@ HERMES_VERSION=$(basename "$HERMES_TARBALL" | sed 's/^hermes-ios-//; s/-release\
 
 mkdir -p "$WORK_DIR"
 export SENTRY_ORG="${SENTRY_ORG:-$ORG}" SENTRY_PROJECT="${SENTRY_PROJECT:-$PROJECT}"
+unset SENTRY_ALLOW_FAILURE
 
 uuid_of() {
-  xcrun dwarfdump --uuid "$1" | awk 'NR==1 {print $2}'
+  uuid=$(xcrun dwarfdump --uuid "$1" | awk 'NR==1 {print $2}') || exit
+  if [ -z "$uuid" ]; then
+    echo "$1: dwarfdump reported no uuid" >&2
+    exit 1
+  fi
+  echo "$uuid"
 }
 
 fetch_dsym() {
@@ -56,14 +57,15 @@ fetch_dsym() {
 
   binary="$FRAMEWORKS/$label.framework/$label"
   if [ ! -f "$binary" ]; then
-    echo "$label: not in the archive, skipping"
-    return 0
+    echo "$label: not in the archive at $binary — this script expects the prebuilt React Native frameworks" >&2
+    exit 1
   fi
 
   want=$(uuid_of "$binary")
   existing="$SYMBOLS_DIR/$label.framework.dSYM/Contents/Resources/DWARF/$label"
   if [ -f "$existing" ] && [ "$(uuid_of "$existing")" = "$want" ]; then
-    echo "$label: dSYM already in the archive ($want)"
+    echo "$label: uploading the archive's dSYM $want"
+    "$SENTRY_CLI" debug-files upload "$existing"
     return 0
   fi
 
