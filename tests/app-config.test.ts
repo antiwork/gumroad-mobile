@@ -12,6 +12,10 @@ describe("app.config", () => {
     expect(config.ios?.infoPlist?.NSPhotoLibraryAddUsageDescription).toEqual(expect.any(String));
   });
 
+  it("registers the podfile plugin that keeps prebuilt framework dSYMs in the archive", () => {
+    expect(config.plugins).toContain("./plugins/ios-prebuilt-framework-symbols");
+  });
+
   it("allows fullscreen video to rotate while the rest of the app starts in portrait", () => {
     expect(config.orientation).toBe("default");
     expect(config.ios?.requireFullScreen).toBeUndefined();
