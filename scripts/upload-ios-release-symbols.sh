@@ -61,12 +61,16 @@ fetch_dsym() {
   fi
 
   want=$(uuid_of "$binary")
-  if [ -f "$SYMBOLS_DIR/$label.framework.dSYM/Contents/Resources/DWARF/$label" ]; then
+  existing="$SYMBOLS_DIR/$label.framework.dSYM/Contents/Resources/DWARF/$label"
+  if [ -f "$existing" ] && [ "$(uuid_of "$existing")" = "$want" ]; then
     echo "$label: dSYM already in the archive ($want)"
     return 0
   fi
 
-  [ -f "$tarball" ] || curl -fsSL -o "$tarball" "$url"
+  if [ ! -f "$tarball" ]; then
+    curl -fsSL -o "$tarball.tmp" "$url" || { rm -f "$tarball.tmp"; return 1; }
+    mv "$tarball.tmp" "$tarball"
+  fi
   mkdir -p "$WORK_DIR/$label"
   tar xzf "$tarball" -C "$WORK_DIR/$label" "$member"
   dsym="$WORK_DIR/$label/$member"
