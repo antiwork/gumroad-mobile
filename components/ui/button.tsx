@@ -33,9 +33,10 @@ const buttonVariants = cva(
         link: "",
       },
       size: {
-        default: cn("h-12 px-4 py-3 ", Platform.select({ web: "has-[>svg]:px-3" })),
-        sm: cn("h-9 gap-1.5 rounded-md px-3 ", Platform.select({ web: "has-[>svg]:px-2.5" })),
-        lg: cn("h-11 rounded-md px-6 ", Platform.select({ web: "has-[>svg]:px-4" })),
+        // min-h, not a fixed h: a label scaled up by the system text size grows the button instead of clipping
+        default: cn("min-h-12 px-4 py-2.5 ", Platform.select({ web: "has-[>svg]:px-3" })),
+        sm: cn("min-h-9 gap-1.5 rounded-md px-3 ", Platform.select({ web: "has-[>svg]:px-2.5" })),
+        lg: cn("min-h-11 rounded-md px-6 ", Platform.select({ web: "has-[>svg]:px-4" })),
         icon: "h-10 w-10",
       },
     },

@@ -131,7 +131,7 @@ export const LibraryFilters = ({
       )}
     >
       <View className="flex-row items-center gap-2 px-4 py-4">
-        <View className="h-10 flex-1 flex-row items-center rounded border border-border bg-background px-3">
+        <View className="min-h-10 flex-1 flex-row items-center rounded border border-border bg-background px-3">
           <LineIcon name="search" size={20} className="text-muted" />
           <TextInput
             className="ml-2 flex-1 py-0 font-sans text-base text-foreground"

@@ -345,7 +345,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               onPress={handleCycleSpeed}
               accessibilityRole="button"
               accessibilityLabel="Playback speed"
-              className="h-10 min-w-16 items-center justify-center px-3"
+              className="min-h-10 min-w-16 items-center justify-center px-3"
             >
               <Text className="font-bold text-foreground">{playbackSpeed}x</Text>
             </TouchableOpacity>
@@ -354,7 +354,7 @@ export const FullAudioPlayer = ({ visible, onClose }: { visible: boolean; onClos
               accessibilityRole="button"
               accessibilityLabel="Toggle loop"
               accessibilityValue={{ text: loopEnabled ? "On" : "Off" }}
-              className="h-10 min-w-16 flex-row items-center justify-center gap-2 px-3"
+              className="min-h-10 min-w-16 flex-row items-center justify-center gap-2 px-3"
             >
               <LineIcon name="repeat-alt-2" size={22} className={loopEnabled ? "text-accent" : "text-foreground"} />
               {!loopEnabled && <Text>Off</Text>}
