@@ -502,7 +502,10 @@ export default function VideoPlayerScreen() {
                 const isAtEnd = !isResumableLocation(savedPosition, player.duration);
                 const position = isAtEnd ? 0 : savedPosition;
                 setSavedPositionIsAtEnd(isAtEnd);
-                if (position !== resumePosition) {
+                // The setup seek is lost on iOS when the player was created before its source was
+                // known, so the loaded player can still sit at the start.
+                const setupSeekWasLost = player.currentTime < position - ACCEPTED_SAMPLE_SECONDS;
+                if (position !== resumePosition || setupSeekWasLost) {
                   player.currentTime = position;
                   setCurrentPosition(position);
                   lastObservedTimeRef.current = position;
