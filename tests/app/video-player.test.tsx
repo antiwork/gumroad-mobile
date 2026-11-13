@@ -490,6 +490,15 @@ describe("VideoPlayerScreen", () => {
       }
     });
 
+    it("seeks again once loaded when the player dropped the setup seek", () => {
+      mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "300" };
+      renderScreen();
+      mockPlayer.currentTime = 0.5;
+      mockPlayer.duration = 660;
+      act(() => statusChangeListener!({ status: "readyToPlay" }));
+      expect(mockPlayer.currentTime).toBe(300);
+    });
+
     it("keeps already-playing drift when loaded duration agrees with the provisional restore", () => {
       mockSearchParams = { uri: "https://example.com/video.mp4", initialPosition: "300" };
       renderScreen();
