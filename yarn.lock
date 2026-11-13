@@ -718,13 +718,6 @@
   resolved "https://registry.npmjs.org/@csstools/css-tokenizer/-/css-tokenizer-3.0.4.tgz"
   integrity sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==
 
-"@emnapi/wasi-threads@1.2.1":
-  version "1.2.1"
-  resolved "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.1.tgz"
-  integrity sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==
-  dependencies:
-    tslib "^2.4.0"
-
 "@eslint-community/eslint-utils@^4.8.0", "@eslint-community/eslint-utils@^4.9.1":
   version "4.9.1"
   resolved "https://registry.npmjs.org/@eslint-community/eslint-utils/-/eslint-utils-4.9.1.tgz"
@@ -2510,13 +2503,6 @@
     picocolors "^1.1.1"
     pretty-format "^30.0.5"
     redent "^3.0.0"
-
-"@tybys/wasm-util@^0.10.3":
-  version "0.10.4"
-  resolved "https://registry.npmjs.org/@tybys/wasm-util/-/wasm-util-0.10.4.tgz"
-  integrity sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==
-  dependencies:
-    tslib "^2.4.0"
 
 "@types/babel__core@^7.1.14", "@types/babel__core@^7.20.5":
   version "7.20.5"
@@ -8779,7 +8765,7 @@ tsconfig-paths@^3.15.0:
     minimist "^1.2.6"
     strip-bom "^3.0.0"
 
-tslib@^2.0.0, tslib@^2.1.0, tslib@^2.4.0:
+tslib@^2.0.0, tslib@^2.1.0:
   version "2.8.1"
   resolved "https://registry.npmjs.org/tslib/-/tslib-2.8.1.tgz"
   integrity sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==
