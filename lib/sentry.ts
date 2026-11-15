@@ -86,6 +86,10 @@ const isNonActionableError = (event: ErrorEvent) => {
   const primaryType = values[0]?.type;
   if (primaryType === "AbortError" || primaryType === "UnauthorizedError" || primaryType === "SessionExpiredError")
     return true;
+  // A file that still 404s after a fresh URL and one retry is gone or unpublished:
+  // lib/file-utils.ts throws FileUnavailableError for exactly that, callers show their error
+  // state, and that class promises not to report. Raw download 404s still report below.
+  if (primaryType === "FileUnavailableError") return true;
   const text = values.map((value) => `${value.type ?? ""}: ${value.value ?? ""}`).join("\n");
   if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
   if (STALE_BLOB_MARKERS.some((marker) => text.includes(marker)) && !hasAppFrames(event)) return true;

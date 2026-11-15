@@ -153,6 +153,12 @@ describe("sentry beforeSend", () => {
         "sign-out racing an in-flight refresh (SessionExpiredError variant)",
         errorEvent([{ type: "SessionExpiredError", value: "Signed out while the token was refreshing" }]),
       ],
+      [
+        "file gone after a fresh URL and one retry (FileUnavailableError)",
+        errorEvent([
+          { type: "FileUnavailableError", value: "This file is unavailable right now. Please try again later." },
+        ]),
+      ],
     ];
 
     it.each(dropped)("drops: %s", (_label, event) => {
