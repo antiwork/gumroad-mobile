@@ -23,4 +23,12 @@ describe("app.config", () => {
       },
     ]);
   });
+
+  it("declares the light, dark and tinted iOS icons so prebuild writes all three asset appearances", () => {
+    expect(config.ios?.icon).toEqual({
+      light: "./assets/images/icon.png",
+      dark: "./assets/images/icon-dark.png",
+      tinted: "./assets/images/icon-tinted.png",
+    });
+  });
 });
