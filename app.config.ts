@@ -13,6 +13,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     buildNumber: "1",
     supportsTablet: true,
     bundleIdentifier: process.env.IOS_BUNDLE_NAME,
+    icon: {
+      light: "./assets/images/icon.png",
+      dark: "./assets/images/icon-dark.png",
+      tinted: "./assets/images/icon-tinted.png",
+    },
     infoPlist: {
       UIBackgroundModes: ["audio", "remote-notification", "fetch"],
       ITSAppUsesNonExemptEncryption: false,
