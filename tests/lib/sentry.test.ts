@@ -51,6 +51,20 @@ describe("sentry beforeSend", () => {
       ["bad gateway from the API", errorEvent([{ type: "Error", value: "Request failed: 502" }])],
       ["service unavailable from the API", errorEvent([{ type: "Error", value: "Request failed: 503" }])],
       [
+        "Cloudflare rate-limit page instead of our API (gumroad-to issues 7387155281, 7857755653)",
+        errorEvent([
+          {
+            type: "RequestError",
+            value:
+              "Request failed: 429 <!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<html class=\"no-js\" lang=\"en-US\"> <head> <title>Access denied | api.gumroad.com used Cloudflare to restrict access</title>",
+          },
+        ]),
+      ],
+      [
+        "edge block page with an uppercased doctype",
+        errorEvent([{ type: "RequestError", value: "Request failed: 429 <!DOCTYPE HTML><html>" }]),
+      ],
+      [
         "whatwg-fetch timeout variant (gumroad-to issue 7375667799)",
         errorEvent([{ type: "TypeError", value: "Network request timed out" }]),
       ],
@@ -175,6 +189,12 @@ describe("sentry beforeSend", () => {
       [
         "plain 500 from the API (possible malformed request built by the app)",
         errorEvent([{ type: "Error", value: "Request failed: 500" }]),
+      ],
+      [
+        "our own API rate limit (JSON body carrying retry_after)",
+        errorEvent([
+          { type: "RequestError", value: 'Request failed: 429 {"error":"rate limited","retry_after":30}' },
+        ]),
       ],
       [
         "illegal path character (real bug, not transient)",

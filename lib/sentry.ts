@@ -74,6 +74,13 @@ const STALE_BLOB_MARKERS = ["Unable to resolve data for blob", "The specified bl
 // the app can surface as a 500, and those need eyes.
 const GATEWAY_ERROR_MARKERS = ["Request failed: 502", "Request failed: 503", "Request failed: 504"];
 
+// A 429 whose body is an HTML page did not come from the Gumroad API — the API answers in JSON.
+// That is a Cloudflare edge block (error 1015, the calling IP temporarily banned): nothing the app
+// can fix, and one banned device repeats it on every media-location sync tick. Our own rate limits
+// still arrive as JSON with retry_after and keep reporting.
+// https://gumroad-to.sentry.io/issues/7387155281/
+const EDGE_BLOCK_PATTERN = /Request failed: 429\s*<!doctype html/i;
+
 const hasAppFrames = (event: ErrorEvent) =>
   (event.exception?.values ?? []).some((value) => (value.stacktrace?.frames ?? []).some((frame) => frame.in_app));
 
@@ -94,6 +101,7 @@ const isNonActionableError = (event: ErrorEvent) => {
   if (TRANSIENT_MARKERS.some((marker) => text.includes(marker))) return true;
   if (STALE_BLOB_MARKERS.some((marker) => text.includes(marker)) && !hasAppFrames(event)) return true;
   if (GATEWAY_ERROR_MARKERS.some((marker) => text.includes(marker))) return true;
+  if (EDGE_BLOCK_PATTERN.test(text)) return true;
   return (
     DOWNLOAD_CONTEXT_MARKERS.some((marker) => text.includes(marker)) &&
     NATIVE_NETWORK_MARKERS.some((marker) => text.includes(marker))
